@@ -1,5 +1,13 @@
 # borg-backup-ui
 
+Start with the [bilingual user guide](user-manual/README.md): tutorial, tasks,
+reference and concepts. During an outage use [German recovery](user-manual/de/user-manual.md#16-notfallwiederherstellung)
+or [English recovery](user-manual/en/user-manual.md#16-disaster-recovery).
+The technical installation/development reference below is separate from that
+user journey. See [documentation maintenance](maintainer/documentation-style.md)
+for review and validation rules.
+
+
 Web UI for Borg Backup on Unraid. The plugin uses only the Python standard
 library, but requires an installed Python 3 runtime on Unraid.
 

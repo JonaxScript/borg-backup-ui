@@ -143,15 +143,18 @@ def git_path(repo: Path, relative: str) -> Path:
 
 
 def is_deployable_path(path: str) -> bool:
+    """Include shipped files and build inputs in the candidate source digest."""
     if path in {"borg_backup_ui.py", "borg_backup_ui.conf.example", "LICENSE"}:
         return True
-    if path.startswith(("api/", "ui/", "runtime/", "docs/user-manual/")):
+    if path.startswith(("api/", "ui/", "runtime/", "docs/user-manual/", "docs/integrations/", "docs/examples/job-hooks/")):
         return True
     if path in {
         "plugin/apprise-requirements.lock",
         "plugin/apprise-providers.json",
         "plugin/check_apprise_runtime.py",
         "plugin/build.sh",
+        "plugin/package_documentation.py",
+        "docs/auth-user-store-recovery.md",
         "plugin/build-candidate.sh",
         "plugin/security_workflow.py",
         "plugin/README.md",

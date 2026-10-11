@@ -1,6 +1,10 @@
 # Help and UI Improvement Review
 
-Status: 2026-07-16  
+Historical proposals: 2026-07-16
+
+This review is not a description of implemented behavior. Current findings and
+maintenance rules are in [audit #560](../maintainer/documentation-audit-560.md)
+and the [documentation guide](../maintainer/documentation-style.md).
 Issue: #236
 
 This review records wording and contextual-help improvements discovered while rebuilding the bilingual in-app help and user manual. It does not change the documented product behavior.
@@ -37,11 +41,11 @@ This review records wording and contextual-help improvements discovered while re
 ### Modulare Integration
 
 1. Das vollstaendige Handbuch unter `docs/user-manual/` ist die kanonische Langform.
-2. `ui/docs/help.md` und `ui/docs/help.en.md` bleiben aufgabenorientierte Kurzfassungen in derselben Kapitelstruktur.
+2. `ui/docs/help.md` und `ui/docs/help.en.md` bleiben aufgabenorientierte Kurzfassungen mit stabilen Themenverweisen.
 3. Jede H2-Ueberschrift ist ein stabiles Hilfethema. Die Funktion `openHelpTopic(topicId)` kann spaeter von Info-Icons und Dialogen aufgerufen werden.
 4. Seitenspezifische Quick-Hints bleiben kurz und verlinken auf das passende Hilfethema, statt Inhalte mehrfach zu pflegen.
 5. Jede neue sichtbare Funktion benoetigt im Review eine Entscheidung zu Handbuch, In-App-Hilfe, Quick-Hint und Screenshot.
-6. Deutsch und Englisch werden in Tests auf gleiche Kapitelstruktur und vorhandene Ressourcen geprueft.
+6. Deutsch und Englisch werden in Tests auf fachliche Verträge, gültige Links und vorhandene Ressourcen geprueft.
 
 ## English
 
@@ -75,8 +79,8 @@ This review records wording and contextual-help improvements discovered while re
 ### Modular Integration
 
 1. The complete manual under `docs/user-manual/` is the canonical long-form source.
-2. `ui/docs/help.md` and `ui/docs/help.en.md` remain task-oriented summaries with the same chapter structure.
+2. `ui/docs/help.md` and `ui/docs/help.en.md` remain task-oriented summaries with stable topic links.
 3. Every H2 heading is a stable help topic. The `openHelpTopic(topicId)` function can later be called by info icons and dialogs.
 4. Page-level quick hints stay concise and link to the matching topic instead of duplicating long content.
 5. Every new visible feature requires an explicit review decision for the manual, in-app help, quick hint, and screenshot.
-6. Tests verify equal German and English chapter structure and resource completeness.
+6. Tests verify German and English semantic contracts, link validity and resource completeness.

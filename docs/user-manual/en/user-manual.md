@@ -1,12 +1,89 @@
 # Borg-Backup-UI User Manual
 
-Date: 2026-09-03 (stable 2026.08.31.0907)
+Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.09.1435`, Borg `1.4.5`.
 Language: English  
 Audience: Beginners, advanced users, and administrators of an Unraid system
 
-This manual describes Borg-Backup-UI in the same order as the application's menu. It explains the visible pages, typical workflows, important warnings, and the effects of user actions.
+Choose an entry point for your task. The numbered chapters remain available as a menu reference. Updated help rendering ships with the documentation test candidate and does not change backup behavior. Screenshots were refreshed on 2026-10-11 using the current application and synthetic data. The isolated plugin demo uses real Borg; Grafana shows separately generated example metrics. These captures do not replace testing on actual Unraid hardware.
+
+[Capture inventory and demo boundaries](../assets/README.md).
 
 > **Note:** This manual describes the application itself. It does not replace the general BorgBackup documentation or the Unraid system documentation. If a function is not visible in the interface, it may not be available for the currently signed-in role or current configuration.
+
+## Find your path
+
+| Entry point | Start here |
+| --- | --- |
+| Tutorial | [Installation](#13-installation-and-initial-setup), then [first backup and verified restore](#tutorial-first-backup-and-verified-restore) |
+| Tasks | [Back up, check, restore and notify](#11-typical-tasks); during an outage use [disaster recovery](#16-disaster-recovery) |
+| Reference | [Jobs](#3-jobs), [Repositories](#4-repositories), [Restore](#7-browse--restore), [Settings](#9-settings), [actions and settings reference](#17-actions-and-settings-reference) |
+| Concepts | [Terms](#11-key-terms), [lifecycle, sizes and evidence](#18-concepts-and-lifecycle) |
+
+## Tutorial: First backup and verified restore
+
+**Outcome:** Back up a known test file and compare the restored content. You
+need an initialized Unraid system and the **admin** role; subsequent manual runs
+and restores also allow **operator**. Allow about 20 minutes plus installation
+and transfer time. Use new test directories only. This single-host exercise is
+a functional check, not an independent disaster backup.
+
+1. Complete [initial setup](#13-installation-and-initial-setup). In the Unraid
+   terminal or file manager, create three new directories inside an existing
+   share `/mnt/user/demo`: `source`, `repositories` and `restore`. Choose other
+   unused names if those directories already contain data. Create
+   `source/probe.txt` containing `Borg Backup UI restore check`. Back up only the
+   test source, never the entire share containing the repository and restore
+   destination.
+2. Open **Settings > Local Profiles**. Create storage target `Demo-Local` with
+   base path `/mnt/user/demo/repositories`. Save it and check reachability and
+   write access. If the check fails, resolve mount, path and free-space issues
+   before creating a job.
+3. Open **Repositories > Add Repository**. Select `Demo-Local`, **Create New
+   Repository**, display name `Demo-Repository` and relative repository directory
+   `demo-repo`. Choose `repokey-blake2`, set a new passphrase and keep it separately.
+   Verify the full destination shown. After creation, refresh repository
+   information and export its Borg key from management. Keep the export outside
+   this server. See [keys and recovery](#16-disaster-recovery).
+4. Open **Jobs > New Job**. Set **Job name** to `Demo-Backup` and **Archive prefix**
+   to `demo-backup`. Keep the generated **Job ID**. Leave Docker/VM control off
+   for this text-file exercise.
+5. In **Sources & Target**, select only `/mnt/user/demo/source`, `Demo-Local`,
+   `Demo-Repository` and compression `lz4`. Leave **Exclusions** empty. Docker and
+   VM steps are skipped. Under **Retention**, choose **Keep all** for this small
+   test, enter a description and leave scheduling disabled initially. Select no
+   **Pre/Post scripts**. Review source and destination in **Flow Preview**, then
+   save.
+6. Start `Demo-Backup` manually under **Jobs** and confirm the dialog. Wait for
+   completion. In **History**, verify the result, archive name and plausible
+   original size. Under **Repositories > Archives**, open the new archive and
+   find `probe.txt`. Success alone does not prove that the right data was selected.
+7. Open **Browse & Restore**. Select `Demo-Backup` and that exact archive. Navigate
+   to the stored path and select only `probe.txt`. Choose
+   `/mnt/user/demo/restore` and **Do Not Overwrite**. Check the final file path in
+   the summary. You may run **Dry run (no changes)** first, but it produces no
+   comparison file. Then turn it off and perform the actual restore.
+8. Check completion and **Restore History**. Open the restored file. Compare it
+   in the Unraid terminal using `cmp`; if the destination differs, use the exact
+   path shown in the summary:
+
+   ```bash
+   cmp /mnt/user/demo/source/probe.txt /mnt/user/demo/restore/probe.txt
+   ```
+
+   No output and exit code `0` mean equal contents. A missing file, a difference,
+   or a skipped existing destination is not a passed test. Check archive,
+   selection, destination, conflict strategy and log. Application data also
+   requires a startup test and application-specific checks in an isolated instance.
+9. Only after a successful comparison, enable the backup schedule. For example,
+   use 03:00 daily in the Unraid server timezone. Schedule Restore Tests separately,
+   such as Sunday 06:00 with eight days of evidence validity. The
+   [test limits](#83-test-levels) still apply. Configure
+   [notifications](#115-configure-notifications), save the settings and send a
+   test message.
+10. For real data, choose suitable retention and at least one independent copy.
+    Protect configuration, keys and credentials following the
+    [recovery guide](#16-disaster-recovery). Keep the test data until you have
+    confirmed the comparison.
 
 ## Table of Contents
 
@@ -25,6 +102,9 @@ This manual describes Borg-Backup-UI in the same order as the application's menu
 13. [Troubleshooting](#13-troubleshooting)
 14. [FAQ](#14-faq)
 15. [Recommended Operating Practices](#15-recommended-operating-practices)
+16. [Disaster Recovery](#16-disaster-recovery)
+17. [Actions and Settings Reference](#17-actions-and-settings-reference)
+18. [Concepts and Lifecycle](#18-concepts-and-lifecycle)
 
 ## 1. Basics
 
@@ -57,6 +137,8 @@ The application supports the `admin`, `operator`, and `viewer` roles:
 
 ### 1.3 Installation and Initial Setup
 
+General Unraid steps are covered by the official [Community Apps](https://docs.unraid.net/unraid-os/manual/applications/) and [plugins](https://docs.unraid.net/unraid-os/using-unraid-to/customize-your-experience/plugins/) guides.
+
 Borg Backup UI is in **public beta** and is installed through **Unraid Community Apps**. It requires **Unraid 6.12.5 or newer** and **Python 3.10 or newer**. Install the separate **Python 3 for Unraid** plugin from Community Apps first. BorgBackup itself is bundled with Borg Backup UI; no separate Borg or pip installation is required.
 
 1. Open **Apps** in Unraid.
@@ -75,9 +157,9 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 ## 2. Dashboard
 
-![Dashboard with highlighted status and filter areas](../assets/en/dashboard-guide.png)
+![Current dashboard with demo backup and restore status](../assets/en/dashboard-guide.png)
 
-**Figure 1 - Dashboard:** (1) overall backup-run and restore-evidence status, (2) location filter, (3) detailed table for the filtered jobs.
+**Figure 1 - Dashboard:** (1) Overall backup-run and restore-evidence status, (2) location filter, (3) detailed table for the filtered jobs.
 
 The Dashboard is the central overview of backup state, restore evidence, storage growth, and repository checks.
 
@@ -140,7 +222,7 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ![Jobs page with target filter, new-job action, and job list](../assets/en/jobs-guide.png)
 
-**Figure 2 - Jobs:** (1) filter by storage target, (2) entry point to the job wizard, (3) job cards with state, policy, and start action.
+**Figure 2 - Jobs:** (1) Filter by storage target, (2) entry point to the job wizard, (3) job cards with state, policy, and start action.
 
 The **Jobs** page manages backup jobs. Jobs can be viewed, started, edited, scheduled, and deleted here.
 
@@ -148,7 +230,7 @@ The **Jobs** page manages backup jobs. Jobs can be viewed, started, edited, sche
 
 Jobs define which data is backed up and where it is stored. A job contains:
 
-- Display name and type ID
+- Display name, permanent job ID and archive prefix
 - Location and repository
 - Folders or files to back up
 - Docker and VM control
@@ -196,19 +278,24 @@ The job wizard guides creation or editing of a job through fixed steps.
 
 #### Step 1: Basics
 
-This step sets job name, type ID, icon, icon color, and initial runtime options.
+![Job ID, display name and archive prefix](../assets/en/current/wizard-basics.png)
+
+This step sets job name, archive prefix, icon, icon color, and initial runtime options. The automatically assigned **Job ID** is permanent.
 
 Important fields:
 
 - **Job name:** Visible name in the UI, reports, and notifications.
-- **Type ID:** Technical key component. It should be short, unique, and stable.
+- **Archive prefix:** Beginning of future archive names; letters, digits, dots, underscores and hyphens are accepted.
+- **Job ID:** Permanent UUID linking the job, schedule and history independently of its display name.
 - **Icon / icon color:** Representation in Dashboard, Jobs, Restore, and Reports.
 - **Stop Docker before backup:** Enables Docker control.
 - **Shut down VMs before backup:** Enables VM control.
 
-Together with the location, the type ID forms the technical job key, for example `appdata_local`. It also produces the archive pattern `<current-prefix>-*`. If the type ID of an existing job is changed, only future archives use the new prefix. Borg Backup UI stores the previous archive prefixes in the job and displays them in the editor's information popover; existing archives are neither renamed nor moved.
+The **Job name** is a display name. The **Job ID** is an independent, immutable UUID. The **Archive prefix** defines `<current-prefix>-*`. Renaming a job preserves its identity. Changing the prefix affects new archives only; previous prefixes remain visible in the archive-pattern history and information popover. Existing archives are neither renamed nor moved. Browse & Restore can show current and previous patterns together; prune uses only the current prefix. Changing repositories leaves older archives in the previous repository.
 
 #### Step 2: Sources & Target
+
+![Sources and target repository](../assets/en/current/wizard-sources.png)
 
 The compact view shows **Folders to back up** on the left and the **Backup target** on the right. The left side defines which folders or files are included in the backup. Exclusions are configured in the next step. The right side selects storage type, the exact storage target, an existing repository, and job compression. The repository list only shows repositories belonging to the selected storage target. Repository paths are no longer entered freely in a job.
 
@@ -227,14 +314,16 @@ When editing a job, a different existing repository can be selected. The change 
 
 #### Step 3: Exclusions
 
-The dedicated **Exclusions** step always shows excluded paths, marker filenames and the exclusion file. All nine wizard steps keep the same window size; Docker and VMs are skipped when their controls are disabled. Small screens or long lists can still require scrolling.
+![Excluded paths, markers and exclusion file](../assets/en/current/wizard-exclusions.png)
+
+The dedicated **Exclusions** step always shows excluded paths, marker filenames and the exclusion file. All ten wizard steps keep the same window size; Docker and VMs are skipped when their controls are disabled. Small screens or long lists can still require scrolling.
 
 Exclusions are concrete files or directories below a selected backup folder. They are omitted from the Borg archive. With many entries, only the path lists scroll inside their section.
 
 The advanced rules supplement the excluded paths without modifying source files or existing archives.
 
-- **Marker files (#469):** One case-sensitive filename per line. If you enter `.nobackup` and create that file inside `/mnt/user/data/cache`, Borg skips the whole folder, its subfolders and the marker. File contents do not matter. Up to 32 distinct names are allowed; paths are not.
-- **Exclusion file (#470):** Upload one UTF-8 text file without a BOM, up to 64 KiB. Borg patterns remain unchanged, for example `fm:*.tmp`; blank lines and comment lines starting with `#` are ignored. The job stores its own copy. Changes to the original file take effect only after uploading it again and saving. Downloading, replacing and removing the copy are supported.
+- **Marker files:** One case-sensitive filename per line. If you enter `.nobackup` and create that file inside `/mnt/user/data/cache`, Borg skips the whole folder, its subfolders and the marker. File contents do not matter. Up to 32 distinct names are allowed; paths are not.
+- **Exclusion file:** Upload one UTF-8 text file without a BOM, up to 64 KiB. Borg patterns remain unchanged, for example `fm:*.tmp`; blank lines and comment lines starting with `#` are ignored. The job stores its own copy. Changes to the original file take effect only after uploading it again and saving. Downloading, replacing and removing the copy are supported.
 
 A running backup uses a private temporary copy of the uploaded file. Editing the job during a run does not change that run's filter. A missing or corrupt managed file blocks the run before backup starts and is reported in system health. After changes, use a test job to inspect the actual archive contents.
 
@@ -291,6 +380,8 @@ Example: assign PostgreSQL or MariaDB priority `1` and its dependent application
 
 #### Retention, Compression, and Description
 
+![Retention and compression](../assets/en/current/wizard-retention.png)
+
 The wizard stores per-job Borg options such as compression and retention. Encryption and the passphrase belong to the repository.
 
 Choose exactly one retention strategy:
@@ -328,6 +419,8 @@ With file activity enabled, the active log is initially stored in RAM under `/ru
 > **Privacy note:** When this option is enabled, file and directory names appear in both the live log and the stored run log. Because support bundles can contain recent run logs, those names can also be included there. Support bundles mask secrets but are not anonymous; always review a bundle before sharing it.
 
 #### Schedule
+
+![Backup job schedule](../assets/en/current/wizard-schedule.png)
 
 The schedule can be set directly in the wizard. The UI supports simple frequencies and a cron expression.
 
@@ -369,6 +462,8 @@ Definitions are stored in `<data directory>/config/job-scripts.json`; back up th
 
 #### Flow Preview
 
+![Current job flow preview](../assets/en/current/wizard-flow.png)
+
 The final step shows a technical preview of the planned flow. It summarizes repository, folders or files to back up, Docker/VM selection, and planned actions.
 
 Forms and multi-step wizards with unsaved input do not close when the backdrop is clicked. **Cancel** and the close button remain available; when values have changed, Borg Backup UI asks explicitly before discarding them.
@@ -394,7 +489,7 @@ Best practices:
 
 The **Repositories** page uses a master-detail workspace. Borg repositories are grouped by their exact storage target on the left, while the selected repository remains visible in the workspace on the right. **Add repository** creates or imports a repository on a storage target that has already been configured under **Settings**.
 
-![Repository management with storage-target groups and a detail workspace](../assets/en/repositories.png)
+![Repository management with storage-target groups and a detail workspace](../assets/en/current/repositories.png)
 
 Local storage targets are created under **Settings > Local Profiles**. A
 concrete directory below `/mnt`, such as `/mnt/backup` or `/mnt/disks/USB-A`,
@@ -485,7 +580,7 @@ Remove a repository from the application or delete it permanently:
 
 ## 5. History
 
-![History](../assets/en/history.png)
+![History](../assets/en/current/history.png)
 
 The **History** page shows past backup runs and restore test reports in chronological form.
 
@@ -523,7 +618,7 @@ History is the first detail page after a backup run. It shows when a run happene
 
 ## 6. Reports
 
-![Reports](../assets/en/reports.png)
+![Reports](../assets/en/current/reports.png)
 
 The **Reports** page summarizes backup and repository data across multiple runs.
 
@@ -561,9 +656,9 @@ Reports help analyze trends:
 
 ## 7. Browse & Restore
 
-![Restore wizard with highlighted interaction areas](../assets/en/restore-guide.png)
+![Current multi-selection in the restore wizard](../assets/en/restore-guide.png)
 
-**Figure 3 - Browse & Restore:** (1) switch between Restore and History, (2) job selection by location, (3) progress through the five wizard steps, (4) content of the current step.
+**Figure 3 - Browse & Restore:** (1) Switch between Restore and History, (2) job selection by location, (3) progress through the five wizard steps, (4) content of the current step.
 
 **Browse & Restore** guides recovery of data from Borg archives.
 
@@ -675,9 +770,17 @@ Extraction first writes into the displayed hidden `.bbui-restore-stage-…` fold
 
 Successful completion shows the number of restored files and folders; links and other entries are counted separately. Counts exclude unchanged destination files and synthetic parent folders needed only to build the destination path. Skipped selections are listed separately. Simulations write no files and do not display restored counts. Failures have no complete final count; completed selections and technical error details remain available.
 
+![Restore destination and conflict strategy](../assets/en/current/restore-target.png)
+
+![Precheck with concrete destination paths](../assets/en/current/restore-review.png)
+
+![Successful demo restore](../assets/en/current/restore-success.png)
+
+*Current demo: one file and one folder selected, 14 files restored in total. All 14 files were then compared byte-for-byte with their originals outside the plugin. This is a real restore; an L2 dry run does not write these files.*
+
 ### 7.5 Restore History
 
-![Restore History](../assets/en/restore-history.png)
+![Restore History](../assets/en/current/restore-history.png)
 
 Restore History shows completed restore runs with:
 
@@ -702,7 +805,7 @@ The detail view can be expanded and collapsed. It shows structured data and the 
 
 ## 8. Restore Tests
 
-![Restore Tests - Planning](../assets/en/restore-tests-plan.png)
+![Restore Tests - Planning](../assets/en/current/restore-tests-plan.png)
 
 Restore Tests automatically verify that a restore is technically possible. They are important evidence that backups are not only written but also readable.
 
@@ -739,13 +842,33 @@ Missed or skipped calendar runs are not automatically retried. Use **Test now** 
 
 ### 8.3 Test Levels
 
-The application shows restore test levels as `L1`, `L2`, or `L3`.
+**Reports are stored per job; archive selection is repository-wide.** The runner
+uses `borg list --short --last 1` to select the newest archive without filtering
+by the job's archive prefix. In a shared repository, the tested archive may
+belong to another job. Always check **the archive actually tested** in the report.
+Use explicit archive selection in **Browse & Restore** to test a particular backup.
 
-- **L1:** Basic check that repository and archive are reachable.
-- **L2:** Extended technical check with stronger restore evidence.
-- **L3:** Most extensive check with higher runtime and I/O load.
+| Level | Actual method | Scope and writes | Cost and limits |
+| --- | --- | --- | --- |
+| L1 | List archives, select newest, attempt `borg info --json` | Metadata only; no restored user files. Logs/status and Borg management data may be written | Lower cost than L2; neither `borg check` nor full data verification. An info-step failure can coexist with overall success: read individual steps. |
+| L2 | L1, file listing and `borg extract --dry-run` | Reads metadata and chunks; Borg checks hash/HMAC, decrypts and decompresses. Writes no restored user files. Full archive below the size threshold; bounded regular-file selection above it | Potentially substantial I/O/network traffic. Does not test destination filesystem, write permissions, restore free space or application startup. |
+| L3 | L2, then read selected regular files through `borg extract --stdout` and calculate SHA-256 | Streams content through a pipe and records hashes. No independent expected-hash comparison and no restored destination files | Additional reads; default sample 5 files. No guarantee for all files or full application recovery. This streaming phase has no explicit per-file timeout here. |
 
-> **Note:** Higher test levels improve confidence but can take significantly longer depending on repository and data volume.
+Borg's internal data-integrity checks are separate from the additional SHA-256
+value in the report. Computing a hash without an independently stored expected
+value does not prove a content comparison. The technical report label
+`sha256 sample compare` is misleading in this baseline: L2 performs no such
+comparison and L3 only calculates hashes.
+
+> **Warning:** In this baseline, a full L2 dry-run that times out (exit 124) can
+> be recorded as passed with a previously selected sample. That selection does
+> not prove that those files were read before timeout. Treat the run as incomplete.
+> Review the log and individual steps, repeat with suitable limits and perform
+> an actual restore with content comparison. Even “100%” does not mean an
+> application was tested.
+
+The [Borg 1.4.5 extract reference](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
+explains dry-run and standard output. It is optional for routine operation.
 
 ### 8.4 Start Tests
 
@@ -753,7 +876,7 @@ Use **Test now** next to a job to start it manually with its configured test lev
 
 ### 8.5 Reports
 
-![Restore Tests - Reports](../assets/en/restore-tests-reports.png)
+![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)
 
 The **Reports** tab shows structured evidence for completed restore tests:
 
@@ -786,7 +909,7 @@ The sample targets 5% of regular files by default, capped by the configured file
 
 ![Settings with navigation, system health, and configuration area](../assets/en/settings-guide.png)
 
-**Figure 4 - Settings:** (1) section navigation, (2) system health and migration, (3) settings for the selected section, (4) central save action.
+**Figure 4 - Settings:** (1) Section navigation, (2) system health and migration, (3) settings for the selected section, (4) central save action.
 
 The **Settings** page manages the application configuration. It is grouped into System, Operations, Storage Targets, and Maintenance.
 
@@ -804,7 +927,9 @@ Typical contents:
 - weekly report
 - Homepage widget for external dashboards
 
-#### Notifications
+### Notifications
+
+![Current notification settings](../assets/en/current/settings-notifications.png)
 
 Borg Backup UI manages notification channels under **Settings > Notifications**. There are three separate delivery paths:
 
@@ -835,7 +960,9 @@ Reminder settings apply across channels. The reminder interval prevents the same
 
 > **Note:** Test messages verify only the delivery channel. They do not replace a real backup or restore test.
 
-#### Prometheus and Grafana
+### Prometheus and Grafana
+
+![Prometheus integration before token creation](../assets/en/current/settings-integrations.png)
 
 Under **Settings > Integrations > Prometheus & Grafana**, enable the metrics
 endpoint, which is disabled by default. A dedicated token allows only reading
@@ -848,7 +975,7 @@ are exposed. Missing evidence does not mean success. History starts with
 Prometheus collection. Disabling blocks the endpoint immediately; replacing or
 revoking a token invalidates the previous token.
 
-#### Homepage Widget
+### Homepage Widget
 
 The Homepage widget provides a compact, token-protected status summary for the **Homepage** project. The UI generates a YAML template containing health, successful backups, restore tests, and active runs. Treat the widget token like a password and do not expose it in screenshots or support bundles.
 
@@ -858,7 +985,7 @@ The **About** section shows the installed Borg Backup UI version, bundled BorgBa
 
 ### 9.3 Users
 
-![Settings - Users](../assets/en/settings-users.png)
+![Settings - Users](../assets/en/current/settings-users.png)
 
 The **Users** section is visible when the application runs in user mode and the signed-in user has administrator rights.
 
@@ -889,7 +1016,7 @@ secrets, settings, and logs remain unchanged.
 
 ### 9.4 Backup
 
-![Settings - Backup](../assets/en/settings-backup.png)
+![Settings - Backup](../assets/en/current/settings-backup.png)
 
 The **Backup** section contains defaults and technical limits for backup runs.
 
@@ -905,7 +1032,9 @@ These values affect new jobs or global runtime limits. Job-specific settings in 
 
 ### 9.5 Restore
 
-![Settings - Restore](../assets/en/settings-restore.png)
+![Demo local storage profile](../assets/en/current/settings-local.png)
+
+![Settings - Restore](../assets/en/current/settings-restore.png)
 
 The **Restore** section contains two subsections:
 
@@ -942,7 +1071,7 @@ Overly broad or dangerous targets such as `/`, `/mnt`, and system directories ar
 
 ### 9.7 USB Profiles
 
-![Settings - USB Profiles](../assets/en/settings-usb.png)
+![Settings - USB Profiles](../assets/en/current/settings-usb.png)
 
 USB profiles describe local disks or Unassigned Devices targets. They are used by the job wizard for USB jobs.
 
@@ -966,7 +1095,7 @@ Existing profile and repository paths remain unchanged; no reimport or file move
 
 ### 9.8 SMB Profiles
 
-![Settings - SMB Profiles](../assets/en/settings-smb.png)
+![Settings - SMB Profiles](../assets/en/current/settings-smb.png)
 
 SMB profiles define network shares. Passwords are treated as secrets.
 
@@ -996,7 +1125,7 @@ Typical actions:
 
 ### 9.9 SSH Profiles
 
-![Settings - SSH Profiles](../assets/en/settings-storagebox.png)
+![Settings - SSH Profiles](../assets/en/current/settings-storagebox.png)
 
 SSH profiles are used for Storagebox or other SSH targets.
 
@@ -1028,7 +1157,7 @@ The **Storagebox**, **Synology**, and **Generic SSH** target types continue to u
 
 ### 9.10 Import / Export
 
-![Settings - Import / Export](../assets/en/settings-import-export.png)
+![Settings - Import / Export](../assets/en/current/settings-import-export.png)
 
 The **Import / Export** section is used to back up and transfer application configuration.
 
@@ -1049,11 +1178,11 @@ Import strategies can keep, replace, or rename existing entries depending on the
 
 New encrypted exports use a versioned, authenticated envelope. Wrong passwords and damaged, truncated, or manipulated files are checked before import data is written. The enclosed configuration format must also be supported; the filename and export date do not determine compatibility.
 
-> **Create fresh exports after updating:** Previous-format job and profile exports can no longer be imported. After successful migration, create new job and profile exports. Old formats are rejected before changing jobs, settings, or secrets. Existing Borg backup archives remain usable for restoring data and do not need to be recreated.
+> **Import compatibility:** Job bundles v3/v4 require schema-5 jobs; secure job bundles secure-v3 and profile bundles v2 are accepted. Older inner formats are rejected. See [formats and limits](#163-export-formats-and-limits). Borg archives remain usable independently.
 
 ### 9.11 Advanced
 
-![Settings - Advanced](../assets/en/settings-advanced.png)
+![Settings - Advanced](../assets/en/current/settings-advanced.png)
 
 The **Advanced** section contains technical data that regular users should only inspect when needed.
 
@@ -1076,7 +1205,7 @@ Approval requires every risk acknowledgment, the server name, the current admini
 
 ### 9.13 System Status and Migration
 
-![Settings - System Status and Migration](../assets/en/settings-system-health.png)
+![Settings - System Status and Migration](../assets/en/current/settings-general.png)
 
 The system status is visible at the bottom left of the sidebar. Clicking it opens the related diagnostics area inside Settings.
 
@@ -1119,9 +1248,13 @@ Runtime recovery indicates that Docker containers or VMs were stopped during a b
 
 ## 10. Help
 
-![Help](../assets/en/help.png)
+![Help](../assets/en/current/help.png)
 
-The **Help** page shows the application's integrated quick help.
+The **Help** page offers **Quick help** and **User manual** offline, follows the selected language and opens bundled companion documents in the same reader. Use either view to return to its entry point.
+
+Switching views or opening a document without a chapter link shows the page header and view tabs. Chapter links still navigate directly to their section.
+
+On desktop screens, the document and table of contents scroll independently. The main navigation, heading, view tabs and search field stay in place. Focus the document with Tab to scroll it using the keyboard.
 
 ### 10.1 Purpose of the Page
 
@@ -1144,57 +1277,189 @@ The help page provides quick orientation directly in the UI. It is shorter than 
 
 ### 11.1 Create a New Backup Job
 
-1. Open **Jobs**.
-2. Click **New job**.
-3. Enter name, type ID, icon, and location.
-4. Select the folders or files to back up.
-5. Select the storage target first and then an existing repository.
-6. Configure Docker or VM control if needed.
-7. Set compression and retention. Encryption and passphrase belong to the repository.
-8. Optionally enable a schedule.
-9. Review the flow preview.
-10. Save the job.
-11. Start the job manually once and check **History**.
+**Outcome:** Repeatable backups. **Role:** admin. The repository must already
+exist and be reachable. Consider user impact before stopping services and the
+required recovery points before changing retention.
+
+1. Open **Jobs > New Job**. Set job name and archive prefix, check the generated
+   Job ID and choose an icon and required workload control.
+2. Select sources, storage and repository, followed by exclusions.
+3. Configure Docker and VMs only if their control is enabled.
+4. Choose retention, description and optional schedule. Select only reviewed,
+   previously saved definitions under **Pre/Post scripts**.
+5. Review **Flow Preview**, save and start one manual run.
+6. Check history, archive contents and a restore using the
+   [tutorial](#tutorial-first-backup-and-verified-restore).
+
+**Result:** Job and archive are visible; only a content comparison verifies the
+test file. For an empty archive, inspect sources and exclusions. See
+[Job Wizard](#35-job-wizard) and [retention](#retention-compression-and-description).
 
 ### 11.2 Check a Repository
 
-1. Open **Repositories**.
-2. Select the storage target and repository.
-3. Refresh the repository information.
-4. Open **Maintenance** and start the required check if needed.
-5. Check passphrase, profile, mount, or SSH connection when an error occurs.
+**Outcome:** Check structure or payload data. **Role:** operator or admin. Target,
+keys and passphrase must be available. Allow time and I/O and wait for other
+repository operations.
+
+1. Select storage and repository under **Repositories**.
+2. Refresh information and open **Maintenance**.
+3. Select **Check**, or **Verify Data** for payload verification, and confirm.
+4. Wait for completion; read status, timestamp and details.
+5. For errors, first check profile, mount, credentials and the specific Borg
+   message. Do not start Prune or Compact as a supposed repair.
+
+**Success:** The selected check completed without errors. This does not prove
+application startup. See the [maintenance table](#172-maintenance-and-deletion).
 
 ### 11.3 Restore Files
 
-1. Open **Browse & Restore**.
-2. Select the job.
-3. Select an archive.
-4. Mark files or directories.
-5. Select target directory and conflict strategy.
-6. Review the summary.
-7. Start the restore.
-8. Watch the restore status and check the completion summary.
-9. Check the entry in **Restore History**.
+**Outcome:** Write a file, directory or multiple selections to a safe destination.
+**Role:** operator or admin. Requires repository access, sufficient free space and
+an existing approved destination. Back up existing destination data before
+**Replace**; preferably begin with an empty test destination.
+
+1. Open **Browse & Restore**, select job and exact archive.
+2. Deliberately use **All archives in the repository** for foreign archive names.
+3. Select up to 256 files/directories and review the selection list.
+4. Choose destination and conflict strategy. Check each final destination in the
+   precheck and allow space for staging the complete selection.
+5. Optionally perform **Dry run (no changes)** first. Turn it off to write actual
+   files, then confirm the restore.
+6. Review completion and **Restore History**. Distinguish written, skipped and
+   failed entries.
+7. Compare contents, required permissions/metadata and application behavior in an
+   isolated environment.
+
+**Failures:** **Do Not Overwrite** skips an existing selected directory as a whole.
+A later move failure can leave a partial restore. Use a new destination for
+diagnosis. See [Restore Wizard](#73-restore-wizard).
 
 ### 11.4 Schedule a Restore Test
 
-1. Open **Restore Tests**.
-2. Select the desired job.
-3. Set policy to scheduled.
-4. Choose interval and level.
-5. Save the policy.
-6. Optionally start a manual test.
-7. Review the verification report.
+**Outcome:** Regular technical checks with a separate evidence expiry.
+**Role:** admin to schedule, operator to start manually. First review
+[archive selection and test limits](#83-test-levels).
+
+1. Open **Restore Tests > Planning & Policy**, select the job and **Edit plan**.
+2. Enable scheduled execution and select calendar frequency/time or cron, plus
+   L1, L2 or L3.
+3. Set **Evidence validity** independently, for example eight days for a weekly
+   test. The Unraid server timezone applies; daylight saving can change actual
+   elapsed intervals.
+4. Save. Check **Next test** and plan status. Saved policy with failed cron
+   installation is not active automation.
+5. Use **Test now** and review report, archive name, steps and coverage. Also
+   compare an actual restore.
+
+Missed slots or tests skipped for repository conflicts are not caught up. Run
+manually if needed. Skipping does not renew validity. Legacy interval tests
+remain separate under **Settings > Restore**; their interval does not replace a
+calendar schedule. No restore-overdue reminder is sent without a previous report.
+See [planning](#82-planning--policy-tab).
 
 ### 11.5 Configure Notifications
 
-1. Open **Settings > General**.
-2. Open the **Notifications** area.
-3. Configure Unraid, email, or an Apprise profile.
-4. Select the desired events.
-5. Set reminder interval and backup tolerance.
-6. Send a test message.
-7. Check diagnostics under **Settings > Advanced > Notification reminders**.
+**Outcome:** Receive relevant results and overdue warnings. **Role:** admin.
+Have credentials for the chosen channel; do not expose them in logs or screenshots.
+
+1. Open **Settings > Notifications**.
+2. Configure Unraid, email/SMTP or an Apprise profile.
+3. Select events, reminder interval and backup tolerance. Save.
+4. Send a test message and confirm arrival at its destination.
+5. Check **Settings > Advanced > Notification Reminder**, then verify the result
+   and delivery for the next real run.
+
+**Failures:** A test message checks only the channel. Event selection, recipient,
+tolerance and retry queue affect actual notifications. See
+[notifications](#notifications) and [troubleshooting](#134-email-ntfy-or-apprise-is-not-sent).
+
+### 11.6 Configure and verify Pre/Post scripts
+
+**Goal:** Add controlled preparation and cleanup to a job. **Role:** admin to
+configure, operator to run. Start with a test job. Scripts run with the backup
+service's privileges; a faulty script can change data or affect services. Use
+log messages only while learning.
+
+1. Open **Settings > Scripts**, select **New script**, name it `Demo Pre`, and
+   set the timeout to `30` seconds.
+2. Enter this harmless example and select **Validate and save**:
+
+   ```bash
+   #!/bin/bash
+   set -euo pipefail
+   printf '%s\n' 'Demo Pre: preparation checked'
+   ```
+
+3. Create `Demo Post` with the message `Demo Post: cleanup completed`. Syntax
+   validation has not executed either script.
+4. Edit the test job. In **Pre/Post scripts**, select both saved scripts.
+   **On success** is the usual Post condition; choose **Also on failure, skip or
+   cancellation** only when the script handles those states correctly. Review
+   **Flow Preview** and save.
+5. Start the job manually. The log must show Pre before preparation and Post
+   after maintenance and cleanup. Open **History** and inspect the separate
+   script outcomes, exit codes and backup result.
+6. Review assignments under **Settings > Scripts > Used by**. Editing a central
+   script affects all listed jobs at their next start. Back up script text,
+   timeout and assignments separately from the job export.
+
+**Verify:** Both example messages and exit code `0` appear; the archive still
+contains the expected files. A failed Pre prevents the backup from starting.
+A failed Post can coexist with an already written archive. For a timeout, first
+inspect the operation rather than blindly increasing the limit. See
+[execution and failure rules](#step-9-prepost-scripts) and
+[extended test scripts](../../examples/job-hooks/README.md).
+
+![Current script manager with a harmless Demo Pre script](../assets/en/current/scripts.png)
+
+*Current application, 2026-10-11: central Bash editor, syntax validation, timeout,
+import/export and job assignments. Synthetic demonstration data only.*
+
+![Pre and Post selection in the current job wizard](../assets/en/current/wizard-scripts.png)
+
+*Step 9 assigns saved scripts; the Post condition belongs to the job.*
+
+### 11.7 Monitor backup health in Grafana
+
+**Goal:** Use the included overview dashboard in Grafana. **Role:** admin for
+plugin settings and appropriate Prometheus/Grafana permissions. Both services
+must be available separately; the plugin does not install them.
+
+1. Open **Settings > Integrations > Prometheus & Grafana**. Enable metrics and
+   securely store the new restricted read-only token. Do not include it in
+   screenshots, links or support bundles.
+2. Add the displayed scrape configuration to Prometheus. Use a plugin address
+   reachable from that environment. A container's `localhost` refers to the
+   container, not your Unraid host.
+3. Check the Prometheus target: **UP**. Download the dashboard JSON from the
+   integration and import it into Grafana, selecting your Prometheus data source.
+   Export local customizations before replacing a dashboard with the same UID.
+4. Select one server and optionally filter by location, repository and job.
+   Check **Connection**, **Dashboard data** and **Snapshot age** first.
+5. Read latest backup results, overdue status and restore evidence separately.
+   **Latest runs successful** counts jobs whose latest result succeeded, not
+   every execution in the selected time range.
+
+![Included Grafana dashboard with synthetic backup and restore metrics](../assets/shared/grafana-overview.png)
+
+*Actual Grafana 12.1.1 capture using the shipped dashboard template, 2026-10-11.
+Names, sizes and states are synthetic examples; the dashboard language is
+English. This is not evidence about a real server's backups.*
+
+| Example display | Meaning and next step |
+| --- | --- |
+| Connection online, Dashboard data available | Exporter reachable and data readable; this does not establish backup success. |
+| Latest backup successful but overdue | The last success is too old. Review the schedule, mount and job log in the plugin. |
+| Restore evidence expired/failed | Evidence expired or a check failed. Inspect the report and actual archive tested, then perform a real restore. |
+| No data / No result | Missing data remains unknown. Check target, token, filters and collection start; do not interpret it as a healthy zero. |
+| Stored in repositories | Cached unique compressed chunks; neither total filesystem usage nor just data belonging to the selected job. |
+
+**Verify:** The target is UP, the snapshot is current, and a known demo job has
+plausible values. History begins when Prometheus starts collecting; short runs
+can fall between scrapes. Use the plugin's **History** for the complete run
+history. Configuration examples and metric limits are in the
+[Prometheus/Grafana guide](../../integrations/prometheus.md).
+
 
 ## 12. Status, Warnings, and Best Practices
 
@@ -1395,3 +1660,214 @@ A typical Unraid setup combines the original data on the array with a local or U
 - Perform a manual restore to a test directory after major changes.
 - Document where passphrases, keyfiles, and export passwords are securely stored.
 - After updates, verify migration, jobs, repository assignments, and at least one representative backup run.
+
+## 16. Disaster Recovery
+
+### 16.1 Prepare before failure
+
+**Outcome:** Access an existing archive after losing the Unraid host. You need
+administrative control of the replacement host and storage. A job export alone
+is not a complete recovery plan.
+
+| Required item | Storage and purpose |
+| --- | --- |
+| Independent Borg repository copy | Contains archives and chunks. Plugin configuration exports contain no backup data. |
+| Repository address and Borg repository ID | Prevent target confusion; record host, port, base path and relative path. |
+| Borg passphrase and Borg key export | With `repokey`/`repokey-blake2`, the active key is in the repository; export an additional copy. With `keyfile`/`keyfile-blake2`, the external keyfile is essential. A passphrase cannot replace a missing key. |
+| SSH keys, SMB credentials and export passwords | Keep outside the sole backup host; independently verify the remote SSH host identity. |
+| `/boot/config/borg-backup` | Configuration, jobs, inventories, users, secrets, Borg keyfiles, schedules, migration state and central scripts. Make a protected, consistent copy with the service stopped. |
+| Configured main directory (`GLOBAL_DATA_DIR`) | Logs, status, reports and restore data. This is separate from flash configuration; check scope and size before copying. |
+| Unraid configuration and application knowledge | Separately protect pools, shares, container/VM definitions, networking and application recovery procedures. |
+
+Keep at least one copy outside the server and passwords in an independent
+password store. Regularly test export decryption, check manifests for failed
+key exports and perform a test restore. A support bundle is no substitute.
+
+### 16.2 Recover on a replacement host
+
+1. Stop automatic backups, prune and schedules. Preserve damaged configuration
+   and the repository; preferably work with an independent repository copy.
+   Never use **Create New Repository** on the existing target.
+2. Prepare Unraid, pools, shares and Python requirements. Install a Borg Backup UI
+   version compatible with the export; compare **About** with the documented
+   baseline. Create an administrator account and an available main directory.
+   Without the Unraid configuration, this is not automatic whole-server recovery.
+3. Either restore a verified complete plugin configuration with the service
+   stopped, or use configuration exports. Preserve both new and old configuration
+   before replacing anything. Do not copy old migration state as a supposed code
+   downgrade. Recheck paths, mounts, users and networking on a changed host.
+4. For exports, restore storage profiles and their secrets first, then job and
+   repository definitions with passphrases and existing keyfiles. Review the
+   import preview and deliberately choose conflict strategies. Immediately check
+   imported schedules before jobs can run. The format table explains which parts
+   require separate backups.
+5. When reconstructing definitions manually, use **Import Existing Repository**
+   under **Repositories**. Supply the original passphrase and the matching Borg
+   key for keyfile encryption. Check the repository ID. Import an individual key
+   or matching repository-key backup through repository management.
+6. Restore central script definitions separately. `.sh` imports create new
+   definitions: recheck content, timeout and job assignments. Hooks must not
+   perform unknown production actions before the test run.
+7. Check **System Health & Migration**. Failed required migrations block normal
+   operation. Resolve the specific cause, then restart with the installed or
+   corrected version. Preserve details and the audit log. A migration snapshot
+   is not an automatic plugin rollback.
+8. List archives. If job prefixes no longer match, choose **All archives in the
+   repository**. Browse & Restore requires a job associated with that repository;
+   a new helper job with scheduling disabled provides the association. Restore a
+   small selection into a separate approved destination first. Compare content
+   and required metadata; test applications in isolation before replacing
+   production data.
+9. Verify required services, results and notifications. Only then re-enable
+   schedules and retention. A green connection test alone is not completed recovery.
+
+For a forgotten admin password, use **Admin Access Recovery** on the Unraid
+plugin page. For a damaged user store, follow the separate
+[user-store recovery guide](../../auth-user-store-recovery.md); never delete a
+valid user store as a routine password reset.
+
+### 16.3 Export formats and limits
+
+These details apply to `2026.10.09.1435`. Encrypted exports use the outer
+`bbui-authenticated-export` version `2`. Import also validates the inner format.
+A legacy OpenSSL encryption envelope may be readable without making an
+unsupported inner format compatible. Always use the import preview; never edit
+a format identifier by hand.
+
+| Export / inner format | Includes | Excludes / import boundary |
+| --- | --- | --- |
+| Jobs: `bbui-job-bundle-v3` or `bbui-job-bundle-v4` | Schema-5 job metadata, linked repositories/storage, schedules, profile configuration; managed exclusion files when used | No passphrase-file or Borg-keyfile contents, central script definitions or archives. v4 is generated for extended exclusions/retention; both formats with valid schema 5 are accepted. v1/v2 and older job schemas are rejected. |
+| Jobs with passphrases: `bbui-job-bundle-secure-v3` | Inner v3/v4 bundle, associated existing passphrase files and local Borg keyfiles | No general settings/profile-secret package, central scripts, archives or automatically exported repokey keys. Older secure formats are rejected. |
+| Profiles and secrets: `bbui-profile-secrets-v2` | SMB/storage profiles and their associated SMB/SSH secret files | No jobs, archives or complete application configuration. v1 is rejected. |
+| Secrets: `bbui-secrets-backup-v1` | Allowed secret files and files under `secrets/borg-keys` | No job/profile definitions or archives; only accepted filenames are imported. |
+| Repository keys: `bbui-repository-keys-v1` | Borg key exports, manifest and repository IDs | No archive data; check failed entries in the manifest. Imports match repository IDs, not merely display names. |
+| Individual script: `.sh` | Bash source | No permanent script ID, description, timeout or job assignment; review and assign after importing. |
+| Config backup / migration snapshot | Local configuration files named in that backup's manifest | No complete system backup or installed-code downgrade; different from a portable job export. |
+
+**Central scripts:** Job bundles contain hook references only. A complete backup
+also requires `/boot/config/borg-backup/config/job-scripts.json` or individual
+script exports with documented assignments. Successful job import does not prove
+that every referenced hook exists on the target.
+
+## 17. Actions and Settings Reference
+
+### 17.1 Permissions and effects
+
+Minimum roles follow API authorization. A hidden button grants no additional
+permission. **admin** includes **operator** privileges, which include **viewer**
+read access.
+
+| Action | Minimum role | Notes |
+| --- | --- | --- |
+| Read dashboard, jobs, archives, history, reports and restore status | viewer | Secrets remain protected; administrative configuration is not fully readable. |
+| Start/cancel backup, precheck/start restore, start restore test | operator | Can write user data within an approved restore destination. |
+| Test storage, perform SMB mount action, refresh repository info; check, verify data, prune, compact | operator | The maintenance endpoint includes destructive prune; operator is not merely a start-only role. |
+| Change jobs, schedules, restore-test policy, profiles and repository associations | admin | Can change future execution and deletion policies. |
+| Delete individual archives or whole repositories, import/export Borg keys | admin | Confirmation steps and additional prerequisites still apply. |
+| Users, scripts, exports, system settings, reset and support bundle | admin | Exports and support bundles may contain confidential information. |
+
+Prometheus and Homepage tokens are separate read-only tokens restricted to their
+respective endpoints; they do not replace a user role. Disabling or revoking an
+integration blocks access. The [Prometheus guide](../../integrations/prometheus.md)
+and [Homepage guide](../../integrations/homepage-widget.md) are bundled offline
+technical references.
+
+### 17.2 Maintenance and deletion
+
+Before destructive actions, have a verified independent backup and decide which
+recovery points may be removed. Wait for other repository users. Check is not repair.
+
+| Action | Prerequisites and purpose | Data effect | Verification |
+| --- | --- | --- | --- |
+| Check | Reachable repository; check repository and archive structure | No `--repair`; no intended archive deletion | Review completion, timestamp and error details in Maintenance |
+| Verify Data | Check with `--verify-data`; allow time, I/O and network capacity | Also reads payload data to check integrity; does not restore an application | Wait for full completion without data errors |
+| Prune | Job supplying retention; explicitly select one when several share the repository | Deletes unprotected archives matching the current job prefix. Previous prefixes are outside this filter | Check rules, actual filter and deleted-archive list; do not assume the wizard previews actual deletions |
+| Compact | After pruning/deletion or when unused segments exist | Reclaims unreferenced storage; does not select additional archives for deletion | Review completion and reported reclaimed space; zero can be correct |
+| Delete archive | admin; deliberate archive selection and confirmation | Removes that recovery point independently of job retention | Refresh archive list; physical space may require Compact |
+| Delete repository | admin; no assigned jobs and multi-step confirmation | Removes the entire Borg repository and its archives | Verify target and management status; distinguish this from removing the UI entry |
+
+The official [Borg 1.4.5 check](https://borgbackup.readthedocs.io/en/1.4.5/usage/check.html)
+and [retention reference](https://borgbackup.readthedocs.io/en/1.4.5/usage/prune.html)
+provide additional detail. Do not use automatic lock removal, repair or recursive
+permission changes as routine troubleshooting.
+
+### 17.3 Important defaults and limits
+
+Defaults are initial-install values, not a statement about your saved
+configuration. Check the visible values. Global runtime limits also affect
+existing jobs; compression and retention are explicitly stored per job.
+
+| Setting | Default / boundary | Scope and effect |
+| --- | --- | --- |
+| Main directory | Empty on first installation; must be configured | Logs, status and restore data; backing mount must be available. Changing it does not move a repository. |
+| Compression / retention | New jobs: `lz4`; daily 7, weekly 4, monthly 6, yearly 3 | Per job; global changes do not replace saved job values. Counts 0–1,000,000; last-N at least 1. |
+| Borg runtime limit | 0 hours = unlimited | Backup Borg processes; positive value sends TERM at deadline, then KILL after 30 seconds if needed. Not an L3 file timeout. |
+| Borg checkpoint / check | 1800 seconds / 30 days | Checkpoint during archive creation; due maintenance check after backup. Does not replace a restore. |
+| Repository information refresh | Off; 24-hour interval, retry after 1 hour | Reads repository information and may wake disks. Refreshing Dashboard alone is not a fresh Borg check. |
+| Docker stop / waits | 60-second timeout; 5 seconds after stop/start | Job workloads; allow adequate application shutdown time. |
+| VM shutdown / warning / startup wait | 120 seconds / 5 minutes / 60 seconds | VM control; inspect logs and Runtime Recovery, with no consistency guarantee after failed shutdown. |
+| Parity protection | On | Can skip a run during an active parity check. |
+| Allowed restore roots | `/mnt/user` | Administrators deliberately extend them; destination must exist and be writable. |
+| Restore-test size threshold | 500 GB; 0 disables size-based switching | L2/L3 full dry-run or bounded file selection. |
+| Sample / file limits / L3 | 5%; both file limits 1000; L3 5 files | Regular-file selection, not guaranteed application coverage. |
+| Test Borg timeout / dry-run / chunk size | Config template: 240 seconds / 0 unlimited / 100 files | Individual calls have additional limits; runner fallbacks for missing values are 180 seconds and 200 files. No single timeout covers all phases. |
+| Calendar and evidence | Per job; validity at least 1 day | Calendar uses server timezone; validity is independent of next execution. Legacy interval default 30 days. |
+| Hook timeout | Default 300; allowed 1–86400 seconds | Per script; failed Pre prevents backup, failed Post may leave an archive with an overall failed job. |
+| Reminder / backup tolerance | 24 / 6 hours | Repeat-notification interval / delay after expected backup start. Verify delivery separately. |
+| Log retention / session | 30 days / 30 minutes | Old run logs are cleaned up; sessions expire. Save logs first if longer retention is needed. |
+
+## 18. Concepts and Lifecycle
+
+### 18.1 Archives and sizes
+
+A Borg archive is a logical recovery point. It does not require manually
+assembling a full/incremental backup chain. Archives in one repository can share
+data chunks. **Original size** is the logical data amount, **compressed size**
+its compressed representation, and **deduplicated size** the new or unique
+storage amount attributed to that report. These are not measurements of network
+traffic. Repository size includes shared chunks and management overhead;
+growth is the difference between measurements. Prune may not reclaim space until
+Compact runs. Missing or old measurements do not prove no data has been added.
+
+### 18.2 Job lifecycle
+
+1. Load the job, validate its definition and acquire resource locks. A run that
+   never starts or is skipped because of a lock conflict executes neither hook.
+2. Snapshot Pre/Post definitions for this run. Execute **Pre**, then mount SMB and
+   prepare the backup: exclusion copy, parity/USB/source checks and log cleanup.
+   A Pre failure or timeout prevents workload shutdown and archive creation.
+3. Stop selected running Docker containers, then shut down selected running VMs.
+   Do not start previously stopped workloads merely for the backup.
+4. Create the archive with Borg. Failure or cancellation enters cleanup and
+   workload recovery. A warning may still leave an archive; inspect details.
+5. After successful archive creation, restart Docker and then VMs before
+   retention, Compact and any due Check maintenance.
+6. Attempt required workload recovery on failure paths too. Remove the temporary
+   exclusion file, clean up SMB mounts created by the run, then execute **Post**
+   according to its condition. “On success” also includes warnings without a
+   failure/skip; “Also on failure, skip or cancellation” applies only to started
+   jobs. Further user cancellation is unavailable during recovery/Post; the
+   script timeout still applies.
+7. Persist final result, history and status, send notifications and release locks.
+   Post or cleanup failures can fail the overall job after `borg create` has
+   already written an archive. Acknowledge workload-recovery warnings under
+   **System Health & Migration** only after actually verifying those workloads.
+
+Backing up a database while it is writing is not automatically application
+consistent. Use suitable service shutdown or verified application dumps. Hook
+syntax validation proves only valid Bash syntax. The bundled
+[hook examples](../../examples/job-hooks/README.md) are targeted tests that do not
+modify production data.
+
+### 18.3 Troubleshooting by symptom
+
+| Symptom | Low-risk diagnosis | Cause and next action | Verification |
+| --- | --- | --- | --- |
+| Success, but file missing | Read archive contents, source, exclusions and markers | Correct source/filter and run a new manual backup | Find the file in the new archive and restore it separately |
+| Restore skips destination | Read precheck and conflict mode | Do Not Overwrite encountered an existing target; choose a new empty destination | Compare a file actually written by the restore |
+| Restore partly completed | Preserve log listing completed entries | Check move errors, permissions and space; avoid blindly replacing data | Restore missing selections into a new destination |
+| Repository locked | Check active local and remote Borg processes | Wait for the other run; after a crash establish owner and cause first | Retry after normal release, without routine lock removal |
+| Green test, wrong job's archive | Compare tested archive name with job prefix | Repository-wide selection; manually select intended archive | Perform a real restore of that archive and compare contents |
+| Test timeout or contradictory report | Read exit code and individual steps | Apply section 8.3 limits; check load, reachability and runtime | Repeat without timeout and verify an actual restore |
+| No reminder | Check event, recipient, tolerance and last delivery | Save settings and test the channel; no restore overdue reminder without a previous report | Verify test message and next eligible event |
+| Migration blocked / workloads remain off | Read health, migration and Runtime Recovery | Fix specific cause and check workloads; do not delete status files as a repair | Successful restart and verified workload state |

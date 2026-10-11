@@ -1,12 +1,97 @@
 # Borg-Backup-UI Benutzerhandbuch
 
-Stand: 03.09.2026 (Stable 2026.08.31.0907)
+Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.09.1435`, Borg `1.4.5`.
 Sprache: Deutsch  
 Zielgruppe: Einsteiger, fortgeschrittene Anwender und Administratoren eines Unraid-Systems
 
-Dieses Handbuch beschreibt Borg-Backup-UI in der Reihenfolge des Menüs der Anwendung. Es erklärt die sichtbaren Seiten, typische Arbeitsabläufe, wichtige Warnungen und die Auswirkungen der jeweiligen Aktionen.
+Wählen Sie den Einstieg nach Ihrer Aufgabe. Die nummerierten Kapitel bleiben als Menüreferenz erhalten. Die neuen Hilfe-Darstellungen werden mit dem Dokumentations-Testkandidaten ausgeliefert; sie ändern keine Backup-Funktion. Die Bilder wurden am 11.10.2026 mit der aktuellen Anwendung und synthetischen Daten neu aufgenommen. Die Plugin-Demo läuft isoliert mit echtem Borg; Grafana zeigt separat erzeugte Beispielmetriken. Die Aufnahmen ersetzen keinen Test auf echter Unraid-Hardware.
+
+[Bildstand und Demo-Grenzen](../assets/README.md).
 
 > **Hinweis:** Dieses Handbuch beschreibt die Anwendung selbst. Es ersetzt keine allgemeine BorgBackup-Dokumentation und keine Unraid-Systemdokumentation. Wenn eine Funktion in der Oberfläche nicht sichtbar ist, ist sie für die aktuell angemeldete Rolle oder die aktuelle Konfiguration möglicherweise nicht verfügbar.
+
+## Ihr Weg durch das Handbuch
+
+| Zugang | Beginnen Sie hier |
+| --- | --- |
+| Einstieg | [Installation](#13-installation-und-erstkonfiguration), danach der [Schnellstart](#schnellstart-erstes-backup-und-geprüfter-restore) |
+| Aufgaben | [Sichern, prüfen, wiederherstellen und benachrichtigen](#11-typische-aufgaben); bei Ausfall [Notfallwiederherstellung](#16-notfallwiederherstellung) |
+| Referenz | [Jobs](#3-jobs), [Repositories](#4-repositories), [Restore](#7-browse--restore), [Einstellungen](#9-einstellungen), [Aktions- und Einstellungsreferenz](#17-aktions--und-einstellungsreferenz) |
+| Konzepte | [Begriffe](#11-grundbegriffe), [Ablauf, Datenmengen und Aussagegrenzen](#18-konzepte-und-ablauf) |
+
+## Schnellstart: Erstes Backup und geprüfter Restore
+
+**Ziel:** Eine bekannte Testdatei sichern und ihren wiederhergestellten Inhalt
+vergleichen. Dafür benötigen Sie ein eingerichtetes Unraid-System und die Rolle
+**admin**; spätere manuelle Läufe und Restores sind auch als **operator** möglich.
+Planen Sie etwa 20 Minuten zuzüglich Installation und Datenübertragung ein.
+Verwenden Sie ausschließlich neue Testverzeichnisse. Das Beispiel ist eine
+Funktionsprobe auf einem Host, keine unabhängige Ausfallsicherung.
+
+1. Schließen Sie die [Erstkonfiguration](#13-installation-und-erstkonfiguration)
+   ab. Öffnen Sie im Unraid-Terminal eine Shell. Legen Sie in einem vorhandenen
+   Share `/mnt/user/demo` drei bisher nicht vorhandene Ordner an:
+   `source`, `repositories` und `restore`. Wählen Sie andere neue Namen, falls
+   dort bereits Daten liegen. Schreiben Sie in `source/probe.txt` den Text
+   `Borg Backup UI restore check`. Das können Sie auch über die Dateiverwaltung
+   tun. Nur die Testquelle soll gesichert werden, niemals der gesamte Share mit
+   Repository und Restore-Ziel.
+2. Öffnen Sie **Einstellungen > Lokale Profile**. Legen Sie das Speicherziel
+   `Demo-Lokal` mit Basispfad `/mnt/user/demo/repositories` an. Speichern Sie und
+   prüfen Sie die Erreichbarkeit und Schreibbarkeit. Bei Fehlern zuerst Mount,
+   Pfad und freien Platz prüfen; noch keinen Job anlegen.
+3. Öffnen Sie **Repositories > Repository hinzufügen**. Wählen Sie `Demo-Lokal`,
+   **Neues Repository erstellen**, den Anzeigenamen `Demo-Repository` und das
+   relative Repository-Verzeichnis `demo-repo`. Wählen Sie `repokey-blake2`,
+   vergeben Sie eine neue Passphrase und bewahren Sie sie getrennt auf. Prüfen
+   Sie die angezeigte vollständige Zieladresse. Nach dem Erstellen laden Sie
+   die Repository-Informationen und exportieren den Borg-Key über die Verwaltung.
+   Sichern Sie den Export außerhalb dieses Servers. [Schlüssel und Recovery](#16-notfallwiederherstellung).
+4. Öffnen Sie **Jobs > Neuer Job**. Setzen Sie **Job-Name** auf `Demo-Backup` und
+   **Archivpräfix** auf `demo-backup`. Behalten Sie die automatisch erzeugte
+   **Job-ID**. Lassen Sie Docker-/VM-Steuerung für diese Textdatei ausgeschaltet.
+5. In **Quellen & Ziel** wählen Sie ausschließlich `/mnt/user/demo/source`,
+   `Demo-Lokal`, `Demo-Repository` und Kompression `lz4`. Lassen Sie
+   **Ausschlüsse** leer. Docker und VMs werden übersprungen. Wählen Sie unter
+   **Retention** für diese kleine Probe **Alle behalten**, tragen Sie eine
+   Beschreibung ein und lassen Sie den Zeitplan zunächst ausgeschaltet.
+   Unter **Pre-/Post-Skripte** wählen Sie keine Skripte. Prüfen Sie in der
+   **Flow-Vorschau** Quelle und Ziel, dann speichern Sie.
+6. Starten Sie `Demo-Backup` unter **Jobs** manuell und bestätigen Sie den Dialog.
+   Warten Sie den Abschluss ab. In **History** müssen Ergebnis, Archivname und
+   Originalgröße plausibel sein. Öffnen Sie unter **Repositories > Archive** das
+   neue Archiv und suchen Sie `probe.txt`. Ein erfolgreicher Status allein sagt
+   nicht, dass die richtigen Daten ausgewählt wurden.
+7. Öffnen Sie **Browse & Restore**. Wählen Sie `Demo-Backup` und genau dieses
+   Archiv. Navigieren Sie zum gespeicherten Pfad und markieren Sie nur
+   `probe.txt`. Wählen Sie als Ziel `/mnt/user/demo/restore` und
+   **Nicht überschreiben**. Prüfen Sie in der Zusammenfassung den endgültigen
+   Dateipfad. Sie können zuerst einen **Testlauf (keine Änderungen)** ausführen;
+   dieser erzeugt keine Vergleichsdatei. Schalten Sie die Option danach aus und
+   starten Sie den echten Restore.
+8. Prüfen Sie den Abschluss und **Restore History**. Öffnen Sie die tatsächlich
+   wiederhergestellte Datei. Vergleichen Sie im Unraid-Terminal mit `cmp` (bei
+   abweichendem Ziel den in der Zusammenfassung angezeigten Pfad verwenden):
+
+   ```bash
+   cmp /mnt/user/demo/source/probe.txt /mnt/user/demo/restore/probe.txt
+   ```
+
+   Keine Ausgabe und Exit-Code `0` bedeuten gleiche Inhalte. Eine fehlende Datei,
+   ein Unterschied oder ein übersprungenes vorhandenes Ziel ist kein bestandener
+   Test. Prüfen Sie dann Archiv, Auswahl, Zielpfad, Konfliktstrategie und Log.
+   Bei Anwendungsdaten gehören zusätzlich ein Starttest und fachliche Kontrollen
+   in einer isolierten Anwendungsinstanz dazu.
+9. Erst nach erfolgreichem Vergleich aktivieren Sie den Backup-Zeitplan. Ein
+   Beispiel ist täglich 03:00 Uhr in der Unraid-Serverzeitzone. Planen Sie
+   Restore Tests getrennt, z. B. sonntags 06:00 Uhr mit acht Tagen
+   Nachweisgültigkeit. Die [Testgrenzen](#83-testlevel) bleiben dabei bestehen.
+   Richten Sie [Benachrichtigungen](#115-benachrichtigungen-einrichten) ein,
+   speichern Sie die Einstellungen und senden Sie eine Testnachricht.
+10. Für echte Daten wählen Sie eine geeignete Aufbewahrung und mindestens eine
+    unabhängige Kopie. Sichern Sie Konfiguration, Schlüssel und Zugangsdaten nach
+    dem [Notfallleitfaden](#16-notfallwiederherstellung). Lassen Sie die Testdaten
+    bestehen, bis Sie den Vergleich nachvollzogen haben.
 
 ## Inhaltsverzeichnis
 
@@ -25,6 +110,9 @@ Dieses Handbuch beschreibt Borg-Backup-UI in der Reihenfolge des Menüs der Anwe
 13. [Fehlerbehebung](#13-fehlerbehebung)
 14. [FAQ](#14-faq)
 15. [Empfohlene Betriebspraxis](#15-empfohlene-betriebspraxis)
+16. [Notfallwiederherstellung](#16-notfallwiederherstellung)
+17. [Aktions- und Einstellungsreferenz](#17-aktions--und-einstellungsreferenz)
+18. [Konzepte und Ablauf](#18-konzepte-und-ablauf)
 
 ## 1. Grundlagen
 
@@ -57,6 +145,8 @@ Die Anwendung kennt die Rollen `admin`, `operator` und `viewer`:
 
 ### 1.3 Installation und Erstkonfiguration
 
+Allgemeine Unraid-Schritte erläutern die offiziellen Anleitungen zu [Community Apps](https://docs.unraid.net/unraid-os/manual/applications/) und [Plugins](https://docs.unraid.net/unraid-os/using-unraid-to/customize-your-experience/plugins/).
+
 Borg Backup UI befindet sich in der **Public Beta** und wird über **Unraid Community Apps** installiert. Voraussetzungen sind **Unraid 6.12.5 oder neuer** sowie **Python 3.10 oder neuer**. Installieren Sie das separate Plugin **Python 3 for Unraid** zuerst über Community Apps. BorgBackup selbst ist im Borg-Backup-UI-Paket enthalten; eine zusätzliche Borg- oder pip-Installation ist nicht erforderlich.
 
 1. Öffnen Sie in Unraid **Apps**.
@@ -75,7 +165,7 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 ## 2. Dashboard
 
-![Dashboard mit markierten Status- und Filterbereichen](../assets/de/dashboard-guide.png)
+![Aktuelles Dashboard mit Demo-Backup und Restore-Status](../assets/de/dashboard-guide.png)
 
 **Abbildung 1 - Dashboard:** (1) Gesamtstatus für Backup-Läufe und Restore-Nachweise, (2) Standortfilter, (3) Detailtabelle der gefilterten Jobs.
 
@@ -148,7 +238,7 @@ Die Seite **Jobs** verwaltet Backup-Jobs. Hier werden Jobs angezeigt, gestartet,
 
 Jobs definieren, welche Daten wohin gesichert werden. Ein Job enthält:
 
-- Anzeigename und Typ-ID
+- Anzeigename, dauerhafte Job-ID und Archivpräfix
 - Standort und Repository
 - Zu sichernde Ordner oder Dateien
 - Docker- und VM-Steuerung
@@ -196,19 +286,24 @@ Der Job-Wizard führt in festen Schritten durch die Erstellung oder Bearbeitung 
 
 #### Schritt 1: Grunddaten
 
-Hier werden Jobname, Typ-ID, Icon, Icon-Farbe und erste Laufzeitoptionen gesetzt.
+![Job-ID, Anzeigename und Archivpräfix](../assets/de/current/wizard-basics.png)
+
+Hier werden Jobname, Archivpräfix, Icon, Icon-Farbe und erste Laufzeitoptionen gesetzt. Die automatisch vergebene **Job-ID** bleibt unverändert.
 
 Wichtige Felder:
 
 - **Job-Name:** Sichtbarer Name in UI, Berichten und Benachrichtigungen.
-- **Typ-ID:** Technischer Schlüsselbestandteil. Er sollte kurz, eindeutig und stabil sein.
+- **Archivpräfix:** Namensanfang zukünftiger Archive; erlaubt sind Buchstaben, Ziffern, Punkt, Unterstrich und Bindestrich.
+- **Job-ID:** Dauerhafte UUID; verbindet Job, Zeitplan und Verlauf unabhängig vom Anzeigenamen.
 - **Icon / Icon-Farbe:** Darstellung in Dashboard, Jobs, Restore und Reports.
 - **Docker vor dem Backup stoppen:** Aktiviert Docker-Steuerung.
 - **VMs vor dem Backup herunterfahren:** Aktiviert VM-Steuerung.
 
-Die Typ-ID bildet zusammen mit dem Standort den technischen Job-Schlüssel, beispielsweise `appdata_local`. Außerdem entsteht daraus das Archivmuster `<aktueller-präfix>-*`. Wenn Sie die Typ-ID eines vorhandenen Jobs ändern, erhalten nur zukünftige Archive das neue Präfix. Borg Backup UI speichert die bisherigen Archivpräfixe im Job und zeigt sie im Informations-Popover des Editors; vorhandene Archive werden weder umbenannt noch verschoben.
+Der **Job-Name** ist ein Anzeigename. Die **Job-ID** ist eine davon unabhängige, unveränderliche UUID. Das **Archivpräfix** bestimmt das Muster `<aktueller-präfix>-*`. Umbenennen des Jobs ändert seine Identität nicht. Ändern des Präfixes gilt nur für neue Archive; frühere Präfixe bleiben in der Archivmuster-Historie und im Informations-Popover sichtbar. Bestehende Archive werden weder umbenannt noch verschoben. Browse & Restore kann aktuelle und frühere Muster gemeinsam anzeigen; Prune berücksichtigt nur das aktuelle Präfix. Nach einem Repositorywechsel bleiben alte Archive im bisherigen Repository.
 
 #### Schritt 2: Quellen & Ziel
+
+![Quellen und vorhandenes Ziel-Repository](../assets/de/current/wizard-sources.png)
 
 Die kompakte Ansicht zeigt links **Zu sichernde Ordner** und rechts das **Backup-Ziel**. Links legen Sie fest, welche Ordner oder Dateien in das Backup aufgenommen werden. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
 
@@ -227,14 +322,16 @@ Beim Bearbeiten eines Jobs kann ein anderes vorhandenes Repository gewählt werd
 
 #### Schritt 3: Ausschlüsse
 
-Der eigene Schritt **Ausschlüsse** zeigt Ausschlusspfade, Markerdateien und die Ausschlussdatei immer sichtbar an. Alle neun Wizard-Schritte behalten dieselbe Fenstergröße; Docker und VMs werden bei ausgeschalteter Steuerung übersprungen. Auf kleinen Bildschirmen oder bei langen Listen bleibt Scrollen möglich.
+![Ausschlusspfade, Marker und Ausschlussdatei](../assets/de/current/wizard-exclusions.png)
+
+Der eigene Schritt **Ausschlüsse** zeigt Ausschlusspfade, Markerdateien und die Ausschlussdatei immer sichtbar an. Alle zehn Wizard-Schritte behalten dieselbe Fenstergröße; Docker und VMs werden bei ausgeschalteter Steuerung übersprungen. Auf kleinen Bildschirmen oder bei langen Listen bleibt Scrollen möglich.
 
 Ausschlüsse sind konkrete Dateien oder Verzeichnisse unterhalb eines ausgewählten Backup-Ordners. Sie werden nicht in das Borg-Archiv aufgenommen. Bei vielen Einträgen scrollen nur die Pfadlisten innerhalb ihres Bereichs.
 
 Die erweiterten Regeln ergänzen die Ausschlusspfade und verändern keine Quelldateien oder vorhandenen Archive.
 
-- **Markerdateien (#469):** Ein Dateiname pro Zeile, Groß-/Kleinschreibung beachten. Wird z. B. `.nobackup` eingetragen und im Ordner `/mnt/user/data/cache` eine Datei dieses Namens angelegt, überspringt Borg diesen Ordner vollständig, einschließlich Unterordnern und Marker. Der Dateiinhalt ist unwichtig. Es werden höchstens 32 verschiedene Namen akzeptiert; keine Pfade.
-- **Ausschlussdatei (#470):** Eine UTF-8-Textdatei ohne BOM hochladen, maximal 64 KiB. Borg-Muster bleiben unverändert, etwa `fm:*.tmp`; Leerzeilen und mit `#` beginnende Kommentarzeilen werden ignoriert. Eine eigene Kopie wird beim Job gespeichert. Änderungen an der ursprünglichen Datei wirken erst nach erneutem Hochladen und Speichern. Herunterladen, Ersetzen und Entfernen sind möglich.
+- **Markerdateien:** Ein Dateiname pro Zeile, Groß-/Kleinschreibung beachten. Wird z. B. `.nobackup` eingetragen und im Ordner `/mnt/user/data/cache` eine Datei dieses Namens angelegt, überspringt Borg diesen Ordner vollständig, einschließlich Unterordnern und Marker. Der Dateiinhalt ist unwichtig. Es werden höchstens 32 verschiedene Namen akzeptiert; keine Pfade.
+- **Ausschlussdatei:** Eine UTF-8-Textdatei ohne BOM hochladen, maximal 64 KiB. Borg-Muster bleiben unverändert, etwa `fm:*.tmp`; Leerzeilen und mit `#` beginnende Kommentarzeilen werden ignoriert. Eine eigene Kopie wird beim Job gespeichert. Änderungen an der ursprünglichen Datei wirken erst nach erneutem Hochladen und Speichern. Herunterladen, Ersetzen und Entfernen sind möglich.
 
 Der Lauf verwendet eine private temporäre Kopie der hochgeladenen Datei. Wird die Job-Konfiguration währenddessen bearbeitet, verändert dies den laufenden Backup-Filter nicht. Eine fehlende oder beschädigte verwaltete Datei blockiert den Lauf, bevor das Backup startet. Der Systemzustand meldet den Fehler. Prüfen Sie nach Änderungen mit einem Testjob den tatsächlichen Archivinhalt.
 
@@ -291,6 +388,8 @@ Beispiel: Setzen Sie PostgreSQL oder MariaDB auf Priorität `1` und die davon ab
 
 #### Retention, Kompression und Beschreibung
 
+![Aufbewahrung und Kompression](../assets/de/current/wizard-retention.png)
+
 Der Wizard setzt jobbezogene Borg-Optionen wie Kompression und Aufbewahrung. Verschlüsselung und Passphrase gehören zum Repository.
 
 Wählen Sie genau eine Aufbewahrungsstrategie:
@@ -328,6 +427,8 @@ Bei aktivierter Dateiaktivität liegt das laufende Log zunächst im RAM unter `/
 > **Datenschutzhinweis:** Bei aktivierter Option erscheinen Datei- und Verzeichnisnamen im Live-Log und im gespeicherten Lauf-Log. Da Support-Pakete aktuelle Lauf-Logs enthalten können, können diese Namen auch dort enthalten sein. Support-Pakete maskieren Secrets, sind aber nicht anonym; prüfen Sie ein Paket immer vor der Weitergabe.
 
 #### Zeitplan
+
+![Zeitplan des Backup-Jobs](../assets/de/current/wizard-schedule.png)
 
 Der Zeitplan kann direkt im Wizard gesetzt werden. Die UI unterstützt einfache Frequenzen und einen Cron-Ausdruck.
 
@@ -369,6 +470,8 @@ Die Definitionen liegen in `<Datenverzeichnis>/config/job-scripts.json`; sichern
 
 #### Flow-Vorschau
 
+![Ablaufvorschau des aktuellen Jobs](../assets/de/current/wizard-flow.png)
+
 Der letzte Schritt zeigt eine technische Vorschau des geplanten Ablaufs. Hier werden Repository, zu sichernde Ordner oder Dateien, Docker-/VM-Auswahl und geplante Aktionen zusammengefasst.
 
 Formulare und mehrstufige Assistenten mit ungespeicherten Eingaben werden nicht durch einen Klick auf den Hintergrund geschlossen. **Abbrechen** oder die Schließen-Schaltfläche bleiben verfügbar; bei geänderten Eingaben fragt Borg Backup UI vor dem Verwerfen ausdrücklich nach.
@@ -394,7 +497,7 @@ Best Practices:
 
 Die Seite **Repositories** verwendet eine Master-Detail-Ansicht. Links werden Borg-Repositorys nach dem exakten Speicherziel gruppiert; rechts bleibt der Arbeitsbereich des ausgewählten Repositorys sichtbar. Über **Repository hinzufügen** können Repositorys auf einem bereits unter **Einstellungen** eingerichteten Speicherziel erstellt oder importiert werden.
 
-![Repository-Verwaltung mit Speicherzielgruppen und Detailbereich](../assets/de/repositories.png)
+![Repository-Verwaltung mit Speicherzielgruppen und Detailbereich](../assets/de/current/repositories.png)
 
 Lokale Speicherziele werden unter **Einstellungen > Lokale Profile** angelegt.
 Zulässig sind konkrete Verzeichnisse unter `/mnt`, etwa `/mnt/backup` oder
@@ -485,7 +588,7 @@ Repository aus der Anwendung entfernen oder endgültig löschen:
 
 ## 5. History
 
-![History](../assets/de/history.png)
+![History](../assets/de/current/history.png)
 
 Die Seite **History** zeigt vergangene Backup-Läufe und Restore-Testberichte in chronologischer Form.
 
@@ -523,7 +626,7 @@ History ist die erste Detailseite nach einem Backup-Lauf. Sie zeigt, wann ein La
 
 ## 6. Berichte
 
-![Berichte](../assets/de/reports.png)
+![Berichte](../assets/de/current/reports.png)
 
 Die Seite **Berichte** fasst Backup- und Repository-Daten über mehrere Läufe zusammen.
 
@@ -561,7 +664,7 @@ Berichte helfen bei der Auswertung von Trends:
 
 ## 7. Browse & Restore
 
-![Restore-Wizard mit markierten Bedienbereichen](../assets/de/restore-guide.png)
+![Aktuelle Mehrfachauswahl im Restore-Wizard](../assets/de/restore-guide.png)
 
 **Abbildung 3 - Browse & Restore:** (1) Wechsel zwischen Restore und History, (2) Jobauswahl nach Standort, (3) Fortschritt der fünf Wizard-Schritte, (4) Inhalt des aktuellen Schritts.
 
@@ -675,9 +778,17 @@ Beim Entpacken liegen die Daten zunächst im angezeigten versteckten Zwischenord
 
 Nach erfolgreichem Abschluss zeigt die Ansicht die Anzahl der übernommenen Dateien und Ordner; Verknüpfungen und sonstige Einträge werden getrennt gezählt. Gezählt werden die wiederhergestellten Einträge, nicht bereits vorhandene, unveränderte Zieldateien oder nur für den Pfadaufbau benötigte Elternordner. Übersprungene Auswahleinträge werden separat genannt. Testläufe schreiben keine Dateien und zeigen deshalb keine Wiederherstellungszählung. Bei Fehlern steht keine vollständige Abschlusszählung zur Verfügung; bereits bereitgestellte Auswahleinträge und technische Fehlerdetails bleiben nachvollziehbar.
 
+![Restore-Ziel und Konfliktstrategie](../assets/de/current/restore-target.png)
+
+![Vorprüfung mit konkreten Zielpfaden](../assets/de/current/restore-review.png)
+
+![Erfolgreicher Demo-Restore](../assets/de/current/restore-success.png)
+
+*Aktuelle Demo: eine Datei und ein Ordner ausgewählt, insgesamt 14 Dateien wiederhergestellt. Alle 14 Dateien wurden anschließend außerhalb des Plugins bytegenau mit den Originalen verglichen. Das ist ein echter Restore; ein L2-Dry-Run schreibt diese Dateien nicht.*
+
 ### 7.5 Restore History
 
-![Restore History](../assets/de/restore-history.png)
+![Restore History](../assets/de/current/restore-history.png)
 
 Die Restore History zeigt abgeschlossene Restore-Läufe mit:
 
@@ -702,7 +813,7 @@ Die Detailansicht kann ein- und ausgeklappt werden und zeigt strukturierte Daten
 
 ## 8. Restore Tests
 
-![Restore Tests - Planung](../assets/de/restore-tests-plan.png)
+![Restore Tests - Planung](../assets/de/current/restore-tests-plan.png)
 
 Restore Tests prüfen automatisiert, ob eine Wiederherstellung technisch funktioniert. Sie sind ein wichtiger Nachweis, dass Backups nicht nur geschrieben, sondern auch lesbar sind.
 
@@ -739,13 +850,34 @@ Verpasste oder übersprungene Kalendertermine werden nicht automatisch nachgehol
 
 ### 8.3 Testlevel
 
-Die Anwendung zeigt Restore-Testlevel als `L1`, `L2` oder `L3`.
+**Der Bericht ist jobbezogen gespeichert; die Archivauswahl ist repositoryweit.**
+Der Runner fragt mit `borg list --short --last 1` das neueste Archiv ab, ohne den
+Archivpräfix des Jobs zu filtern. Teilen sich Jobs ein Repository, kann das
+getestete Archiv zu einem anderen Job gehören. Prüfen Sie im Bericht immer
+**das tatsächlich getestete Archiv**. Für einen bestimmten Sicherungsstand
+verwenden Sie die explizite Archivauswahl in **Browse & Restore**.
 
-- **L1:** Grundprüfung, ob Repository und Archiv erreichbar sind.
-- **L2:** Erweiterte technische Prüfung mit stärkerem Wiederherstellungsnachweis.
-- **L3:** Umfangreichste Prüfung mit höherer Laufzeit und I/O-Last.
+| Level | Tatsächliches Verfahren | Umfang und Schreibzugriffe | Last und Aussagegrenze |
+| --- | --- | --- | --- |
+| L1 | Archivliste abrufen, neuestes Archiv auswählen, `borg info --json` versuchen | Metadaten, keine Nutzdateien am Restore-Ziel; Logs/Status und Borg-Verwaltungsdaten können geschrieben werden | Geringer als L2; kein `borg check`, keine vollständige Datenprüfung. Ein Fehler im Info-Schritt kann trotz Gesamtstatus „Erfolgreich“ auftreten: Einzelschritte lesen. |
+| L2 | L1, Dateiliste und `borg extract --dry-run` | Liest Metadaten und Datenblöcke, Borg prüft Hash/HMAC, entschlüsselt und dekomprimiert. Schreibt keine wiederhergestellten Nutzdateien. Unter dem Größenschwellwert vollständiger Dry-Run, darüber begrenzte Auswahl regulärer Dateien | Kann viel I/O und Netzwerkverkehr verursachen. Prüft weder Ziel-Dateisystem, Schreibrechte, freien Restore-Platz noch Anwendungsstart. |
+| L3 | L2, danach ausgewählte reguläre Dateien mit `borg extract --stdout` lesen und SHA-256 berechnen | Dateiinhalte werden durch eine Pipe gelesen; Hashes landen im Bericht. Kein unabhängiger Soll-Hash-Vergleich und keine Dateien im Restore-Ziel | Zusätzlicher Datenabruf; Stichprobe standardmäßig 5 Dateien. Keine Garantie für alle Dateien oder einen vollständigen Anwendungs-Restore. Für diesen Streaming-Schritt gibt es hier keinen expliziten Datei-Timeout. |
 
-> **Hinweis:** Höhere Testlevel erhöhen die Aussagekraft, können aber je nach Repository und Datenmenge deutlich länger laufen.
+Borgs interne Datenintegritätsprüfung ist vom zusätzlichen SHA-256-Wert im Bericht
+zu unterscheiden. Ein berechneter Hash ohne unabhängig gesicherten Sollwert
+belegt keinen Inhaltsvergleich. Die technische Berichtsbezeichnung
+`sha256 sample compare` ist im geprüften Stand irreführend: L2 führt keinen
+solchen Vergleich aus; L3 berechnet nur Hashes.
+
+> **Warnung:** Im geprüften Stand kann ein vollständiger L2-Dry-Run nach Timeout
+> (Exit-Code 124) als bestanden mit einer vorab ausgewählten Stichprobe erscheinen.
+> Diese Auswahl belegt nicht, dass deren Dateien vor dem Timeout gelesen wurden.
+> Behandeln Sie diesen Lauf als unvollständig. Prüfen Sie Log und Einzelschritte,
+> wiederholen Sie mit geeigneten Grenzen und führen Sie einen echten Restore mit
+> Inhaltsvergleich durch. Auch „100 %“ beschreibt keine getestete Anwendung.
+
+Die [Borg-1.4.5-Referenz zu extract](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
+erläutert Dry-Run und Standardausgabe. Für die normale Bedienung ist sie nicht erforderlich.
 
 ### 8.4 Tests starten
 
@@ -753,7 +885,7 @@ Mit **Jetzt testen** neben einem Job starten Sie den Test manuell mit seinem kon
 
 ### 8.5 Prüfberichte
 
-![Restore Tests - Prüfberichte](../assets/de/restore-tests-reports.png)
+![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
 
 Der Reiter **Prüfberichte** zeigt strukturierte Nachweise abgeschlossener Restore-Tests:
 
@@ -773,7 +905,7 @@ Typische Statuswerte:
 
 Bei Restore-Tests ab Level 2 entscheidet die eingestellte Archivgröße über den Dry-Run: Unterhalb des Schwellwerts wird das vollständige Archiv geprüft, ab dem Schwellwert eine Dateistichprobe in Gruppen. Standardmäßig beträgt der Schwellwert 500 GB; 0 deaktiviert die Umschaltung. Die frühere Sonderregel für die Typen `photos` und `vms` entfällt.
 
-Die Stichprobe zielt standardmäßig auf 5 % der regulären Dateien, begrenzt durch die eingestellten Dateilimits (standardmäßig 1.000). Verzeichnisse zählen weder als Dateien noch zur Abdeckung. Beispiel: Bei 10.000 Dateien werden 500 geprüft; bei 100.000 Dateien greift die Grenze von 1.000, entsprechend 1 % Abdeckung. Der Bericht zeigt die erreichte Datei-Abdeckung. Die zusätzliche Level-3-Prüfung verwendet weiterhin ihre eigene Stichprobengröße.
+Die Stichprobe zielt standardmäßig auf 5 % der regulären Dateien, begrenzt durch die eingestellten Dateilimits (standardmäßig 1.000). Verzeichnisse zählen weder als Dateien noch zur Abdeckung. Beispiel: Bei 10.000 Dateien werden 500 geprüft; bei 100.000 Dateien greift die Grenze von 1.000, entsprechend 1 % Abdeckung. Der Bericht zeigt die gemeldete Datei-Abdeckung; beachten Sie die Timeout-Einschränkung aus 8.3. Die zusätzliche Level-3-Prüfung verwendet weiterhin ihre eigene Stichprobengröße.
 
 ### 8.6 Best Practices
 
@@ -802,9 +934,11 @@ Typische Inhalte:
 - Standardpfade für Logs, Status und Restore-Status
 - allgemeine Systemparameter
 - Wochenbericht
-- Homepage-Widget für externe Dashboards
+- Integrationen werden in einer eigenen Rubrik verwaltet
 
-#### Benachrichtigungen
+### Benachrichtigungen
+
+![Aktueller Benachrichtigungsbereich](../assets/de/current/settings-notifications.png)
 
 Borg Backup UI verwaltet Benachrichtigungskanäle in **Einstellungen > Benachrichtigungen**. Es gibt drei getrennte Versandwege:
 
@@ -812,15 +946,15 @@ Borg Backup UI verwaltet Benachrichtigungskanäle in **Einstellungen > Benachric
 - E-Mail/SMTP
 - Apprise-Benachrichtigungsprofile
 
-Apprise-Profile können angelegt, bearbeitet, dupliziert, aktiviert/deaktiviert, getestet und entfernt werden. Das Plugin bündelt Apprise `1.13.1` mit 141 verfügbaren Anbietern (bisher 137). Neu sind Pinglet, Trigv, Pingram, Signalgrid und Lauther. Die URL-Formulare entstehen aus Apprise-Metadaten; gespeicherte URLs bleiben ausschließlich schreibbare Secrets. Die [Anbieterliste](../apprise-providers.md) enthält alle im Paket verfügbaren Anbieter. Optionale Anbieter mit zusätzlichen Paketabhängigkeiten, etwa MQTT und XMPP, bleiben außerhalb des bisherigen Paketumfangs.
+Apprise-Profile können angelegt, bearbeitet, dupliziert, aktiviert/deaktiviert, getestet und entfernt werden. Das Plugin bündelt Apprise `1.13.1` mit 141 verfügbaren Anbietern. Die URL-Formulare entstehen aus Apprise-Metadaten; gespeicherte URLs bleiben ausschließlich schreibbare Secrets. Die [Anbieterliste](../apprise-providers.md) enthält alle im Paket verfügbaren Anbieter. Optionale Anbieter mit zusätzlichen Paketabhängigkeiten, etwa MQTT und XMPP, bleiben außerhalb des bisherigen Paketumfangs.
 
-**NotificationAPI-Profile:** Apprise unterstützt `napi://` und `notificationapi://` nicht mehr. Betroffene Profile erhalten unter Einstellungen > Benachrichtigungen einen Hinweis; Validierung und Versand schlagen mit einem Hinweis zur Neueinrichtung fehl. Einstellungen und Secret-Dateien bleiben erhalten. Bearbeite das Profil und richte Pingram mit dessen neuen Zugangsdaten oder einen anderen Anbieter ein; nur das URL-Schema zu ändern reicht nicht aus. Andere Profile, Unraid-Benachrichtigungen und native E-Mail funktionieren unabhängig davon weiter. Es gibt keine Konfigurationsmigration oder automatische Umwandlung von Zugangsdaten. Fehlerhafte URLs werden abgelehnt, ohne die Anwendung zu unterbrechen.
+**NotificationAPI-Profile:** Apprise unterstützt `napi://` und `notificationapi://` nicht mehr. Betroffene Profile erhalten unter Einstellungen > Benachrichtigungen einen Hinweis; Validierung und Versand schlagen mit einem Hinweis zur Neueinrichtung fehl. Einstellungen und Secret-Dateien bleiben erhalten. Bearbeiten Sie das Profil und richten Sie Pingram mit dessen neuen Zugangsdaten oder einen anderen Anbieter ein; nur das URL-Schema zu ändern reicht nicht aus. Andere Profile, Unraid-Benachrichtigungen und native E-Mail funktionieren unabhängig davon weiter. Es gibt keine Konfigurationsmigration oder automatische Umwandlung von Zugangsdaten. Fehlerhafte URLs werden abgelehnt, ohne die Anwendung zu unterbrechen.
 
 Für direkte E-Mail-Benachrichtigungen wird die gespeicherte globale Empfängeradresse verwendet; ist sie leer, dient der Empfänger des Wochenberichts als Rückfall. Speichern Sie geänderte SMTP- und E-Mail-Felder vor einer Testmail. Port `465` verwendet implizites TLS, während TLS auf Port `587` per STARTTLS aufgebaut wird.
 
 Echte Backup-, Restore-Test- und Reminder-Ereignisse werden für Apprise im Hintergrund zugestellt. Der auslösende Job legt einen Queue-Eintrag ab und wartet nicht auf den externen Provider. Der UI-Dienst verarbeitet die Queue regelmäßig, beachtet Timeout, Versuche und Backoff des Profils und setzt nach einem Neustart mit noch offenen Einträgen fort. Bereinigte Zustellstände stehen im Systemzustand und im Support-Paket; die Queue mit Nachrichtentexten und die Apprise-Secret-URLs werden nicht in Support-Pakete exportiert.
 
-Konfigurierbare Ereignisse koennen unter anderem sein:
+Konfigurierbare Ereignisse können unter anderem sein:
 
 - Backup erfolgreich
 - Backup fehlgeschlagen
@@ -835,7 +969,9 @@ Die Reminder-Einstellungen gelten kanalübergreifend. Das Reminder-Intervall ver
 
 > **Hinweis:** Testnachrichten prüfen nur den Versandkanal. Sie ersetzen keinen echten Backup- oder Restore-Test.
 
-#### Prometheus und Grafana
+### Prometheus und Grafana
+
+![Prometheus-Integration vor der Token-Erstellung](../assets/de/current/settings-integrations.png)
 
 Unter **Einstellungen > Integrationen > Prometheus & Grafana** lässt sich der
 standardmäßig deaktivierte Metrik-Endpunkt aktivieren. Ein eigenes Token erlaubt
@@ -849,7 +985,7 @@ letzten Aktualisierungsversuchs werden angezeigt. Fehlende Daten sind kein Erfol
 Der Verlauf beginnt mit der Prometheus-Erfassung. Deaktivieren sperrt den Endpunkt
 sofort; Ersetzen oder Widerrufen macht das bisherige Token ungültig.
 
-#### Homepage-Widget
+### Homepage-Widget
 
 Das Homepage-Widget stellt eine kompakte, token-geschützte Statusübersicht für das Projekt **Homepage** bereit. Die Oberfläche erzeugt eine YAML-Vorlage mit Status, erfolgreichen Backups, Restore-Tests und aktiven Läufen. Behandeln Sie den Widget-Token wie ein Passwort und geben Sie ihn nicht in Screenshots oder Support-Paketen weiter.
 
@@ -859,7 +995,7 @@ Der Bereich **About** zeigt die installierte Borg-Backup-UI-Version, die gebünd
 
 ### 9.3 Benutzer
 
-![Einstellungen - Benutzer](../assets/de/settings-users.png)
+![Einstellungen - Benutzer](../assets/de/current/settings-users.png)
 
 Der Bereich **Benutzer** ist sichtbar, wenn die Anwendung im Benutzer-Modus läuft und der angemeldete Benutzer Administratorrechte besitzt.
 
@@ -891,7 +1027,7 @@ und Logs bleiben unverändert.
 
 ### 9.4 Backup
 
-![Einstellungen - Backup](../assets/de/settings-backup.png)
+![Einstellungen - Backup](../assets/de/current/settings-backup.png)
 
 Der Bereich **Backup** enthält Standardwerte und technische Grenzen für Backup-Läufe.
 
@@ -907,7 +1043,9 @@ Diese Werte beeinflussen neue Jobs oder globale Laufzeitgrenzen. Job-spezifische
 
 ### 9.5 Restore
 
-![Einstellungen - Restore](../assets/de/settings-restore.png)
+![Lokales Speicherprofil der Demo](../assets/de/current/settings-local.png)
+
+![Einstellungen - Restore](../assets/de/current/settings-restore.png)
 
 Der Bereich **Restore** enthält zwei Unterbereiche:
 
@@ -944,7 +1082,7 @@ Zu breite oder gefährliche Ziele wie `/`, `/mnt` und Systemverzeichnisse werden
 
 ### 9.7 USB-Profile
 
-![Einstellungen - USB-Profile](../assets/de/settings-usb.png)
+![Einstellungen - USB-Profile](../assets/de/current/settings-usb.png)
 
 USB-Profile beschreiben lokale Datenträger oder Unassigned-Devices-Ziele. Sie werden im Job-Wizard für USB-Jobs verwendet.
 
@@ -968,7 +1106,7 @@ Bestehende Profil- und Repository-Pfade bleiben unverändert; ein erneuter Impor
 
 ### 9.8 SMB-Profile
 
-![Einstellungen - SMB-Profile](../assets/de/settings-smb.png)
+![Einstellungen - SMB-Profile](../assets/de/current/settings-smb.png)
 
 SMB-Profile definieren Netzwerkfreigaben. Passwörter werden als Secrets behandelt.
 
@@ -998,7 +1136,7 @@ Typische Aktionen:
 
 ### 9.9 SSH-Profile
 
-![Einstellungen - SSH-Profile](../assets/de/settings-storagebox.png)
+![Einstellungen - SSH-Profile](../assets/de/current/settings-storagebox.png)
 
 SSH-Profile werden für Storagebox- oder andere SSH-Ziele verwendet.
 
@@ -1030,7 +1168,7 @@ Die Zieltypen **Storagebox**, **Synology** und **Generic SSH** verwenden weiterh
 
 ### 9.10 Import / Export
 
-![Einstellungen - Import / Export](../assets/de/settings-import-export.png)
+![Einstellungen - Import / Export](../assets/de/current/settings-import-export.png)
 
 Der Bereich **Import / Export** dient zur Sicherung und Übertragung von Anwendungskonfiguration.
 
@@ -1051,11 +1189,11 @@ Importstrategien können je nach Importtyp vorhandene Einträge behalten, ersetz
 
 Neue verschlüsselte Exporte verwenden eine versionierte, authentifizierte Hülle. Ein falsches Passwort sowie beschädigte, abgeschnittene oder manipulierte Dateien werden geprüft, bevor Importdaten geschrieben werden. Zusätzlich muss das enthaltene Konfigurationsformat unterstützt werden; Dateiname und Exportdatum sind dafür nicht entscheidend.
 
-> **Nach dem Update neue Exporte erstellen:** Job- und Profilexporte im bisherigen Format sind nicht mehr importierbar. Erstellen Sie nach erfolgreicher Migration neue Job- und Profilexporte. Alte Formate werden vor Änderungen an Jobs, Einstellungen oder Secrets abgelehnt. Vorhandene Borg-Backup-Archive bleiben für Wiederherstellungen verwendbar und müssen nicht neu erstellt werden.
+> **Import-Kompatibilität:** Unterstützt werden Jobpakete v3/v4 mit Job-Schema 5, sichere Jobpakete secure-v3 und Profilpakete v2. Ältere innere Formate werden abgelehnt. [Die Formattabelle](#163-exportformate-und-grenzen) nennt Inhalte und getrennt nötige Sicherungen. Borg-Archive bleiben unabhängig davon verwendbar.
 
 ### 9.11 Erweitert
 
-![Einstellungen - Erweitert](../assets/de/settings-advanced.png)
+![Einstellungen - Erweitert](../assets/de/current/settings-advanced.png)
 
 Der Bereich **Erweitert** enthält technische Daten, die normale Anwender nur bei Bedarf prüfen sollten.
 
@@ -1078,7 +1216,7 @@ Für die Freigabe sind alle Risikobestätigungen, der Servername, das aktuelle A
 
 ### 9.13 Systemstatus und Migration
 
-![Einstellungen - Systemstatus und Migration](../assets/de/settings-system-health.png)
+![Einstellungen - Systemstatus und Migration](../assets/de/current/settings-general.png)
 
 Der Systemstatus ist unten links in der Seitenleiste sichtbar. Ein Klick öffnet den zugehörigen Diagnosebereich innerhalb der Einstellungen.
 
@@ -1124,9 +1262,13 @@ Runtime-Recovery weist darauf hin, wenn Docker-Container oder VMs während eines
 
 ## 10. Hilfe
 
-![Hilfe](../assets/de/help.png)
+![Hilfe](../assets/de/current/help.png)
 
-Die Seite **Hilfe** zeigt die integrierte Kurzhilfe der Anwendung.
+Die Seite **Hilfe** bietet **Schnellhilfe** und **Handbuch**. Beide sind offline verfügbar und folgen der gewählten Sprache. Begleitdokumente öffnen sich innerhalb der Hilfe; mit den beiden Ansichten kehren Sie zum Einstieg zurück.
+
+Beim Wechsel der Ansicht oder beim Öffnen eines Dokuments ohne Kapitelverweis bleibt der Seitenanfang mit Überschrift und Ansichtsreitern sichtbar. Kapitelverweise springen weiterhin direkt zum gewünschten Abschnitt.
+
+Auf großen Bildschirmen scrollen Dokument und Kapitelverzeichnis unabhängig voneinander. Hauptnavigation, Überschrift, Ansichtsreiter und Suchfeld bleiben stehen. Den Dokumentbereich können Sie per Tabulator fokussieren und mit der Tastatur scrollen.
 
 ### 10.1 Zweck der Seite
 
@@ -1149,57 +1291,193 @@ Die Hilfe liefert schnelle Orientierung direkt in der UI. Sie ist kürzer als di
 
 ### 11.1 Neuen Backup-Job anlegen
 
-1. Öffnen Sie **Jobs**.
-2. Klicken Sie auf **Neuer Job**.
-3. Tragen Sie Name, Typ-ID, Icon und Standort ein.
-4. Wählen Sie die Ordner oder Dateien, die gesichert werden sollen.
-5. Wählen Sie zuerst das Speicherziel und danach ein vorhandenes Repository.
-6. Konfigurieren Sie Docker- oder VM-Steuerung, wenn nötig.
-7. Setzen Sie Kompression und Retention. Verschlüsselung und Passphrase gehören zum Repository.
-8. Aktivieren Sie optional einen Zeitplan.
-9. Prüfen Sie die Flow-Vorschau.
-10. Speichern Sie den Job.
-11. Starten Sie den Job einmal manuell und prüfen Sie **History**.
+**Ziel:** Wiederholbar sichern. **Rolle:** admin. Das Repository muss bereits
+vorhanden und erreichbar sein. Prüfen Sie vor Dienststopps die Auswirkungen auf
+Benutzer und vor Retention-Änderungen die benötigten Sicherungsstände.
+
+1. Öffnen Sie **Jobs > Neuer Job**. Setzen Sie Job-Name und Archivpräfix, prüfen
+   Sie die automatische Job-ID und wählen Sie Icon und erforderliche Dienststeuerung.
+2. Wählen Sie Quellen, Speicherziel und Repository; danach Ausschlüsse.
+3. Konfigurieren Sie Docker und VMs nur bei aktivierter Steuerung.
+4. Wählen Sie Retention, Beschreibung und optionalen Zeitplan. Wählen Sie unter
+   **Pre-/Post-Skripte** nur geprüfte, zuvor gespeicherte Definitionen.
+5. Prüfen Sie **Flow-Vorschau**, speichern Sie und starten Sie einmal manuell.
+6. Kontrollieren Sie History, Archivinhalt und eine Wiederherstellung nach dem
+   [Schnellstart](#schnellstart-erstes-backup-und-geprüfter-restore).
+
+**Ergebnis:** Job und Archiv sind sichtbar; nur ein Inhaltsvergleich bestätigt
+die Testdatei. Bei leerem Archiv Quellen und Ausschlüsse prüfen. Details:
+[Job-Wizard](#35-job-wizard), [Retention](#retention-kompression-und-beschreibung).
 
 ### 11.2 Repository prüfen
 
-1. Öffnen Sie **Repositories**.
-2. Wählen Sie Speicherziel und Repository.
-3. Aktualisieren Sie die Repository-Informationen.
-4. Öffnen Sie bei Bedarf **Wartung** und starten Sie die passende Prüfung.
-5. Prüfen Sie bei Fehlern Passphrase, Profil, Mount oder SSH-Verbindung.
+**Ziel:** Struktur beziehungsweise Nutzdaten prüfen. **Rolle:** operator oder
+admin. Ziel, Schlüssel und Passphrase müssen verfügbar sein. Planen Sie Zeit und
+I/O ein und warten Sie andere Repository-Aktionen ab.
+
+1. Wählen Sie unter **Repositories** das Speicherziel und Repository.
+2. Aktualisieren Sie Informationen und öffnen Sie **Wartung**.
+3. Wählen Sie **Check** oder für Nutzdaten **Daten prüfen**; bestätigen Sie.
+4. Warten Sie den Abschluss ab und lesen Sie Status, Zeitpunkt und Details.
+5. Bei Fehlern zuerst Profil, Mount, Zugang und konkrete Borg-Meldung prüfen.
+   Kein Prune oder Compact als vermeintliche Reparatur starten.
+
+**Erfolg:** Die gewählte Prüfung ist ohne Fehler abgeschlossen. Das belegt keinen
+Anwendungsstart. Unterschiede: [Wartungstabelle](#172-wartung-und-löschung).
 
 ### 11.3 Dateien wiederherstellen
 
-1. Öffnen Sie **Browse & Restore**.
-2. Wählen Sie den Job.
-3. Wählen Sie ein Archiv.
-4. Markieren Sie Dateien oder Verzeichnisse.
-5. Wählen Sie Zielordner und Konfliktstrategie.
-6. Prüfen Sie die Zusammenfassung.
-7. Starten Sie den Restore.
-8. Beobachten Sie den Restore-Status und prüfen Sie anschließend die Abschlussübersicht.
-9. Prüfen Sie den Eintrag in **Restore History**.
+**Ziel:** Datei, Verzeichnis oder mehrere Einträge in ein sicheres Ziel schreiben.
+**Rolle:** operator oder admin. Repository-Zugang, genügend freier Platz und ein
+vorhandenes erlaubtes Ziel sind erforderlich. Sichern Sie vorhandene Zieldaten
+vor **Ersetzen**; beginnen Sie möglichst in einem leeren Testziel.
+
+1. Öffnen Sie **Browse & Restore**, wählen Sie Job und konkretes Archiv.
+2. Verwenden Sie bei fremden Namen bewusst **Alle Archive im Repository**.
+3. Markieren Sie bis zu 256 Dateien/Ordner und prüfen Sie die Auswahlliste.
+4. Wählen Sie Ziel und Konfliktstrategie. Kontrollieren Sie jeden endgültigen
+   Zielpfad in der Vorprüfung und die Platzanforderung für die Zwischenablage.
+5. Optional zuerst **Testlauf (keine Änderungen)**. Für echte Dateien muss die
+   Option anschließend ausgeschaltet sein. Bestätigen Sie den Restore.
+6. Lesen Sie Abschlussstatus und **Restore History**. Prüfen Sie geschriebene,
+   übersprungene und fehlgeschlagene Einträge getrennt.
+7. Vergleichen Sie Inhalte, erforderliche Rechte/Metadaten und bei Anwendungen
+   deren Funktion in einer isolierten Umgebung.
+
+**Fehler:** Ein vorhandener ausgewählter Ordner wird bei **Nicht überschreiben**
+als Ganzes übersprungen. Ein späterer Verschiebefehler kann einen Teilrestore
+hinterlassen. Verwenden Sie zur Diagnose ein neues Ziel. Details:
+[Restore-Wizard](#73-restore-wizard).
 
 ### 11.4 Restore-Test planen
 
-1. Öffnen Sie **Restore Tests**.
-2. Wählen Sie den gewünschten Job.
-3. Setzen Sie Policy auf geplant.
-4. Wählen Sie Intervall und Level.
-5. Speichern Sie die Policy.
-6. Starten Sie optional einen manuellen Test.
-7. Prüfen Sie den Prüfbericht.
+**Ziel:** Regelmäßige technische Prüfung und getrennte Nachweisfrist.
+**Rolle:** admin zum Planen, operator zum manuellen Start. Prüfen Sie zunächst
+[Archivwahl und Testgrenzen](#83-testlevel).
+
+1. Öffnen Sie **Restore Tests > Planung & Policy**, wählen Sie den Job und
+   **Plan bearbeiten**.
+2. Aktivieren Sie die geplante Ausführung, wählen Sie Kalenderfrequenz/Uhrzeit
+   beziehungsweise Cron und L1, L2 oder L3.
+3. Setzen Sie **Nachweisgültigkeit** unabhängig vom Termin, z. B. acht Tage für
+   einen wöchentlichen Test. Maßgeblich ist die Unraid-Serverzeitzone; Sommerzeit
+   kann die realen Abstände verändern.
+4. Speichern Sie. Prüfen Sie **Nächster Test** und den Planstatus. Ein gespeicherter
+   Plan mit fehlgeschlagener Cron-Installation ist noch keine aktive Automatik.
+5. Starten Sie **Jetzt testen**, lesen Sie Prüfbericht, Archivname, Schritte und
+   Abdeckung. Vergleichen Sie zusätzlich einen echten Restore.
+
+Verpasste oder wegen Repository-Konflikt übersprungene Termine werden nicht
+nachgeholt. Starten Sie dann manuell. Ein Skip erneuert die Gültigkeit nicht.
+Legacy-Intervalltests bleiben unter **Einstellungen > Restore** getrennt; deren
+Intervall ist kein Ersatz für den Kalenderplan. Ohne bisherigen Testbericht
+wird kein Restore-Überfälligkeits-Reminder gesendet. Referenz: [Planung](#82-reiter-planung--policy).
 
 ### 11.5 Benachrichtigungen einrichten
 
-1. Öffnen Sie **Einstellungen > Allgemein**.
-2. Öffnen Sie die Rubrik **Benachrichtigungen**.
-3. Konfigurieren Sie Unraid-, E-Mail- oder Apprise-Profil.
-4. Wählen Sie die gewünschten Ereignisse.
-5. Setzen Sie Reminder-Intervall und Backup-Toleranz.
-6. Senden Sie eine Testnachricht.
-7. Prüfen Sie unter **Einstellungen > Erweitert > Notification Reminder** die Diagnose.
+**Ziel:** Relevante Ergebnisse und Überfälligkeit empfangen. **Rolle:** admin.
+Benötigt werden die Zugangsdaten des gewählten Kanals; geben Sie sie nicht in Logs
+oder Screenshots weiter.
+
+1. Öffnen Sie **Einstellungen > Benachrichtigungen**.
+2. Konfigurieren Sie Unraid, E-Mail/SMTP oder ein Apprise-Profil.
+3. Wählen Sie Ereignisse, Reminder-Abstand und Backup-Toleranz. Speichern Sie.
+4. Senden Sie eine Testnachricht und bestätigen Sie den Empfang am Ziel.
+5. Prüfen Sie **Einstellungen > Erweitert > Notification Reminder** sowie beim
+   nächsten echten Lauf dessen Ergebnis und Zustellung.
+
+**Fehler:** Eine Testmail prüft nur den Kanal. Fehlendes Ereignis, falscher Empfänger,
+Toleranz und Retry-Queue können echte Meldungen beeinflussen. Siehe
+[Benachrichtigungen](#benachrichtigungen) und [Fehlerhilfe](#134-e-mail-ntfy-oder-apprise-wird-nicht-gesendet).
+
+### 11.6 Pre-/Post-Skripte einrichten und prüfen
+
+**Ziel:** Einen Job um kontrollierte Vor- und Nacharbeiten ergänzen. **Rolle:**
+admin zum Einrichten, operator zum Starten. Verwenden Sie zuerst einen Testjob.
+Skripte laufen mit den Rechten des Backupdienstes; ein fehlerhaftes Skript kann
+Daten verändern oder Dienste beeinflussen. Nutzen Sie zum Lernen nur Logausgaben.
+
+1. Öffnen Sie **Einstellungen > Skripte**, wählen Sie **Neues Skript** und nennen
+   Sie es `Demo Pre`. Setzen Sie den Timeout auf `30` Sekunden.
+2. Tragen Sie dieses harmlose Beispiel ein und wählen Sie **Prüfen und speichern**:
+
+   ```bash
+   #!/bin/bash
+   set -euo pipefail
+   printf '%s\n' 'Demo Pre: Vorbereitung geprüft'
+   ```
+
+3. Legen Sie analog `Demo Post` mit der Ausgabe `Demo Post: Nacharbeit beendet`
+   an. Die Syntaxprüfung startet die Skripte noch nicht.
+4. Bearbeiten Sie den Testjob. Wählen Sie in Schritt **Pre-/Post-Skripte** die
+   beiden gespeicherten Skripte. **Bei Erfolg** ist die übliche Post-Bedingung;
+   wählen Sie **Auch bei Fehler, Überspringen oder Abbruch** nur, wenn das Skript
+   diese Zustände sinnvoll behandelt. Prüfen Sie die **Flow-Vorschau** und speichern Sie.
+5. Starten Sie den Job manuell. Im Log muss Pre vor der Vorbereitung und Post
+   nach Wartung und Cleanup erscheinen. Öffnen Sie **History** und prüfen Sie
+   die getrennten Skriptergebnisse, Exitcodes und das Backup-Ergebnis.
+6. Prüfen Sie unter **Einstellungen > Skripte > Verwendet von** die Zuordnungen.
+   Änderungen an einem zentralen Skript betreffen alle dort genannten Jobs beim
+   nächsten Start. Sichern Sie Skripttext, Timeout und Zuordnung separat vom Jobexport.
+
+**Erfolgskontrolle:** Beide Beispielausgaben und Exitcode `0` sind sichtbar; das
+Archiv enthält weiterhin die erwarteten Dateien. Ein Pre-Fehler bedeutet keinen
+Backupstart. Ein Post-Fehler kann neben einem bereits geschriebenen Archiv stehen.
+Bei einem Timeout zuerst die ausgeführte Aktion prüfen, statt die Grenze blind
+zu erhöhen. [Ablauf und Fehlerregeln](#schritt-9-pre-post-skripte) und
+[erweiterte Testskripte](../../examples/job-hooks/README.md).
+
+![Aktuelle Skriptverwaltung mit harmlosem Demo-Pre-Skript](../assets/de/current/scripts.png)
+
+*Aktuelle Anwendung, 11.10.2026: zentraler Bash-Editor mit Syntaxprüfung, Timeout,
+Import/Export und Jobzuordnungen. Ausschließlich synthetische Beispieldaten.*
+
+![Pre- und Post-Auswahl im aktuellen Job-Wizard](../assets/de/current/wizard-scripts.png)
+
+*Schritt 9 ordnet gespeicherte Skripte zu; die Post-Bedingung gehört zum Job.*
+
+### 11.7 Backup-Zustand in Grafana verfolgen
+
+**Ziel:** Die mitgelieferte Übersicht in Grafana verwenden. **Rolle:** admin für
+Plugin-Einstellungen und passende Rechte in Prometheus/Grafana. Beide Dienste
+müssen separat vorhanden sein. Das Plugin installiert sie nicht.
+
+1. Öffnen Sie **Einstellungen > Integrationen > Prometheus & Grafana**. Aktivieren
+   Sie Metriken und verwahren Sie das neu angezeigte, eingeschränkte Lesetoken.
+   Veröffentlichen Sie den Token nicht in Bildern, Links oder Support-Paketen.
+2. Übernehmen Sie die angezeigte Scrape-Konfiguration in Prometheus. Verwenden
+   Sie eine aus dessen Umgebung erreichbare Plugin-Adresse. Ein Container-
+   `localhost` bezeichnet den Container, nicht Ihren Unraid-Host.
+3. Prüfen Sie in Prometheus das Target: **UP**. Laden Sie in der Integration die
+   Dashboard-JSON herunter und importieren Sie sie in Grafana. Wählen Sie dabei
+   Ihre Prometheus-Datenquelle. Sichern Sie lokale Anpassungen vor dem Ersetzen
+   eines vorhandenen Dashboards mit derselben UID.
+4. Wählen Sie oben einen Server und bei Bedarf Standort, Repository und Job.
+   Prüfen Sie zuerst **Connection**, **Dashboard data** und **Snapshot age**.
+5. Lesen Sie danach letzte Backup-Ergebnisse, Überfälligkeit und Restore-Nachweise
+   getrennt. **Latest runs successful** zählt Jobs mit erfolgreichem letztem
+   Ergebnis; es zählt nicht alle Läufe im gewählten Zeitraum.
+
+![Mitgeliefertes Grafana-Dashboard mit synthetischen Backup- und Restore-Daten](../assets/shared/grafana-overview.png)
+
+*Echte Aufnahme in Grafana 12.1.1 mit der ausgelieferten Dashboard-Vorlage,
+11.10.2026. Namen, Größen und Zustände sind Beispieldaten; die Dashboard-Sprache
+ist Englisch. Kein Nachweis über die Backups eines realen Servers.*
+
+| Beispielanzeige | Bedeutung und nächster Schritt |
+| --- | --- |
+| Connection online, Dashboard data available | Exporter erreichbar und Daten lesbar; noch keine Aussage über den Backup-Erfolg. |
+| Erfolgreiches letztes Backup, aber überfällig | Der letzte Erfolg ist zu alt. Zeitplan, Mount und Joblog im Plugin prüfen. |
+| Restore evidence expired/failed | Nachweis abgelaufen oder Prüfung fehlgeschlagen. Bericht und tatsächlich getestetes Archiv prüfen; echten Restore durchführen. |
+| No data / No result | Fehlende Daten bleiben unbekannt. Target, Token, Filter und Erfassungsbeginn prüfen; nicht als gesunden Nullwert lesen. |
+| Stored in repositories | Zwischengespeicherte eindeutige komprimierte Chunks; nicht der gesamte Dateisystemverbrauch und nicht nur die Daten des ausgewählten Jobs. |
+
+**Erfolgskontrolle:** Target ist UP, Snapshot aktuell und ein bekannter Demojob
+erscheint mit plausiblen Werten. Die Historie beginnt erst mit der Erfassung in
+Prometheus; kurze Läufe können zwischen Abfragen liegen. Für den vollständigen
+Laufverlauf verwenden Sie **History** im Plugin. Details, Beispielkonfiguration
+und Metrikgrenzen: [Prometheus-/Grafana-Leitfaden](../../integrations/prometheus.md).
+
 
 ## 12. Status, Warnungen und Best Practices
 
@@ -1404,3 +1682,225 @@ Ein typisches Unraid-Setup kombiniert Originaldaten auf dem Array mit einem loka
 - Führen Sie nach wesentlichen Änderungen einen manuellen Restore in ein Testverzeichnis durch.
 - Dokumentieren Sie, wo Passphrase, Keyfile und Export-Passwort sicher hinterlegt sind.
 - Prüfen Sie nach Updates Migration, Jobs, Repository-Zuordnung und mindestens einen repräsentativen Backup-Lauf.
+
+## 16. Notfallwiederherstellung
+
+### 16.1 Vor dem Ausfall sichern
+
+**Ziel:** Nach Verlust des Unraid-Hosts wieder auf ein bestehendes Archiv zugreifen.
+Dazu benötigen Sie administrative Kontrolle über den neuen Host und die
+Speicherziele. Ein Jobexport allein ist kein vollständiger Wiederanlaufplan.
+
+| Was Sie benötigen | Aufbewahrung und Zweck |
+| --- | --- |
+| Unabhängige Kopie des Borg-Repositorys | Enthält Archive und Datenblöcke. Ein Export der Plugin-Einstellungen enthält keine Backup-Daten. |
+| Repository-Adresse und Borg-Repository-ID | Verhindert eine Verwechslung von Zielen; dokumentieren Sie Host, Port, Basis- und relativen Pfad. |
+| Borg-Passphrase und Borg-Key-Export | Bei `repokey`/`repokey-blake2` liegt der aktive Schlüssel im Repository; exportieren Sie ihn zusätzlich. Bei `keyfile`/`keyfile-blake2` ist die externe Schlüsseldatei zwingend erforderlich. Die Passphrase allein ersetzt keinen fehlenden Schlüssel. |
+| SSH-Schlüssel, SMB-Zugang und Export-Passwörter | Getrennt vom alleinigen Backup-Host sichern; bei SSH auch die Identität des Zielhosts unabhängig prüfen. |
+| `/boot/config/borg-backup` | Enthält Konfiguration, Jobs, Inventare, Benutzer, Secrets, Borg-Keyfiles, Zeitpläne, Migrationszustand und zentrale Skripte. Geschützt und bei gestopptem Dienst konsistent kopieren. |
+| Konfiguriertes Hauptverzeichnis (`GLOBAL_DATA_DIR`) | Enthält Logs, Status, Reports und Restore-Daten. Es ist ein anderer Speicherbereich als die Flash-Konfiguration. Umfang und Größe vor einer Kopie prüfen. |
+| Unraid-Systemkonfiguration und Anwendungswissen | Pools, Shares, Freigaben, Container-/VM-Definitionen, Netzwerk und anwendungseigene Wiederherstellungsschritte separat sichern. |
+
+Bewahren Sie mindestens eine Kopie außerhalb des Servers auf, und Passwörter
+zusätzlich in einem unabhängigen Passwortspeicher. Prüfen Sie regelmäßig, ob
+Exporte entschlüsselt werden können, ob ihr Manifest fehlgeschlagene Key-Exporte
+meldet und ob ein Testrestore gelingt. Support-Pakete sind dafür kein Ersatz.
+
+### 16.2 Wiederanlauf auf einem neuen Host
+
+1. Stoppen Sie automatische Backups, Prune und Zeitpläne. Bewahren Sie beschädigte
+   Konfigurationen und das Repository unverändert auf; arbeiten Sie nach
+   Möglichkeit mit einer unabhängigen Repository-Kopie. Niemals **Neues Repository
+   erstellen** auf das vorhandene Ziel anwenden.
+2. Stellen Sie Unraid, Pools, Shares und Python-Voraussetzungen bereit. Installieren
+   Sie eine zum Export kompatible Borg-Backup-UI-Version; vergleichen Sie **About**
+   mit dem dokumentierten Stand. Richten Sie ein Administratorkonto und ein
+   verfügbares Hauptverzeichnis ein. Ohne vorhandene Unraid-Konfiguration ist
+   dies keine automatische vollständige Serverwiederherstellung.
+3. Stellen Sie entweder eine geprüfte vollständige Plugin-Konfiguration bei
+   gestopptem Dienst kontrolliert wieder her oder verwenden Sie die Exportimporte.
+   Bewahren Sie die neue und die alte Konfiguration vor dem Ersetzen separat auf.
+   Kopieren Sie keinen alten Migrationszustand als angebliches Code-Downgrade.
+   Bei geändertem Host prüfen Sie Pfade, Mounts, Benutzer und Netzwerk erneut.
+4. Bei Exportimporten: zuerst Speicherprofile und deren Secrets wiederherstellen,
+   dann Job-/Repository-Definitionen samt Passphrases und vorhandenen Keyfiles.
+   Nutzen Sie die Importvorschau und wählen Sie Konfliktstrategien bewusst.
+   Prüfen Sie unmittelbar danach importierte Zeitpläne, bevor Jobs laufen können.
+   Die Formattabelle unten zeigt, welche Teile getrennt benötigt werden.
+5. Falls Sie Definitionen manuell rekonstruieren, wählen Sie unter **Repositories**
+   **Vorhandenes Repository importieren**. Verwenden Sie dessen ursprüngliche
+   Passphrase und bei Keyfile-Verschlüsselung den passenden Borg-Key. Prüfen Sie
+   die Repository-ID. Einen einzelnen Key beziehungsweise eine passende
+   Repository-Key-Sicherung importieren Sie über die Repository-Verwaltung.
+6. Stellen Sie zentrale Skriptdefinitionen separat wieder her. `.sh`-Importe
+   erzeugen neue Definitionen: prüfen Sie Inhalt, Timeout und Jobzuordnung erneut.
+   Hooks dürfen vor dem Testlauf keine unbekannten Produktionsaktionen ausführen.
+7. Prüfen Sie **Systemzustand & Migration**. Fehlgeschlagene Pflichtmigrationen
+   blockieren den normalen Betrieb; zuerst die konkrete Ursache beheben und mit
+   der installierten oder korrigierten Version neu starten. Details und Audit-Log
+   sichern. Eine Migrationssicherung ist kein automatisches Plugin-Rollback.
+8. Listen Sie Archive. Bei fehlenden Jobpräfixen wählen Sie **Alle Archive im
+   Repository**. Für Browse & Restore muss ein Job mit diesem Repository
+   existieren; ein neuer, noch nicht geplanter Hilfsjob reicht zur Zuordnung.
+   Stellen Sie zunächst eine kleine Auswahl in ein separates erlaubtes Ziel
+   wieder her. Vergleichen Sie Inhalt und benötigte Metadaten; testen Sie
+   Anwendungen isoliert, bevor Sie Produktionsdaten ersetzen.
+9. Prüfen Sie den Neustart der benötigten Dienste, Ergebnisse und Benachrichtigungen.
+   Erst danach aktivieren Sie Zeitpläne und Retention wieder. Eine grüne
+   Verbindungsprüfung allein ist keine abgeschlossene Wiederherstellung.
+
+Bei vergessenem Admin-Passwort verwenden Sie **Admin Access Recovery** auf der
+Unraid-Pluginseite. Bei beschädigtem Benutzerbestand gilt der gesonderte
+[Leitfaden zur Benutzerdatei](../../auth-user-store-recovery.md) (technische
+Referenz auf Englisch); niemals eine gültige Benutzerdatei als Routine-Passwortreset löschen.
+
+### 16.3 Exportformate und Grenzen
+
+Die Angaben gelten für `2026.10.09.1435`. Verschlüsselte Exporte verwenden außen
+`bbui-authenticated-export` Version `2`. Der Import prüft zusätzlich das innere
+Format. Eine alte OpenSSL-Verschlüsselungshülle kann gelesen werden, macht ein
+nicht unterstütztes inneres Format aber nicht kompatibel. Prüfen Sie jedes Paket
+in der Importvorschau; ändern Sie keine Formatkennung von Hand.
+
+| Export / inneres Format | Enthalten | Nicht enthalten / Importgrenze |
+| --- | --- | --- |
+| Jobs: `bbui-job-bundle-v3` oder `bbui-job-bundle-v4` | Job-Metadaten im Schema 5, Repository-/Speicherzuordnungen, Zeitpläne, Profilkonfiguration; verwaltete Ausschlussdateien bei Bedarf | Keine Passphrase-Dateiinhalte, keine Borg-Keyfile-Inhalte, keine zentralen Skriptdefinitionen, keine Archive. v4 wird bei erweiterten Ausschlüssen/Retention erzeugt; beide Formate mit gültigem Schema 5 werden akzeptiert. v1/v2 und ältere Job-Schemas werden abgelehnt. |
+| Jobs mit Passphrases: `bbui-job-bundle-secure-v3` | Inneres v3/v4-Jobpaket, zugehörige vorhandene Passphrase-Dateien und lokale Borg-Keyfiles | Kein allgemeines Einstellungs-/Profil-Secret-Paket, keine zentralen Skripte, keine Archive, keine automatisch exportierten Repokey-Schlüssel. Ältere secure-Formate werden abgelehnt. |
+| Profile und Secrets: `bbui-profile-secrets-v2` | SMB-/Speicherprofile, deren zugeordnete SMB-/SSH-Secret-Dateien | Keine Jobs, Archive oder vollständige Anwendungskonfiguration. v1 wird abgelehnt. |
+| Secrets: `bbui-secrets-backup-v1` | Zulässige Secret-Dateien und Dateien unter `secrets/borg-keys` | Keine Job-/Profildefinitionen oder Datenarchive; nur akzeptierte Dateinamen werden importiert. |
+| Repository-Keys: `bbui-repository-keys-v1` | Borg-Key-Exporte mit Manifest und Repository-ID | Keine Archivdaten; fehlgeschlagene Exporte im Manifest prüfen. Import ordnet nach Repository-ID zu, nicht nur nach Anzeigename. |
+| Einzelnes Skript: `.sh` | Bash-Quelltext | Keine dauerhafte Skript-ID, Beschreibung, Timeout oder Jobzuordnung; nach Import neu prüfen und zuordnen. |
+| Config-Backup / Migrationssnapshot | Die jeweils im Sicherungsmanifest genannten lokalen Konfigurationsdateien | Kein vollständiges Systembackup, kein Downgrade des installierten Codes; nicht mit einem transportablen Jobexport verwechseln. |
+
+**Zentrale Skripte:** Jobpakete enthalten lediglich Hook-Verweise. Für eine
+vollständige Sicherung benötigen Sie zusätzlich
+`/boot/config/borg-backup/config/job-scripts.json` oder einzeln exportierte
+Skripte samt dokumentierter Zuordnung. Ein erfolgreicher Jobimport belegt nicht,
+dass jeder Hook auf dem Ziel vorhanden ist.
+
+## 17. Aktions- und Einstellungsreferenz
+
+### 17.1 Rechte und Datenwirkung
+
+Die Mindestrollen richten sich nach den API-Prüfungen. Eine ausgeblendete
+Schaltfläche ist keine zusätzliche Berechtigung. **admin** umfasst die Rechte
+von **operator**, und dieser die Leserechte von **viewer**.
+
+| Aktion | Mindestrolle | Hinweise |
+| --- | --- | --- |
+| Dashboard, Jobs, Archive, History, Reports und Restore-Status lesen | viewer | Geheimnisse bleiben geschützt; administrative Konfiguration ist nicht vollständig lesbar. |
+| Backup starten/abbrechen, Restore vorprüfen/starten, Restore-Test starten | operator | Darf Nutzdaten im erlaubten Restore-Ziel schreiben. |
+| Speicher testen, SMB-Mount-Aktion, Repository-Info laden; Check, Datenprüfung, Prune, Compact | operator | Wartungs-Endpunkt erlaubt auch löschendes Prune; operator ist keine reine „Starten“-Rolle. |
+| Jobs, Zeitpläne, Restore-Test-Policy, Profile und Repository-Zuordnungen ändern | admin | Kann zukünftige Läufe und Löschregeln verändern. |
+| Einzelne Archive oder Repository endgültig löschen, Borg-Keys importieren/exportieren | admin | Schutzdialoge und weitere Vorbedingungen gelten zusätzlich. |
+| Benutzer, Skripte, Exporte, Systemeinstellungen, Reset und Supportpaket | admin | Exporte und Supportpakete können vertrauliche Informationen enthalten. |
+
+Prometheus- und Homepage-Token sind getrennte, eingeschränkte Lesetoken für
+jeweils ihren Endpunkt; sie ersetzen keine Benutzerrolle. Deaktivieren oder
+Widerrufen sperrt die Integration. Die [Prometheus-Anleitung](../../integrations/prometheus.md)
+und [Homepage-Anleitung](../../integrations/homepage-widget.md) sind technische
+Begleitdokumente auf Englisch und werden offline mitgeliefert.
+
+### 17.2 Wartung und Löschung
+
+Vor löschenden Aktionen benötigen Sie eine geprüfte unabhängige Sicherung und
+eine bewusste Entscheidung über die betroffenen Wiederherstellungspunkte.
+Warten Sie andere Repository-Nutzer ab. Ein Check ist keine Reparatur.
+
+| Aktion | Voraussetzungen und Zweck | Datenwirkung | Erfolgskontrolle |
+| --- | --- | --- | --- |
+| Check | Erreichbares Repository; Struktur von Repository und Archiven prüfen | Kein `--repair`; keine geplante Archivlöschung | Abschlussstatus, Zeitpunkt und Fehlerdetails in Wartung prüfen |
+| Daten prüfen | Check mit `--verify-data`; Zeit, I/O und Netzwerk einplanen | Liest zusätzlich Nutzdaten zur Integritätsprüfung; stellt keine Anwendung wieder her | Vollständigen Abschluss ohne Datenfehler abwarten |
+| Prune | Job als Retention-Quelle; bei mehreren Jobs explizit auswählen | Löscht ungeschützte Archive passend zum aktuellen Jobpräfix. Frühere Präfixe bleiben außerhalb dieses Filters | Regeln, tatsächlichen Filter und Liste gelöschter Archive prüfen; keine Wizard-Löschvorschau voraussetzen |
+| Compact | Nach Prune/Löschung oder bei ungenutzten Segmenten | Gibt unreferenzierten Speicher frei, wählt selbst keine zusätzlichen Archive zur Löschung aus | Abschluss und gemeldeten freigegebenen Platz prüfen; 0 kann korrekt sein |
+| Archiv löschen | admin; bewusst gewähltes Archiv, Schutzdialog bestätigen | Entfernt genau diesen Sicherungsstand unabhängig von der Job-Retention | Archivliste neu laden; physischer Platz wird ggf. erst durch Compact frei |
+| Repository löschen | admin; keine Job-Zuordnung, mehrstufige Bestätigung | Entfernt das gesamte Borg-Repository und seine Archive | Ziel und Managementstatus prüfen; nicht mit „aus UI entfernen“ verwechseln |
+
+[Offizielle Borg-1.4.5-Prüfung](https://borgbackup.readthedocs.io/en/1.4.5/usage/check.html)
+und [Aufbewahrung](https://borgbackup.readthedocs.io/en/1.4.5/usage/prune.html)
+sind ergänzende Referenzen. Keine automatische Lock-Entfernung, Reparatur oder
+rekursive Rechteänderung als Standardfehlerbehebung verwenden.
+
+### 17.3 Wichtige Vorgaben und Grenzen
+
+Defaults sind Installationsvorgaben, keine Aussage über Ihre gespeicherte
+Konfiguration. Prüfen Sie die sichtbaren Werte. Globale Laufzeitgrenzen gelten
+auch für vorhandene Jobs; Kompression und Retention sind explizit im Job gespeichert.
+
+| Einstellung | Vorgabe / Grenze | Geltungsbereich und Wirkung |
+| --- | --- | --- |
+| Hauptverzeichnis | Bei Erstinstallation leer und zwingend einzurichten | Logs, Status und Restore-Daten; Mount muss verfügbar sein. Eine Pfadänderung ist kein Repository-Umzug. |
+| Kompression / Retention | Neue Jobs `lz4`; täglich 7, wöchentlich 4, monatlich 6, jährlich 3 | Pro Job; globale Änderungen ersetzen gespeicherte Jobwerte nicht. Zählregeln 0–1.000.000; „letzte X“ mindestens 1. |
+| Borg-Laufzeitgrenze | 0 Stunden = unbegrenzt | Backup-Borg-Prozesse; positiver Wert beendet nach Frist zunächst mit TERM, 30 Sekunden später ggf. KILL. Kein L3-Datei-Timeout. |
+| Borg-Checkpoint / Check | 1800 Sekunden / 30 Tage | Checkpoint bei Archiverstellung; fällige Wartungsprüfung nach Backup. Kein Ersatz für separaten Restore. |
+| Repository-Info-Aktualisierung | Aus; Intervall 24 Stunden, Wiederholung nach 1 Stunde | Liest Repository-Informationen und kann Datenträger aufwecken. Dashboard-Aktualisieren allein ist kein frischer Borg-Check. |
+| Docker-Stopp / Warten | 60 Sekunden Timeout; je 5 Sekunden nach Stopp/Start | Dienste des Jobs; prüfen Sie ausreichende Zeit für die Anwendung. |
+| VM-Shutdown / Warnung / Startwarten | 120 Sekunden / 5 Minuten / 60 Sekunden | VM-Steuerung; Probleme im Log und Runtime-Recovery prüfen, kein Konsistenzversprechen bei fehlgeschlagenem Shutdown. |
+| Parity-Schutz | Ein | Lauf kann bei aktivem Parity-Check übersprungen werden. |
+| Erlaubte Restore-Wurzeln | `/mnt/user` | Administrator erweitert bewusst; Restore-Ziel muss vorhanden und beschreibbar sein. |
+| Restore-Test-Größenschwelle | 500 GB, 0 schaltet Größenumschaltung aus | L2/L3: vollständiger Dry-Run oder begrenzte Dateiauswahl. |
+| Stichprobe / Dateilimits / L3 | 5 %; beide Dateilimits 1000; L3 5 Dateien | Auswahl regulärer Dateien, keine garantierte Anwendungsabdeckung. |
+| Test-Borg-Timeout / Dry-Run / Gruppengröße | Konfigurationsvorlage 240 Sekunden / 0 unbegrenzt / 100 Dateien | Einzelne Aufrufe setzen eigene Limits; die Runner-Fallbacks bei fehlenden Werten sind 180 Sekunden und 200 Dateien. Kein einheitlicher Timeout für alle Phasen. |
+| Kalender und Nachweis | Pro Job; Gültigkeit mindestens 1 Tag | Kalender in Serverzeitzone; Gültigkeit unabhängig vom nächsten Termin. Legacy-Intervallvorgabe 30 Tage. |
+| Hook-Timeout | Vorgabe 300, erlaubt 1–86400 Sekunden | Pro Skript; fehlgeschlagenes Pre verhindert Backup, fehlgeschlagenes Post kann vorhandenes Archiv mit Gesamtfehler hinterlassen. |
+| Reminder / Backup-Toleranz | 24 / 6 Stunden | Abstand wiederholter Meldungen / Wartezeit nach erwartetem Backupstart. Kein Ersatz für Zustellkontrolle. |
+| Logaufbewahrung / Sitzung | 30 Tage / 30 Minuten | Alte Lauf-Logs werden bereinigt; Sitzung läuft ab. Logs vorher sichern, falls länger benötigt. |
+
+## 18. Konzepte und Ablauf
+
+### 18.1 Was ein Archiv und eine Größe bedeuten
+
+Ein Borg-Archiv ist ein logischer Sicherungsstand. Es benötigt keine manuell
+zusammengesetzte Kette aus Voll- und inkrementellen Sicherungen. Datenblöcke
+können zwischen Archiven desselben Repositorys geteilt werden. **Originalgröße**
+beschreibt die logische Datenmenge, **komprimierte Größe** deren komprimierte
+Darstellung und **deduplizierte Größe** den dem Bericht zugeordneten neuen bzw.
+eindeutigen Speicheranteil. Diese Werte sind keine Messung des Netzwerkverkehrs.
+Repositorygröße umfasst auch gemeinsam genutzte Daten und Verwaltungsaufwand;
+Wachstum ist die Differenz zwischen Messständen. Nach Prune kann Platz erst
+nach Compact frei werden. Fehlende oder alte Messwerte sind kein Nachweis, dass
+seitdem keine Daten hinzugekommen sind.
+
+### 18.2 Lebenszyklus eines Jobs
+
+1. Job laden, Voraussetzungen der Definition und Ressourcensperren prüfen.
+   Ein nicht gestarteter oder wegen Sperrkonflikt übersprungener Lauf führt
+   keine Hooks aus.
+2. Pre-/Post-Definitionen für diesen Lauf festhalten. **Pre** ausführen, danach
+   SMB-Mount und Backup-Vorbereitung: Ausschlusskopie, Parity-/USB-/Quellprüfung,
+   Logbereinigung. Ein Pre-Fehler oder Timeout verhindert Stopp und Archivierung.
+3. Ausgewählte laufende Docker-Container stoppen, danach ausgewählte laufende VMs
+   herunterfahren. Keine ausgeschalteten Dienste allein für das Backup starten.
+4. Archiv mit Borg erstellen. Fehler oder Abbruch führen zur Aufräum- und
+   Wiederanlaufphase. Bei Warnung kann ein Archiv vorhanden sein; Details prüfen.
+5. Nach erfolgreicher Archiverstellung zuerst Docker und danach VMs wieder
+   starten; erst anschließend Retention, Compact und fällige Check-Wartung.
+6. Auch im Fehlerpfad den erforderlichen Wiederanlauf versuchen. Temporäre
+   Ausschlussdatei entfernen, selbst angelegten SMB-Mount aufräumen, dann **Post**
+   nach gewählter Bedingung ausführen. „Bei Erfolg“ umfasst auch Warnungen, sofern
+   kein Fehler/Skip vorliegt; „auch bei Fehler, Überspringen oder Abbruch“ gilt
+   nur für tatsächlich gestartete Jobs. Während Recovery/Post ist kein weiterer
+   Benutzerabbruch möglich; der Skript-Timeout gilt weiterhin.
+7. Abschlussergebnis, History, Status und Benachrichtigung festhalten; Sperren
+   freigeben. Post- oder Cleanup-Fehler können den Gesamtjob fehlschlagen lassen,
+   obwohl `borg create` bereits ein Archiv geschrieben hat. Wiederanlaufprobleme
+   unter **Systemzustand & Migration** erst nach tatsächlicher Prüfung quittieren.
+
+Ein Backup bei laufenden Datenbank-Schreibvorgängen ist nicht automatisch
+anwendungskonsistent. Verwenden Sie geeignete Dienststopps oder geprüfte
+anwendungseigene Dumps; ein Hook-Syntaxcheck belegt nur gültige Bash-Syntax.
+[Mitgelieferte Hook-Beispiele](../../examples/job-hooks/README.md) ändern keine
+Produktionsdaten und dienen gezielten Tests.
+
+### 18.3 Fehlersuche nach Symptomen
+
+| Symptom | Risikoarme Diagnose | Ursache und nächster Schritt | Erfolgskontrolle |
+| --- | --- | --- | --- |
+| Erfolgreich, aber Datei fehlt | Archivinhalt, Quelle, Ausschlüsse und Marker lesen | Falsche Quelle oder Filter korrigieren; neuen manuellen Lauf starten | Datei im neuen Archiv finden und separat wiederherstellen |
+| Restore überspringt Ziel | Vorprüfung und Konfliktmodus lesen | „Nicht überschreiben“ trifft auf vorhandenes Ziel; neues leeres Ziel wählen | Tatsächlich geschriebene Datei und Inhalt vergleichen |
+| Restore teilweise fertig | Log mit abgeschlossenen Einträgen sichern | Verschiebefehler, Rechte oder Platz prüfen; kein blindes Ersetzen | Fehlende Auswahl gezielt in neues Ziel restoren |
+| Repository gesperrt | Lokale und entfernte aktive Borg-Prozesse prüfen | Anderen Lauf abwarten; bei Absturz erst Eigentümer und Ursache klären | Aktion nach regulärer Freigabe wiederholen, keine Routine-Locklöschung |
+| Test grün, Archiv gehört anderem Job | Getesteten Archivnamen mit Jobpräfix vergleichen | Repositoryweite Testauswahl; gewünschten Stand manuell auswählen | Echten Restore dieses Archivs mit Inhaltstest durchführen |
+| Test-Timeout oder widersprüchlicher Bericht | Exit-Code und einzelne Schritte lesen | Grenzen aus 8.3 beachten; Last/Erreichbarkeit und Laufzeit prüfen | Ohne Timeout wiederholen und tatsächlichen Restore prüfen |
+| Kein Reminder | Ereignis, Empfänger, Toleranz, letzten Versand prüfen | Einstellungen speichern; Kanal testen; ohne bisherigen Restore-Bericht kein entsprechender Überfälligkeits-Reminder | Testnachricht und nächstes berechtigtes Ereignis kontrollieren |
+| Migration blockiert / Dienste bleiben aus | Systemzustand, Migration und Runtime-Recovery lesen | Konkrete Ursache beheben; Dienste bewusst prüfen; keine Statusdateien als Reparatur löschen | Fehlerfreier Neustart und geprüfter Dienstzustand |

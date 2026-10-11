@@ -1455,6 +1455,52 @@
   font-size: var(--ui-font-size-xs);
 }
 
+/* Keep desktop help chrome stationary while each reading pane scrolls. */
+@media (min-width: 1024px) {
+  #page-hilfe.active {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 28px;
+  }
+
+  #page-hilfe > .page-header,
+  #page-hilfe > .help-view-tabs { flex-shrink: 0; }
+
+  .help-redesign-layout {
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+  }
+
+  .help-toc-sidebar {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .help-toc-sidebar > .ui-context-sidebar__header { flex-shrink: 0; }
+
+  #help-toc {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .help-doc {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
 @media (max-width: 1023px) {
   .storage-redesign-layout { grid-template-columns: minmax(0, 1fr); }
   .storage-repository-search { position: static; flex: 0 0 15rem; border-right: 1px solid var(--ui-color-border); border-bottom: 0; }
@@ -1560,3 +1606,14 @@
     border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0;
   }
 }
+
+/* Offline manual tables retain readable columns on narrow screens. */
+.help-table-scroll { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
+.help-doc table { width: 100%; border-collapse: collapse; font-size: .92em; }
+.help-doc th, .help-doc td { padding: .7rem; border: 1px solid var(--ui-color-border); vertical-align: top; text-align: left; min-width: 9rem; }
+.help-doc th { font-weight: 700; background: var(--ui-color-surface-alt, transparent); }
+.help-doc li > p { margin: .35rem 0; }
+.help-doc pre { max-width: 100%; overflow-x: auto; }
+.help-doc h4, .help-doc h5, .help-doc h6 { scroll-margin-top: 1rem; }
+
+.help-figure img { height: auto; }

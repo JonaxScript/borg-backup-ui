@@ -1,5 +1,17 @@
 # Changelog
 
+## Pending - Bilingual documentation and offline help audit (#560)
+
+- Bound the desktop Help workspace to the viewport and give the document and table of contents independent scroll areas. Keep navigation/search stationary, support keyboard scrolling and reset the reading pane on document changes.
+
+- Start help views and companion documents at the page header without focusing the search field. Preserve explicit chapter jumps and prevent hidden help reloads from scrolling another page.
+
+- Refresh all 50 existing bilingual PNGs, including eight numbered guides, and add lossless current feature captures. Add practical hook setup and a Grafana main-dashboard example with explicit synthetic-data provenance. Verify a real UI backup, both hooks, an L2 test and a 14-file restore.
+
+- Add task-oriented entry paths, first-backup/restore tutorial, disaster recovery, permissions, export formats and source-verified restore-test limitations in both languages. Preserve menu anchors and document screenshot provenance.
+- Extend the restricted help renderer for tables, nested lists, Unicode/legacy anchors and bundled companion navigation. Package canonical companions and rewrite source-relative quick-help links for offline use.
+- Replace stale text assertions with executed rendering, source/package link and safety-contract checks; record evidence and remaining Unraid validation in the documentation audit.
+
 ## Pending - Native Unraid widget freshness and contrast (#546)
 
 - Export absolute backup and schedule times, render relative labels in the browser, and distinguish data update time from successful fetch time without periodic Borg calls or status scans. Mark elapsed cached schedules explicitly and retain evidence on failed or invalid fetches.

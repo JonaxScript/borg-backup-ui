@@ -173,11 +173,7 @@ cp "${REPO_DIR}/borg_backup_ui.conf.example" "${APP_DST}/"
 cp "${REPO_DIR}/LICENSE"                     "${APP_DST}/"
 cp -r "${REPO_DIR}/api"                      "${APP_DST}/"
 cp -r "${REPO_DIR}/ui"                       "${APP_DST}/"
-MANUAL_DST="${APP_DST}/ui/docs/manual"
-mkdir -p "${MANUAL_DST}/de" "${MANUAL_DST}/en"
-cp "${REPO_DIR}/docs/user-manual/de/user-manual.md" "${MANUAL_DST}/de/"
-cp "${REPO_DIR}/docs/user-manual/en/user-manual.md" "${MANUAL_DST}/en/"
-cp -r "${REPO_DIR}/docs/user-manual/assets" "${MANUAL_DST}/"
+python3 "${REPO_DIR}/plugin/package_documentation.py" "${REPO_DIR}" "${APP_DST}"
 if [ -d "${REPO_DIR}/runtime" ]; then
   mkdir -p "${APP_DST}/runtime"
   (
