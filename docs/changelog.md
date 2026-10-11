@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Documentation and release preparation (#560, #557, #563, #565)
+
+- Refresh the English/German manuals and offline help, including first-backup and recovery guidance, current screenshots, permissions, export limits, and the actual scope of restore-test evidence. Keep desktop Help navigation stationary and preserve headers when switching documents. (#560)
+- Add configurable, importable Bash examples for source/free-space checks, Wake-on-LAN, MariaDB/PostgreSQL exports, and a Post webhook, with bilingual instructions and focused tests. The examples are included in the offline documentation package. (#557)
+- Update the repository README with the v7 feature video, current screenshots, Pre/Post workflows, early workload recovery, restore scheduling, and Grafana monitoring. (#563)
+- Prepare a combined test candidate after the documentation PRs merged. The previous 2026.10.11.1325 candidate predates the practical templates; stable promotion requires a new package whose deployable source matches the merged main branch. (#565)
+
 ## Pending - Bilingual documentation and offline help audit (#560)
 
 - Bound the desktop Help workspace to the viewport and give the document and table of contents independent scroll areas. Keep navigation/search stationary, support keyboard scrolling and reset the reading pane on document changes.
