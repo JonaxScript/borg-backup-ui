@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Bilingual documentation and offline help audit (#560)
+
+- Add task-oriented entry paths, first-backup/restore tutorial, disaster recovery, permissions, export formats and source-verified restore-test limitations in both languages. Preserve menu anchors and explicitly identify historic screenshots.
+- Extend the restricted help renderer for tables, nested lists, Unicode/legacy anchors and bundled companion navigation. Package canonical companions and rewrite source-relative quick-help links for offline use.
+- Replace stale text assertions with executed rendering, source/package link and safety-contract checks; record evidence and remaining Unraid validation in the documentation audit.
+
 ## Pending - Native Unraid widget freshness and contrast (#546)
 
 - Export absolute backup and schedule times, render relative labels in the browser, and distinguish data update time from successful fetch time without periodic Borg calls or status scans. Mark elapsed cached schedules explicitly and retain evidence on failed or invalid fetches.

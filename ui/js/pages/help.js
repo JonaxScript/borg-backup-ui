@@ -32,152 +32,145 @@ async function fetchHelpDocument(language) {
   return { markdown: await fallback.text(), path: fallbackPath };
 }
 
-function _helpAssetUrl(rawSource) {
-  const source = String(rawSource || '').trim();
-  if (!source || /^(?:[a-z]+:|\/|#)/i.test(source)) return source;
+/** Resolve documentation references without allowing executable URL schemes.
+ * Returns a URL for HTTP(S) or null for unsupported/invalid input.
+ */
+function _helpUrl(raw) {
   try {
-    return new URL(source, new URL(_helpDocumentUrl, window.location.origin)).pathname;
-  } catch (_err) {
-    return source;
+    const url = new URL(String(raw || '').trim(), new URL(_helpDocumentUrl || '/ui/docs/help.md', window.location.origin));
+    return ['http:', 'https:'].includes(url.protocol) ? url : null;
+  } catch (_err) { return null; }
+}
+
+/** GitHub-style heading slug; punctuation is removed, spaces stay distinct. */
+function _helpSlug(text) {
+  return String(text).toLowerCase().replace(/[^\p{L}\p{N}\p{M}_\-\s]/gu, '').replace(/\s/g, '-');
+}
+
+/** Render the supported inline Markdown subset; source HTML remains escaped. */
+function _helpInline(text) {
+  const source = String(text || '');
+  const pattern = /\x60([^\x60\n]+)\x60|!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+  let result = '', cursor = 0;
+  for (const match of source.matchAll(pattern)) {
+    result += escHtml(source.slice(cursor, match.index));
+    cursor = match.index + match[0].length;
+    if (match[1] !== undefined) result += `<code>${escHtml(match[1])}</code>`;
+    else if (match[2] !== undefined) {
+      const url = _helpUrl(match[3]);
+      // Offline documentation images must stay within the bundled docs tree.
+      if (url && url.origin === window.location.origin && url.pathname.startsWith('/ui/docs/')) {
+        const alt = escHtml(match[2]);
+        const dimensions = /\/manual\/assets\/(de|en)\/[^/]+\.png$/.test(url.pathname) ? ' width="1600" height="1100"' : '';
+        result += `<figure class="help-figure"><img src="${escHtml(url.href)}" alt="${alt}"${dimensions} loading="lazy"><figcaption>${alt}</figcaption></figure>`;
+      } else result += escHtml(match[2]);
+    } else if (match[4] !== undefined) {
+      const label = escHtml(match[4]);
+      const raw = match[5];
+      const url = _helpUrl(raw);
+      if (raw.startsWith('#')) result += `<a href="#help-${escHtml(raw.slice(1).replace(/^help-/, ''))}" data-help-anchor="${escHtml(raw.slice(1))}">${label}</a>`;
+      else if (url) {
+        const internal = url.origin === window.location.origin && url.pathname.startsWith('/ui/docs/');
+        const documentLink = internal && url.pathname.endsWith('.md');
+        const attrs = documentLink ? ' data-help-document="true"' : (internal ? '' : ' target="_blank" rel="noopener noreferrer"');
+        result += `<a href="${escHtml(url.href)}"${attrs}>${label}${internal ? '' : ' ↗'}</a>`;
+      } else result += label;
+    } else if (match[6] !== undefined) result += `<strong>${escHtml(match[6])}</strong>`;
+    else result += `<em>${escHtml(match[7])}</em>`;
   }
+  return result + escHtml(source.slice(cursor));
 }
 
-function _helpInline(mdText) {
-  const inlineCodePattern = new RegExp(String.fromCharCode(96) + '([^\\n]+)' + String.fromCharCode(96), 'g');
-  return escHtml(String(mdText || ''))
-    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt, src) => {
-      const a = escHtml(alt || '');
-      const u = escHtml(_helpAssetUrl(src));
-      const t = a;
-      return `<figure class="help-figure"><img src="${u}" alt="${a}" title="${t}" loading="lazy"><figcaption>${a || t || ''}</figcaption></figure>`;
-    })
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, target) => {
-      if (target.startsWith('#')) return '<a href="#help-' + target.slice(1) + '">' + label + '</a>';
-      return '<a href="' + target + '" target="_blank" rel="noopener">' + label + '</a>';
-    })
-    .replace(inlineCodePattern, '<code>$1</code>')
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+/** Split GFM table cells while preserving escaped pipes and inline code. */
+function _helpCells(line) {
+  const cells = []; let cell = '', code = false;
+  const text = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\\' && text[i + 1] === '|') { cell += '|'; i += 1; }
+    else if (text[i] === '`') { code = !code; cell += text[i]; }
+    else if (text[i] === '|' && !code) { cells.push(cell.trim()); cell = ''; }
+    else cell += text[i];
+  }
+  cells.push(cell.trim()); return cells;
 }
 
+/** Render bundled Markdown: headings, paragraphs, nested lists, tables and code.
+ * This is a restricted renderer, not an HTML interpreter; no raw HTML is trusted.
+ */
 function _renderHelpMarkdown(md) {
   const lines = String(md || '').replace(/\r\n?/g, '\n').split('\n');
-  const out = [];
-  let inList = false;
-  let listType = '';
-  let inCode = false;
-  let callout = [];
-
-  const closeList = () => {
-    if (!inList) return;
-    out.push(listType === 'ol' ? '</ol>' : '</ul>');
-    inList = false;
-    listType = '';
+  const out = [], lists = [], paragraph = [];
+  let inCode = false, callout = [];
+  const flushParagraph = () => {
+    if (paragraph.length) out.push(`<p>${_helpInline(paragraph.splice(0).join(' '))}</p>`);
+  };
+  const closeLists = (indent = -1) => {
+    while (lists.length && lists[lists.length - 1].indent > indent) {
+      out.push(`</li></${lists.pop().type}>`);
+    }
   };
   const closeCallout = () => {
     if (!callout.length) return;
     const directive = callout[0].match(/^\[!(NOTE|TIP|WARNING|IMPORTANT)\]\s*(.*)$/i);
     const emphasized = callout[0].match(/^\*\*(Hinweis|Tipp|Warnung|Wichtig|Note|Tip|Warning|Important):\*\*\s*(.*)$/i);
-    const calloutKinds = {
-      hinweis: 'note', note: 'note', tipp: 'tip', tip: 'tip',
-      warnung: 'warning', warning: 'warning', wichtig: 'important', important: 'important',
-    };
-    const kind = directive
-      ? String(directive[1]).toLowerCase()
-      : (calloutKinds[String(emphasized?.[1] || '').toLowerCase()] || 'note');
+    const kinds = { hinweis: 'note', note: 'note', tipp: 'tip', tip: 'tip', warnung: 'warning', warning: 'warning', wichtig: 'important', important: 'important' };
+    const kind = directive ? directive[1].toLowerCase() : (kinds[String(emphasized?.[1] || '').toLowerCase()] || 'note');
     const title = directive?.[2] || emphasized?.[1] || helpT(`callout.${kind}`);
-    const firstBody = emphasized?.[2] || '';
-    const body = directive
-      ? callout.slice(1)
-      : (emphasized ? [firstBody, ...callout.slice(1)].filter(Boolean) : callout);
-    out.push(`<aside class="help-callout help-callout--${kind}"><strong>${_helpInline(title)}</strong>${body.map(item => `<p>${_helpInline(item)}</p>`).join('')}</aside>`);
+    const body = directive ? callout.slice(1) : (emphasized ? [emphasized[2], ...callout.slice(1)] : callout);
+    out.push(`<aside class="help-callout help-callout--${kind}"><strong>${_helpInline(title)}</strong><p>${_helpInline(body.join(' '))}</p></aside>`);
     callout = [];
   };
-
-  for (const raw of lines) {
-    const line = raw.replace(/\t/g, '  ');
-    const t = line.trim();
-
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i].replace(/\t/g, '    '), t = line.trim();
+    const indent = line.length - line.trimStart().length;
     if (t.startsWith('```')) {
-      if (!inCode) {
-        inCode = true;
-        closeList();
-        closeCallout();
-        out.push('<pre><code>');
-      } else {
-        inCode = false;
-        out.push('</code></pre>');
-      }
+      flushParagraph(); closeCallout();
+      if (inCode) { out.push('</code></pre>'); inCode = false; }
+      else { if (!lists.length || indent <= lists[lists.length - 1].indent) closeLists(); out.push('<pre><code>'); inCode = true; }
       continue;
     }
-    if (inCode) {
-      out.push(`${escHtml(line)}\n`);
-      continue;
-    }
-
-    if (!t) {
-      closeList();
-      closeCallout();
-      continue;
-    }
-
-    if (t.startsWith('> ')) {
-      closeList();
-      callout.push(t.slice(2).trim());
-      continue;
+    if (inCode) { out.push(`${escHtml(line)}\n`); continue; }
+    if (!t) { flushParagraph(); closeCallout(); continue; }
+    if (t.startsWith('>')) {
+      flushParagraph(); closeLists(); callout.push(t.replace(/^>\s?/, '')); continue;
     }
     closeCallout();
-
-    if (t.startsWith('# ')) {
-      closeList();
-      out.push(`<h2 class="help-document-title">${_helpInline(t.slice(2).trim())}</h2>`);
-      continue;
+    if (/^!\[[^\]]*\]\([^)]+\)$/.test(t)) { flushParagraph(); closeLists(); out.push(_helpInline(t)); continue; }
+    const heading = t.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      flushParagraph(); closeLists();
+      const level = Math.max(2, heading[1].length);
+      out.push(`<h${level}${heading[1].length === 1 ? ' class="help-document-title"' : ''}>${_helpInline(heading[2])}</h${level}>`); continue;
     }
-    if (t.startsWith('## ')) {
-      closeList();
-      out.push(`<h2>${_helpInline(t.slice(3).trim())}</h2>`);
-      continue;
+    const nextCells = i + 1 < lines.length ? _helpCells(lines[i + 1]) : [];
+    if (t.includes('|') && nextCells.length > 1 && nextCells.every(cell => /^:?-{3,}:?$/.test(cell))) {
+      flushParagraph(); closeLists();
+      const headers = _helpCells(t);
+      out.push('<div class="help-table-scroll"><table><thead><tr>');
+      headers.forEach(cell => out.push(`<th scope="col">${_helpInline(cell)}</th>`));
+      out.push('</tr></thead><tbody>'); i += 1;
+      while (i + 1 < lines.length && lines[i + 1].trim().includes('|') && lines[i + 1].trim()) {
+        const cells = _helpCells(lines[++i]); out.push('<tr>');
+        headers.forEach((_cell, col) => out.push(`<td>${_helpInline(cells[col] || '')}</td>`)); out.push('</tr>');
+      }
+      out.push('</tbody></table></div>'); continue;
     }
-    if (t.startsWith('### ')) {
-      closeList();
-      out.push(`<h3>${_helpInline(t.slice(4).trim())}</h3>`);
-      continue;
+    const item = t.match(/^(?:([-*])|([0-9]+)\.)\s+(.+)$/);
+    if (item) {
+      flushParagraph(); closeLists(indent);
+      const type = item[1] ? 'ul' : 'ol';
+      if (lists.length && lists[lists.length - 1].indent === indent && lists[lists.length - 1].type !== type) closeLists(indent - 1);
+      if (lists.length && lists[lists.length - 1].indent === indent) out.push('</li><li>');
+      else { out.push(`<${type}${type === 'ol' && item[2] !== '1' ? ` start="${Number(item[2])}"` : ''}><li>`); lists.push({ indent, type }); }
+      out.push(_helpInline(item[3])); continue;
     }
-    if (t.startsWith('#### ')) {
-      closeList();
-      out.push(`<h4>${_helpInline(t.slice(5).trim())}</h4>`);
-      continue;
-    }
-    if (t.startsWith('- ') || t.startsWith('* ')) {
-      if (inList && listType !== 'ul') closeList();
-      if (!inList) { out.push('<ul>'); listType = 'ul'; }
-      inList = true;
-      out.push(`<li>${_helpInline(t.slice(2).trim())}</li>`);
-      continue;
-    }
-
-    const ordered = t.match(/^\d+\.\s+(.+)$/);
-    if (ordered) {
-      if (inList && listType !== 'ol') closeList();
-      if (!inList) { out.push('<ol>'); listType = 'ol'; }
-      inList = true;
-      out.push(`<li>${_helpInline(ordered[1])}</li>`);
-      continue;
-    }
-
-    if (t === '---') {
-      closeList();
-      out.push('<hr>');
-      continue;
-    }
-
-    closeList();
-    out.push(`<p>${_helpInline(t)}</p>`);
+    if (t === '---') { flushParagraph(); closeLists(); out.push('<hr>'); continue; }
+    if (lists.length && indent <= lists[lists.length - 1].indent) { flushParagraph(); closeLists(); }
+    paragraph.push(t);
   }
-
-  closeList();
-  closeCallout();
+  flushParagraph();
   if (inCode) out.push('</code></pre>');
+  closeLists(); closeCallout();
   return out.join('');
 }
 
@@ -185,20 +178,16 @@ function _renderHelpToc(content) {
   const toc = document.getElementById('help-toc');
   if (!toc || !content) return;
   const usedIds = new Set();
-  const headings = [...content.querySelectorAll('h2, h3')];
-  headings.forEach((heading, index) => {
-    const base = String(heading.textContent || `section-${index + 1}`)
-      .toLocaleLowerCase()
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || `section-${index + 1}`;
-    let id = `help-${base}`;
-    let suffix = 2;
+  const allHeadings = [...content.querySelectorAll('h2, h3, h4, h5, h6')];
+  allHeadings.forEach((heading, index) => {
+    const text = heading.textContent || `section-${index + 1}`;
+    const base = _helpSlug(text);
+    let id = `help-${base}`, suffix = 1;
     while (usedIds.has(id)) id = `help-${base}-${suffix++}`;
-    usedIds.add(id);
-    heading.id = id;
+    usedIds.add(id); heading.id = id;
+    heading.dataset.helpAlias = `help-${text.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
   });
+  const headings = allHeadings.filter(heading => ['H2', 'H3'].includes(heading.tagName));
   toc.innerHTML = headings.map((heading, index) => `
     <a class="ui-context-nav__item help-toc-entry ${heading.tagName === 'H3' ? 'is-subsection' : ''}"
       href="#${heading.id}" data-help-target="${heading.id}" ${index === 0 ? 'aria-current="page"' : ''}>
@@ -248,16 +237,21 @@ function helpClearSearch() {
   input?.focus();
 }
 
-function helpSetView(rawView) {
-  const view = rawView === 'manual' ? 'manual' : 'quick';
-  if (_helpView === view && _helpLoadedLanguage) return;
+/** Update the selected view and its tab state without fetching a document. */
+function _helpSelectView(view) {
   _helpView = view;
-  _helpLoadedLanguage = '';
   document.querySelectorAll('[data-help-view]').forEach((button) => {
     const active = button.dataset.helpView === view;
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-selected', active ? 'true' : 'false');
   });
+}
+
+function helpSetView(rawView) {
+  const view = rawView === 'manual' ? 'manual' : 'quick';
+  if (_helpView === view && _helpLoadedLanguage && _helpDocumentUrl === helpDocumentPath(helpLanguage(), view)) return;
+  _helpSelectView(view);
+  _helpLoadedLanguage = '';
   helpClearSearch();
   helpInit(true);
 }
@@ -267,11 +261,13 @@ function openHelpTopic(topic) {
   if (input) input.value = '';
   helpFilter('');
   const normalized = String(topic || '').replace(/^#/, '');
-  const target = document.getElementById(normalized) || document.getElementById(`help-${normalized}`);
+  const target = document.getElementById(normalized) || document.getElementById(`help-${normalized}`)
+    || [...document.querySelectorAll('[data-help-alias]')].find(node => node.dataset.helpAlias === normalized || node.dataset.helpAlias === `help-${normalized}`);
   target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function helpInit(force = false) {
+/** Load the selected help view, or a bundled companion document, with stale-request protection. */
+async function helpInit(force = false, documentUrl = null) {
   const language = helpLanguage();
   if (_helpLoadedLanguage === language && !force) return;
   const box = document.getElementById('help-content');
@@ -282,13 +278,22 @@ async function helpInit(force = false) {
   if (toc) toc.innerHTML = '';
   box.innerHTML = `<div class="loading-spinner"><div class="spinner"></div><span>${escHtml(helpT('loading'))}</span></div>`;
   try {
-    const helpDocument = await fetchHelpDocument(language);
+    let helpDocument;
+    if (documentUrl) {
+      const response = await fetch(documentUrl.pathname, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      helpDocument = { markdown: await response.text(), path: documentUrl.pathname };
+    } else helpDocument = await fetchHelpDocument(language);
     if (requestId !== _helpRequestId) return;
     _helpDocumentUrl = helpDocument.path;
+    if (/^\/ui\/docs\/manual\/(de|en)\/user-manual\.md$/.test(_helpDocumentUrl)) _helpSelectView('manual');
+    else if (/^\/ui\/docs\/help(?:\.en)?\.md$/.test(_helpDocumentUrl)) _helpSelectView('quick');
     box.innerHTML = _renderHelpMarkdown(helpDocument.markdown);
     _renderHelpToc(box);
     helpFilter(document.getElementById('help-search-input')?.value || '');
     _helpLoadedLanguage = language;
+    if (documentUrl?.hash) openHelpTopic(decodeURIComponent(documentUrl.hash.slice(1)));
+    else box.scrollIntoView?.({ block: 'start' });
   } catch (err) {
     if (requestId !== _helpRequestId) return;
     _helpLoadedLanguage = '';
@@ -303,3 +308,16 @@ window.helpFilter = helpFilter;
 window.helpClearSearch = helpClearSearch;
 window.helpSetView = helpSetView;
 window.openHelpTopic = openHelpTopic;
+
+/** Keep bundled Markdown links in the offline reader and resolve legacy anchors. */
+document.addEventListener('click', event => {
+  const link = event.target.closest?.('#help-content a');
+  if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (link.dataset.helpAnchor !== undefined) {
+    event.preventDefault(); openHelpTopic(decodeURIComponent(link.dataset.helpAnchor));
+  } else if (link.dataset.helpDocument) {
+    const url = _helpUrl(link.getAttribute('href'));
+    if (!url || url.origin !== window.location.origin || !url.pathname.startsWith('/ui/docs/') || !url.pathname.endsWith('.md')) return;
+    event.preventDefault(); helpClearSearch(); helpInit(true, url);
+  }
+});

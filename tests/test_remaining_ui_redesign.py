@@ -138,14 +138,14 @@ def test_help_has_generated_table_of_contents() -> None:
     assert 'id="help-view-quick-btn"' in html
     assert 'id="help-view-manual-btn"' in html
     assert "function _renderHelpToc(content)" in script
-    assert "content.querySelectorAll('h2, h3')" in script
+    assert "content.querySelectorAll('h2, h3, h4, h5, h6')" in script
     assert "_renderHelpToc(box);" in script
     assert "function helpFilter(rawQuery = '')" in script
     assert "section.tocTargets" in script
     assert "node.matches?.('h2, h3')" in script
     assert "function helpSetView(rawView)" in script
     assert "function openHelpTopic(topic)" in script
-    assert "const helpDocument = await fetchHelpDocument(language)" in script
+    assert "helpDocument = await fetchHelpDocument(language)" in script
     assert "const document = await fetchHelpDocument(language)" not in script
     assert "window.helpSetView = helpSetView" in script
     assert "window.openHelpTopic = openHelpTopic" in script
@@ -156,8 +156,7 @@ def test_help_renders_operational_callouts_and_ordered_steps() -> None:
     css = _read("ui/remaining-ui-redesign.css")
     assert "NOTE|TIP|WARNING|IMPORTANT" in script
     assert "Hinweis|Tipp|Warnung|Wichtig|Note|Tip|Warning|Important" in script
-    assert "'<a href=\"#help-' + target.slice(1)" in script
-    assert "<ol>" in script
+    # Executed link/ordered-list behavior is covered by tests/help_markdown.cjs.
     assert "help-callout--warning" in css
     assert "help-callout--tip" in css
     assert ".help-search-hidden" in css

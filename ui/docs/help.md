@@ -13,7 +13,10 @@ Diese Hilfe begleitet Einsteiger, fortgeschrittene Anwender und Administratoren 
 3. Erstellen oder importieren Sie unter **Repositories** ein Borg-Repository.
 4. Erstellen Sie unter **Jobs** einen Backup-Job und wählen Sie das vorhandene Repository.
 5. Starten Sie den Job zuerst manuell und prüfen Sie Live-Log und **History**.
-6. Planen Sie anschließend einen Restore-Test.
+6. Stellen Sie eine bekannte Datei über **Browse & Restore** in ein separates Ziel wieder her; **Testlauf** dafür ausschalten. Vergleichen Sie den Inhalt.
+7. Aktivieren Sie erst danach Zeitplan, Restore-Test und Benachrichtigungen.
+
+[Vollständiger Schnellstart mit Beispielpfaden](../../docs/user-manual/de/user-manual.md#schnellstart-erstes-backup-und-geprüfter-restore).
 
 ### Grundbegriffe
 
@@ -109,7 +112,7 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 
 ### Job-Wizard
 
-1. **Grunddaten:** Name, technischer Typ, Icon und optionale Docker-/VM-Steuerung.
+1. **Grunddaten:** Job-Name, dauerhafte Job-ID, Archivpräfix, Icon und optionale Docker-/VM-Steuerung.
 2. **Quellen & Ziel:** Zu sichernde Ordner oder Dateien, Speichertyp, Speicherziel, Repository und Kompression.
 3. **Ausschlüsse:** Pfade, Markerdateien und eine hochgeladene Ausschlussdatei, gemeinsam sichtbar in einem eigenen Schritt.
 4. **Docker:** alle laufenden Container, nur ausgewählte Container oder alle außer ausgewählte Container stoppen und danach neu starten.
@@ -117,7 +120,10 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 6. **Retention:** gestaffelt mit optionalem Zeitfenster, letzte X Archive oder alle behalten.
 7. **Beschreibung:** verständliche Beschreibung mit optionalem Markdown.
 8. **Zeitplan:** einfache Planung oder Cron-Ausdruck.
-9. **Flow-Vorschau:** endgültige Prüfung des geplanten Ablaufs.
+9. **Pre-/Post-Skripte:** optionale, zentral gespeicherte Skripte zuordnen.
+10. **Flow-Vorschau:** endgültige Prüfung des geplanten Ablaufs.
+
+Docker und VMs werden bei ausgeschalteter Steuerung übersprungen. Jobname, dauerhafte Job-ID und Archivpräfix sind getrennt; Umbenennen verändert die Identität nicht. Prune verwendet nur den aktuellen Präfix, Browse & Restore auch die gespeicherten früheren Präfixe.
 
 > [!IMPORTANT] Retention-Werte zählen Zeiträume mit Backups. Wählen Sie „Gestaffelt“, „Letzte X Archive“ oder „Alle behalten“. Ein Zeitfenster wie „alle Archive der letzten 7 Tage“ ergänzt Zählregeln und darf nicht allein aktiv sein. `0` deaktiviert eine Regel. Leere Regeln und „letzte 0“ sind gesperrt. Eine kleine Anzahl kann viele ältere Archive zur Löschung freigeben. Das Info-i erklärt jede Strategie und ihre Löschwirkung, ohne den Wizard zu verlängern.
 
@@ -193,21 +199,32 @@ Der Restore-Wizard führt durch Job, Archiv, Auswahl, Ziel und Prüfung. Im Ziel
 
 ## 12. Restore Tests
 
-Restore-Tests prüfen automatisiert die Wiederherstellbarkeit. **Planung & Policy** legt Modus, Intervall und Level fest. **Prüfberichte** zeigt Nachweise, Abdeckung, Prüfschritte und verständliche Fehlerkategorien.
+Unter **Planung & Policy > Plan bearbeiten** legen Administratoren Kalendertermin,
+Testlevel und getrennte Nachweisgültigkeit fest. **Jetzt testen** startet manuell.
+Die Serverzeitzone gilt; verpasste/übersprungene Termine werden nicht nachgeholt.
+Ein Skip erneuert keinen Nachweis. Legacy-Intervalltests bleiben getrennt unter
+**Einstellungen > Restore**. Ohne bisherigen Bericht gibt es keinen entsprechenden
+Überfälligkeits-Reminder.
 
 ### Testlevel
 
-- **L1:** Erreichbarkeit und grundlegende Repository-Prüfung.
-- **L2:** Zusätzlich Stichproben-Wiederherstellung und technische Prüfungen.
-- **L3:** Umfangreichste Prüfung mit größerer Stichprobe und Integritätsvergleich.
+- **L1:** Archivliste und Metadaten; kein vollständiger Datencheck.
+- **L2:** `borg extract --dry-run` liest Daten und prüft sie mit Borg, schreibt aber keine wiederhergestellten Nutzdateien.
+- **L3:** Zusätzlich ausgewählte Dateien über `--stdout` lesen und SHA-256 berechnen; kein unabhängiger Soll-Hash-Vergleich.
 
-> [!NOTE] Höhere Level benötigen mehr Zeit und I/O. Planen Sie große Offsite-Repositorys außerhalb produktiver Spitzenzeiten.
+> [!WARNING] Die Auswahl ist das neueste Archiv des Repositorys, nicht zwingend
+> des Jobs. Prüfen Sie den Archivnamen und die Einzelschritte. Im dokumentierten
+> Stand können L1-Infofehler oder ein L2-Timeout hinter einem erfolgreichen
+> Gesamtstatus stehen. Ein solcher Lauf ist kein belastbarer vollständiger Nachweis.
+
+[Verfahren, Schreibzugriffe, Abdeckung und Grenzen](../../docs/user-manual/de/user-manual.md#83-testlevel).
+Ein echter Restore in ein separates Ziel mit Inhalts- und Anwendungstest bleibt nötig.
 
 ## 13. Einstellungen
 
 ### Allgemein
 
-Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz, SMTP, Wochenbericht, Homepage-Widget und Anwendungsinformationen. Benachrichtigungskanäle liegen in der eigenen Rubrik **Benachrichtigungen**.
+Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz und Homepage-Widget. SMTP und Benachrichtigungskanäle liegen unter **Benachrichtigungen**, der Wochenbericht unter **Backup**, Versionsinformationen unter **About**.
 
 ### Benutzer
 
@@ -254,3 +271,9 @@ Prüfen Sie Schreibweise, Groß-/Kleinschreibung, Inhalt und Lesbarkeit der ausg
 ### Welche Backup-Strategie ist sinnvoll?
 
 Nutzen Sie mehrere Kopien auf unterschiedlichen Medien, mindestens eine Offsite-Kopie, automatische Fehlerüberwachung und regelmäßige Restore-Tests. Passphrasen und Keyfiles müssen zusätzlich außerhalb des Servers gesichert werden.
+
+## Notfall und Konfigurationssicherung
+
+Sichern Sie Repository, Passphrase, Borg-Key, Profile/Secrets und Plugin-Konfiguration getrennt vom Server. Jobexporte enthalten keine Archive und keine zentralen Skriptdefinitionen. Profil-Secret-Import und Jobimport haben getrennte Formate.
+
+[Notfallleitfaden und genaue Exportgrenzen](../../docs/user-manual/de/user-manual.md#16-notfallwiederherstellung). Vorhandene Repositorys importieren, niemals neu initialisieren.

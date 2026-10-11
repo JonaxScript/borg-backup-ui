@@ -13,7 +13,10 @@ This guide supports beginners, advanced users, and administrators throughout the
 3. Create or import a Borg repository under **Repositories**.
 4. Create a backup job under **Jobs** and select the existing repository.
 5. Run the job manually first and review its live log and **History**.
-6. Schedule a restore test afterwards.
+6. Restore a known file through **Browse & Restore** to a separate destination with **Dry run** off; compare its contents.
+7. Only then enable schedules, restore tests and notifications.
+
+[Complete tutorial](../../docs/user-manual/en/user-manual.md#tutorial-first-backup-and-verified-restore).
 
 ### Key Terms
 
@@ -109,7 +112,7 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 
 ### Job Wizard
 
-1. **Basics:** Name, technical type, icon, and optional Docker/VM control.
+1. **Basics:** Job name, permanent Job ID, archive prefix, icon and optional Docker/VM control.
 2. **Sources & Target:** Folders or files to back up, storage type, storage target, repository, and compression.
 3. **Exclusions:** Paths, marker filenames and one uploaded exclusion file, shown together in a dedicated step.
 4. **Docker:** Stop all running containers, selected containers, or all containers except selected containers and restart them afterwards.
@@ -117,7 +120,10 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 6. **Retention:** Tiered with an optional time window, last X archives, or keep all.
 7. **Description:** Clear description with optional Markdown.
 8. **Schedule:** Simple schedule or cron expression.
-9. **Flow Preview:** Final review of the planned workflow.
+9. **Pre/Post scripts:** Assign optional centrally stored scripts.
+10. **Flow Preview:** Final review of the planned workflow.
+
+Docker and VM steps are skipped when control is off. Job name, permanent Job ID and archive prefix are separate; renaming preserves identity. Prune uses only the current prefix, while Browse & Restore also includes saved previous prefixes.
 
 > [!IMPORTANT] Retention values count periods containing backups. Choose “Tiered”, “Last X archives” or “Keep all”. A time window such as “all archives from the last 7 days” supplements count rules and cannot be used alone. `0` disables a rule. Empty policies and “last 0” are blocked. A small count can permit deletion of many older archives. The info button explains each strategy and its deletion effect without expanding the wizard.
 
@@ -193,21 +199,32 @@ The restore wizard walks through job, archive, selection, target, and review. In
 
 ## 12. Restore Tests
 
-Restore tests automatically verify recoverability. **Planning & Policy** defines mode, interval, and level. **Reports** provides evidence, coverage, test steps, and clear error categories.
+Under **Planning & Policy > Edit plan**, administrators set calendar execution,
+test level and separate evidence validity. **Test now** starts manually.
+Server timezone applies; missed/skipped slots are not caught up. Skipping does
+not renew evidence. Legacy interval tests remain separate under **Settings >
+Restore**. No corresponding overdue reminder is sent without a previous report.
 
 ### Test Levels
 
-- **L1:** Connectivity and basic repository verification.
-- **L2:** Adds sample restore and technical checks.
-- **L3:** Most extensive verification with a larger sample and integrity comparison.
+- **L1:** Archive listing and metadata; no complete data check.
+- **L2:** `borg extract --dry-run` reads data and checks it with Borg, but writes no restored user files.
+- **L3:** Additionally stream selected files through `--stdout` and calculate SHA-256; no independent expected-hash comparison.
 
-> [!NOTE] Higher levels require more time and I/O. Schedule large offsite repositories outside production peak times.
+> [!WARNING] Selection uses the newest repository archive, not necessarily the
+> job's archive. Check its name and individual steps. In this baseline, L1 info
+> failures or an L2 timeout may coexist with overall success. Such a run is not
+> dependable evidence of complete verification.
+
+[Methods, writes, coverage and limits](../../docs/user-manual/en/user-manual.md#83-test-levels).
+An actual restore to a separate destination, content comparison and application
+test remain necessary.
 
 ## 13. Settings
 
 ### General
 
-Manages data paths, theme, log retention, Borg cache, parity protection, SMTP, weekly report, Homepage widget, and application information. Notification channels live in the separate **Notifications** area.
+Manages data paths, theme, log retention, Borg cache, parity protection and the Homepage widget. SMTP and notification channels are under **Notifications**, the weekly report under **Backup**, and version information under **About**.
 
 ### Users
 
@@ -254,3 +271,9 @@ Check spelling, letter case, content, and readability of the selected folders or
 ### What Backup Strategy Should I Use?
 
 Use multiple copies on different media, at least one offsite copy, automatic failure monitoring, and regular restore tests. Passphrases and keyfiles must also be backed up outside the server.
+
+## Emergency and Configuration Backup
+
+Protect repository, passphrase, Borg key, profiles/secrets and plugin configuration separately from the server. Job exports contain neither archives nor central script definitions. Profile-secret imports and job imports use separate formats.
+
+[Recovery guide and exact export limits](../../docs/user-manual/en/user-manual.md#16-disaster-recovery). Import existing repositories; never initialize them again.

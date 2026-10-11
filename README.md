@@ -20,6 +20,13 @@ diagnostics.
 [Unraid support thread](https://forums.unraid.net/topic/198728-plugin-borg-backup-ui-web-ui-for-borg-backup-on-unraid/) |
 [Issues](https://github.com/borgforge/borg-backup-ui/issues)
 
+## Documentation
+
+Follow the [German/English tutorial, tasks, reference and concepts](docs/user-manual/README.md).
+For an outage, use [Notfallwiederherstellung](docs/user-manual/de/user-manual.md#16-notfallwiederherstellung)
+or [Disaster Recovery](docs/user-manual/en/user-manual.md#16-disaster-recovery).
+The same manuals are available offline under **Help > User Manual**.
+
 ## Feature demo
 
 A short walkthrough of backup jobs, exclusion rules, retention settings,
