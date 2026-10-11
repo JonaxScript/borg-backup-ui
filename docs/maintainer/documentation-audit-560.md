@@ -140,6 +140,15 @@ Recorded 2026-10-11 before the final source commit:
   search focus, stale responses and hidden reloads that must not scroll other
   pages. Focused documentation/i18n/UI checks: 38 passed. Records:
   `.release-tmp/docs-560/help-scroll-before.json` and `help-scroll-after.json`.
+- **Independent desktop help scrolling:** reproduced a 600-pixel document
+  wheel scroll that moved the entire page and shifted the chapter sidebar from
+  152.5 to 16 pixels. The bounded desktop workspace passed 12 combinations of
+  German/English, quick/manual and 1886/1280/1024-pixel widths. Document and
+  chapter-list wheel scrolling, boundary containment, keyboard PageDown, chapter
+  targets and stationary header/search/navigation were checked. The 390-pixel
+  stacked fallback remains usable without horizontal overflow. Both help images
+  and their compatibility aliases were recaptured. Record:
+  `.release-tmp/docs-560/help-panes-qa.json`. Focused checks: 38 passed.
 - **Final gates:** full preflight, candidate build and published package checks
   are recorded against the exact final commit in the PR. They cannot be claimed
   before execution and must not require editing this commit afterward.

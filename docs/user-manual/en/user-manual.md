@@ -1254,6 +1254,8 @@ The **Help** page offers **Quick help** and **User manual** offline, follows the
 
 Switching views or opening a document without a chapter link shows the page header and view tabs. Chapter links still navigate directly to their section.
 
+On desktop screens, the document and table of contents scroll independently. The main navigation, heading, view tabs and search field stay in place. Focus the document with Tab to scroll it using the keyboard.
+
 ### 10.1 Purpose of the Page
 
 The help page provides quick orientation directly in the UI. It is shorter than this manual and is useful for:

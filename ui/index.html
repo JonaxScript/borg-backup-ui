@@ -962,7 +962,7 @@
     <div id="page-hilfe" class="page">
       <div class="page-header ui-page-header">
         <div>
-          <h1 data-i18n="help.title">Hilfe &amp; Dokumentation</h1>
+          <h1 id="help-page-title" data-i18n="help.title">Hilfe &amp; Dokumentation</h1>
           <p class="page-subtitle" data-i18n="help.subtitle">Bedienung, Troubleshooting und visuelle Anleitungen</p>
         </div>
         <div class="header-actions">
@@ -999,7 +999,7 @@
           </div>
           <nav id="help-toc" class="ui-context-nav" data-i18n-aria-label="help.contents" aria-label="Inhalt"></nav>
         </aside>
-        <div id="help-content" class="help-doc">
+        <div id="help-content" class="help-doc" role="region" tabindex="0" aria-labelledby="help-page-title">
           <div class="loading-spinner">
             <div class="spinner"></div>
             <span data-i18n="help.loading">Lade Dokumentation...</span>

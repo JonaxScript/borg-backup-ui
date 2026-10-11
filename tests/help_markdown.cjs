@@ -49,7 +49,7 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   const scrollCalls = [], focusCalls = [];
   context.window.scrollTo = options => scrollCalls.push(options);
   const page = { classList: { contains: () => helpActive } };
-  const box = { innerHTML: '', children: [], querySelectorAll: () => [], closest: () => page,
+  const box = { scrollTop: 650, innerHTML: '', children: [], querySelectorAll: () => [], closest: () => page,
     scrollIntoView() { throw new Error('Document scrolling hides the Help header'); } };
   const input = { value: '', focus: options => focusCalls.push(options) };
   const pending = [];
@@ -69,6 +69,7 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   assert.equal(tabs[0]['aria-selected'], 'true');
   assert.equal(scrollCalls.length, 1, 'Stale response cannot change scroll position');
   assert.equal(scrollCalls[0].top, 0, 'Document starts above the header and tabs');
+  assert.equal(box.scrollTop, 0, 'A new document resets its own reading pane');
   const manual = context.helpInit(true, new URL('http://127.0.0.1:8766/ui/docs/manual/de/user-manual.md'));
   pending[2].resolve({ ok: true, text: async () => '# Current manual' });
   await manual;
@@ -76,10 +77,12 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   assert.match(box.innerHTML, /Current manual/);
   assert.equal(scrollCalls.length, 2);
   helpActive = false;
+  box.scrollTop = 320;
   const hidden = context.helpInit(true);
   pending[3].resolve({ ok: true, text: async () => '# Hidden refresh' });
   await hidden;
   assert.equal(scrollCalls.length, 2, 'Background language reload must not scroll another page');
+  assert.equal(box.scrollTop, 320);
   helpActive = true;
   const topics = [];
   context.openHelpTopic = topic => topics.push(topic);
@@ -88,6 +91,7 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   await chapter;
   assert.deepEqual(topics, ['chapter']);
   assert.equal(scrollCalls.length, 2, 'Explicit chapter links keep their target');
+  assert.equal(box.scrollTop, 320, 'Chapter navigation must not be reset to the document start');
   input.value = 'previous search';
   context.helpSetView('quick');
   assert.equal(input.value, '');
@@ -95,6 +99,7 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   pending[5].resolve({ ok: true, text: async () => '# Quick help again' });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(scrollCalls.at(-1).top, 0);
+  assert.equal(box.scrollTop, 0);
   context.helpClearSearch();
   assert.equal(focusCalls.length, 1);
   assert.equal(focusCalls[0].preventScroll, true);

@@ -2,6 +2,8 @@
 
 ## Pending - Bilingual documentation and offline help audit (#560)
 
+- Bound the desktop Help workspace to the viewport and give the document and table of contents independent scroll areas. Keep navigation/search stationary, support keyboard scrolling and reset the reading pane on document changes.
+
 - Start help views and companion documents at the page header without focusing the search field. Preserve explicit chapter jumps and prevent hidden help reloads from scrolling another page.
 
 - Refresh all 50 existing bilingual PNGs, including eight numbered guides, and add lossless current feature captures. Add practical hook setup and a Grafana main-dashboard example with explicit synthetic-data provenance. Verify a real UI backup, both hooks, an L2 test and a 14-file restore.

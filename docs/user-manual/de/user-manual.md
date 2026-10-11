@@ -1268,6 +1268,8 @@ Die Seite **Hilfe** bietet **Schnellhilfe** und **Handbuch**. Beide sind offline
 
 Beim Wechsel der Ansicht oder beim Öffnen eines Dokuments ohne Kapitelverweis bleibt der Seitenanfang mit Überschrift und Ansichtsreitern sichtbar. Kapitelverweise springen weiterhin direkt zum gewünschten Abschnitt.
 
+Auf großen Bildschirmen scrollen Dokument und Kapitelverzeichnis unabhängig voneinander. Hauptnavigation, Überschrift, Ansichtsreiter und Suchfeld bleiben stehen. Den Dokumentbereich können Sie per Tabulator fokussieren und mit der Tastatur scrollen.
+
 ### 10.1 Zweck der Seite
 
 Die Hilfe liefert schnelle Orientierung direkt in der UI. Sie ist kürzer als dieses Handbuch und eignet sich für:

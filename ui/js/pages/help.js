@@ -271,7 +271,7 @@ function openHelpTopic(topic) {
   target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/** Load help with stale-request protection. Active views start at the page header;
+/** Load help with stale-request protection. Active views reset the reading pane and show the page header;
  * explicit document fragments navigate to their chapter instead. Hidden help
  * reloads never change the current page's scroll position.
  * @param {boolean|Event} [force=false] Bypass the cached-language check.
@@ -305,7 +305,10 @@ async function helpInit(force = false, documentUrl = null) {
     _helpLoadedLanguage = language;
     if (box.closest('.page')?.classList.contains('active')) {
       if (documentUrl?.hash) openHelpTopic(decodeURIComponent(documentUrl.hash.slice(1)));
-      else window.scrollTo({ top: 0, behavior: 'instant' });
+      else {
+        box.scrollTop = 0;
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
     }
   } catch (err) {
     if (requestId !== _helpRequestId) return;

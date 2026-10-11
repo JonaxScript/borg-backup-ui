@@ -2,7 +2,8 @@
 
 Captured 2026-10-11 from the current repository application (stable behavior
 baseline `2026.10.09.1435`, Borg `1.4.5`, source based on `41831a5` plus the
-updated documentation). The help view includes this documentation candidate.
+updated documentation). The help view includes this documentation candidate and its independently
+scrolling desktop document and chapter panes.
 Lossless PNG captures from a local headless browser, explicitly requested by
 the maintainer after JPEG compression artifacts were visible in the initial
 preview. No painted controls or generated UI. Numbered guide images add documentation-only

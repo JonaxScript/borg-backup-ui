@@ -1455,6 +1455,52 @@
   font-size: var(--ui-font-size-xs);
 }
 
+/* Keep desktop help chrome stationary while each reading pane scrolls. */
+@media (min-width: 1024px) {
+  #page-hilfe.active {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 28px;
+  }
+
+  #page-hilfe > .page-header,
+  #page-hilfe > .help-view-tabs { flex-shrink: 0; }
+
+  .help-redesign-layout {
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+  }
+
+  .help-toc-sidebar {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .help-toc-sidebar > .ui-context-sidebar__header { flex-shrink: 0; }
+
+  #help-toc {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .help-doc {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
 @media (max-width: 1023px) {
   .storage-redesign-layout { grid-template-columns: minmax(0, 1fr); }
   .storage-repository-search { position: static; flex: 0 0 15rem; border-right: 1px solid var(--ui-color-border); border-bottom: 0; }
