@@ -25,6 +25,9 @@ Projects folder (14 files). A separate byte-for-byte comparison matched all
 14 originals. The L2 report itself is not proof of that write/compare operation.
 This is not an Unraid hardware, Docker/VM shutdown or fresh-host recovery test.
 The second sample job has no run yet; its empty status is intentional.
+Notification screenshots were recaptured after mounting the verified packaged
+Apprise 1.13.1 runtime into the demo. Both languages were captured only after
+provider loading succeeded (148 entries) and no feedback/alert was visible.
 
 | Screen | German | English | Native pixels DE / EN |
 | --- | --- | --- | --- |
