@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.09.1435">
+<!ENTITY version   "2026.10.11.1525">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,19 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.11.1525###
+### Bug Fixes
+
+- Keep desktop Help navigation and search stationary while scrolling the document or table of contents independently. (#560)
+
+- Keep the Help header and view tabs visible when opening or switching documents; preserve explicit chapter navigation. (#560)
+
+- Render help tables, nested lists and Unicode chapter links correctly, preserve legacy topic links, and include linked guides and examples in the offline package. (#560)
+
+### Improvements
+
+- Rework German and English documentation with a complete first-backup/restore tutorial, recovery checklist, permissions and export reference, and precise restore-test limits. Correct job identity, wizard steps and scheduling guidance; refresh all existing screenshots and numbered guides as lossless PNGs, and add practical Pre/Post script and Grafana guides. (#560)
+
 ###2026.10.09.1435###
 ### Bug Fixes
 
@@ -42,15 +55,6 @@
 ### Security
 
 - Restrict history log access to configured and supported legacy log directories, preventing reads outside these directories through file paths or symbolic links. (GHSA-h4gr-4cm5-92gr)
-
-###2026.09.23.0926###
-### Improvements
-
-- **Optional Prometheus and Grafana integration:** Enable read-only metrics in Settings > Integrations and import the included Grafana dashboard for backup results, sizes, repository statistics and restore-test evidence. (#534)
-    - Disabled by default, with a separate revocable access token and German/English setup guidance.
-    - Cached collection reads existing plugin data without running Borg or refreshing repositories. Missing evidence and collector failures remain visible.
-    - Redesigned Grafana dashboard with the plugin icon, active jobs, equal-sized job cards, storage efficiency and consolidated backup, recovery and repository details.
-- Browse & Restore can show all archives in the selected repository or use a custom archive name pattern, including archives from other applications. The job's current and historical archive prefixes remain the default. Backup names and retention rules are unchanged (#537).
 
 ]]>
 </CHANGES>
@@ -77,7 +81,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="8bdb3f31d721299648de3256711067dd"
+EXPECTED_MD5="912da5a874b86884527e677574c02728"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
