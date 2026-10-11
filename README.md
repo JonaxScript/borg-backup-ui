@@ -2,7 +2,8 @@
 
 An Unraid plugin that turns BorgBackup into a guided backup and restore
 workflow: configure jobs and repositories, browse archives, verify restores,
-review reports, and receive notifications from one web interface.
+review reports, automate optional Pre/Post tasks, and monitor results from one
+web interface. The UI and user manuals are available in English and German.
 
 Borg Backup UI is built for Unraid users who want the reliability of BorgBackup
 without maintaining custom shell scripts for everyday operation. BorgBackup
@@ -22,12 +23,21 @@ diagnostics.
 
 ## Feature demo
 
-A short walkthrough of backup jobs, exclusion rules, retention settings,
-archive browsing, file restores and restore verification.
+A walkthrough of reusable Pre/Post scripts, the job wizard, Docker/VM
+handling, exclusions, retention, multi-file restores, scheduled restore tests,
+and the Prometheus/Grafana integration.
 
-*4:48 minutes | English narration | Recorded with release 2026.09.13.1711.*
+*7:11 minutes | English narration | Recorded with release 2026.10.09.1435.*
 
-https://github.com/user-attachments/assets/4cf24bb8-de2d-46b3-aa6c-34810e6b335d
+[![Watch the feature demo: new version, new features, Pre/Post scripts and Grafana](docs/assets/readme/demo-video-v7.png)](https://www.youtube.com/watch?v=ewaQ4SC4haQ)
+
+[Watch on YouTube](https://www.youtube.com/watch?v=ewaQ4SC4haQ) ·
+[Pre/Post scripts](https://www.youtube.com/watch?v=ewaQ4SC4haQ&t=33s) ·
+[Restore files and folders](https://www.youtube.com/watch?v=ewaQ4SC4haQ&t=257s) ·
+[Grafana](https://www.youtube.com/watch?v=ewaQ4SC4haQ&t=391s)
+
+The demo uses generated data in an isolated environment. Grafana shows synthetic
+metrics; Docker/VM behavior is explained through the job configuration.
 
 ## Install
 
@@ -44,12 +54,14 @@ If the Apps tab is unavailable, follow the official
 ## Overview
 
 - Guided job wizard for common Unraid backup workflows.
+- Reusable Pre/Post scripts managed in Settings and assigned per job.
 - Storage profiles for local paths, USB devices, SMB shares, SSH targets, and
   Hetzner Storage Box style repositories.
-- Docker container and VM runtime handling during backup runs.
+- Docker/VM handling with restart after archive creation, before maintenance.
 - Dashboard overview for backup runs, restore proof, storage data, and checks.
-- Browse and Restore assistant with configurable safe restore target roots.
-- Automated restore tests with structured reports and restore history.
+- Multi-file and folder restores with configurable safe restore target roots.
+- Scheduled restore tests with separate evidence validity and structured reports.
+- Optional Prometheus metrics and a supplied Grafana dashboard.
 - Notifications through Apprise profiles, Unraid notifications, and email.
 - Import/export, support bundle, system health, and auditable migrations.
 
@@ -58,12 +70,32 @@ If the Apps tab is unavailable, follow the official
 ### Backup Jobs
 
 - Create and edit jobs through a guided multi-step wizard.
-- Choose backup type, source paths, repository target, retention, passphrase,
-  schedule, and runtime behavior.
+- Choose backup type, source paths, repository target, compression, retention,
+  schedule, optional scripts, and runtime behavior.
+- Exclude paths, skip folders containing marker files, or import Borg pattern
+  files. Keep archives by retention tiers, age, latest count, or keep all.
 - Stop all Docker containers, selected containers, or all except selected
-  containers before a backup, then restart them after the run.
+  containers before a backup.
 - Stop selected VMs when a VM backup requires consistent runtime state.
+- Restart workloads stopped by the job after successful or warning-only archive
+  creation, before pruning, compaction, and final repository statistics.
+- Configure Docker restart priority and delays for service dependencies.
+- Schedule jobs in the wizard and optionally show added, modified, and errored
+  files in the live log.
 - Review a flow preview before saving the job.
+
+### Pre/Post Scripts
+
+- Manage reusable Bash scripts under **Settings > Scripts**, with descriptions,
+  timeouts, syntax validation, duplication, and `.sh` import/export.
+- Assign scripts in the wizard's **Pre/Post scripts** step. Pre runs before
+  backup preparation; Post runs after maintenance and cleanup according to the
+  selected condition, optionally including failure, skip, or cancellation.
+- Use job context and results for custom automation, such as publishing a status
+  for external tools. Normal backup checks work without custom scripts.
+- Review script outcomes in the job log and history. A failed Pre script stops
+  the backup from starting; a failed Post script marks the job failed while
+  retaining an archive already created.
 
 ### Storage and Repositories
 
@@ -76,21 +108,29 @@ If the Apps tab is unavailable, follow the official
 
 ### Restore and Verification
 
-- Browse Borg archives and restore selected files or directories.
+- Browse Borg archives and select multiple files and folders in one restore.
+- Review destination paths, conflicts, and available space before starting.
 - Restrict restore targets to administrator-approved safe roots.
 - Prevent unsafe backup and restore write operations from using the same
   repository at the same time.
 - Track active restore runs and completed restore history.
-- Configure and run automated restore tests for backup verification.
-- Use restore test reports to verify repository accessibility, archive
-  readability, metadata checks, sample restore, integrity comparison, and
-  cleanup.
+- Schedule recurring restore tests or run them manually; configure how long a
+  successful test remains valid independently of the next scheduled run.
+- Choose L1-L3 checks and inspect archive metadata, dry-run extraction, and
+  sample extraction results according to the selected level. L3 records SHA-256
+  hashes of extracted sample data; it does not compare against independent
+  expected hashes or prove full application recovery.
 
 ### Monitoring and Notifications
 
 - Dashboard overview for backup runs, restore verification, and growth/check
   state.
 - Backup history and reports for operational review.
+- Enable the optional read-only Prometheus exporter under **Settings >
+  Integrations > Prometheus & Grafana**, then import the supplied Grafana
+  dashboard into your separate monitoring installation.
+- Monitor job results, restore evidence, repository storage efficiency, and
+  collector health. See the [Prometheus/Grafana setup guide](docs/integrations/prometheus.md).
 - Notification events for successful, warning, failed, skipped, and overdue
   backup runs.
 - Restore test notifications for success, failure, and overdue tests.
@@ -107,6 +147,7 @@ If the Apps tab is unavailable, follow the official
 - Plugin packaging for Unraid with bundled BorgBackup runtime.
 - Admin access recovery from the Unraid control page through a short-lived,
   one-time recovery link.
+- English/German UI, light/dark themes, and bundled offline help.
 
 ## Requirements
 
@@ -128,11 +169,17 @@ installation is required for normal operation.
 6. Restore a small sample into a separate test folder and verify the result.
 7. Configure restore tests and notifications for ongoing verification.
 
+For custom automation, create scripts under **Settings > Scripts** before
+assigning them to a job. For external monitoring, follow the
+[Prometheus/Grafana setup guide](docs/integrations/prometheus.md).
+
 For first tests, start with a small test folder or non-critical share. Do not
 begin with irreplaceable data until backup and restore behavior has been
 verified on your system.
 
 ## Screenshots
+
+Screenshots use demo data. The Grafana example uses synthetic metrics.
 
 ### Dashboard
 
@@ -157,24 +204,38 @@ verification state, and manual start controls.
 
 ### Job Wizard
 
-A step-by-step workflow for sources, repositories, Docker/VM handling,
-retention, description, schedule, and flow preview.
+A step-by-step workflow for sources, repositories, exclusions, Docker/VM
+handling, retention, scheduling, Pre/Post scripts, and flow preview. The image
+shows the script assignment step.
 
 ![Job wizard](docs/assets/readme/job-wizard.png)
 
+### Script Management
+
+Create and validate reusable Bash scripts before assigning them to jobs.
+Validation checks syntax without executing the script.
+
+![Pre/Post script management](docs/assets/readme/scripts.png)
+
 ### Browse and Restore
 
-Browse archives, select content, precheck the restore target, and restore into
-administrator-approved paths.
+Browse archives, select multiple files and folders, precheck the restore target,
+and restore into administrator-approved paths.
 
 ![Restore wizard](docs/assets/readme/restore-wizard.png)
 
 ### Restore Tests
 
-Plan and review automated restore checks so backups are not only written, but
-also verified.
+Set recurring test times and evidence validity, then review results and reports.
 
 ![Restore test plan](docs/assets/readme/restore-tests-plan.png)
+
+### Grafana
+
+Monitor backup status, restore evidence, and storage efficiency with the supplied
+dashboard. Prometheus and Grafana run separately from the plugin.
+
+![Grafana backup overview with synthetic demonstration metrics](docs/assets/readme/grafana.png)
 
 ## Data and Secrets
 
