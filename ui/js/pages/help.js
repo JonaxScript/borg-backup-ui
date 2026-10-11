@@ -229,11 +229,17 @@ function helpFilter(rawQuery = '') {
   if (status) status.textContent = query ? helpT('searchResults', { count: visible }) : helpT('searchHint');
 }
 
-function helpClearSearch() {
+/** Clear the query and filter without moving keyboard focus or the viewport. */
+function _helpResetSearch() {
   const input = document.getElementById('help-search-input');
   if (input) input.value = '';
   helpFilter('');
-  input?.focus();
+}
+
+/** Clear search on request and return focus without scrolling the page. */
+function helpClearSearch() {
+  _helpResetSearch();
+  document.getElementById('help-search-input')?.focus({ preventScroll: true });
 }
 
 /** Update the selected view and its tab state without fetching a document. */
@@ -251,7 +257,7 @@ function helpSetView(rawView) {
   if (_helpView === view && _helpLoadedLanguage && _helpDocumentUrl === helpDocumentPath(helpLanguage(), view)) return;
   _helpSelectView(view);
   _helpLoadedLanguage = '';
-  helpClearSearch();
+  _helpResetSearch();
   helpInit(true);
 }
 
@@ -265,7 +271,13 @@ function openHelpTopic(topic) {
   target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/** Load the selected help view, or a bundled companion document, with stale-request protection. */
+/** Load help with stale-request protection. Active views start at the page header;
+ * explicit document fragments navigate to their chapter instead. Hidden help
+ * reloads never change the current page's scroll position.
+ * @param {boolean|Event} [force=false] Bypass the cached-language check.
+ * @param {URL|null} [documentUrl=null] Optional bundled document and chapter.
+ * @returns {Promise<void>} Completes after rendering or displaying a load error.
+ */
 async function helpInit(force = false, documentUrl = null) {
   const language = helpLanguage();
   if (_helpLoadedLanguage === language && !force) return;
@@ -291,8 +303,10 @@ async function helpInit(force = false, documentUrl = null) {
     _renderHelpToc(box);
     helpFilter(document.getElementById('help-search-input')?.value || '');
     _helpLoadedLanguage = language;
-    if (documentUrl?.hash) openHelpTopic(decodeURIComponent(documentUrl.hash.slice(1)));
-    else box.scrollIntoView?.({ block: 'start' });
+    if (box.closest('.page')?.classList.contains('active')) {
+      if (documentUrl?.hash) openHelpTopic(decodeURIComponent(documentUrl.hash.slice(1)));
+      else window.scrollTo({ top: 0, behavior: 'instant' });
+    }
   } catch (err) {
     if (requestId !== _helpRequestId) return;
     _helpLoadedLanguage = '';
@@ -317,6 +331,6 @@ document.addEventListener('click', event => {
   } else if (link.dataset.helpDocument) {
     const url = _helpUrl(link.getAttribute('href'));
     if (!url || url.origin !== window.location.origin || !url.pathname.startsWith('/ui/docs/') || !url.pathname.endsWith('.md')) return;
-    event.preventDefault(); helpClearSearch(); helpInit(true, url);
+    event.preventDefault(); _helpResetSearch(); helpInit(true, url);
   }
 });

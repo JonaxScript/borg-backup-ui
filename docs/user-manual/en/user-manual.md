@@ -1252,6 +1252,8 @@ Runtime recovery indicates that Docker containers or VMs were stopped during a b
 
 The **Help** page offers **Quick help** and **User manual** offline, follows the selected language and opens bundled companion documents in the same reader. Use either view to return to its entry point.
 
+Switching views or opening a document without a chapter link shows the page header and view tabs. Chapter links still navigate directly to their section.
+
 ### 10.1 Purpose of the Page
 
 The help page provides quick orientation directly in the UI. It is shorter than this manual and is useful for:

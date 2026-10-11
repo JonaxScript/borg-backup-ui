@@ -132,6 +132,14 @@ Recorded 2026-10-11 before the final source commit:
   compared byte-for-byte. This validates Borg methods, not the complete plugin
   wizard, L1/L2/L3 runner, or application-data recovery. Local execution record:
   `.release-tmp/docs-560/borg-smoke/result.json`.
+- **Help navigation regression:** reproduced a 137-pixel automatic scroll when
+  switching to the manual, hiding the header and tabs and focusing search.
+  The fixed reader passed 20 header-position checks across German/English at
+  1886 and 390 pixels: manual, companion, return, quick help and refresh.
+  Chapter links still reach their target. JS regression coverage also verifies
+  search focus, stale responses and hidden reloads that must not scroll other
+  pages. Focused documentation/i18n/UI checks: 38 passed. Records:
+  `.release-tmp/docs-560/help-scroll-before.json` and `help-scroll-after.json`.
 - **Final gates:** full preflight, candidate build and published package checks
   are recorded against the exact final commit in the PR. They cannot be claimed
   before execution and must not require editing this commit afterward.

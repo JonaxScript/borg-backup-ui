@@ -45,10 +45,15 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
     dataset: { helpView: view }, classList: { toggle() {} },
     setAttribute(name, value) { this[name] = value; },
   }));
-  const box = { innerHTML: '', children: [], querySelectorAll: () => [], scrollIntoView() {} };
-  const input = { value: '', focus() {} };
+  let helpActive = true;
+  const scrollCalls = [], focusCalls = [];
+  context.window.scrollTo = options => scrollCalls.push(options);
+  const page = { classList: { contains: () => helpActive } };
+  const box = { innerHTML: '', children: [], querySelectorAll: () => [], closest: () => page,
+    scrollIntoView() { throw new Error('Document scrolling hides the Help header'); } };
+  const input = { value: '', focus: options => focusCalls.push(options) };
   const pending = [];
-  context.document.getElementById = id => ({ 'help-content': box, 'help-toc': toc, 'help-search-input': input }[id]);
+  context.document.getElementById = id => ({ 'page-hilfe': page, 'help-content': box, 'help-toc': toc, 'help-search-input': input }[id]);
   context.document.querySelectorAll = selector => selector === '[data-help-view]' ? tabs : [];
   context.hideEl = () => {};
   context.showMsg = () => { throw new Error('Unexpected document load error'); };
@@ -62,10 +67,36 @@ console.log('Help renderer: tables, nested lists, code, escaping, links, Unicode
   assert.match(box.innerHTML, /Latest quick help/);
   assert.doesNotMatch(box.innerHTML, /Stale manual/);
   assert.equal(tabs[0]['aria-selected'], 'true');
+  assert.equal(scrollCalls.length, 1, 'Stale response cannot change scroll position');
+  assert.equal(scrollCalls[0].top, 0, 'Document starts above the header and tabs');
   const manual = context.helpInit(true, new URL('http://127.0.0.1:8766/ui/docs/manual/de/user-manual.md'));
   pending[2].resolve({ ok: true, text: async () => '# Current manual' });
   await manual;
   assert.equal(tabs[1]['aria-selected'], 'true', 'Quick-help link selects the manual tab');
   assert.match(box.innerHTML, /Current manual/);
-  console.log('Help navigation: current document, tab state and stale responses OK');
+  assert.equal(scrollCalls.length, 2);
+  helpActive = false;
+  const hidden = context.helpInit(true);
+  pending[3].resolve({ ok: true, text: async () => '# Hidden refresh' });
+  await hidden;
+  assert.equal(scrollCalls.length, 2, 'Background language reload must not scroll another page');
+  helpActive = true;
+  const topics = [];
+  context.openHelpTopic = topic => topics.push(topic);
+  const chapter = context.helpInit(true, new URL('http://127.0.0.1:8766/ui/docs/manual/de/user-manual.md#chapter'));
+  pending[4].resolve({ ok: true, text: async () => '# Chapter link' });
+  await chapter;
+  assert.deepEqual(topics, ['chapter']);
+  assert.equal(scrollCalls.length, 2, 'Explicit chapter links keep their target');
+  input.value = 'previous search';
+  context.helpSetView('quick');
+  assert.equal(input.value, '');
+  assert.equal(focusCalls.length, 0, 'View changes must not focus the search field');
+  pending[5].resolve({ ok: true, text: async () => '# Quick help again' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(scrollCalls.at(-1).top, 0);
+  context.helpClearSearch();
+  assert.equal(focusCalls.length, 1);
+  assert.equal(focusCalls[0].preventScroll, true);
+  console.log('Help navigation: header visibility, focus, chapter links, hidden reloads and stale responses OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });

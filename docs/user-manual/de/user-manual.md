@@ -1266,6 +1266,8 @@ Runtime-Recovery weist darauf hin, wenn Docker-Container oder VMs während eines
 
 Die Seite **Hilfe** bietet **Schnellhilfe** und **Handbuch**. Beide sind offline verfügbar und folgen der gewählten Sprache. Begleitdokumente öffnen sich innerhalb der Hilfe; mit den beiden Ansichten kehren Sie zum Einstieg zurück.
 
+Beim Wechsel der Ansicht oder beim Öffnen eines Dokuments ohne Kapitelverweis bleibt der Seitenanfang mit Überschrift und Ansichtsreitern sichtbar. Kapitelverweise springen weiterhin direkt zum gewünschten Abschnitt.
+
 ### 10.1 Zweck der Seite
 
 Die Hilfe liefert schnelle Orientierung direkt in der UI. Sie ist kürzer als dieses Handbuch und eignet sich für:
