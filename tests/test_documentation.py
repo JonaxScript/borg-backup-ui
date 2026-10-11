@@ -81,3 +81,25 @@ def test_packaged_documentation_is_covered_by_candidate_source_digest():
             if path.is_file():
                 assert workflow.is_deployable_path(path.relative_to(ROOT).as_posix()), path
     assert workflow.is_deployable_path('docs/auth-user-store-recovery.md')
+
+
+def test_current_screenshots_are_bilingual_and_referenced():
+    """Require bilingual captures, numbered guides and the single Grafana overview."""
+    assets = ROOT / 'docs/user-manual/assets'
+    de = {p.name for p in (assets / 'de/current').glob('*.png')}
+    en = {p.name for p in (assets / 'en/current').glob('*.png')}
+    assert de == en
+    assert {'scripts.png', 'wizard-scripts.png', 'wizard-exclusions.png',
+            'restore-selection.png', 'restore-success.png', 'settings-integrations.png'} <= de
+    for language in ('de', 'en'):
+        manual = (ROOT / f'docs/user-manual/{language}/user-manual.md').read_text()
+        for guide in ('dashboard', 'jobs', 'restore', 'settings'):
+            assert f'../assets/{language}/{guide}-guide.png' in manual
+        for name in de:
+            assert f'{language}/current/{name}' in (assets / 'README.md').read_text(), (language, name)
+        for name in ('grafana-overview',):
+            assert f'../assets/shared/{name}.png' in manual
+    assert {p.name for p in (assets / 'shared').iterdir()} == {'grafana-overview.png'}
+    assert not list(assets.rglob('*.jpg'))
+    for path in assets.rglob('*.png'):
+        assert path.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'), path

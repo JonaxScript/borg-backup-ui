@@ -2,7 +2,9 @@
 
 ## Pending - Bilingual documentation and offline help audit (#560)
 
-- Add task-oriented entry paths, first-backup/restore tutorial, disaster recovery, permissions, export formats and source-verified restore-test limitations in both languages. Preserve menu anchors and explicitly identify historic screenshots.
+- Refresh all 50 existing bilingual PNGs, including eight numbered guides, and add lossless current feature captures. Add practical hook setup and a Grafana main-dashboard example with explicit synthetic-data provenance. Verify a real UI backup, both hooks, an L2 test and a 14-file restore.
+
+- Add task-oriented entry paths, first-backup/restore tutorial, disaster recovery, permissions, export formats and source-verified restore-test limitations in both languages. Preserve menu anchors and document screenshot provenance.
 - Extend the restricted help renderer for tables, nested lists, Unicode/legacy anchors and bundled companion navigation. Package canonical companions and rewrite source-relative quick-help links for offline use.
 - Replace stale text assertions with executed rendering, source/package link and safety-contract checks; record evidence and remaining Unraid validation in the documentation audit.
 

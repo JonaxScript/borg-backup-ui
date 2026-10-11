@@ -4,7 +4,9 @@ Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.09.1435`, B
 Sprache: Deutsch  
 Zielgruppe: Einsteiger, fortgeschrittene Anwender und Administratoren eines Unraid-Systems
 
-Wählen Sie den Einstieg nach Ihrer Aufgabe. Die nummerierten Kapitel bleiben als Menüreferenz erhalten. Die neuen Hilfe-Darstellungen werden mit dem Dokumentations-Testkandidaten ausgeliefert; sie ändern keine Backup-Funktion. Die vorhandenen Screenshots zeigen den historischen Stand vom 03.09.2026 (`2026.08.31.0907`), nicht durchgehend die aktuelle Oberfläche. Maßgeblich sind die geprüften Bedienhinweise.
+Wählen Sie den Einstieg nach Ihrer Aufgabe. Die nummerierten Kapitel bleiben als Menüreferenz erhalten. Die neuen Hilfe-Darstellungen werden mit dem Dokumentations-Testkandidaten ausgeliefert; sie ändern keine Backup-Funktion. Die Bilder wurden am 11.10.2026 mit der aktuellen Anwendung und synthetischen Daten neu aufgenommen. Die Plugin-Demo läuft isoliert mit echtem Borg; Grafana zeigt separat erzeugte Beispielmetriken. Die Aufnahmen ersetzen keinen Test auf echter Unraid-Hardware.
+
+[Bildstand und Demo-Grenzen](../assets/README.md).
 
 > **Hinweis:** Dieses Handbuch beschreibt die Anwendung selbst. Es ersetzt keine allgemeine BorgBackup-Dokumentation und keine Unraid-Systemdokumentation. Wenn eine Funktion in der Oberfläche nicht sichtbar ist, ist sie für die aktuell angemeldete Rolle oder die aktuelle Konfiguration möglicherweise nicht verfügbar.
 
@@ -163,7 +165,7 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 ## 2. Dashboard
 
-![Dashboard mit markierten Status- und Filterbereichen](../assets/de/dashboard-guide.png)
+![Aktuelles Dashboard mit Demo-Backup und Restore-Status](../assets/de/dashboard-guide.png)
 
 **Abbildung 1 - Dashboard:** (1) Gesamtstatus für Backup-Läufe und Restore-Nachweise, (2) Standortfilter, (3) Detailtabelle der gefilterten Jobs.
 
@@ -284,6 +286,8 @@ Der Job-Wizard führt in festen Schritten durch die Erstellung oder Bearbeitung 
 
 #### Schritt 1: Grunddaten
 
+![Job-ID, Anzeigename und Archivpräfix](../assets/de/current/wizard-basics.png)
+
 Hier werden Jobname, Archivpräfix, Icon, Icon-Farbe und erste Laufzeitoptionen gesetzt. Die automatisch vergebene **Job-ID** bleibt unverändert.
 
 Wichtige Felder:
@@ -298,6 +302,8 @@ Wichtige Felder:
 Der **Job-Name** ist ein Anzeigename. Die **Job-ID** ist eine davon unabhängige, unveränderliche UUID. Das **Archivpräfix** bestimmt das Muster `<aktueller-präfix>-*`. Umbenennen des Jobs ändert seine Identität nicht. Ändern des Präfixes gilt nur für neue Archive; frühere Präfixe bleiben in der Archivmuster-Historie und im Informations-Popover sichtbar. Bestehende Archive werden weder umbenannt noch verschoben. Browse & Restore kann aktuelle und frühere Muster gemeinsam anzeigen; Prune berücksichtigt nur das aktuelle Präfix. Nach einem Repositorywechsel bleiben alte Archive im bisherigen Repository.
 
 #### Schritt 2: Quellen & Ziel
+
+![Quellen und vorhandenes Ziel-Repository](../assets/de/current/wizard-sources.png)
 
 Die kompakte Ansicht zeigt links **Zu sichernde Ordner** und rechts das **Backup-Ziel**. Links legen Sie fest, welche Ordner oder Dateien in das Backup aufgenommen werden. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
 
@@ -315,6 +321,8 @@ Eine vollständig eingegebene, gültige Quelle kann mit **Enter** übernommen we
 Beim Bearbeiten eines Jobs kann ein anderes vorhandenes Repository gewählt werden. Diese Änderung gilt nur für zukünftige Backups. Bestehende Archive werden nicht verschoben und sind danach über diesen Job in **Browse & Restore** nicht mehr erreichbar; der Wizard verlangt dafür eine ausdrückliche Bestätigung.
 
 #### Schritt 3: Ausschlüsse
+
+![Ausschlusspfade, Marker und Ausschlussdatei](../assets/de/current/wizard-exclusions.png)
 
 Der eigene Schritt **Ausschlüsse** zeigt Ausschlusspfade, Markerdateien und die Ausschlussdatei immer sichtbar an. Alle zehn Wizard-Schritte behalten dieselbe Fenstergröße; Docker und VMs werden bei ausgeschalteter Steuerung übersprungen. Auf kleinen Bildschirmen oder bei langen Listen bleibt Scrollen möglich.
 
@@ -380,6 +388,8 @@ Beispiel: Setzen Sie PostgreSQL oder MariaDB auf Priorität `1` und die davon ab
 
 #### Retention, Kompression und Beschreibung
 
+![Aufbewahrung und Kompression](../assets/de/current/wizard-retention.png)
+
 Der Wizard setzt jobbezogene Borg-Optionen wie Kompression und Aufbewahrung. Verschlüsselung und Passphrase gehören zum Repository.
 
 Wählen Sie genau eine Aufbewahrungsstrategie:
@@ -417,6 +427,8 @@ Bei aktivierter Dateiaktivität liegt das laufende Log zunächst im RAM unter `/
 > **Datenschutzhinweis:** Bei aktivierter Option erscheinen Datei- und Verzeichnisnamen im Live-Log und im gespeicherten Lauf-Log. Da Support-Pakete aktuelle Lauf-Logs enthalten können, können diese Namen auch dort enthalten sein. Support-Pakete maskieren Secrets, sind aber nicht anonym; prüfen Sie ein Paket immer vor der Weitergabe.
 
 #### Zeitplan
+
+![Zeitplan des Backup-Jobs](../assets/de/current/wizard-schedule.png)
 
 Der Zeitplan kann direkt im Wizard gesetzt werden. Die UI unterstützt einfache Frequenzen und einen Cron-Ausdruck.
 
@@ -458,6 +470,8 @@ Die Definitionen liegen in `<Datenverzeichnis>/config/job-scripts.json`; sichern
 
 #### Flow-Vorschau
 
+![Ablaufvorschau des aktuellen Jobs](../assets/de/current/wizard-flow.png)
+
 Der letzte Schritt zeigt eine technische Vorschau des geplanten Ablaufs. Hier werden Repository, zu sichernde Ordner oder Dateien, Docker-/VM-Auswahl und geplante Aktionen zusammengefasst.
 
 Formulare und mehrstufige Assistenten mit ungespeicherten Eingaben werden nicht durch einen Klick auf den Hintergrund geschlossen. **Abbrechen** oder die Schließen-Schaltfläche bleiben verfügbar; bei geänderten Eingaben fragt Borg Backup UI vor dem Verwerfen ausdrücklich nach.
@@ -483,7 +497,7 @@ Best Practices:
 
 Die Seite **Repositories** verwendet eine Master-Detail-Ansicht. Links werden Borg-Repositorys nach dem exakten Speicherziel gruppiert; rechts bleibt der Arbeitsbereich des ausgewählten Repositorys sichtbar. Über **Repository hinzufügen** können Repositorys auf einem bereits unter **Einstellungen** eingerichteten Speicherziel erstellt oder importiert werden.
 
-![Repository-Verwaltung mit Speicherzielgruppen und Detailbereich](../assets/de/repositories.png)
+![Repository-Verwaltung mit Speicherzielgruppen und Detailbereich](../assets/de/current/repositories.png)
 
 Lokale Speicherziele werden unter **Einstellungen > Lokale Profile** angelegt.
 Zulässig sind konkrete Verzeichnisse unter `/mnt`, etwa `/mnt/backup` oder
@@ -574,7 +588,7 @@ Repository aus der Anwendung entfernen oder endgültig löschen:
 
 ## 5. History
 
-![History](../assets/de/history.png)
+![History](../assets/de/current/history.png)
 
 Die Seite **History** zeigt vergangene Backup-Läufe und Restore-Testberichte in chronologischer Form.
 
@@ -612,7 +626,7 @@ History ist die erste Detailseite nach einem Backup-Lauf. Sie zeigt, wann ein La
 
 ## 6. Berichte
 
-![Berichte](../assets/de/reports.png)
+![Berichte](../assets/de/current/reports.png)
 
 Die Seite **Berichte** fasst Backup- und Repository-Daten über mehrere Läufe zusammen.
 
@@ -650,7 +664,7 @@ Berichte helfen bei der Auswertung von Trends:
 
 ## 7. Browse & Restore
 
-![Restore-Wizard mit markierten Bedienbereichen](../assets/de/restore-guide.png)
+![Aktuelle Mehrfachauswahl im Restore-Wizard](../assets/de/restore-guide.png)
 
 **Abbildung 3 - Browse & Restore:** (1) Wechsel zwischen Restore und History, (2) Jobauswahl nach Standort, (3) Fortschritt der fünf Wizard-Schritte, (4) Inhalt des aktuellen Schritts.
 
@@ -764,9 +778,17 @@ Beim Entpacken liegen die Daten zunächst im angezeigten versteckten Zwischenord
 
 Nach erfolgreichem Abschluss zeigt die Ansicht die Anzahl der übernommenen Dateien und Ordner; Verknüpfungen und sonstige Einträge werden getrennt gezählt. Gezählt werden die wiederhergestellten Einträge, nicht bereits vorhandene, unveränderte Zieldateien oder nur für den Pfadaufbau benötigte Elternordner. Übersprungene Auswahleinträge werden separat genannt. Testläufe schreiben keine Dateien und zeigen deshalb keine Wiederherstellungszählung. Bei Fehlern steht keine vollständige Abschlusszählung zur Verfügung; bereits bereitgestellte Auswahleinträge und technische Fehlerdetails bleiben nachvollziehbar.
 
+![Restore-Ziel und Konfliktstrategie](../assets/de/current/restore-target.png)
+
+![Vorprüfung mit konkreten Zielpfaden](../assets/de/current/restore-review.png)
+
+![Erfolgreicher Demo-Restore](../assets/de/current/restore-success.png)
+
+*Aktuelle Demo: eine Datei und ein Ordner ausgewählt, insgesamt 14 Dateien wiederhergestellt. Alle 14 Dateien wurden anschließend außerhalb des Plugins bytegenau mit den Originalen verglichen. Das ist ein echter Restore; ein L2-Dry-Run schreibt diese Dateien nicht.*
+
 ### 7.5 Restore History
 
-![Restore History](../assets/de/restore-history.png)
+![Restore History](../assets/de/current/restore-history.png)
 
 Die Restore History zeigt abgeschlossene Restore-Läufe mit:
 
@@ -791,7 +813,7 @@ Die Detailansicht kann ein- und ausgeklappt werden und zeigt strukturierte Daten
 
 ## 8. Restore Tests
 
-![Restore Tests - Planung](../assets/de/restore-tests-plan.png)
+![Restore Tests - Planung](../assets/de/current/restore-tests-plan.png)
 
 Restore Tests prüfen automatisiert, ob eine Wiederherstellung technisch funktioniert. Sie sind ein wichtiger Nachweis, dass Backups nicht nur geschrieben, sondern auch lesbar sind.
 
@@ -863,7 +885,7 @@ Mit **Jetzt testen** neben einem Job starten Sie den Test manuell mit seinem kon
 
 ### 8.5 Prüfberichte
 
-![Restore Tests - Prüfberichte](../assets/de/restore-tests-reports.png)
+![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
 
 Der Reiter **Prüfberichte** zeigt strukturierte Nachweise abgeschlossener Restore-Tests:
 
@@ -916,6 +938,8 @@ Typische Inhalte:
 
 ### Benachrichtigungen
 
+![Aktueller Benachrichtigungsbereich](../assets/de/current/settings-notifications.png)
+
 Borg Backup UI verwaltet Benachrichtigungskanäle in **Einstellungen > Benachrichtigungen**. Es gibt drei getrennte Versandwege:
 
 - Unraid-Benachrichtigungen
@@ -947,6 +971,8 @@ Die Reminder-Einstellungen gelten kanalübergreifend. Das Reminder-Intervall ver
 
 ### Prometheus und Grafana
 
+![Prometheus-Integration vor der Token-Erstellung](../assets/de/current/settings-integrations.png)
+
 Unter **Einstellungen > Integrationen > Prometheus & Grafana** lässt sich der
 standardmäßig deaktivierte Metrik-Endpunkt aktivieren. Ein eigenes Token erlaubt
 nur das Lesen der Metriken. Kopieren Sie die Prometheus-Konfiguration und laden Sie
@@ -969,7 +995,7 @@ Der Bereich **About** zeigt die installierte Borg-Backup-UI-Version, die gebünd
 
 ### 9.3 Benutzer
 
-![Einstellungen - Benutzer](../assets/de/settings-users.png)
+![Einstellungen - Benutzer](../assets/de/current/settings-users.png)
 
 Der Bereich **Benutzer** ist sichtbar, wenn die Anwendung im Benutzer-Modus läuft und der angemeldete Benutzer Administratorrechte besitzt.
 
@@ -1001,7 +1027,7 @@ und Logs bleiben unverändert.
 
 ### 9.4 Backup
 
-![Einstellungen - Backup](../assets/de/settings-backup.png)
+![Einstellungen - Backup](../assets/de/current/settings-backup.png)
 
 Der Bereich **Backup** enthält Standardwerte und technische Grenzen für Backup-Läufe.
 
@@ -1017,7 +1043,9 @@ Diese Werte beeinflussen neue Jobs oder globale Laufzeitgrenzen. Job-spezifische
 
 ### 9.5 Restore
 
-![Einstellungen - Restore](../assets/de/settings-restore.png)
+![Lokales Speicherprofil der Demo](../assets/de/current/settings-local.png)
+
+![Einstellungen - Restore](../assets/de/current/settings-restore.png)
 
 Der Bereich **Restore** enthält zwei Unterbereiche:
 
@@ -1054,7 +1082,7 @@ Zu breite oder gefährliche Ziele wie `/`, `/mnt` und Systemverzeichnisse werden
 
 ### 9.7 USB-Profile
 
-![Einstellungen - USB-Profile](../assets/de/settings-usb.png)
+![Einstellungen - USB-Profile](../assets/de/current/settings-usb.png)
 
 USB-Profile beschreiben lokale Datenträger oder Unassigned-Devices-Ziele. Sie werden im Job-Wizard für USB-Jobs verwendet.
 
@@ -1078,7 +1106,7 @@ Bestehende Profil- und Repository-Pfade bleiben unverändert; ein erneuter Impor
 
 ### 9.8 SMB-Profile
 
-![Einstellungen - SMB-Profile](../assets/de/settings-smb.png)
+![Einstellungen - SMB-Profile](../assets/de/current/settings-smb.png)
 
 SMB-Profile definieren Netzwerkfreigaben. Passwörter werden als Secrets behandelt.
 
@@ -1108,7 +1136,7 @@ Typische Aktionen:
 
 ### 9.9 SSH-Profile
 
-![Einstellungen - SSH-Profile](../assets/de/settings-storagebox.png)
+![Einstellungen - SSH-Profile](../assets/de/current/settings-storagebox.png)
 
 SSH-Profile werden für Storagebox- oder andere SSH-Ziele verwendet.
 
@@ -1140,7 +1168,7 @@ Die Zieltypen **Storagebox**, **Synology** und **Generic SSH** verwenden weiterh
 
 ### 9.10 Import / Export
 
-![Einstellungen - Import / Export](../assets/de/settings-import-export.png)
+![Einstellungen - Import / Export](../assets/de/current/settings-import-export.png)
 
 Der Bereich **Import / Export** dient zur Sicherung und Übertragung von Anwendungskonfiguration.
 
@@ -1165,7 +1193,7 @@ Neue verschlüsselte Exporte verwenden eine versionierte, authentifizierte Hüll
 
 ### 9.11 Erweitert
 
-![Einstellungen - Erweitert](../assets/de/settings-advanced.png)
+![Einstellungen - Erweitert](../assets/de/current/settings-advanced.png)
 
 Der Bereich **Erweitert** enthält technische Daten, die normale Anwender nur bei Bedarf prüfen sollten.
 
@@ -1188,7 +1216,7 @@ Für die Freigabe sind alle Risikobestätigungen, der Servername, das aktuelle A
 
 ### 9.13 Systemstatus und Migration
 
-![Einstellungen - Systemstatus und Migration](../assets/de/settings-system-health.png)
+![Einstellungen - Systemstatus und Migration](../assets/de/current/settings-general.png)
 
 Der Systemstatus ist unten links in der Seitenleiste sichtbar. Ein Klick öffnet den zugehörigen Diagnosebereich innerhalb der Einstellungen.
 
@@ -1234,7 +1262,7 @@ Runtime-Recovery weist darauf hin, wenn Docker-Container oder VMs während eines
 
 ## 10. Hilfe
 
-![Hilfe](../assets/de/help.png)
+![Hilfe](../assets/de/current/help.png)
 
 Die Seite **Hilfe** bietet **Schnellhilfe** und **Handbuch**. Beide sind offline verfügbar und folgen der gewählten Sprache. Begleitdokumente öffnen sich innerhalb der Hilfe; mit den beiden Ansichten kehren Sie zum Einstieg zurück.
 
@@ -1357,6 +1385,95 @@ oder Screenshots weiter.
 **Fehler:** Eine Testmail prüft nur den Kanal. Fehlendes Ereignis, falscher Empfänger,
 Toleranz und Retry-Queue können echte Meldungen beeinflussen. Siehe
 [Benachrichtigungen](#benachrichtigungen) und [Fehlerhilfe](#134-e-mail-ntfy-oder-apprise-wird-nicht-gesendet).
+
+### 11.6 Pre-/Post-Skripte einrichten und prüfen
+
+**Ziel:** Einen Job um kontrollierte Vor- und Nacharbeiten ergänzen. **Rolle:**
+admin zum Einrichten, operator zum Starten. Verwenden Sie zuerst einen Testjob.
+Skripte laufen mit den Rechten des Backupdienstes; ein fehlerhaftes Skript kann
+Daten verändern oder Dienste beeinflussen. Nutzen Sie zum Lernen nur Logausgaben.
+
+1. Öffnen Sie **Einstellungen > Skripte**, wählen Sie **Neues Skript** und nennen
+   Sie es `Demo Pre`. Setzen Sie den Timeout auf `30` Sekunden.
+2. Tragen Sie dieses harmlose Beispiel ein und wählen Sie **Prüfen und speichern**:
+
+   ```bash
+   #!/bin/bash
+   set -euo pipefail
+   printf '%s\n' 'Demo Pre: Vorbereitung geprüft'
+   ```
+
+3. Legen Sie analog `Demo Post` mit der Ausgabe `Demo Post: Nacharbeit beendet`
+   an. Die Syntaxprüfung startet die Skripte noch nicht.
+4. Bearbeiten Sie den Testjob. Wählen Sie in Schritt **Pre-/Post-Skripte** die
+   beiden gespeicherten Skripte. **Bei Erfolg** ist die übliche Post-Bedingung;
+   wählen Sie **Auch bei Fehler, Überspringen oder Abbruch** nur, wenn das Skript
+   diese Zustände sinnvoll behandelt. Prüfen Sie die **Flow-Vorschau** und speichern Sie.
+5. Starten Sie den Job manuell. Im Log muss Pre vor der Vorbereitung und Post
+   nach Wartung und Cleanup erscheinen. Öffnen Sie **History** und prüfen Sie
+   die getrennten Skriptergebnisse, Exitcodes und das Backup-Ergebnis.
+6. Prüfen Sie unter **Einstellungen > Skripte > Verwendet von** die Zuordnungen.
+   Änderungen an einem zentralen Skript betreffen alle dort genannten Jobs beim
+   nächsten Start. Sichern Sie Skripttext, Timeout und Zuordnung separat vom Jobexport.
+
+**Erfolgskontrolle:** Beide Beispielausgaben und Exitcode `0` sind sichtbar; das
+Archiv enthält weiterhin die erwarteten Dateien. Ein Pre-Fehler bedeutet keinen
+Backupstart. Ein Post-Fehler kann neben einem bereits geschriebenen Archiv stehen.
+Bei einem Timeout zuerst die ausgeführte Aktion prüfen, statt die Grenze blind
+zu erhöhen. [Ablauf und Fehlerregeln](#schritt-9-pre-post-skripte) und
+[erweiterte Testskripte](../../examples/job-hooks/README.md).
+
+![Aktuelle Skriptverwaltung mit harmlosem Demo-Pre-Skript](../assets/de/current/scripts.png)
+
+*Aktuelle Anwendung, 11.10.2026: zentraler Bash-Editor mit Syntaxprüfung, Timeout,
+Import/Export und Jobzuordnungen. Ausschließlich synthetische Beispieldaten.*
+
+![Pre- und Post-Auswahl im aktuellen Job-Wizard](../assets/de/current/wizard-scripts.png)
+
+*Schritt 9 ordnet gespeicherte Skripte zu; die Post-Bedingung gehört zum Job.*
+
+### 11.7 Backup-Zustand in Grafana verfolgen
+
+**Ziel:** Die mitgelieferte Übersicht in Grafana verwenden. **Rolle:** admin für
+Plugin-Einstellungen und passende Rechte in Prometheus/Grafana. Beide Dienste
+müssen separat vorhanden sein. Das Plugin installiert sie nicht.
+
+1. Öffnen Sie **Einstellungen > Integrationen > Prometheus & Grafana**. Aktivieren
+   Sie Metriken und verwahren Sie das neu angezeigte, eingeschränkte Lesetoken.
+   Veröffentlichen Sie den Token nicht in Bildern, Links oder Support-Paketen.
+2. Übernehmen Sie die angezeigte Scrape-Konfiguration in Prometheus. Verwenden
+   Sie eine aus dessen Umgebung erreichbare Plugin-Adresse. Ein Container-
+   `localhost` bezeichnet den Container, nicht Ihren Unraid-Host.
+3. Prüfen Sie in Prometheus das Target: **UP**. Laden Sie in der Integration die
+   Dashboard-JSON herunter und importieren Sie sie in Grafana. Wählen Sie dabei
+   Ihre Prometheus-Datenquelle. Sichern Sie lokale Anpassungen vor dem Ersetzen
+   eines vorhandenen Dashboards mit derselben UID.
+4. Wählen Sie oben einen Server und bei Bedarf Standort, Repository und Job.
+   Prüfen Sie zuerst **Connection**, **Dashboard data** und **Snapshot age**.
+5. Lesen Sie danach letzte Backup-Ergebnisse, Überfälligkeit und Restore-Nachweise
+   getrennt. **Latest runs successful** zählt Jobs mit erfolgreichem letztem
+   Ergebnis; es zählt nicht alle Läufe im gewählten Zeitraum.
+
+![Mitgeliefertes Grafana-Dashboard mit synthetischen Backup- und Restore-Daten](../assets/shared/grafana-overview.png)
+
+*Echte Aufnahme in Grafana 12.1.1 mit der ausgelieferten Dashboard-Vorlage,
+11.10.2026. Namen, Größen und Zustände sind Beispieldaten; die Dashboard-Sprache
+ist Englisch. Kein Nachweis über die Backups eines realen Servers.*
+
+| Beispielanzeige | Bedeutung und nächster Schritt |
+| --- | --- |
+| Connection online, Dashboard data available | Exporter erreichbar und Daten lesbar; noch keine Aussage über den Backup-Erfolg. |
+| Erfolgreiches letztes Backup, aber überfällig | Der letzte Erfolg ist zu alt. Zeitplan, Mount und Joblog im Plugin prüfen. |
+| Restore evidence expired/failed | Nachweis abgelaufen oder Prüfung fehlgeschlagen. Bericht und tatsächlich getestetes Archiv prüfen; echten Restore durchführen. |
+| No data / No result | Fehlende Daten bleiben unbekannt. Target, Token, Filter und Erfassungsbeginn prüfen; nicht als gesunden Nullwert lesen. |
+| Stored in repositories | Zwischengespeicherte eindeutige komprimierte Chunks; nicht der gesamte Dateisystemverbrauch und nicht nur die Daten des ausgewählten Jobs. |
+
+**Erfolgskontrolle:** Target ist UP, Snapshot aktuell und ein bekannter Demojob
+erscheint mit plausiblen Werten. Die Historie beginnt erst mit der Erfassung in
+Prometheus; kurze Läufe können zwischen Abfragen liegen. Für den vollständigen
+Laufverlauf verwenden Sie **History** im Plugin. Details, Beispielkonfiguration
+und Metrikgrenzen: [Prometheus-/Grafana-Leitfaden](../../integrations/prometheus.md).
+
 
 ## 12. Status, Warnungen und Best Practices
 

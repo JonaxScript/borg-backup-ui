@@ -13,9 +13,11 @@ GitHub Releases has no entries; publication is the plugin manifest/package,
 not a GitHub Release. Website branch #559 and hook-example branch #557 are
 excluded. No product behavior from either branch is documented as released.
 
-The existing 25 PNGs per language claim stable `2026.08.31.0907`, captured
-2026-09-03. Dimensions alone are not UI verification. They remain historical
-illustrations until a current, synthetic Unraid capture is reviewed.
+All 25 existing PNGs per language were refreshed on 2026-10-11, including
+the eight numbered guides. Existing paths stay stable. The isolated synthetic
+application demo provides 33 views per language and one shared Grafana main
+dashboard with charts. See the
+[capture inventory](../user-manual/assets/README.md) for provenance and limits.
 
 ## Inventory and structural decision
 
@@ -23,8 +25,10 @@ Reviewed README, docs index, manual entry/readme, both canonical manuals, both
 quick-help files, historical help proposal, Apprise provider catalog, integration
 and hook-example guides, authentication recovery, maintainer release/support
 instructions, changelog/manifest/package provenance, help JS/CSS and packaging
-and language tests. There are 50 historical PNG assets (25 per language), with
-20 embedded images per manual. Assets are retained and explicitly dated.
+and language tests. All 50 existing PNG assets are refreshed; 67 additional lossless PNGs
+cover current application views and the Grafana overview.
+Both manuals replace all 20 old embedded references and add images for current
+wizard steps, notifications, integrations, real restore results and Grafana.
 
 Keep the two canonical long manuals and existing menu chapters. Four entry routes
 and sections 16-18 provide tutorial, tasks, reference and concepts without a new
@@ -77,21 +81,22 @@ or unit test does not imply a successful real backup or restored application.
 
 | Task/function | Authoritative code/UI | German | English | Short help | Image need | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| Install/setup/first backup and restore | control page, setup-wizard.js, wizard_api.py, restore_api.py | Tutorial, 1.3 | Tutorial, 1.3 | First steps | New setup + final restore | C/S; Borg CLI P, complete Unraid flow O |
-| Job identity/ten steps | job_identity.py, wizard.js, ui/index.html | 3.5 | 3.5 | Job wizard | Current step 1/9/10 | C |
-| Local/USB/SMB/SSH | storage_objects_api.py, storage_profiles_api.py, usb_storage.py, smb_profiles_api.py, storagebox_api.py | 9.6-9.9 | 9.6-9.9 | Profiles | Existing historic profiles | C; devices O |
+| Install/setup/first backup and restore | control page, setup-wizard.js, wizard_api.py, restore_api.py | Tutorial, 1.3 | Tutorial, 1.3 | First steps | Current restore sequence; setup gap | C/S/P for UI backup/restore; fresh Unraid O |
+| Job identity/ten steps | job_identity.py, wizard.js, ui/index.html | 3.5 | 3.5 | Job wizard | Current step 1/9/10 | C/P, current captures |
+| Local/USB/SMB/SSH | storage_objects_api.py, storage_profiles_api.py, usb_storage.py, smb_profiles_api.py, storagebox_api.py | 9.6-9.9 | 9.6-9.9 | Profiles | Current profile forms | C/P UI; devices O |
 | Encryption/key recovery | repositories_api.py, borg_key_store.py, settings_transfer_api.py | 4, 16 | 4, 16 | Repository/recovery | Key export | C |
-| Sources/exclusions | job_source_paths.py, job_exclusions.py, wizard_runner.py | 3.5 | 3.5 | Sources | Current exclusions | C |
-| Docker/VM and hooks | wizard_runner.py, backup_job.py, job_scripts.py | 3.5, 18 | 3.5, 18 | Jobs | Current scripts | C; Unraid O |
-| Schedules/retention | schedule_api.py, retention_policy.py, borg_runner.py, check_api.py | 3.5-3.6, 17 | 3.5-3.6, 17 | Jobs/tests | Current retention | C |
-| Selection/conflicts/foreign archives | restore_api.py, restore_selection.py, restore.js | 7, 11.3 | 7, 11.3 | Restore | Current multi-select | C |
-| L1/L2/L3 and validity | borg_restore_test.py, restore_tests_api.py | 8, 17 | 8, 17 | Tests | New report limits | C; product findings above |
+| Sources/exclusions | job_source_paths.py, job_exclusions.py, wizard_runner.py | 3.5 | 3.5 | Sources | Current exclusions | C/P UI |
+| Docker/VM and hooks | wizard_runner.py, backup_job.py, job_scripts.py | 3.5, 18 | 3.5, 18 | Jobs | Current scripts and step 9 | C/P hooks; Docker/VM on Unraid O |
+| Schedules/retention | schedule_api.py, retention_policy.py, borg_runner.py, check_api.py | 3.5-3.6, 17 | 3.5-3.6, 17 | Jobs/tests | Current retention and schedule | C/P UI |
+| Selection/conflicts/foreign archives | restore_api.py, restore_selection.py, restore.js | 7, 11.3 | 7, 11.3 | Restore | Current selection/target/precheck/result | C/P; 14 restored files compared |
+| L1/L2/L3 and validity | borg_restore_test.py, restore_tests_api.py | 8, 17 | 8, 17 | Tests | Current L2 report | C/P L2; product findings above |
 | Maintenance/delete | check_api.py, repositories_api.py | 4, 17 | 4, 17 | Repositories | Current maintenance | C |
 | Roles/tokens | borg_backup_ui.py:_required_role_for_request, prometheus_api.py, homepage_widget_api.py | 17 | 17 | Roles | No image needed | C |
 | Export/recovery/update | settings_transfer_api.py, job_scripts.py, migrations/registry.py | 9.10, 16 | 9.10, 16 | Recovery | Export summary | C; new host O |
-| Notifications/reminders | notification_events.py, notification_reminder_api.py | 9, 11.5 | 9, 11.5 | Notifications | Current navigation | C; delivery O |
-| Sizes/dashboard/reports | status_api.py, reports_api.py, borg_runner.py | 2, 5-6, 18 | 2, 5-6, 18 | Dashboard/reports | Historic overview | C |
+| Notifications/reminders | notification_events.py, notification_reminder_api.py | 9, 11.5 | 9, 11.5 | Notifications | Current navigation | C/P UI; delivery O |
+| Sizes/dashboard/reports | status_api.py, reports_api.py, borg_runner.py | 2, 5-6, 18 | 2, 5-6, 18 | Dashboard/reports | Current overview and report | C/P UI |
 | Reset/uninstall/support | factory_reset_api.py, support_bundle_api.py, manifest REMOVE | 9.12, 13-14 | 9.12, 13-14 | Support | No destructive demo | C |
+| Prometheus/Grafana | prometheus_api.py, shipped dashboard JSON | 11.7 | 11.7 | Task link | One real Grafana main dashboard | C/P template; synthetic metrics |
 | Offline help/links/themes | help.js, build.sh, remaining-ui-redesign.css | All | All | All | Current help both themes | C/S/P; actual help component tested |
 
 ## Validation record
@@ -102,13 +107,14 @@ Recorded 2026-10-11 before the final source commit:
   references resolve. Both languages retain the original menu anchors. Review
   covers tutorial, recovery, roles, exports, retention and restore-test limits;
   this is a reviewed coverage matrix, not a claim derived from keyword counts.
-- **Focused automated tests:** 55 passed across documentation, i18n, remaining UI
+- **Focused automated tests:** 56 passed across documentation, i18n, remaining UI
   and release workflow. Executed JS covers tables, nested lists, code escaping,
   blocked executable URLs, Unicode/duplicate/legacy anchors, selected view and
   out-of-order responses. The actual packaging copier is exercised and every
   shipped companion is covered by the candidate source digest.
 - **GitHub rendering:** both manuals passed through GitHub's Markdown API;
-  each produced 9 tables, 20 images, lists and code blocks. The API does not emit
+  each final manual produces 10 tables and 35 images, plus lists and code
+  blocks. The API does not emit
   heading IDs; fragment resolution is checked separately by the source checker
   and real help DOM. This is not a claim that the API checked browser navigation.
 - **Browser/component execution:** real help markup, JS, CSS, translations and
@@ -130,16 +136,35 @@ Recorded 2026-10-11 before the final source commit:
   are recorded against the exact final commit in the PR. They cannot be claimed
   before execution and must not require editing this commit afterward.
 
+- **Full application demo:** normal authentication and migrations in an isolated
+  mount/PID namespace, repository-local synthetic `/mnt/user/demo` fixtures,
+  actual application code and bundled Borg. The job completed Pre, create,
+  prune/compact/check and Post successfully. A real L2 dry-run completed.
+  Browse & Restore selected one file and one folder, prechecked an empty
+  destination and restored 14 files. A separate byte-for-byte comparison
+  matched every file. Record: `.release-tmp/docs-560/unraid-demo/restore-verification.json`.
+  This extends the initial component/CLI tests; the first preview's missing
+  Unraid mount layout was resolved with private mounts, without host-root
+  changes or application validation bypasses.
+- **Current images:** native bilingual UI captures, reviewed representative
+  settings/wizard/restore/help views and real Grafana dashboard with synthetic
+  Prometheus data. All current assets and their source dimensions are catalogued. Following
+  maintainer feedback, JPEG previews were replaced by direct lossless PNG
+  captures at 2x device scale, with complete long settings pages.
+  All eight guides have fresh numbered outlines and matching localized captions.
+  Final application-help QA loads all 35 embedded images per language, checks
+  the Grafana TOC target and tests light/dark at 390 pixels without page overflow
+  or page errors. Record: `.release-tmp/docs-560/png-qa.json`.
+  Only the Grafana datasource binding was adapted for demo provisioning.
+
 ## Remaining validation and acceptance limits
 
-The real application started and login worked, but initial setup correctly
-requires an Unraid `/mnt` data root; this workspace is not an Unraid host. No
-production roots were added or bypassed. A full UI tutorial, fresh-host recovery,
-real devices, mail delivery and Docker/VM shutdown remain maintainer tests.
+This host is not Unraid. Initial installation/setup on a fresh Unraid host,
+fresh-host recovery, real USB/SMB/SSH devices, mail delivery and Docker/VM
+shutdown/recovery remain maintainer tests. Current screenshots demonstrate the
+application UI and synthetic local workflow, not those environment integrations.
 
-Current setup, wizard identity/exclusions/scripts/retention, restore multi-select,
-report limitations and notification-navigation screenshots remain missing in both
-languages. Existing images are historical and were not relabelled current. The
-coverage matrix names those gaps. Product findings above remain open; this change
-corrects the documentation and help delivery without changing their behavior.
-
+All 50 existing PNG paths contain refreshed captures, including newly placed
+numbered callouts. Canonical manuals embed current images only. Missing hardware/setup captures are explicit in the
+capture inventory. Product findings above remain open; this change corrects
+documentation and help delivery without changing backup/restore behavior.

@@ -61,8 +61,7 @@ function _helpInline(text) {
       // Offline documentation images must stay within the bundled docs tree.
       if (url && url.origin === window.location.origin && url.pathname.startsWith('/ui/docs/')) {
         const alt = escHtml(match[2]);
-        const dimensions = /\/manual\/assets\/(de|en)\/[^/]+\.png$/.test(url.pathname) ? ' width="1600" height="1100"' : '';
-        result += `<figure class="help-figure"><img src="${escHtml(url.href)}" alt="${alt}"${dimensions} loading="lazy"><figcaption>${alt}</figcaption></figure>`;
+        result += `<figure class="help-figure"><img src="${escHtml(url.href)}" alt="${alt}" loading="lazy"><figcaption>${alt}</figcaption></figure>`;
       } else result += escHtml(match[2]);
     } else if (match[4] !== undefined) {
       const label = escHtml(match[4]);

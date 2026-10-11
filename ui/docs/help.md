@@ -277,3 +277,5 @@ Nutzen Sie mehrere Kopien auf unterschiedlichen Medien, mindestens eine Offsite-
 Sichern Sie Repository, Passphrase, Borg-Key, Profile/Secrets und Plugin-Konfiguration getrennt vom Server. Jobexporte enthalten keine Archive und keine zentralen Skriptdefinitionen. Profil-Secret-Import und Jobimport haben getrennte Formate.
 
 [Notfallleitfaden und genaue Exportgrenzen](../../docs/user-manual/de/user-manual.md#16-notfallwiederherstellung). Vorhandene Repositorys importieren, niemals neu initialisieren.
+
+Praktische Erweiterungen: [Pre/Post scripts](../../docs/user-manual/de/user-manual.md#116-pre-post-skripte-einrichten-und-prüfen) und [Grafana](../../docs/user-manual/de/user-manual.md#117-backup-zustand-in-grafana-verfolgen).

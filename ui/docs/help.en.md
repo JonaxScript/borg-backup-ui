@@ -277,3 +277,5 @@ Use multiple copies on different media, at least one offsite copy, automatic fai
 Protect repository, passphrase, Borg key, profiles/secrets and plugin configuration separately from the server. Job exports contain neither archives nor central script definitions. Profile-secret imports and job imports use separate formats.
 
 [Recovery guide and exact export limits](../../docs/user-manual/en/user-manual.md#16-disaster-recovery). Import existing repositories; never initialize them again.
+
+Practical extensions: [Pre/Post scripts](../../docs/user-manual/en/user-manual.md#116-configure-and-verify-prepost-scripts) and [Grafana](../../docs/user-manual/en/user-manual.md#117-monitor-backup-health-in-grafana).

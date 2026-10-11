@@ -17,12 +17,16 @@ subsequent documentation test candidate; no backup behavior is changed.
 
 ## Images
 
-`assets/de` and `assets/en` contain historical screenshots captured on 2026-09-03
-from stable `2026.08.31.0907`, in light theme at 1600 x 1100. They illustrate
-layout, not a verified current feature set. In particular job identity, scripts,
-calendar planning, restore selection and help need current Unraid captures.
-Do not relabel the old images with a new version. See the
-[audit and image gaps](../maintainer/documentation-audit-560.md).
+The embedded screenshots were replaced on 2026-10-11: 33 current application
+views per language and one shared Grafana main dashboard. They use synthetic data;
+backup, hooks, restore and L2 execution in the application demo use real Borg.
+Grafana uses the shipped template with separate synthetic Prometheus metrics.
+See the [capture inventory and boundaries](assets/README.md).
+
+All 50 existing PNG paths now contain refreshed lossless captures, including
+all eight numbered guide images. Captions and marker positions match the
+current controls. Initial Unraid installation, real devices and Docker/VM
+operations still require hardware-specific verification.
 
 ## Maintenance
 

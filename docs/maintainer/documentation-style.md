@@ -45,6 +45,11 @@ Use real UI captures with synthetic data in both languages, matching theme,
 viewport and crop. Never generate replacement UI or expose secrets/private paths.
 If Unraid, devices or a suitable demo are unavailable, record the exact image gap
 and label historical images. Dimensions/file existence do not prove visual accuracy.
+Use direct lossless PNG at 2x device scale; do not convert JPEG previews to PNG.
+Capture complete panels/tables and long settings pages without scrollbar
+decorations. Rebuild documentation callouts on the refreshed UI and match every
+number to its localized caption. Record capture dimensions and demo provenance
+in the asset inventory.
 
 ## Feature review checklist
 

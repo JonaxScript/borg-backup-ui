@@ -4,7 +4,9 @@ Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.09.1435`, B
 Language: English  
 Audience: Beginners, advanced users, and administrators of an Unraid system
 
-Choose an entry point for your task. The numbered chapters remain available as a menu reference. Updated help rendering ships with the documentation test candidate and does not change backup behavior. Existing screenshots illustrate the historical 2026-09-03 build (`2026.08.31.0907`), not every current screen. Follow the verified written instructions.
+Choose an entry point for your task. The numbered chapters remain available as a menu reference. Updated help rendering ships with the documentation test candidate and does not change backup behavior. Screenshots were refreshed on 2026-10-11 using the current application and synthetic data. The isolated plugin demo uses real Borg; Grafana shows separately generated example metrics. These captures do not replace testing on actual Unraid hardware.
+
+[Capture inventory and demo boundaries](../assets/README.md).
 
 > **Note:** This manual describes the application itself. It does not replace the general BorgBackup documentation or the Unraid system documentation. If a function is not visible in the interface, it may not be available for the currently signed-in role or current configuration.
 
@@ -155,9 +157,9 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 ## 2. Dashboard
 
-![Dashboard with highlighted status and filter areas](../assets/en/dashboard-guide.png)
+![Current dashboard with demo backup and restore status](../assets/en/dashboard-guide.png)
 
-**Figure 1 - Dashboard:** (1) overall backup-run and restore-evidence status, (2) location filter, (3) detailed table for the filtered jobs.
+**Figure 1 - Dashboard:** (1) Overall backup-run and restore-evidence status, (2) location filter, (3) detailed table for the filtered jobs.
 
 The Dashboard is the central overview of backup state, restore evidence, storage growth, and repository checks.
 
@@ -220,7 +222,7 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ![Jobs page with target filter, new-job action, and job list](../assets/en/jobs-guide.png)
 
-**Figure 2 - Jobs:** (1) filter by storage target, (2) entry point to the job wizard, (3) job cards with state, policy, and start action.
+**Figure 2 - Jobs:** (1) Filter by storage target, (2) entry point to the job wizard, (3) job cards with state, policy, and start action.
 
 The **Jobs** page manages backup jobs. Jobs can be viewed, started, edited, scheduled, and deleted here.
 
@@ -276,6 +278,8 @@ The job wizard guides creation or editing of a job through fixed steps.
 
 #### Step 1: Basics
 
+![Job ID, display name and archive prefix](../assets/en/current/wizard-basics.png)
+
 This step sets job name, archive prefix, icon, icon color, and initial runtime options. The automatically assigned **Job ID** is permanent.
 
 Important fields:
@@ -290,6 +294,8 @@ Important fields:
 The **Job name** is a display name. The **Job ID** is an independent, immutable UUID. The **Archive prefix** defines `<current-prefix>-*`. Renaming a job preserves its identity. Changing the prefix affects new archives only; previous prefixes remain visible in the archive-pattern history and information popover. Existing archives are neither renamed nor moved. Browse & Restore can show current and previous patterns together; prune uses only the current prefix. Changing repositories leaves older archives in the previous repository.
 
 #### Step 2: Sources & Target
+
+![Sources and target repository](../assets/en/current/wizard-sources.png)
 
 The compact view shows **Folders to back up** on the left and the **Backup target** on the right. The left side defines which folders or files are included in the backup. Exclusions are configured in the next step. The right side selects storage type, the exact storage target, an existing repository, and job compression. The repository list only shows repositories belonging to the selected storage target. Repository paths are no longer entered freely in a job.
 
@@ -307,6 +313,8 @@ A complete and valid source can be accepted with **Enter** even while autocomple
 When editing a job, a different existing repository can be selected. The change affects future backups only. Existing archives are not moved and are no longer reachable through this job in **Browse & Restore**; the wizard requires explicit confirmation.
 
 #### Step 3: Exclusions
+
+![Excluded paths, markers and exclusion file](../assets/en/current/wizard-exclusions.png)
 
 The dedicated **Exclusions** step always shows excluded paths, marker filenames and the exclusion file. All ten wizard steps keep the same window size; Docker and VMs are skipped when their controls are disabled. Small screens or long lists can still require scrolling.
 
@@ -372,6 +380,8 @@ Example: assign PostgreSQL or MariaDB priority `1` and its dependent application
 
 #### Retention, Compression, and Description
 
+![Retention and compression](../assets/en/current/wizard-retention.png)
+
 The wizard stores per-job Borg options such as compression and retention. Encryption and the passphrase belong to the repository.
 
 Choose exactly one retention strategy:
@@ -409,6 +419,8 @@ With file activity enabled, the active log is initially stored in RAM under `/ru
 > **Privacy note:** When this option is enabled, file and directory names appear in both the live log and the stored run log. Because support bundles can contain recent run logs, those names can also be included there. Support bundles mask secrets but are not anonymous; always review a bundle before sharing it.
 
 #### Schedule
+
+![Backup job schedule](../assets/en/current/wizard-schedule.png)
 
 The schedule can be set directly in the wizard. The UI supports simple frequencies and a cron expression.
 
@@ -450,6 +462,8 @@ Definitions are stored in `<data directory>/config/job-scripts.json`; back up th
 
 #### Flow Preview
 
+![Current job flow preview](../assets/en/current/wizard-flow.png)
+
 The final step shows a technical preview of the planned flow. It summarizes repository, folders or files to back up, Docker/VM selection, and planned actions.
 
 Forms and multi-step wizards with unsaved input do not close when the backdrop is clicked. **Cancel** and the close button remain available; when values have changed, Borg Backup UI asks explicitly before discarding them.
@@ -475,7 +489,7 @@ Best practices:
 
 The **Repositories** page uses a master-detail workspace. Borg repositories are grouped by their exact storage target on the left, while the selected repository remains visible in the workspace on the right. **Add repository** creates or imports a repository on a storage target that has already been configured under **Settings**.
 
-![Repository management with storage-target groups and a detail workspace](../assets/en/repositories.png)
+![Repository management with storage-target groups and a detail workspace](../assets/en/current/repositories.png)
 
 Local storage targets are created under **Settings > Local Profiles**. A
 concrete directory below `/mnt`, such as `/mnt/backup` or `/mnt/disks/USB-A`,
@@ -566,7 +580,7 @@ Remove a repository from the application or delete it permanently:
 
 ## 5. History
 
-![History](../assets/en/history.png)
+![History](../assets/en/current/history.png)
 
 The **History** page shows past backup runs and restore test reports in chronological form.
 
@@ -604,7 +618,7 @@ History is the first detail page after a backup run. It shows when a run happene
 
 ## 6. Reports
 
-![Reports](../assets/en/reports.png)
+![Reports](../assets/en/current/reports.png)
 
 The **Reports** page summarizes backup and repository data across multiple runs.
 
@@ -642,9 +656,9 @@ Reports help analyze trends:
 
 ## 7. Browse & Restore
 
-![Restore wizard with highlighted interaction areas](../assets/en/restore-guide.png)
+![Current multi-selection in the restore wizard](../assets/en/restore-guide.png)
 
-**Figure 3 - Browse & Restore:** (1) switch between Restore and History, (2) job selection by location, (3) progress through the five wizard steps, (4) content of the current step.
+**Figure 3 - Browse & Restore:** (1) Switch between Restore and History, (2) job selection by location, (3) progress through the five wizard steps, (4) content of the current step.
 
 **Browse & Restore** guides recovery of data from Borg archives.
 
@@ -756,9 +770,17 @@ Extraction first writes into the displayed hidden `.bbui-restore-stage-…` fold
 
 Successful completion shows the number of restored files and folders; links and other entries are counted separately. Counts exclude unchanged destination files and synthetic parent folders needed only to build the destination path. Skipped selections are listed separately. Simulations write no files and do not display restored counts. Failures have no complete final count; completed selections and technical error details remain available.
 
+![Restore destination and conflict strategy](../assets/en/current/restore-target.png)
+
+![Precheck with concrete destination paths](../assets/en/current/restore-review.png)
+
+![Successful demo restore](../assets/en/current/restore-success.png)
+
+*Current demo: one file and one folder selected, 14 files restored in total. All 14 files were then compared byte-for-byte with their originals outside the plugin. This is a real restore; an L2 dry run does not write these files.*
+
 ### 7.5 Restore History
 
-![Restore History](../assets/en/restore-history.png)
+![Restore History](../assets/en/current/restore-history.png)
 
 Restore History shows completed restore runs with:
 
@@ -783,7 +805,7 @@ The detail view can be expanded and collapsed. It shows structured data and the 
 
 ## 8. Restore Tests
 
-![Restore Tests - Planning](../assets/en/restore-tests-plan.png)
+![Restore Tests - Planning](../assets/en/current/restore-tests-plan.png)
 
 Restore Tests automatically verify that a restore is technically possible. They are important evidence that backups are not only written but also readable.
 
@@ -854,7 +876,7 @@ Use **Test now** next to a job to start it manually with its configured test lev
 
 ### 8.5 Reports
 
-![Restore Tests - Reports](../assets/en/restore-tests-reports.png)
+![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)
 
 The **Reports** tab shows structured evidence for completed restore tests:
 
@@ -887,7 +909,7 @@ The sample targets 5% of regular files by default, capped by the configured file
 
 ![Settings with navigation, system health, and configuration area](../assets/en/settings-guide.png)
 
-**Figure 4 - Settings:** (1) section navigation, (2) system health and migration, (3) settings for the selected section, (4) central save action.
+**Figure 4 - Settings:** (1) Section navigation, (2) system health and migration, (3) settings for the selected section, (4) central save action.
 
 The **Settings** page manages the application configuration. It is grouped into System, Operations, Storage Targets, and Maintenance.
 
@@ -906,6 +928,8 @@ Typical contents:
 - Homepage widget for external dashboards
 
 ### Notifications
+
+![Current notification settings](../assets/en/current/settings-notifications.png)
 
 Borg Backup UI manages notification channels under **Settings > Notifications**. There are three separate delivery paths:
 
@@ -938,6 +962,8 @@ Reminder settings apply across channels. The reminder interval prevents the same
 
 ### Prometheus and Grafana
 
+![Prometheus integration before token creation](../assets/en/current/settings-integrations.png)
+
 Under **Settings > Integrations > Prometheus & Grafana**, enable the metrics
 endpoint, which is disabled by default. A dedicated token allows only reading
 metrics. Copy the Prometheus configuration and download the Grafana dashboard
@@ -959,7 +985,7 @@ The **About** section shows the installed Borg Backup UI version, bundled BorgBa
 
 ### 9.3 Users
 
-![Settings - Users](../assets/en/settings-users.png)
+![Settings - Users](../assets/en/current/settings-users.png)
 
 The **Users** section is visible when the application runs in user mode and the signed-in user has administrator rights.
 
@@ -990,7 +1016,7 @@ secrets, settings, and logs remain unchanged.
 
 ### 9.4 Backup
 
-![Settings - Backup](../assets/en/settings-backup.png)
+![Settings - Backup](../assets/en/current/settings-backup.png)
 
 The **Backup** section contains defaults and technical limits for backup runs.
 
@@ -1006,7 +1032,9 @@ These values affect new jobs or global runtime limits. Job-specific settings in 
 
 ### 9.5 Restore
 
-![Settings - Restore](../assets/en/settings-restore.png)
+![Demo local storage profile](../assets/en/current/settings-local.png)
+
+![Settings - Restore](../assets/en/current/settings-restore.png)
 
 The **Restore** section contains two subsections:
 
@@ -1043,7 +1071,7 @@ Overly broad or dangerous targets such as `/`, `/mnt`, and system directories ar
 
 ### 9.7 USB Profiles
 
-![Settings - USB Profiles](../assets/en/settings-usb.png)
+![Settings - USB Profiles](../assets/en/current/settings-usb.png)
 
 USB profiles describe local disks or Unassigned Devices targets. They are used by the job wizard for USB jobs.
 
@@ -1067,7 +1095,7 @@ Existing profile and repository paths remain unchanged; no reimport or file move
 
 ### 9.8 SMB Profiles
 
-![Settings - SMB Profiles](../assets/en/settings-smb.png)
+![Settings - SMB Profiles](../assets/en/current/settings-smb.png)
 
 SMB profiles define network shares. Passwords are treated as secrets.
 
@@ -1097,7 +1125,7 @@ Typical actions:
 
 ### 9.9 SSH Profiles
 
-![Settings - SSH Profiles](../assets/en/settings-storagebox.png)
+![Settings - SSH Profiles](../assets/en/current/settings-storagebox.png)
 
 SSH profiles are used for Storagebox or other SSH targets.
 
@@ -1129,7 +1157,7 @@ The **Storagebox**, **Synology**, and **Generic SSH** target types continue to u
 
 ### 9.10 Import / Export
 
-![Settings - Import / Export](../assets/en/settings-import-export.png)
+![Settings - Import / Export](../assets/en/current/settings-import-export.png)
 
 The **Import / Export** section is used to back up and transfer application configuration.
 
@@ -1154,7 +1182,7 @@ New encrypted exports use a versioned, authenticated envelope. Wrong passwords a
 
 ### 9.11 Advanced
 
-![Settings - Advanced](../assets/en/settings-advanced.png)
+![Settings - Advanced](../assets/en/current/settings-advanced.png)
 
 The **Advanced** section contains technical data that regular users should only inspect when needed.
 
@@ -1177,7 +1205,7 @@ Approval requires every risk acknowledgment, the server name, the current admini
 
 ### 9.13 System Status and Migration
 
-![Settings - System Status and Migration](../assets/en/settings-system-health.png)
+![Settings - System Status and Migration](../assets/en/current/settings-general.png)
 
 The system status is visible at the bottom left of the sidebar. Clicking it opens the related diagnostics area inside Settings.
 
@@ -1220,7 +1248,7 @@ Runtime recovery indicates that Docker containers or VMs were stopped during a b
 
 ## 10. Help
 
-![Help](../assets/en/help.png)
+![Help](../assets/en/current/help.png)
 
 The **Help** page offers **Quick help** and **User manual** offline, follows the selected language and opens bundled companion documents in the same reader. Use either view to return to its entry point.
 
@@ -1340,6 +1368,94 @@ Have credentials for the chosen channel; do not expose them in logs or screensho
 **Failures:** A test message checks only the channel. Event selection, recipient,
 tolerance and retry queue affect actual notifications. See
 [notifications](#notifications) and [troubleshooting](#134-email-ntfy-or-apprise-is-not-sent).
+
+### 11.6 Configure and verify Pre/Post scripts
+
+**Goal:** Add controlled preparation and cleanup to a job. **Role:** admin to
+configure, operator to run. Start with a test job. Scripts run with the backup
+service's privileges; a faulty script can change data or affect services. Use
+log messages only while learning.
+
+1. Open **Settings > Scripts**, select **New script**, name it `Demo Pre`, and
+   set the timeout to `30` seconds.
+2. Enter this harmless example and select **Validate and save**:
+
+   ```bash
+   #!/bin/bash
+   set -euo pipefail
+   printf '%s\n' 'Demo Pre: preparation checked'
+   ```
+
+3. Create `Demo Post` with the message `Demo Post: cleanup completed`. Syntax
+   validation has not executed either script.
+4. Edit the test job. In **Pre/Post scripts**, select both saved scripts.
+   **On success** is the usual Post condition; choose **Also on failure, skip or
+   cancellation** only when the script handles those states correctly. Review
+   **Flow Preview** and save.
+5. Start the job manually. The log must show Pre before preparation and Post
+   after maintenance and cleanup. Open **History** and inspect the separate
+   script outcomes, exit codes and backup result.
+6. Review assignments under **Settings > Scripts > Used by**. Editing a central
+   script affects all listed jobs at their next start. Back up script text,
+   timeout and assignments separately from the job export.
+
+**Verify:** Both example messages and exit code `0` appear; the archive still
+contains the expected files. A failed Pre prevents the backup from starting.
+A failed Post can coexist with an already written archive. For a timeout, first
+inspect the operation rather than blindly increasing the limit. See
+[execution and failure rules](#step-9-prepost-scripts) and
+[extended test scripts](../../examples/job-hooks/README.md).
+
+![Current script manager with a harmless Demo Pre script](../assets/en/current/scripts.png)
+
+*Current application, 2026-10-11: central Bash editor, syntax validation, timeout,
+import/export and job assignments. Synthetic demonstration data only.*
+
+![Pre and Post selection in the current job wizard](../assets/en/current/wizard-scripts.png)
+
+*Step 9 assigns saved scripts; the Post condition belongs to the job.*
+
+### 11.7 Monitor backup health in Grafana
+
+**Goal:** Use the included overview dashboard in Grafana. **Role:** admin for
+plugin settings and appropriate Prometheus/Grafana permissions. Both services
+must be available separately; the plugin does not install them.
+
+1. Open **Settings > Integrations > Prometheus & Grafana**. Enable metrics and
+   securely store the new restricted read-only token. Do not include it in
+   screenshots, links or support bundles.
+2. Add the displayed scrape configuration to Prometheus. Use a plugin address
+   reachable from that environment. A container's `localhost` refers to the
+   container, not your Unraid host.
+3. Check the Prometheus target: **UP**. Download the dashboard JSON from the
+   integration and import it into Grafana, selecting your Prometheus data source.
+   Export local customizations before replacing a dashboard with the same UID.
+4. Select one server and optionally filter by location, repository and job.
+   Check **Connection**, **Dashboard data** and **Snapshot age** first.
+5. Read latest backup results, overdue status and restore evidence separately.
+   **Latest runs successful** counts jobs whose latest result succeeded, not
+   every execution in the selected time range.
+
+![Included Grafana dashboard with synthetic backup and restore metrics](../assets/shared/grafana-overview.png)
+
+*Actual Grafana 12.1.1 capture using the shipped dashboard template, 2026-10-11.
+Names, sizes and states are synthetic examples; the dashboard language is
+English. This is not evidence about a real server's backups.*
+
+| Example display | Meaning and next step |
+| --- | --- |
+| Connection online, Dashboard data available | Exporter reachable and data readable; this does not establish backup success. |
+| Latest backup successful but overdue | The last success is too old. Review the schedule, mount and job log in the plugin. |
+| Restore evidence expired/failed | Evidence expired or a check failed. Inspect the report and actual archive tested, then perform a real restore. |
+| No data / No result | Missing data remains unknown. Check target, token, filters and collection start; do not interpret it as a healthy zero. |
+| Stored in repositories | Cached unique compressed chunks; neither total filesystem usage nor just data belonging to the selected job. |
+
+**Verify:** The target is UP, the snapshot is current, and a known demo job has
+plausible values. History begins when Prometheus starts collecting; short runs
+can fall between scrapes. Use the plugin's **History** for the complete run
+history. Configuration examples and metric limits are in the
+[Prometheus/Grafana guide](../../integrations/prometheus.md).
+
 
 ## 12. Status, Warnings, and Best Practices
 

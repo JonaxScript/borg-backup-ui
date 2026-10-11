@@ -248,7 +248,6 @@ def test_user_manuals_cover_current_stable_safety_and_runtime_guidance():
 
 
 def test_user_manual_screenshots_are_aligned_high_resolution_pngs():
-    expected_size = (1600, 1100)
     asset_sets = {}
 
     for language in ("de", "en"):
@@ -259,7 +258,8 @@ def test_user_manual_screenshots_are_aligned_high_resolution_pngs():
         for path in assets:
             header = path.read_bytes()[:24]
             assert header[:8] == b"\x89PNG\r\n\x1a\n", path
-            assert struct.unpack(">II", header[16:24]) == expected_size, path
+            width, height = struct.unpack(">II", header[16:24])
+            assert width == 4000 and height >= 2250, path
 
     assert asset_sets["de"] == asset_sets["en"]
 
