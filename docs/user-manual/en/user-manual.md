@@ -1,6 +1,6 @@
 # Borg-Backup-UI User Manual
 
-Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.09.1435`, Borg `1.4.5`.
+Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.11.1525`, Borg `1.4.5`.
 Language: English  
 Audience: Beginners, advanced users, and administrators of an Unraid system
 

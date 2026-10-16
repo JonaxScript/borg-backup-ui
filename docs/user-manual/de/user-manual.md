@@ -1,6 +1,6 @@
 # Borg-Backup-UI Benutzerhandbuch
 
-Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.09.1435`, Borg `1.4.5`.
+Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.11.1525`, Borg `1.4.5`.
 Sprache: Deutsch  
 Zielgruppe: Einsteiger, fortgeschrittene Anwender und Administratoren eines Unraid-Systems
 
