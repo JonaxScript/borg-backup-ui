@@ -746,6 +746,7 @@
     "title": "Schedule",
     "titleFor": "Schedule: {name}",
     "enable": "Enable schedule",
+    "disabledHint": "This job only runs manually. Enable the schedule to set up automatic backups.",
     "frequency": "Frequency",
     "daily": "Daily",
     "weekly": "Weekly",

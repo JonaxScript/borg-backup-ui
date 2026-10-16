@@ -746,6 +746,7 @@
     "title": "Zeitplan",
     "titleFor": "Zeitplan: {name}",
     "enable": "Zeitplan aktivieren",
+    "disabledHint": "Der Job läuft nur manuell. Aktivieren Sie den Zeitplan, um automatische Backups einzurichten.",
     "frequency": "Häufigkeit",
     "daily": "Täglich",
     "weekly": "Wöchentlich",

@@ -422,7 +422,7 @@ With file activity enabled, the active log is initially stored in RAM under `/ru
 
 ![Backup job schedule](../assets/en/current/wizard-schedule.png)
 
-The schedule can be set directly in the wizard. The UI supports simple frequencies and a cron expression.
+The schedule can be set directly in the wizard. Turn on **Enable schedule** to show the frequency, time, and cron controls and the next-run preview. While disabled, the wizard shows a hint that the job only runs manually. Toggling the schedule off and on preserves the entered values. The UI supports simple frequencies and a cron expression.
 
 Cron format:
 
