@@ -75,4 +75,3 @@ def start_backup(config, job_key, *, app_version="", request_id="", source="manu
         group_run_id=(group_env or {}).get("BORG_UI_GROUP_RUN_ID", ""),
     )
     return {"started": True, "job_key": job_key, "run_id": launched_run_id}
-
