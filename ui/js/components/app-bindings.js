@@ -115,6 +115,7 @@
         if (el.classList.contains('maintenance-disabled')) return;
         const target = el.getAttribute('data-page');
         const current = core()?.getCurrentPage?.() || '';
+        if (current === 'jobs' && target !== 'jobs' && window.BBUI?.jobGroups?.canLeave?.() === false) return;
         if (current === 'settings' && target !== 'settings' && typeof window.canLeaveSettingsPage === 'function') {
           const ok = await window.canLeaveSettingsPage();
           if (!ok) return;

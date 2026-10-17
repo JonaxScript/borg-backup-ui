@@ -185,3 +185,14 @@ All 50 existing PNG paths contain refreshed captures, including newly placed
 numbered callouts. Canonical manuals embed current images only. Missing hardware/setup captures are explicit in the
 capture inventory. Product findings above remain open; this change corrects
 documentation and help delivery without changing backup/restore behavior.
+
+## Job group extension (#570)
+
+Source baseline is `36273fe` plus the #570 feature changes; this does not change
+existing screenshot capture dates or imply a stable release.
+
+| Behavior | Authoritative implementation | DE / EN manual | Quick help | Evidence / image decision |
+| --- | --- | --- | --- | --- |
+| Ordered full-job completion, stop/continue, duplicate protection and restart interruption | `api/job_groups.py`, `api/job_launch.py`, `api/jobs_api.py` | 3.8 / 3.8 | Jobgruppen / Job Groups | Process, HTTP and behavioral tests; real Unraid/NAS hooks still require maintainer testing |
+| Membership, independent schedules, step states, mouse reordering and themed logs | `ui/js/pages/job-groups.js`, `ui/js/pages/jobs.js`, `api/schedule_api.py` | 3.8 / 3.8 | Jobgruppen / Job Groups | Actual browser exercised with synthetic API data; existing manual screenshots predate groups, no generated mockup substituted |
+| Complete group transfer, partial selection reporting, reminder semantics | `api/settings_transfer_api.py`, `api/notification_reminder_api.py` | 3.8, 18 export matrix / 3.8, 18 export matrix | Linked group instructions | Round-trip, partial selection, schedule and reminder-context tests; no archives or central script bodies added to job exports |

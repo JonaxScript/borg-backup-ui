@@ -491,7 +491,30 @@ Best Practices:
 
 - **Vorschau Fehler / ungültige Angaben:** Ein Feld im Wizard ist nicht plausibel. Prüfen Sie die zu sichernden Ordner oder Dateien, Typ-ID, Speicherziel und Repository-Auswahl.
 - **Kein Speicherziel oder Repository vorhanden:** Richten Sie das Speicherziel zuerst unter **Einstellungen** ein. Erstellen oder importieren Sie danach das Repository unter **Repositories**.
-- **Schedule disabled / Zeitplan deaktiviert:** Der Job läuft nur manuell.
+- **Schedule disabled / Zeitplan deaktiviert:** Der Job läuft manuell oder über eine Jobgruppe.
+
+### 3.8 Jobgruppen
+
+Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
+
+1. Öffnen Sie **Jobs > Jobgruppen > Neue Gruppe** und geben Sie einen Namen ein.
+2. Fügen Sie die vorhandenen Jobs hinzu. Ordnen Sie sie mit den Pfeilen oder durch Ziehen von oben nach unten an.
+3. Aktivieren Sie bei Bedarf den **Gruppenzeitplan**. Wählen Sie täglich, wöchentlich, monatlich oder einen eigenen Cron-Ausdruck; es gilt die Serverzeit. Ohne Gruppenzeitplan bleibt der manuelle Gruppenstart verfügbar.
+4. Lassen Sie **Gruppe stoppen** bei Fehlern aktiviert oder wählen Sie ausdrücklich **Mit nächstem Job fortfahren**. Speichern Sie die Gruppe.
+5. Prüfen Sie die zusätzlich angezeigten Einzelzeitpläne und stimmen Sie diese auf die Gruppe ab. Ein deaktivierter Einzelzeitplan deaktiviert weder den Job noch seinen Start durch die Gruppe.
+6. Starten Sie die Gruppe manuell. Prüfen Sie den aktiven Schritt und das **Live-Log**. **Aktuellem Job folgen** wechselt die Logansicht beim nächsten Job. Die bisherigen Logfarben bleiben erhalten.
+
+Unter **Einzeljobs** zeigt eine verlinkte Zeile die Gruppe und die Position, etwa „Gruppe: Lokale Sicherung · Schritt 1 von 3“. Einzelstart, Job-Einstellungen und Einzelzeitplan bleiben verfügbar. Der Gruppenlauf wartet auf das vollständige Prozessende einschließlich Wartung, Wiederanlauf, Aufräumen und Post-Skript. Erst danach startet der nächste Job. History und Berichte bleiben pro Job erhalten; die Gruppenzuordnung und ein eigener Gruppenverlauf ergänzen sie.
+
+**Stoppen und Fehler:** „Nach aktuellem Job stoppen“ lässt den laufenden Job fertig werden und startet keinen weiteren. Ein gezielter Jobabbruch stoppt auch die Gruppe. Warnungen lassen die Reihenfolge weiterlaufen; Fehler oder wegen einer Sperre übersprungene Jobs stoppen sie standardmäßig. Bei „Mit nächstem Job fortfahren“ bleiben Fehler im Gesamtergebnis sichtbar. Eine bereits laufende Gruppe kann nicht doppelt gestartet oder gelöscht werden. Gruppenänderungen gelten für den nächsten Gruppenlauf; geänderte Einstellungen eines Einzeljobs werden bei dessen Start gelesen.
+
+**Backup-Rechner starten und herunterfahren:** Hinterlegen Sie das Starten und Warten auf Erreichbarkeit im Pre-Skript des ersten Jobs und das Herunterfahren im Post-Skript des letzten Jobs. Wird die Gruppe vorher gestoppt, läuft dieses letzte Post-Skript nicht. Beim Einzelstart gelten dieselben Skripte. Es gibt keine gruppenübergreifende Reservierung: Andere Jobs und Gruppen können unabhängig starten; die vorhandenen Job-/Repository-Sperren bleiben wirksam. Zwischen zwei Gruppenjobs kann ein anderer Job die freigegebene Ressource zuerst belegen. Stimmen Sie daher Zeitpläne und Shutdown-Skripte selbst ab.
+
+Nach einem Verlust des koordinierenden Dienstprozesses wird der Gruppenlauf als **Unterbrochen** angezeigt und nicht automatisch wiederholt. Ein noch laufender Kindprozess wird dadurch nicht automatisch beendet. Prüfen Sie dessen Zustand und Log, bevor Sie einen neuen Gruppenlauf starten.
+
+**Sichern und Übertragen:** Gruppen stehen unter `config/job-groups.json`, Laufzustände unter `group-runs` im Datenverzeichnis. Sichern Sie diese mit Ihrer Konfiguration. Job-Exporte übernehmen nur Gruppen, deren sämtliche Jobs ausgewählt sind, im Format `bbui-job-bundle-v5`. Beim Import werden Referenzen auf die übernommenen Jobs angepasst; unvollständige Gruppen werden im Ergebnis als ausgelassen angezeigt. Bestehende Gruppen bleiben bei `skip` erhalten. Skriptdefinitionen müssen weiterhin separat übertragen werden. Erinnerungen berücksichtigen den Gruppenzeitplan als gemeinsamen Start und melden die wartenden Folgejobs nicht vorzeitig als ausgefallen; zusätzliche Einzelzeitpläne gelten weiterhin separat.
+
+**Prüfung:** Kontrollieren Sie nach einem Testlauf die Reihenfolge im Gruppenverlauf, die einzelnen Joblogs und den Zustand des Backup-Rechners. Bei fehlenden Jobs bearbeiten Sie die Gruppe. Ein zugeordneter Job kann erst gelöscht werden, wenn er aus seinen Gruppen entfernt wurde und keinem aktiven Gruppenlauf mehr angehört. Das Löschen einer Gruppe erhält ihre Jobs und gespeicherten Läufe. Weitere Details zu Skripten stehen in Abschnitt 3.5.
 
 ## 4. Repositories
 
@@ -1764,7 +1787,7 @@ in der Importvorschau; ändern Sie keine Formatkennung von Hand.
 
 | Export / inneres Format | Enthalten | Nicht enthalten / Importgrenze |
 | --- | --- | --- |
-| Jobs: `bbui-job-bundle-v3` oder `bbui-job-bundle-v4` | Job-Metadaten im Schema 5, Repository-/Speicherzuordnungen, Zeitpläne, Profilkonfiguration; verwaltete Ausschlussdateien bei Bedarf | Keine Passphrase-Dateiinhalte, keine Borg-Keyfile-Inhalte, keine zentralen Skriptdefinitionen, keine Archive. v4 wird bei erweiterten Ausschlüssen/Retention erzeugt; beide Formate mit gültigem Schema 5 werden akzeptiert. v1/v2 und ältere Job-Schemas werden abgelehnt. |
+| Jobs: `bbui-job-bundle-v3`, `bbui-job-bundle-v4` oder `bbui-job-bundle-v5` | Job-Metadaten im Schema 5, Repository-/Speicherzuordnungen, Zeitpläne, Profilkonfiguration; verwaltete Ausschlussdateien bei Bedarf | Keine Passphrase-Dateiinhalte, keine Borg-Keyfile-Inhalte, keine zentralen Skriptdefinitionen, keine Archive. v4 wird bei erweiterten Ausschlüssen/Retention erzeugt; v5 enthält zusätzlich vollständige Jobgruppen; alle drei Formate mit gültigem Schema 5 werden akzeptiert. v1/v2 und ältere Job-Schemas werden abgelehnt. |
 | Jobs mit Passphrases: `bbui-job-bundle-secure-v3` | Inneres v3/v4-Jobpaket, zugehörige vorhandene Passphrase-Dateien und lokale Borg-Keyfiles | Kein allgemeines Einstellungs-/Profil-Secret-Paket, keine zentralen Skripte, keine Archive, keine automatisch exportierten Repokey-Schlüssel. Ältere secure-Formate werden abgelehnt. |
 | Profile und Secrets: `bbui-profile-secrets-v2` | SMB-/Speicherprofile, deren zugeordnete SMB-/SSH-Secret-Dateien | Keine Jobs, Archive oder vollständige Anwendungskonfiguration. v1 wird abgelehnt. |
 | Secrets: `bbui-secrets-backup-v1` | Zulässige Secret-Dateien und Dateien unter `secrets/borg-keys` | Keine Job-/Profildefinitionen oder Datenarchive; nur akzeptierte Dateinamen werden importiert. |

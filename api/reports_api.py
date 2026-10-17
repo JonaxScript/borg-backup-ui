@@ -92,6 +92,9 @@ def get_report_data(config: dict, job_key: str) -> dict:
         backup_type, location = raw.get("backup_type", ""), raw.get("location", "")
         ts = raw.get("timestamp", "")
         runs.append({
+            "group_id": raw.get("group_id", ""),
+            "group_name": raw.get("group_name", ""),
+            "group_run_id": raw.get("group_run_id", ""),
             "timestamp": ts,
             "date": ts[:10] if ts else "",
             "status": raw.get("status", "unknown"),

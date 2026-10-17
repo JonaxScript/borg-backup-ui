@@ -162,6 +162,7 @@ function renderHistoryRow(e, idx) {
         ${detailError ? renderHistoryError(detailError, e.status === 'skipped') : ''}
         <div class="history-detail-panel">
           ${detailGroup(historyT('jobId'), e.job_id || '—', 'wide')}
+          ${e.group_name ? detailGroup(jobsT('jobGroups.groupLabel'), e.group_name + ' · ' + e.group_run_id, 'wide') : ''}
           ${detailGroup(historyT('archive'), e.archive_name || '-', 'archive')}
           ${detailGroup(historyT('compressed'), e.compressed_size_fmt)}
           ${detailGroup(historyT('repositorySize'), e.repository_size_fmt)}

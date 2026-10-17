@@ -66,6 +66,7 @@
     '/ui/js/pages/history.js',
     '/ui/js/pages/dashboard.js',
     '/ui/js/pages/jobs.js',
+    '/ui/js/pages/job-groups.js',
     '/ui/js/pages/wizard.js',
     '/ui/js/pages/restore.js',
     '/ui/js/pages/restore-tests.js',

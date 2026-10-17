@@ -2903,6 +2903,7 @@ function renderJobsImportPreview(d) {
   return `
     ${renderLegacyEncryptionWarning(d)}
     ${settingsBlock}
+    ${(d?.job_groups || []).length ? `<div class="status-message info">${escHtml(settingsT('transfer.groupsPreview', { names: d.job_groups.map(g => g.name).join(', ') }))}</div>` : ''}
     <div class="text-muted" style="font-size:12px;margin-bottom:8px">${settingsT('transfer.jobsPreviewTitle', { count: rows.length })}${Number(d?.passphrase_count || 0) ? ` · ${settingsT('transfer.passphrasesInPackage', { count: Number(d.passphrase_count) })}` : ''}${Number(d?.keyfile_count || 0) ? ` · ${settingsT('transfer.keyfilesInPackage', { count: Number(d.keyfile_count) })}` : ''}${Number(d?.borg_key_export_count || 0) ? ` · ${settingsT('transfer.borgKeyExportsInPackage', { count: Number(d.borg_key_export_count) })}` : ''}${Number(d?.borg_key_export_failed_count || 0) ? ` · ${settingsT('transfer.borgKeyExportsFailedInPackage', { count: Number(d.borg_key_export_failed_count) })}` : ''}</div>
     <div class="status-message info" style="margin:0 0 8px 0">
       ${settingsT('transfer.total', { count: stats.total })} · ${settingsT('transfer.new', { count: stats.new })} · ${settingsT('transfer.existing', { count: stats.exists })} · ${settingsT('transfer.invalid', { count: stats.invalid })}${stats.other ? ` · ${settingsT('transfer.other', { count: stats.other })}` : ''}
@@ -3955,6 +3956,10 @@ function settingsTransferImportResultMessage(data) {
     const count = Number(byStatus[status] || 0);
     if (count) parts.push(settingsT(`transfer.${key}`, { count }));
   });
+  (data?.group_report || []).forEach(row => {
+    parts.push(settingsT(row.status === 'imported' ? 'transfer.groupImported' : 'transfer.groupSkipped', { name: row.name }));
+  });
+  if (data?.group_schedule_error) parts.push(settingsT('transfer.groupScheduleError', { error: data.group_schedule_error }));
   const passphrases = Number(data?.restored_passphrases || 0);
   if (passphrases) parts.push(settingsT('transfer.passphrasesRestored', { count: passphrases }));
   const keyfiles = Number(data?.restored_keyfiles || 0);

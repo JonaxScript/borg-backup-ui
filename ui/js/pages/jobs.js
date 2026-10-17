@@ -177,6 +177,7 @@ async function refreshJobs() {
     }));
     jobsState.lastRunningSnapshot = JSON.stringify(runningData);
 
+    await window.BBUI.jobGroups?.load();
     jobsState.loaded = true;
     renderJobsGrid(jobsState.jobs);
   } catch (err) {
@@ -204,6 +205,7 @@ async function _pollRunningStates() {
   const coreState = _coreState();
   if (coreState.currentPage !== 'jobs') return;
   try {
+    await window.BBUI.jobGroups?.load();
     const res = await fetch('/api/jobs/running');
     if (!res.ok) return;
     const running = await res.json();
@@ -235,6 +237,8 @@ function jobRuntimeState(runtime, previous = {}) {
     run_id: runtime?.run_id ?? previous.run_id ?? '',
     run_file_activity: runtime ? runtime.file_activity === true : (previous.run_file_activity ?? false),
     run_phase: runtime?.phase ?? '',
+    group_name: runtime?.group_name ?? '',
+    group_run_id: runtime?.group_run_id ?? '',
     cancel_allowed: runtime?.cancel_allowed ?? false,
     cancellation_deferred: runtime?.cancellation_deferred ?? false,
     cancel_requested: runtime?.cancel_requested ?? false,
@@ -245,6 +249,7 @@ function jobRuntimeState(runtime, previous = {}) {
 // ── Jobs rendern ──────────────────────────────────────────────────────────────
 
 function renderJobsGrid(jobs) {
+  if (window.BBUI.jobGroups?.state.view === 'groups') { window.BBUI.jobGroups.render(); return; }
   const el = document.getElementById('jobs-grid');
   if (!el) return;
   const jobsNewBtn = document.getElementById('jobs-new-btn');
@@ -484,6 +489,7 @@ function renderJobCard(job) {
         <div class="type-icon${iconColorClass}">${typeIcon(iconKey)}</div>
         <div><div class="type-name">${escHtml(titleName)}</div><span class="type-sub">${escHtml(job.archive_prefix || '')}</span></div>
       </div>
+      ${window.BBUI.jobGroups?.membership(job) || ''}
       ${job.description ? `<div class="job-description">${renderDescriptionMarkdown(job.description)}</div>` : ''}
       <div class="job-meta">${features.join('')}</div>
       ${job.enabled === false ? `<div class="status-message warning-state jobs-redesign-disabled-note">${jobsT('jobs.disabled')}</div>` : ''}
@@ -492,12 +498,15 @@ function renderJobCard(job) {
       <span class="jobs-redesign-label">${jobsT('jobs.operatingState')}</span>
       <span class="badge ${stateClass}"><span class="badge-dot"></span>${escHtml(stateLabel)}</span>
       <span class="jobs-redesign-detail">${escHtml(lastRunText)}</span>
+      ${job.running && job.group_name ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.startedBy', { name: job.group_name }))}</span>` : ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-policy">
       <span class="jobs-redesign-label">${jobsT('jobs.policy')}</span>
       ${policyHtml || `<span class="jobs-redesign-detail">—</span>`}
       ${verificationHtml}
+      ${job.groups?.length ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.individualSchedule'))}</span>` : ''}
       ${schedHtml || (job.enabled === false ? `<span class="jobs-redesign-detail">${jobsT('jobs.scheduleDisabled')}</span>` : '')}
+      ${window.BBUI.jobGroups?.schedules(job) || ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-actions">
       ${actionHtml}
@@ -940,12 +949,14 @@ async function confirmJobStart() {
 
 // ── Log-Panel & SSE ───────────────────────────────────────────────────────────
 
-function openLogPanel(jobKey) {
+/** Open the themed log; an optional run ID prevents reconnecting to a later run. */
+function openLogPanel(jobKey, runId = '') {
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   const job = jobsState.jobs.find(j => j.key === jobKey);
   const title = jobsT('jobs.logTitle', { name: job ? (job.display_name || job.key) : jobKey });
 
+  document.getElementById('log-panel-title-text').removeAttribute('data-i18n');
   document.getElementById('log-panel-title-text').textContent = title;
   document.getElementById('log-output').textContent = '';
   setLogStatus('running');
@@ -991,7 +1002,7 @@ function openLogPanel(jobKey) {
     return;
   }
 
-  const es = new EventSource(`/api/jobs/log/stream?job=${encodeURIComponent(jobKey)}`);
+  const es = new EventSource(`/api/jobs/log/stream?job=${encodeURIComponent(jobKey)}${runId ? '&run=' + encodeURIComponent(runId) : ''}`);
   jobsState.activeEventSource = es;
   jobsState.logAutoScroll = true;
 

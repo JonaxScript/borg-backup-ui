@@ -2805,11 +2805,16 @@ def save_job_repository_transaction(
 
 
 def delete_job_metadata_transaction(config: dict, metadata_paths: list[Path], job_key: str) -> int:
-    """Delete job metadata and unlink its repository references with rollback."""
+    """Delete ungrouped job metadata and unlink repository references with rollback.
+
+    Group references are checked under the same inventory lock as deletion.
+    """
     repo_path = repositories_file(config)
     paths = [Path(path) for path in metadata_paths]
     try:
         with inventory_lock(repo_path.parent):
+            from job_groups import require_unassigned
+            require_unassigned(config, job_key)
             snapshots = {path: path.read_bytes() for path in paths if path.exists()}
             old_repo = repo_path.read_bytes() if repo_path.exists() else None
             try:

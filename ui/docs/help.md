@@ -145,6 +145,15 @@ Bei einem laufenden Job fordert **Job abbrechen** einen kontrollierten Abbruch a
 
 Ein abgebrochener Lauf wird mit dem Status **Abgebrochen** gespeichert. Die Anwendung startet danach nicht automatisch einen Repository-Check und entfernt keine Borg-Locks. Prüfen Sie bei auffälligen Meldungen das Live- beziehungsweise gespeicherte Log.
 
+### Jobgruppen
+
+Unter **Jobs > Jobgruppen** können Administratoren vorhandene Jobs zu einer Reihenfolge mit eigenem Zeitplan zusammenfassen. Die Einzeljobs behalten ihre Einstellungen und zeigen ihre Gruppenzuordnung. Der nächste Job startet erst nach dem vollständigen Ende seines Vorgängers, einschließlich Wartung und Post-Skript. Einzelzeitpläne werden nicht automatisch geändert.
+
+**Nach aktuellem Job stoppen** beendet die Folge nach dem laufenden Job. Bei Fehlern stoppt die Gruppe standardmäßig; eine Fortsetzung ist einstellbar. Andere Jobs können unabhängig starten. Ein Shutdown im letzten Job erfolgt nur, wenn dieser Job ausgeführt wird. Prüfen Sie zusätzliche Einzelzeitpläne und Skripte vor dem ersten automatischen Lauf.
+
+[Einrichtung, Logansicht, Fehlerverhalten und Export](../../docs/user-manual/de/user-manual.md#38-jobgruppen).
+
+
 ## 7. Zeitplanung
 
 Cron verwendet fünf Felder: Minute, Stunde, Tag, Monat und Wochentag. `0 3 * * *` startet einen Job täglich um 03:00 Uhr. Planen Sie große Jobs mit ausreichendem Abstand und vermeiden Sie parallele Zugriffe auf dasselbe Repository.

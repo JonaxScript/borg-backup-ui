@@ -676,6 +676,7 @@ def main() -> int:
 
     job_config = BackupJobConfig.from_config(env)
     _setup_full_logging(job_config.log_file)
+    os.environ["BORG_UI_GROUP_LOG_FILE"] = str(job_config.retained_log_file or job_config.log_file)
     if job_config.retained_log_file:
         # Also avoid including the active log if a source covers /run itself.
         job_config.exclude_paths.append(job_config.log_file.parent)

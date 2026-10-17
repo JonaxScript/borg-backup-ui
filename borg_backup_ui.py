@@ -404,6 +404,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
     _ROUTINE_GET_PATHS = {
         "/api/auth/status",
         "/api/jobs",
+        "/api/job-groups",
         "/api/jobs/running",
         "/api/jobs/log/window",
         "/api/setup-status",
@@ -745,6 +746,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             or p.startswith("/api/system-health")
             or p.startswith("/api/notification-reminders")
             or p.startswith("/api/jobs")
+            or p.startswith("/api/job-groups")
             or p.startswith("/api/schedules")
             or p.startswith("/api/storage")
             or p.startswith("/api/repositories")
@@ -762,6 +764,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         if p in {
             "/api/jobs/run",
             "/api/jobs/cancel",
+            "/api/job-groups/run",
+            "/api/job-groups/stop",
             "/api/restore-tests/run",
             "/api/restore-tests/run-job",
             "/api/storage/test",
@@ -934,7 +938,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         elif path == "/api/jobs/log/stream":
             qs = parse_qs(parsed.query)
             job_key = (qs.get("job") or [""])[0]
-            self._handle_direct_api(lambda: self._handle_sse(job_key))
+            self._handle_direct_api(lambda: self._handle_sse(job_key, (qs.get("run") or [""])[0]))
         elif path == "/api/jobs/log/download":
             self._handle_direct_api(lambda: self._download_activity_log(parsed.query))
         elif path == "/api/restore-tests/log/stream":
@@ -958,6 +962,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/system-health": self._get_system_health,
                 "/api/notification-reminders/diagnostics": self._get_notification_reminder_diagnostics,
                 "/api/jobs": self._get_jobs,
+                "/api/job-groups": self._get_job_groups,
+                "/api/job-groups/history": lambda: self._get_job_group_history(parsed.query),
                 "/api/jobs/running": self._get_running,
                 "/api/schedules": self._get_schedules,
                 "/api/storage": self._get_storage,
@@ -1012,6 +1018,9 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         routes = {
             "/api/jobs/run": self._post_run_job,
+            "/api/job-groups": self._save_job_group,
+            "/api/job-groups/run": self._run_job_group,
+            "/api/job-groups/stop": self._stop_job_group,
             "/api/jobs/cancel": self._post_cancel_job,
             "/api/restore-tests/run": self._post_run_restore_test,
             "/api/restore-tests/run-job": self._post_run_restore_test_job,
@@ -1095,6 +1104,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/storage": self._put_storage,
             "/api/settings": self._put_settings,
             "/api/schedules": self._put_schedule,
+            "/api/job-groups": self._save_job_group,
             "/api/jobs/enabled": self._put_job_enabled,
             "/api/auth/users": self._put_auth_user_update,
             "/api/restore-tests/policy": self._put_restore_test_policy,
@@ -1111,6 +1121,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         routes = {
             "/api/schedules": self._delete_schedule,
             "/api/jobs": self._delete_job,
+            "/api/job-groups": self._delete_job_group,
             "/api/restore-tests": self._delete_restore_test,
             "/api/restore/history": self._delete_restore_history,
             "/api/repositories": self._delete_repository,
@@ -1792,6 +1803,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         if get_job_runtime_state(self.config, job_key).get("running"):
             raise RuntimeError("The job is currently running; wait for it to finish")
 
+        from job_groups import require_unassigned
+        require_unassigned(self.config, job_key)
         info = jobs[job_key]
         passphrase_path = None
         if body.get("delete_passphrase"):
@@ -3438,80 +3451,58 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             raise ValueError("session_id is required")
         return storagebox_deploy_cancel(sid)
 
+    def _get_job_groups(self):
+        """Expose group definitions and current runs to authenticated readers."""
+        from job_groups import list_groups
+        return list_groups(self.config)
+
+    def _get_job_group_history(self, query):
+        """Return the most recent fifty runs of the selected group."""
+        from job_groups import group_history
+        return group_history(self.config, parse_qs(query).get("id", [""])[0])
+
+    def _save_job_group(self):
+        """Save administrator-edited group configuration and apply its schedule."""
+        self._require_data_dir_ready()
+        from job_groups import save_group
+        return save_group(self.config, self._read_json_body())
+
+    def _delete_job_group(self):
+        """Delete an idle group definition, retaining jobs and historical runs."""
+        self._require_data_dir_ready()
+        from job_groups import delete_group
+        return delete_group(self.config, self._read_json_body().get("id"))
+
+    def _run_job_group(self):
+        """Start a group snapshot under the normal runtime-readiness gate."""
+        self._require_data_dir_ready()
+        from job_groups import start_group
+        body = self._read_json_body()
+        session = self._get_current_session_meta() or {}
+        scheduled = body.get("scheduled") is True
+        actor = _normalize_username(session.get("username", "")) or ("scheduler" if scheduled else "api-token")
+        return start_group(self.config, body.get("id"), scheduled=scheduled,
+                           app_version=APP_VERSION, actor=actor,
+                           request_id=str(getattr(self, "_current_request_id", "") or ""))
+
+    def _stop_job_group(self):
+        """Ask the selected group run to stop after its current child finishes."""
+        from job_groups import stop_group
+        body = self._read_json_body()
+        return stop_group(self.config, body.get("id"), body.get("run_id"))
+
     def _post_run_job(self) -> dict:
         self._require_data_dir_ready()
-        from jobs_api import JobManager, discover_jobs, get_job_runtime_state, resolve_data_root, resolve_scripts_dir
-        from lifecycle_log import emit_lifecycle
+        from job_launch import start_backup
         body = self._read_json_body()
-        job_key = body.get("job_key", "")
-        if not job_key:
-            raise ValueError("job_key is required")
-
-        borg_scripts_dir = resolve_scripts_dir(self.config)
-        backup_scripts_dir = Path(self.config["BACKUP_SCRIPTS_DIR"])
-        data_root = resolve_data_root(self.config)
-        jobs = {j.key: j for j in discover_jobs(borg_scripts_dir, data_root)}
-        if job_key not in jobs:
-            raise ValueError(f"Unknown job: {job_key}")
-        if not jobs[job_key].enabled:
-            raise RuntimeError(f"Job is disabled: {job_key}")
-        if get_job_runtime_state(self.config, job_key).get("running"):
-            raise RuntimeError("Job is already running")
-
-        info = jobs[job_key]
-        plugin_runtime = Path(__file__).resolve().parent / "runtime"
-        existing_pp = os.environ.get("PYTHONPATH", "")
-        runtime_pp = str(plugin_runtime)
-        merged_pp = f"{runtime_pp}:{existing_pp}" if existing_pp else runtime_pp
-        if info.standard != "wizard":
-            raise RuntimeError(f"Unsupported job standard: {info.standard}")
-        runner = Path(__file__).resolve().parent / "api" / "wizard_runner.py"
-        request_id = str(getattr(self, "_current_request_id", "") or "")
         session = self._get_current_session_meta() or {}
-        actor = _normalize_username(session.get("username", ""))
         source = "schedule" if bool(body.get("scheduled")) else (
-            "api-token" if self._has_valid_api_token_header() else "manual"
-        )
-        if not actor and source == "schedule":
-            actor = "scheduler"
-        if not actor and source == "api-token":
-            actor = "api-token"
-        extra_env = {
-            "BORG_UI_BORG_SCRIPTS_DIR": str(borg_scripts_dir),
-            "BORG_UI_JOB_KEY": job_key,
-            "BORG_UI_JOB_NAME": info.name or info.display_name,
-            "BORG_UI_JOB_LOCATION": info.location,
-            "BORG_UI_APP_VERSION": APP_VERSION,
-            "BORG_UI_REQUEST_ID": request_id,
-            "BORG_UI_REQUEST_SOURCE": source,
-            "BORG_UI_REQUEST_ACTOR": actor,
-            "BORG_UI_FILE_ACTIVITY_RUN": "1" if getattr(info, "file_activity", False) else "0",
-            "PYTHONPATH": merged_pp,
-        }
-        if extra_env["BORG_UI_FILE_ACTIVITY_RUN"] == "1":
-            from jobs_api import _runtime_log_dir
-            extra_env["BORG_UI_ACTIVITY_LOG_DIR"] = str(_runtime_log_dir(self.config))
-        ok, err = JobManager.get().start(
-            job_key,
-            ["python3", str(runner)],
-            backup_scripts_dir,
-            extra_env=extra_env,
-        )
-        if not ok:
-            raise RuntimeError(err)
-        state = JobManager.get().get_state(job_key)
-        emit_lifecycle(
-            "JOB",
-            "requested",
-            request_id=request_id,
-            source=source,
-            actor=actor,
-            job_key=job_key,
-            backup_type=info.backup_type,
-            location=info.location,
-            run_id=state.get("run_id", ""),
-        )
-        return {"started": True, "job_key": job_key, "run_id": state.get("run_id", "")}
+            "api-token" if self._has_valid_api_token_header() else "manual")
+        actor = _normalize_username(session.get("username", "")) or (
+            "scheduler" if source == "schedule" else source)
+        return start_backup(self.config, body.get("job_key", ""), app_version=APP_VERSION,
+                            request_id=str(getattr(self, "_current_request_id", "") or ""),
+                            source=source, actor=actor)
 
     def _post_cancel_job(self) -> dict:
         from jobs_api import cancel_job
@@ -3573,7 +3564,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
 
-    def _handle_sse(self, job_key: str):
+    def _handle_sse(self, job_key: str, run_id: str = ""):
+        """Stream the selected job, optionally confined to one execution identity."""
         from jobs_api import stream_job_output
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -3583,7 +3575,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         self._send_refreshed_session_header()
         self.end_headers()
         try:
-            for chunk in stream_job_output(self.config, job_key):
+            for chunk in stream_job_output(self.config, job_key, run_id):
                 self.wfile.write(chunk.encode("utf-8"))
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):

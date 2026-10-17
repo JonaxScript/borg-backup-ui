@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="/ui/style.css">
   <link rel="stylesheet" href="/ui/design-system.css">
   <link rel="stylesheet" href="/ui/dashboard-jobs.css">
+  <link rel="stylesheet" href="/ui/job-groups.css">
   <link rel="stylesheet" href="/ui/history-reports.css">
   <link rel="stylesheet" href="/ui/restore-tests-redesign.css">
   <link rel="stylesheet" href="/ui/browse-restore-redesign.css">
@@ -268,6 +269,7 @@
             </svg>
             <span data-i18n="jobs.refresh">Aktualisieren</span>
           </button>
+          <button type="button" class="btn btn-primary hidden" id="groups-new-btn" data-group-action="new" data-i18n="jobGroups.new">Neue Gruppe</button>
           <button class="btn btn-primary" id="jobs-new-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -278,6 +280,11 @@
         </div>
       </div>
 
+      <div class="restore-view-tabs job-view-tabs" role="tablist" aria-label="Jobs">
+        <button type="button" class="is-active" data-group-view="jobs" role="tab" aria-selected="true" data-i18n="jobGroups.individual">Einzeljobs</button>
+        <button type="button" data-group-view="groups" role="tab" aria-selected="false" data-i18n="jobGroups.title">Jobgruppen</button>
+      </div>
+      <div id="job-groups-pane" class="ui-context-layout hidden"></div>
       <div id="jobs-message" class="status-message hidden"></div>
       <div id="jobs-data-dir-warning" class="status-message hidden"></div>
       <div class="jobs-location-layout ui-context-layout">

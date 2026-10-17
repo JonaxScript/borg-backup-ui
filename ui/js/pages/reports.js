@@ -360,6 +360,7 @@ function _berichtSizeChart(runs) {
     const dWeek = prevWeek ? (r.repository_size - prevWeek.repository_size) : null;
     const tooltip = [
       reportsT('tooltipDate', { value: r.date || '—' }),
+      ...(r.group_name ? [reportsT('tooltipGroup', { name: r.group_name })] : []),
       reportsT('tooltipRepoSize', { value: _fmtBytes(r.repository_size || 0) }),
       reportsT('tooltipPreviousDayDelta', { value: _fmtDelta(dDay) }),
       reportsT('tooltipPreviousWeekDelta', { value: _fmtDelta(dWeek) }),
@@ -408,6 +409,7 @@ function _berichtDurChart(runs) {
     const dDay = prev ? (r.duration_seconds - prev.duration_seconds) : null;
     const tooltip = [
       reportsT('tooltipDate', { value: r.date || '—' }),
+      ...(r.group_name ? [reportsT('tooltipGroup', { name: r.group_name })] : []),
       reportsT('tooltipDuration', { value: _fmtDuration(r.duration_seconds || 0) }),
       reportsT('tooltipPreviousDayDelta', { value: dDay == null ? '—' : _fmtDuration(Math.abs(dDay)) })
     ].join('\n');
@@ -450,6 +452,7 @@ function _berichtDedupChart(runs) {
     const dDay = prev ? (r.deduplicated_size - prev.deduplicated_size) : null;
     const tooltip = [
       reportsT('tooltipDate', { value: r.date || '—' }),
+      ...(r.group_name ? [reportsT('tooltipGroup', { name: r.group_name })] : []),
       reportsT('tooltipNewData', { value: _fmtBytes(r.deduplicated_size || 0) }),
       reportsT('tooltipPreviousDayDelta', { value: _fmtDelta(dDay) })
     ].join('\n');

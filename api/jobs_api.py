@@ -56,6 +56,7 @@ def _control_state_for_run(run_id: str) -> dict:
             "cancellation_deferred",
             "cancel_requested",
             "message_key",
+            "group_id", "group_name", "group_run_id",
         )
         if key in state
     }
@@ -436,15 +437,19 @@ class JobManager:
     # ── Job starten ──────────────────────────────────────────────────────────
 
     def start(self, job_key: str, command: List[str], cwd: Path,
-              extra_env: Optional[Dict[str, str]] = None) -> tuple:
+              extra_env: Optional[Dict[str, str]] = None, *, run_id=None, inherited_fds=(), state_sink=None) -> tuple:
         """Launch a backup subprocess, returning ``(started, error_message)``.
 
         ``extra_env`` augments the process environment; an already running job
-        returns a failure tuple rather than starting a duplicate.
+        returns a failure tuple rather than starting a duplicate. ``run_id`` may
+        be preallocated by a group; ``inherited_fds`` keeps its guard held until
+        the child exits, including when the service exits first. An internal
+        ``state_sink`` receives the exact child state before another start can
+        replace the latest state for that job.
         """
         # Keep the check, process launch and state publication one operation.
         with self._start_lock:
-            return self._start_locked(job_key, command, cwd, extra_env)
+            return self._start_locked(job_key, command, cwd, extra_env, run_id, inherited_fds, state_sink)
 
     def _start_locked(
         self,
@@ -452,6 +457,7 @@ class JobManager:
         command: List[str],
         cwd: Path,
         extra_env: Optional[Dict[str, str]] = None,
+        run_id=None, inherited_fds=(), state_sink=None,
     ) -> tuple:
         """
         Startet einen Backup-Job als Subprozess.
@@ -466,7 +472,9 @@ class JobManager:
         env = dict(os.environ)
         # Damit das Script seine lib/ findet
         env["BORG_SCRIPT_DIR"] = str(cwd)
-        run_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:12]}"
+        run_id = run_id or f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:12]}"
+        from job_control import _safe_component, _RUN_ID_RE
+        run_id = _safe_component(run_id, _RUN_ID_RE, "run id")
         env["BORG_UI_RUN_ID"] = run_id
         if extra_env:
             env.update(extra_env)
@@ -496,6 +504,7 @@ class JobManager:
                 text=True,
                 bufsize=1,
                 cwd=str(cwd),
+                pass_fds=tuple(inherited_fds),
             )
         except OSError as exc:
             return False, f"Start failed: {exc}"
@@ -506,6 +515,8 @@ class JobManager:
         new_state = _JobState(proc, datetime.now(), run_id, log_file, capture_record_file)
         with self._lock:
             self._states[job_key] = new_state
+            if state_sink is not None:
+                state_sink["state"] = new_state
 
         t = threading.Thread(
             target=self._reader,
@@ -598,17 +609,17 @@ class JobManager:
 
     # ── SSE-Stream ────────────────────────────────────────────────────────────
 
-    def stream_output(self, job_key: str) -> Generator[str, None, None]:
+    def stream_output(self, job_key: str, run_id: str = "") -> Generator[str, None, None]:
         """
         SSE-Generator: liefert neue Log-Zeilen als 'data:' Events.
         Schließt mit einem 'done'-Event (Daten = Exit-Code).
-        Bricht sofort ab wenn Job unbekannt ist.
+        Bricht sofort ab wenn Job unbekannt ist oder die optionale run_id nicht passt.
         """
         job_key = _validate_job_key(job_key)
         with self._lock:
             state = self._states.get(job_key)
-        if state is None:
-            yield "event: error\ndata: Job not found\n\n"
+        if state is None or (run_id and state.run_id != run_id):
+            yield "event: error\ndata: Job run not found\n\n"
             return
         if state.log_file is not None:
             # Keep the existing SSE contract for API clients. The activity UI
@@ -664,17 +675,20 @@ def _latest_job_exit_code(config: dict, job_key: str) -> Optional[int]:
     return None
 
 
-def stream_job_output(config: dict, job_key: str) -> Generator[str, None, None]:
-    """Stream in-memory output or resume a live runner log discovered via locks."""
+def stream_job_output(config: dict, job_key: str, run_id: str = "") -> Generator[str, None, None]:
+    """Stream a job log, optionally pinned to a run to reject later replacements."""
     key = _validate_job_key(job_key)
     manager = JobManager.get()
     if manager.is_running(key):
-        yield from manager.stream_output(key)
+        yield from manager.stream_output(key, run_id)
         return
 
     durable = durable_running_states(config).get(key)
     if not durable:
-        yield from manager.stream_output(key)
+        yield from manager.stream_output(key, run_id)
+        return
+    if run_id and durable.get("run_id") != run_id:
+        yield "event: error\ndata: Job run not found\n\n"
         return
     log_file = Path(str(durable.get("log_file") or ""))
     if not log_file.is_file():
@@ -710,7 +724,8 @@ def stream_job_output(config: dict, job_key: str) -> Generator[str, None, None]:
             yield "event: error\ndata: Live log could not be read.\n\n"
             return
 
-        if key not in durable_running_states(config):
+        current = durable_running_states(config).get(key)
+        if not current or current.get("run_id") != durable.get("run_id"):
             idle_after_finish = 0 if emitted else idle_after_finish + 1
             if idle_after_finish >= 2:
                 exit_code = _latest_job_exit_code(config, key)
@@ -968,6 +983,8 @@ def list_jobs(config: dict, latest_statuses: dict) -> List[dict]:
         repository_inventory = load_repository_inventory(config)
     except Exception:
         repository_inventory = {"repositories": {}, "storages": {}}
+    from job_groups import memberships
+    group_memberships = memberships(config)
     result = []
     for info in discover_jobs(scripts_dir, data_root):
         last = latest_statuses.get(info.key)
@@ -995,6 +1012,10 @@ def list_jobs(config: dict, latest_statuses: dict) -> List[dict]:
             {
                 "key": info.key,
                 "job_id": info.key,
+                "groups": group_memberships.get(info.key, []),
+                "group_name": run_state.get("group_name", ""),
+                "group_id": run_state.get("group_id", ""),
+                "group_run_id": run_state.get("group_run_id", ""),
                 "archive_prefix": info.archive_prefix,
                 "backup_type": info.backup_type,
                 "location": info.location,

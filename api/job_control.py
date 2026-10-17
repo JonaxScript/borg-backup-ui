@@ -85,6 +85,10 @@ class JobControl:
         """Persist the current phase and cancellation policy, returning its state."""
         previous = read_control_state(self.run_id, self.run_dir.parent)
         data: Dict[str, Any] = {
+            "group_id": os.environ.get("BORG_UI_GROUP_ID", ""),
+            "group_name": os.environ.get("BORG_UI_GROUP_NAME", ""),
+            "group_run_id": os.environ.get("BORG_UI_GROUP_RUN_ID", ""),
+            "log_file": os.environ.get("BORG_UI_GROUP_LOG_FILE", ""),
             "schema_version": 1,
             "job_key": self.job_key,
             "run_id": self.run_id,

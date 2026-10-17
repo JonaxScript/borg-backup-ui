@@ -101,6 +101,8 @@ async function refreshStatus() {
       if (!job) continue;
       b.enabled = job.enabled !== false;
       b.display_name = job.display_name || job.name || b.display_name || '';
+      b.group_name = job.group_name || b.group_name || "";
+      b.groups = job.groups || [];
       b.name = job.name || job.display_name || b.name || '';
       b.archive_prefix = job.archive_prefix || '';
       b.icon = job.icon || b.icon || '';
@@ -490,11 +492,16 @@ function renderDashboardInventoryRow(backup) {
   const runDuration = dashboardRunDuration(backup.duration_seconds);
   const nextRun = dashboardNextRun(backup.key, backup.enabled);
   const runFactRows = [
+    ...(backup.group_name ? [[dashboardT('jobGroups.groupLabel'), backup.group_name, '']] : []),
     ...(!backup.never_run ? [
       [dashboardT('dashboard.lastRunTime'), runTime, ''],
       [dashboardT('dashboard.runDuration'), runDuration, ''],
     ] : []),
     ...(nextRun ? [[dashboardT('dashboard.nextRunTime'), nextRun, 'next-run']] : []),
+    ...(backup.groups || []).filter(g => g.schedule?.enabled).map(g => {
+      const next = typeof calcNextRun === 'function' ? calcNextRun(g.schedule.cron) : null;
+      return [dashboardT('jobGroups.groupStart', { schedule: g.name }), next ? dashboardFormatNextRunDate(next) : g.schedule.cron, 'next-run'];
+    }),
   ];
   const runFacts = runFactRows.length ? `<span class="dashboard-run-facts">
       ${runFactRows.map(([label, value, cls]) => {
