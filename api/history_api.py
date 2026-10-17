@@ -197,6 +197,9 @@ def get_history_data(config: dict, filters: dict | None = None) -> dict:
 
         entries.append({
             "entry_kind": "backup_run",
+            "group_id": raw.get("group_id", ""),
+            "group_name": raw.get("group_name", ""),
+            "group_run_id": raw.get("group_run_id", ""),
             "job_id": job_id,
             "job_key": job_id,
             "job_name": (job.name or job.display_name) if job else backup_type,

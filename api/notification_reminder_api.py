@@ -76,6 +76,8 @@ def get_notification_reminder_diagnostics(config: dict) -> dict[str, Any]:
         }
         status = get_status_data(effective)
         latest = _latest_backup_status_by_key(status.get("backups") or [])
+        from job_groups import add_reminder_context
+        add_reminder_context(effective, schedules, jobs, latest)
         result["backup_overdue"]["items"] = _backup_overdue_diagnostics(
             effective,
             schedules,
@@ -213,8 +215,6 @@ def _send_backup_overdue_reminders(effective: dict, mail_config) -> dict[str, An
     )
 
     schedules = get_schedules(effective)
-    if not isinstance(schedules, dict) or not schedules:
-        return {"checked": 0, "sent": 0, "skipped": 0, "rows": []}
 
     jobs = {
         str(job.get("key") or "").strip(): job
@@ -223,6 +223,8 @@ def _send_backup_overdue_reminders(effective: dict, mail_config) -> dict[str, An
     }
     status = get_status_data(effective)
     latest = _latest_backup_status_by_key(status.get("backups") or [])
+    from job_groups import add_reminder_context
+    add_reminder_context(effective, schedules, jobs, latest)
 
     checked = 0
     sent = 0

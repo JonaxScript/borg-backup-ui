@@ -109,3 +109,32 @@ def test_job_import_restores_repository_and_storage_before_job(tmp_path: Path):
         require_passphrase_file=False,
     )
     assert context["repository_path"] == "/mnt/backup/borg-backup-appdata"
+
+
+def test_job_groups_round_trip_and_skip_existing_members(tmp_path, monkeypatch):
+    from job_groups import save_group, definitions
+    import schedule_api
+    installed = []
+    monkeypatch.setattr(schedule_api, 'apply_all_schedules', lambda config: installed.append(config))
+    source, _ = _canonical_source(tmp_path / 'source')
+    key = job_id('appdata_local')
+    group = save_group(source, {'name': 'Nightly', 'jobs': [key],
+                                'schedule': {'enabled': True, 'cron': '0 2 * * *'}})['group']
+    bundle = export_jobs_bundle(source)['bundle']
+    assert bundle['format'] == 'bbui-job-bundle-v5'
+    target = {'BACKUP_SCRIPTS_DIR': str(tmp_path / 'target')}
+    preview = preview_jobs_bundle(target, bundle)
+    assert preview['job_groups'][0]['name'] == 'Nightly'
+    dry = import_jobs_bundle(target, bundle, dry_run=True, settings_mode='ignore')
+    assert dry['group_report'] == [{'name': 'Nightly', 'status': 'imported'}]
+    assert not definitions(target)['groups']
+    imported = import_jobs_bundle(target, bundle, dry_run=False, settings_mode='ignore')
+    assert imported['group_report'][0]['status'] == 'imported'
+    assert definitions(target)['groups'][0]['jobs'] == [key]
+    assert target in installed
+    # An imported new group may reference explicitly retained, existing jobs.
+    bundle['job_groups'][0]['id'] = 'group-' + 'b' * 32
+    second = import_jobs_bundle(target, bundle, dry_run=False, settings_mode='ignore')
+    assert second['imported_count'] == 0
+    assert second['group_report'][0]['status'] == 'imported'
+    assert len(definitions(target)['groups']) == 2

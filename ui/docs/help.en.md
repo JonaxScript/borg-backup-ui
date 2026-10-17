@@ -145,6 +145,15 @@ For a running job, **Cancel job** requests a controlled cancellation. An active 
 
 A cancelled run is stored with the **Cancelled** status. The application does not automatically run a repository check or remove Borg locks afterwards. Review the live or stored log if Borg reports anything unusual.
 
+### Job Groups
+
+Under **Jobs > Job groups**, administrators can arrange existing jobs into a sequence with its own schedule. Individual jobs retain their settings and show their group membership. The next job starts only after its predecessor fully exits, including maintenance and the Post script. Individual schedules are not changed automatically.
+
+**Stop after current job** ends the sequence after the running job. Groups stop on errors by default; continuation is configurable. Other jobs can start independently. Shutdown in the last job only happens if that job runs. Review additional individual schedules and scripts before the first automatic run.
+
+[Setup, log view, error handling and export](../../docs/user-manual/en/user-manual.md#38-job-groups).
+
+
 ## 7. Scheduling
 
 Cron uses five fields: minute, hour, day, month, and weekday. `0 3 * * *` starts a job every day at 03:00. Leave enough time between large jobs and avoid concurrent access to the same repository.

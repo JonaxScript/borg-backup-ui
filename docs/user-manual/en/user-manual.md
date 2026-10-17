@@ -483,7 +483,32 @@ Best practices:
 
 - **Preview error / invalid data:** A wizard field is not plausible. Check the folders or files to back up, type ID, storage target, and repository selection.
 - **No storage target or repository available:** Configure the storage target under **Settings** first. Then create or import the repository under **Repositories**.
-- **Schedule disabled:** The job only runs manually.
+- **Schedule disabled:** The job runs manually or through a job group.
+
+### 3.8 Job Groups
+
+A job group runs existing jobs in a fixed order. Jobs retain their sources, repositories, maintenance and Pre/Post scripts. **admin** can configure groups; **operator** and **admin** can start and stop them. **viewer** can inspect progress and logs.
+
+1. Open **Jobs > Job groups > New group** and enter a name.
+2. Open **Add jobs**. Search by name or archive prefix, or filter by location. Select one or more jobs and click **Add selection**. Selections are retained while filtering; new jobs are appended in selection order. Use the arrows or drag them into their execution order, from top to bottom.
+3. Enable the **Group schedule** if needed. Choose daily, weekly, monthly or a custom cron expression; server time applies. Manual group starts remain available without a group schedule.
+4. Keep **Stop group** on errors or explicitly select **Continue with next job**. Save the group.
+5. Review the additional individual schedules and coordinate them with the group. Disabling an individual schedule disables neither the job nor its group starts.
+6. Start the group manually. Check the active step and **Live log**. **Follow current job** switches the log view when the next job starts and shows the last available job log after the group finishes, even when a short job completes between refreshes. Clicking the current job's **Live log** keeps following enabled; selecting an older log turns it off. Existing log colors are retained.
+
+Under **Individual jobs**, a linked line identifies the group and position, for example “Group: Local backup · Step 1 of 3”. Individual starts, job settings and schedules remain available. The group waits for the complete child process to exit, including maintenance, workload recovery, cleanup and the Post script. Only then does the next job start. History and reports remain per job, supplemented by group context and a separate group run history.
+
+On the dashboard, a compact link with the group name and position (for example, “Local backup · 2/3”) identifies related jobs. Group starts and individual schedules use separate single-line entries; complete group details remain available as tooltips. Leaving modified group settings and deleting a group use the application confirmation dialogs. Unchanged settings can be closed without confirmation. In the group view, live and saved logs keep the same height; longer content scrolls inside the log viewport.
+
+**Stopping and errors:** “Stop after current job” lets the running job finish and starts no further jobs. Cancelling a child job also stops its group. Warnings continue the sequence; failures or jobs skipped because of a lock stop it by default. With “Continue with next job”, failures remain visible in the overall result. A running group cannot be started twice or deleted. Group edits apply to the next group run; each job's current settings are read when that job starts.
+
+**Starting and shutting down a backup machine:** Configure startup and waiting for availability in the first job's Pre script, and shutdown in the last job's Post script. If the group stops earlier, that final Post script does not run. Individual starts execute the same scripts. Groups do not reserve resources across their sequence: other jobs and groups may start independently, while the existing job/repository locks remain effective. Another job can acquire a released resource between two group members. Coordinate schedules and shutdown scripts yourself.
+
+After loss of the coordinating service process, the group run is marked **Interrupted** and is not automatically replayed. A surviving child process is not automatically terminated by this. Check its state and log before starting a new group run.
+
+**Backup and transfer:** Definitions are stored in `config/job-groups.json`, and run state in `group-runs` inside the data directory. Include them in configuration backups. Job exports include only groups whose complete membership is selected, using `bbui-job-bundle-v5`. Imports remap references to the imported jobs; incomplete groups are reported as skipped. Existing groups are retained in `skip` mode. Script definitions still need separate transfer. Reminders monitor the group schedule as one shared start, without prematurely flagging queued members as missing; additional individual schedules remain independent.
+
+**Verification:** After a test run, check the sequence in group history, each job log and the backup machine's state. Edit the group if a job is missing. A referenced job can be deleted only after removal from its groups and any active group run. Deleting a group retains its jobs and saved runs. See section 3.5 for script details.
 
 ## 4. Repositories
 
@@ -1736,7 +1761,7 @@ a format identifier by hand.
 
 | Export / inner format | Includes | Excludes / import boundary |
 | --- | --- | --- |
-| Jobs: `bbui-job-bundle-v3` or `bbui-job-bundle-v4` | Schema-5 job metadata, linked repositories/storage, schedules, profile configuration; managed exclusion files when used | No passphrase-file or Borg-keyfile contents, central script definitions or archives. v4 is generated for extended exclusions/retention; both formats with valid schema 5 are accepted. v1/v2 and older job schemas are rejected. |
+| Jobs: `bbui-job-bundle-v3`, `bbui-job-bundle-v4` or `bbui-job-bundle-v5` | Schema-5 job metadata, linked repositories/storage, schedules, profile configuration; managed exclusion files when used | No passphrase-file or Borg-keyfile contents, central script definitions or archives. v4 is generated for extended exclusions/retention; v5 additionally includes complete job groups; all three formats with valid schema 5 are accepted. v1/v2 and older job schemas are rejected. |
 | Jobs with passphrases: `bbui-job-bundle-secure-v3` | Inner v3/v4 bundle, associated existing passphrase files and local Borg keyfiles | No general settings/profile-secret package, central scripts, archives or automatically exported repokey keys. Older secure formats are rejected. |
 | Profiles and secrets: `bbui-profile-secrets-v2` | SMB/storage profiles and their associated SMB/SSH secret files | No jobs, archives or complete application configuration. v1 is rejected. |
 | Secrets: `bbui-secrets-backup-v1` | Allowed secret files and files under `secrets/borg-keys` | No job/profile definitions or archives; only accepted filenames are imported. |

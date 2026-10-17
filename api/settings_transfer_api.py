@@ -60,8 +60,22 @@ def _validate_jobs_bundle(bundle: dict) -> None:
     from job_settings import JOB_SETTINGS_SCHEMA, explicit_job_settings
     from archive_prefix import job_archive_prefixes
     from job_source_paths import normalize_source_paths
-    if not isinstance(bundle, dict) or bundle.get("format") not in {"bbui-job-bundle-v3", "bbui-job-bundle-v4"} or not isinstance(bundle.get("jobs"), list):
+    if not isinstance(bundle, dict) or bundle.get("format") not in {"bbui-job-bundle-v3", "bbui-job-bundle-v4", "bbui-job-bundle-v5"} or not isinstance(bundle.get("jobs"), list):
         raise ConfigurationExportError()
+    from job_groups import validate_definition, identifier
+    exported_groups = bundle.get('job_groups', [])
+    if not isinstance(exported_groups, list):
+        raise ConfigurationExportError()
+    group_ids = set()
+    for group in exported_groups:
+        try:
+            validate_definition(group)
+            key = identifier(group.get('id'))
+            if key in group_ids:
+                raise ValueError('Duplicate group identity')
+            group_ids.add(key)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ConfigurationExportError() from exc
     for job in bundle["jobs"]:
         if not isinstance(job, dict) or job.get("schema_version") != JOB_SETTINGS_SCHEMA:
             raise ConfigurationExportError()
@@ -120,7 +134,8 @@ def export_jobs_bundle(config: dict, selected_keys: List[str] | None = None) -> 
     """Build a JSON job bundle with linked repositories, storage and schedules.
 
     ``selected_keys`` limits exported jobs when nonempty. Returns the bundle,
-    serialized text, suggested filename and job count. This plain export
+    serialized text, suggested filename and job count. Complete job groups use
+    bundle v5; partial group selections are omitted. This plain export
     records passphrase metadata, not passphrase file contents.
     """
     selected = set((selected_keys or []))
@@ -187,6 +202,11 @@ def export_jobs_bundle(config: dict, selected_keys: List[str] | None = None) -> 
         "keyfile_meta": {},
         "settings_payload": _canonical_profile_payload(config),
     }
+    from job_groups import definitions
+    exported_ids = {j.get('job_id') or j.get('job_key') for j in jobs}
+    bundle['job_groups'] = [g for g in definitions(config)['groups'] if set(g['jobs']) <= exported_ids]
+    if bundle['job_groups']:
+        bundle['format'] = 'bbui-job-bundle-v5'
     bundle["keyfile_meta"] = _collect_job_key_files(config, bundle, include_content=False)
     text = json.dumps(bundle, indent=2, ensure_ascii=False) + "\n"
     return {
@@ -405,6 +425,7 @@ def _job_preview_rows(config: dict, bundle: dict) -> list[dict]:
 def preview_jobs_bundle(config: dict, bundle: dict) -> dict:
     """Validate a bundle and report its job/settings import preview.
 
+    Complete group names and membership are included in the preview.
     Invalid or unsupported bundles raise ConfigurationExportError.
     """
     _validate_jobs_bundle(bundle)
@@ -417,6 +438,7 @@ def preview_jobs_bundle(config: dict, bundle: dict) -> dict:
     return {
         "format": bundle.get("format"),
         "job_count": len(rows),
+        "job_groups": [{"id": g["id"], "name": g["name"], "jobs": g["jobs"]} for g in bundle.get("job_groups", [])],
         "jobs": rows,
         "settings_preview": settings_preview,
     }
@@ -740,6 +762,11 @@ def _import_jobs_bundle_locked(
     for _, candidate in applied_jobs:
         validate_prefix_ownership(candidate, final_jobs.values())
 
+    from job_groups import prepare_import, apply_import
+    key_map = {r['job_key']: r['new_job_key'] for r in report if r.get('new_job_key')}
+    key_map.update({r['job_key']: r['job_key'] for r in report
+                    if r.get('status') == 'skipped_exists' and r['job_key'] in current_jobs})
+    group_rows, group_report = prepare_import(config, bundle.get('job_groups', []), key_map, mode)
     settings_applied = False
     settings_report = {"mode": settings_mode, "applied": 0, "conflicts": 0}
     settings_backup = None
@@ -762,6 +789,7 @@ def _import_jobs_bundle_locked(
             raw["exclude_from"] = prepare_file(raw.get("exclude_from"), jobs_dir, key)
             atomic_write_json(target, raw)
             cleanup_files(jobs_dir, key)
+        apply_import(config, group_rows)
         # merge schedules
         merged = get_schedules(config)
         merged.update(schedule_updates)
@@ -777,6 +805,7 @@ def _import_jobs_bundle_locked(
         "report": report,
         "imported_count": len(applied_jobs),
         "scheduled_count": len(schedule_updates),
+        "group_report": group_report,
         "settings_applied": settings_applied,
         "settings_report": settings_report,
         "settings_backup": settings_backup,
@@ -792,14 +821,26 @@ def import_jobs_bundle(
     """Import or preview a validated bundle under the inventory lock.
 
     ``dry_run`` defaults to a preview of the imported objects; the inventory
-    directory may still be created. Mode and per-item selections are passed
+    directory may still be created. Complete groups are remapped to imported
+    or explicitly retained jobs; imported group schedules are installed after
+    releasing the inventory lock. Installation failures are returned in
+    ``group_schedule_error`` without discarding the imported data.
+    Mode and per-item selections are passed
     to the locked importer. Invalid bundles raise ConfigurationExportError.
     """
     _validate_jobs_bundle(bundle)
     from inventory_store import inventory_lock
     with inventory_lock(_jobs_dir(config).parent):
-        return _import_jobs_bundle_locked(config, bundle, mode, dry_run, selected_jobs,
-                                          per_job_mode, settings_mode, per_profile_mode)
+        result = _import_jobs_bundle_locked(config, bundle, mode, dry_run, selected_jobs,
+                                            per_job_mode, settings_mode, per_profile_mode)
+    if not dry_run and any(g['status'] == 'imported' for g in result['group_report']):
+        from schedule_api import apply_all_schedules
+        try:
+            apply_all_schedules(config)
+        except Exception as exc:
+            from security_utils import mask_secrets
+            result['group_schedule_error'] = mask_secrets(str(exc))
+    return result
 
 
 def _secrets_dir() -> Path:

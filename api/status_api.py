@@ -75,6 +75,9 @@ def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[st
             {
                 "key": key,
                 "job_id": st.job_id,
+                "group_id": getattr(st, "group_id", ""),
+                "group_name": getattr(st, "group_name", ""),
+                "group_run_id": getattr(st, "group_run_id", ""),
                 "backup_type": st.backup_type,
                 "location": st.location,
                 "status": st.status,

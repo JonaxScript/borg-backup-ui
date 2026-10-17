@@ -217,7 +217,8 @@ def test_scheduled_backup_run_sets_lifecycle_source_env(tmp_path: Path, monkeypa
     captured: dict[str, object] = {}
 
     class Jobs:
-        def start(self, job_key, command, cwd, extra_env=None):
+        def start(self, job_key, command, cwd, extra_env=None, *, run_id=None, inherited_fds=(), state_sink=None):
+            state_sink["state"] = SimpleNamespace(run_id="run-scheduled")
             captured["job_key"] = job_key
             captured["command"] = command
             captured["cwd"] = cwd

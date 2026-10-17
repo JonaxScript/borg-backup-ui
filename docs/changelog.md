@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Sequential job groups (#570)
+
+- Reference existing jobs by stable ID in ordered groups with independent schedules and stop/continue policies. Reuse the ordinary runner through full process completion, retaining existing resource locks and hook behavior.
+- Persist run snapshots, reject duplicate group starts, retain a child-inherited group guard, and mark lost coordinators interrupted without replay.
+- Add membership links, group execution/editor views, run-pinned themed logs, per-job history/report context and group-start reminders. Preserve individual schedules.
+- Include complete groups in v5 job exports and remap imported references; report incomplete selections. Add bilingual usage guidance and focused process, API, UI and transfer tests.
+
 ## Pending - Documentation and release preparation (#560, #557, #563, #565)
 
 - Refresh the English/German manuals and offline help, including first-backup and recovery guidance, current screenshots, permissions, export limits, and the actual scope of restore-test evidence. Keep desktop Help navigation stationary and preserve headers when switching documents. (#560)

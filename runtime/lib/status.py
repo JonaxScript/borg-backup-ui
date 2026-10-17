@@ -121,6 +121,9 @@ class BackupStatus:
     job_id: str = ""
     job_name: str = ""
     run_id: str = ""
+    group_id: str = ""
+    group_name: str = ""
+    group_run_id: str = ""
     file_activity: bool = False
     hook_results: dict = field(default_factory=dict)
     backup_exit_code: Optional[int] = None
@@ -141,6 +144,9 @@ class BackupStatus:
         obj.job_id = str(data.get("job_id") or "")
         obj.job_name = str(data.get("job_name") or "")
         obj.run_id = str(data.get("run_id") or "")
+        obj.group_id = str(data.get("group_id") or "")
+        obj.group_name = str(data.get("group_name") or "")
+        obj.group_run_id = str(data.get("group_run_id") or "")
         obj.file_activity = data.get("file_activity") is True
         obj.hook_results = data.get("hook_results") if isinstance(data.get("hook_results"), dict) else {}
         obj.backup_exit_code = data.get("backup_exit_code")

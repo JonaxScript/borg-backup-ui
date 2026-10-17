@@ -206,6 +206,7 @@ def create_support_bundle(config: dict, *, app_version: str = "") -> dict:
         _record_added("config/expanded-conf.sanitized.json")
         for filename in (
             "storages.json",
+            "job-groups.json",
             "repositories.json",
             "apprise-profiles.json",
             "notification-deliveries.json",

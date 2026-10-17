@@ -134,7 +134,7 @@ def write_schedules(config: dict, schedules: dict, *, validate_known_jobs: bool 
 
 
 def apply_all_schedules(config: dict) -> dict:
-    """Install enabled backup and per-job restore-test entries in crontab.
+    """Install enabled individual, group and per-job restore-test entries in crontab.
 
     Validates keys, cron expressions and API port before updating the managed
     crontab block. Returns the update result; failures propagate.
@@ -161,6 +161,13 @@ def apply_all_schedules(config: dict) -> dict:
         line = f"{cron} {_build_schedule_command(url, body, token_file)} >/dev/null 2>&1"
         lines.append(line)
 
+    from job_groups import definitions
+    for group in definitions(config)['groups']:
+        schedule = group['schedule']
+        if schedule['enabled']:
+            body = json.dumps({'id': group['id'], 'scheduled': True}, separators=(',', ':'))
+            command = _build_schedule_command(f"http://127.0.0.1:{port}/api/job-groups/run", body, token_file)
+            lines.append(f"{schedule['cron']} {command} >/dev/null 2>&1")
     lines.extend(restore_test_cron_lines(config).values())
     return _update_crontab(lines)
 

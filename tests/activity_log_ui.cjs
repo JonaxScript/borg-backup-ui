@@ -31,6 +31,7 @@ class Element {
   replaceChildren(...children) { this.text = ''; this.children = []; children.forEach(child => this.append(child)); }
   remove() { this.parent.children = this.parent.children.filter(child => child !== this); }
   addEventListener(event, handler) { this.listeners.set(event, handler); }
+  removeAttribute(name) { delete this[name]; }
   removeEventListener(event) { this.listeners.delete(event); }
 }
 
@@ -298,6 +299,8 @@ test('normal runs keep SSE and scheduled runs select their effective mode', () =
   f.output.textContent = 'Current activity log';
   oldStream.onmessage({ data: 'late normal-job output' });
   assert.equal(f.output.textContent, 'Current activity log');
+  vm.runInContext("openLogPanel('normal', 'group-child-run')", f.context);
+  assert.equal(f.context.window.BBUI.jobsState.activeEventSource.url, '/api/jobs/log/stream?job=normal&run=group-child-run');
   f.viewer.close();
 });
 

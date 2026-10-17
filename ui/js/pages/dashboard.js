@@ -101,6 +101,8 @@ async function refreshStatus() {
       if (!job) continue;
       b.enabled = job.enabled !== false;
       b.display_name = job.display_name || job.name || b.display_name || '';
+      b.group_name = job.group_name || b.group_name || "";
+      b.groups = job.groups || [];
       b.name = job.name || job.display_name || b.name || '';
       b.archive_prefix = job.archive_prefix || '';
       b.icon = job.icon || b.icon || '';
@@ -490,16 +492,23 @@ function renderDashboardInventoryRow(backup) {
   const runDuration = dashboardRunDuration(backup.duration_seconds);
   const nextRun = dashboardNextRun(backup.key, backup.enabled);
   const runFactRows = [
+    ...(backup.group_name ? [[dashboardT('jobGroups.groupLabel'), backup.group_name, '']] : []),
     ...(!backup.never_run ? [
       [dashboardT('dashboard.lastRunTime'), runTime, ''],
       [dashboardT('dashboard.runDuration'), runDuration, ''],
     ] : []),
     ...(nextRun ? [[dashboardT('dashboard.nextRunTime'), nextRun, 'next-run']] : []),
+    ...(backup.groups || []).filter(g => g.schedule?.enabled).map(g => {
+      const next = typeof calcNextRun === 'function' ? calcNextRun(g.schedule.cron) : null;
+      const label = backup.groups.length === 1 ? dashboardT('jobGroups.groupStartLabel') : g.name;
+      const value = next ? dashboardFormatNextRunDate(next) : g.schedule.cron;
+      return [label, value, 'group-next-run', dashboardT('jobGroups.groupStart', { schedule: g.name }) + ' · ' + value];
+    }),
   ];
   const runFacts = runFactRows.length ? `<span class="dashboard-run-facts">
-      ${runFactRows.map(([label, value, cls]) => {
+      ${runFactRows.map(([label, value, cls, detail]) => {
         const rowClass = cls ? ` ${cls}` : '';
-        return `<span class="dashboard-fact-row${rowClass}"><b>${escHtml(label)}:</b><span>${escHtml(value)}</span></span>`;
+        return `<span class="dashboard-fact-row${rowClass}"${detail ? ` title="${escHtml(detail)}"` : ''}><b>${escHtml(label.replace(/:\s*$/, ''))}:</b><span>${escHtml(value)}</span></span>`;
       }).join('')}
     </span>` : '';
   const hasSizes = Number(backup.original_size || 0) > 0;
@@ -515,7 +524,7 @@ function renderDashboardInventoryRow(backup) {
     <td><div class="dashboard-backup-identity">
       <span class="type-icon${iconColorClass}">${typeIcon(iconKey)}</span>
       <span><strong class="dashboard-cell-primary">${escHtml(type)}</strong><span class="dashboard-cell-detail mono" title="${escHtml(identityDetail)}">${escHtml(identityDetail)}</span></span>
-    </div></td>
+    </div>${backup.groups?.length ? `<div class="dashboard-group-memberships">${window.BBUI.jobGroups?.membership(backup, true) || ''}</div>` : ''}</td>
     <td><div class="dashboard-table-badges">
       ${backup.enabled === false ? `<span class="badge warning"><span class="badge-dot"></span>${dashboardT('dashboard.disabled')}</span>` : ''}
       <span class="badge ${run.cls}"><span class="badge-dot"></span>${escHtml(run.label)}</span>
