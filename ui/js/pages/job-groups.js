@@ -123,7 +123,7 @@
       <div class="group-run-list">${steps.map((step, index) => {
         const job = jobsState.jobs.find(j => j.key === step.job_key);
         const isLive = step.status === 'running' && job?.running && job.run_id === step.run_id;
-        return `<article class="group-run-row ${step.status === 'running' ? 'is-running' : ''}">${stepMarker(step, index)}${jobIcon(step.job_key)}<div class="group-job-title"><strong>${escape(jobName(step.job_key))}</strong><small>${escape(job?.archive_prefix || '')}</small><span>${escape(t('step', { current: index + 1, total: steps.length }))}</span>${step.error ? `<span class="group-error">${escape(step.error)}</span>` : ''}</div><div>${badge(step.status)}${isLive && job.run_phase ? `<small>${escape(t('phases.' + job.run_phase) === 'jobGroups.phases.' + job.run_phase ? job.run_phase : t('phases.' + job.run_phase))}</small>` : ''}</div><div class="group-actions">${isLive || step.log_file ? button('log', isLive ? t('liveLog') : t('log'), `data-step="${index}"`) : ''}${isLive && operator() && job.cancel_allowed && !job.cancel_requested ? button('cancel', t('cancelJob'), `data-step="${index}"`) : ''}</div></article>`;
+        return `<article class="group-run-row ${step.status === 'running' ? 'is-running' : ''}">${stepMarker(step, index)}${jobIcon(step.job_key)}<div class="group-job-title"><strong>${escape(jobName(step.job_key))}</strong><small>${escape(job?.archive_prefix || '')}</small><span>${escape(t('step', { current: index + 1, total: steps.length }))}</span>${step.error ? `<span class="group-error">${escape(step.error)}</span>` : ''}</div><div class="group-run-status">${badge(step.status)}${isLive && job.run_phase ? `<small>${escape(t('phases.' + job.run_phase) === 'jobGroups.phases.' + job.run_phase ? job.run_phase : t('phases.' + job.run_phase))}</small>` : ''}</div><div class="group-actions">${isLive || step.log_file ? button('log', isLive ? t('liveLog') : t('log'), `data-step="${index}"`) : ''}${isLive && operator() && job.cancel_allowed && !job.cancel_requested ? button('cancel', t('cancelJob'), `data-step="${index}"`) : ''}</div></article>`;
       }).join('')}</div>
       <label class="group-follow"><input id="group-follow" type="checkbox" ${state.follow ? 'checked' : ''}> ${escape(t('follow'))}</label><div id="group-log-slot"></div>
       <p class="group-help">${escape(t('coordination'))}</p>${run?.error ? `<p class="group-error">${escape(run.error)}</p>` : ''}
@@ -139,7 +139,7 @@
     }
   }
 
-  /** Reuse the existing log panel and its theme; historical logs use confined history access. */
+  /** Reuse the fixed-size themed log viewport; historical logs use confined history access. */
   async function showLog(step, run) {
     const requestId = ++state.logRequest;
     const selected = state.selected;
@@ -230,7 +230,15 @@
   /** Dispatch group actions; callers display rejected API requests in Jobs. */
   async function action(el) {
     const a = el.dataset.groupAction;
-    if (a === 'open') { view('groups', el.dataset.groupId); return; }
+    if (a === 'open') {
+      if (_coreState().currentPage !== 'jobs') {
+        navigate('jobs');
+        await refreshJobs();
+        if (_coreState().currentPage !== 'jobs') return;
+      }
+      view('groups', el.dataset.groupId);
+      return;
+    }
     if (a === 'select') { view('groups', el.dataset.groupId); return; }
     if (a === 'new' || a === 'edit') {
       if (state.editor && !window.confirm(t('discard'))) return;

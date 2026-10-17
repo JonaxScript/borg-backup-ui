@@ -325,6 +325,36 @@
   white-space: nowrap;
 }
 
+/* Group names can be longer than the compact run-fact label column. */
+.dashboard-run-facts .dashboard-fact-row.group-next-run {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.dashboard-run-facts .dashboard-fact-row.group-next-run > b,
+.dashboard-run-facts .dashboard-fact-row.group-next-run > span {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-group-memberships {
+  margin-left: calc(2rem + var(--ui-space-2));
+}
+
+.dashboard-group-memberships .job-group-membership {
+  padding: 6px 8px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--ui-state-info-bg);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-group-memberships .job-group-link { font-weight: 600; }
+
 .dashboard-run-facts b,
 .dashboard-restore-facts b,
 .dashboard-storage-facts b {
