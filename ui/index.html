@@ -1810,62 +1810,65 @@
         <div id="wizard-error-8" class="status-message error hidden"></div>
         <div class="settings-body">
           <div class="schedule-toggle-row">
-            <span class="schedule-field-label" data-i18n="schedule.enable">Zeitplan aktivieren</span>
+            <span id="wiz-sched-enabled-label" class="schedule-field-label" data-i18n="schedule.enable">Zeitplan aktivieren</span>
             <label class="toggle-switch">
-              <input type="checkbox" id="wiz-sched-enabled">
+              <input type="checkbox" id="wiz-sched-enabled" aria-labelledby="wiz-sched-enabled-label" aria-controls="wiz-sched-fields">
               <span class="toggle-slider"></span>
             </label>
           </div>
-          <div class="schedule-field-row">
-            <span class="schedule-field-label" data-i18n="schedule.frequency">Häufigkeit</span>
-            <div class="freq-btn-group">
-              <button class="freq-btn" data-wiz-freq="daily" data-i18n="schedule.daily">Täglich</button>
-              <button class="freq-btn" data-wiz-freq="weekly" data-i18n="schedule.weekly">Wöchentlich</button>
-              <button class="freq-btn" data-wiz-freq="monthly" data-i18n="schedule.monthly">Monatlich</button>
-              <button class="freq-btn" data-wiz-freq="custom" data-i18n="schedule.custom">Benutzerdefiniert</button>
+          <p id="wiz-sched-disabled-hint" class="help-text" data-i18n="schedule.disabledHint">Der Job läuft nur manuell. Aktivieren Sie den Zeitplan, um automatische Backups einzurichten.</p>
+          <div id="wiz-sched-fields" class="hidden">
+            <div class="schedule-field-row">
+              <span class="schedule-field-label" data-i18n="schedule.frequency">Häufigkeit</span>
+              <div class="freq-btn-group">
+                <button class="freq-btn" data-wiz-freq="daily" data-i18n="schedule.daily">Täglich</button>
+                <button class="freq-btn" data-wiz-freq="weekly" data-i18n="schedule.weekly">Wöchentlich</button>
+                <button class="freq-btn" data-wiz-freq="monthly" data-i18n="schedule.monthly">Monatlich</button>
+                <button class="freq-btn" data-wiz-freq="custom" data-i18n="schedule.custom">Benutzerdefiniert</button>
+              </div>
             </div>
-          </div>
-          <div class="schedule-field-row" id="wiz-sched-time-row">
-            <span class="schedule-field-label" data-i18n="schedule.time">Uhrzeit</span>
-            <div class="time-picker">
-              <input type="number" id="wiz-sched-hour"   class="time-input" min="0" max="23" value="3">
-              <span class="time-sep">:</span>
-              <input type="number" id="wiz-sched-minute" class="time-input" min="0" max="59" value="0">
+            <div class="schedule-field-row" id="wiz-sched-time-row">
+              <span class="schedule-field-label" data-i18n="schedule.time">Uhrzeit</span>
+              <div class="time-picker">
+                <input type="number" id="wiz-sched-hour"   class="time-input" min="0" max="23" value="3">
+                <span class="time-sep">:</span>
+                <input type="number" id="wiz-sched-minute" class="time-input" min="0" max="59" value="0">
+              </div>
             </div>
-          </div>
-          <div class="schedule-field-row hidden" id="wiz-sched-dow-row">
-            <span class="schedule-field-label" data-i18n="schedule.weekday">Wochentag</span>
-            <div class="dow-btn-group">
-              <button class="dow-btn" data-wiz-dow="1" data-i18n="schedule.dayMon">Mo</button>
-              <button class="dow-btn" data-wiz-dow="2" data-i18n="schedule.dayTue">Di</button>
-              <button class="dow-btn" data-wiz-dow="3" data-i18n="schedule.dayWed">Mi</button>
-              <button class="dow-btn" data-wiz-dow="4" data-i18n="schedule.dayThu">Do</button>
-              <button class="dow-btn" data-wiz-dow="5" data-i18n="schedule.dayFri">Fr</button>
-              <button class="dow-btn" data-wiz-dow="6" data-i18n="schedule.daySat">Sa</button>
-              <button class="dow-btn" data-wiz-dow="0" data-i18n="schedule.daySun">So</button>
+            <div class="schedule-field-row hidden" id="wiz-sched-dow-row">
+              <span class="schedule-field-label" data-i18n="schedule.weekday">Wochentag</span>
+              <div class="dow-btn-group">
+                <button class="dow-btn" data-wiz-dow="1" data-i18n="schedule.dayMon">Mo</button>
+                <button class="dow-btn" data-wiz-dow="2" data-i18n="schedule.dayTue">Di</button>
+                <button class="dow-btn" data-wiz-dow="3" data-i18n="schedule.dayWed">Mi</button>
+                <button class="dow-btn" data-wiz-dow="4" data-i18n="schedule.dayThu">Do</button>
+                <button class="dow-btn" data-wiz-dow="5" data-i18n="schedule.dayFri">Fr</button>
+                <button class="dow-btn" data-wiz-dow="6" data-i18n="schedule.daySat">Sa</button>
+                <button class="dow-btn" data-wiz-dow="0" data-i18n="schedule.daySun">So</button>
+              </div>
             </div>
-          </div>
-          <div class="schedule-field-row hidden" id="wiz-sched-dom-row">
-            <span class="schedule-field-label" data-i18n="schedule.dayOfMonth">Tag des Monats</span>
-            <div class="dom-picker">
-              <input type="number" id="wiz-sched-dom" class="time-input dom-input"
-                     min="1" max="28" value="1">
-              <span class="schedule-field-hint" data-i18n="schedule.dayOfMonthHint">Hinweis: Max. 28 um Monatsfehler zu vermeiden</span>
+            <div class="schedule-field-row hidden" id="wiz-sched-dom-row">
+              <span class="schedule-field-label" data-i18n="schedule.dayOfMonth">Tag des Monats</span>
+              <div class="dom-picker">
+                <input type="number" id="wiz-sched-dom" class="time-input dom-input"
+                       min="1" max="28" value="1">
+                <span class="schedule-field-hint" data-i18n="schedule.dayOfMonthHint">Hinweis: Max. 28 um Monatsfehler zu vermeiden</span>
+              </div>
             </div>
-          </div>
-          <div class="schedule-field-row hidden" id="wiz-sched-custom-row">
-            <span class="schedule-field-label" data-i18n="schedule.cronExpression">Cron-Ausdruck</span>
-            <div class="custom-cron-wrap">
-              <input type="text" id="wiz-sched-cron-custom" class="cron-input"
-                     placeholder="0 3 * * *">
-              <span class="schedule-field-hint" data-i18n="schedule.cronFormat">Format: Minute Stunde Tag Monat Wochentag</span>
+            <div class="schedule-field-row hidden" id="wiz-sched-custom-row">
+              <span class="schedule-field-label" data-i18n="schedule.cronExpression">Cron-Ausdruck</span>
+              <div class="custom-cron-wrap">
+                <input type="text" id="wiz-sched-cron-custom" class="cron-input"
+                       placeholder="0 3 * * *">
+                <span class="schedule-field-hint" data-i18n="schedule.cronFormat">Format: Minute Stunde Tag Monat Wochentag</span>
+              </div>
             </div>
-          </div>
-          <div class="schedule-next-run" id="wiz-sched-next-run">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span id="wiz-sched-next-run-text">—</span>
+            <div class="schedule-next-run" id="wiz-sched-next-run">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <span id="wiz-sched-next-run-text">—</span>
+            </div>
           </div>
         </div>
       </div>

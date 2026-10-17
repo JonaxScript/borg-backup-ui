@@ -1,6 +1,6 @@
 # Borg-Backup-UI Benutzerhandbuch
 
-Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.09.1435`, Borg `1.4.5`.
+Dokumentationsprüfung: 11.10.2026. Verhaltensbasis: Stable `2026.10.11.1525`, Borg `1.4.5`.
 Sprache: Deutsch  
 Zielgruppe: Einsteiger, fortgeschrittene Anwender und Administratoren eines Unraid-Systems
 
@@ -430,7 +430,7 @@ Bei aktivierter Dateiaktivität liegt das laufende Log zunächst im RAM unter `/
 
 ![Zeitplan des Backup-Jobs](../assets/de/current/wizard-schedule.png)
 
-Der Zeitplan kann direkt im Wizard gesetzt werden. Die UI unterstützt einfache Frequenzen und einen Cron-Ausdruck.
+Der Zeitplan kann direkt im Wizard gesetzt werden. Schalten Sie **Zeitplan aktivieren** ein, damit Häufigkeit, Uhrzeit, Cron-Eingabe und die Vorschau des nächsten Laufs angezeigt werden. Solange der Zeitplan ausgeschaltet ist, zeigt der Wizard einen Hinweis auf den manuellen Start. Beim Aus- und erneuten Einschalten bleiben die Eingaben erhalten. Die UI unterstützt einfache Frequenzen und einen Cron-Ausdruck.
 
 Cron-Format:
 

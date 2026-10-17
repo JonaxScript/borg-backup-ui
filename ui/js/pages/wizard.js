@@ -1640,7 +1640,18 @@ function _wizardBuildCron() {
   return document.getElementById('wiz-sched-cron-custom').value.trim();
 }
 
+/**
+ * Sync schedule visibility and preview with the enable toggle.
+ * Retains input values while disabled and calculates a next run only when enabled.
+ */
 function wizardSchedulePreview() {
+  const enabled = document.getElementById('wiz-sched-enabled').checked;
+  document.getElementById('wiz-sched-fields').classList.toggle('hidden', !enabled);
+  document.getElementById('wiz-sched-disabled-hint').classList.toggle('hidden', enabled);
+  if (!enabled) {
+    document.getElementById('wiz-sched-next-run-text').textContent = '';
+    return;
+  }
   const cron = _wizardBuildCron();
   const next = calcNextRun(cron);
   const el   = document.getElementById('wiz-sched-next-run-text');

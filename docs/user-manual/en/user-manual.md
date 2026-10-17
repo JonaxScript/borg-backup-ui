@@ -1,6 +1,6 @@
 # Borg-Backup-UI User Manual
 
-Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.09.1435`, Borg `1.4.5`.
+Documentation review: 2026-10-11. Behavior baseline: stable `2026.10.11.1525`, Borg `1.4.5`.
 Language: English  
 Audience: Beginners, advanced users, and administrators of an Unraid system
 
@@ -422,7 +422,7 @@ With file activity enabled, the active log is initially stored in RAM under `/ru
 
 ![Backup job schedule](../assets/en/current/wizard-schedule.png)
 
-The schedule can be set directly in the wizard. The UI supports simple frequencies and a cron expression.
+The schedule can be set directly in the wizard. Turn on **Enable schedule** to show the frequency, time, and cron controls and the next-run preview. While disabled, the wizard shows a hint that the job only runs manually. Toggling the schedule off and on preserves the entered values. The UI supports simple frequencies and a cron expression.
 
 Cron format:
 
