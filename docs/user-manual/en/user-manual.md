@@ -494,7 +494,7 @@ A job group runs existing jobs in a fixed order. Jobs retain their sources, repo
 3. Enable the **Group schedule** if needed. Choose daily, weekly, monthly or a custom cron expression; server time applies. Manual group starts remain available without a group schedule.
 4. Keep **Stop group** on errors or explicitly select **Continue with next job**. Save the group.
 5. Review the additional individual schedules and coordinate them with the group. Disabling an individual schedule disables neither the job nor its group starts.
-6. Start the group manually. Check the active step and **Live log**. **Follow current job** switches the log view when the next job starts. Existing log colors are retained.
+6. Start the group manually. Check the active step and **Live log**. **Follow current job** switches the log view when the next job starts and shows the last available job log after the group finishes, even when a short job completes between refreshes. Clicking the current job's **Live log** keeps following enabled; selecting an older log turns it off. Existing log colors are retained.
 
 Under **Individual jobs**, a linked line identifies the group and position, for example “Group: Local backup · Step 1 of 3”. Individual starts, job settings and schedules remain available. The group waits for the complete child process to exit, including maintenance, workload recovery, cleanup and the Post script. Only then does the next job start. History and reports remain per job, supplemented by group context and a separate group run history.
 

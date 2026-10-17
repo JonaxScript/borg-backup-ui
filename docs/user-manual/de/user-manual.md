@@ -502,7 +502,7 @@ Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs 
 3. Aktivieren Sie bei Bedarf den **Gruppenzeitplan**. Wählen Sie täglich, wöchentlich, monatlich oder einen eigenen Cron-Ausdruck; es gilt die Serverzeit. Ohne Gruppenzeitplan bleibt der manuelle Gruppenstart verfügbar.
 4. Lassen Sie **Gruppe stoppen** bei Fehlern aktiviert oder wählen Sie ausdrücklich **Mit nächstem Job fortfahren**. Speichern Sie die Gruppe.
 5. Prüfen Sie die zusätzlich angezeigten Einzelzeitpläne und stimmen Sie diese auf die Gruppe ab. Ein deaktivierter Einzelzeitplan deaktiviert weder den Job noch seinen Start durch die Gruppe.
-6. Starten Sie die Gruppe manuell. Prüfen Sie den aktiven Schritt und das **Live-Log**. **Aktuellem Job folgen** wechselt die Logansicht beim nächsten Job. Die bisherigen Logfarben bleiben erhalten.
+6. Starten Sie die Gruppe manuell. Prüfen Sie den aktiven Schritt und das **Live-Log**. **Aktuellem Job folgen** wechselt die Logansicht beim nächsten Job und zeigt nach Gruppenende das letzte verfügbare Job-Log, auch wenn ein kurzer Job zwischen zwei Aktualisierungen abgeschlossen wurde. Ein Klick auf **Live-Log** des aktuellen Jobs behält aktiviertes Folgen bei; die Auswahl eines älteren Logs schaltet es aus. Die bisherigen Logfarben bleiben erhalten.
 
 Unter **Einzeljobs** zeigt eine verlinkte Zeile die Gruppe und die Position, etwa „Gruppe: Lokale Sicherung · Schritt 1 von 3“. Einzelstart, Job-Einstellungen und Einzelzeitplan bleiben verfügbar. Der Gruppenlauf wartet auf das vollständige Prozessende einschließlich Wartung, Wiederanlauf, Aufräumen und Post-Skript. Erst danach startet der nächste Job. History und Berichte bleiben pro Job erhalten; die Gruppenzuordnung und ein eigener Gruppenverlauf ergänzen sie.
 

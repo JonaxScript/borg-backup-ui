@@ -98,7 +98,7 @@
     if (state.view !== 'groups') return;
     const el = document.getElementById('job-groups-pane');
     if (!el || state.editor) return;
-    const signature = JSON.stringify([state.groups, state.selected, state.historyRun, state.history, _coreState().currentRole, jobsState.jobs.map(j => [j.key, j.run_phase, j.cancel_allowed, j.cancel_requested])]);
+    const signature = JSON.stringify([state.groups, state.selected, state.historyRun, state.history, _coreState().currentRole, jobsState.jobs.map(j => [j.key, j.running, j.run_id, j.run_phase, j.cancel_allowed, j.cancel_requested])]);
     if (signature === state.signature) return;
     state.signature = signature;
     const log = document.getElementById('log-panel');
@@ -129,14 +129,29 @@
       <p class="group-help">${escape(t('coordination'))}</p>${run?.error ? `<p class="group-error">${escape(run.error)}</p>` : ''}
     </section>`;
     document.getElementById('group-log-slot').appendChild(log);
-    if (state.follow && selectedIndex >= 0 && !state.historyRun) {
-      const step = steps[selectedIndex];
-      const job = jobsState.jobs.find(j => j.key === step.job_key);
-      if (job?.run_id === step.run_id && step.run_id !== state.followedRun) {
-        state.followedRun = step.run_id;
-        showLog(step, run).catch(e => showJobsError(e.message));
-      }
-    }
+    followLog(run);
+  }
+
+  /** Follow the active step or latest saved log, including steps completed between polls. */
+  function followLog(run) {
+    if (!state.follow || state.historyRun || !run) return;
+    const steps = run.steps || [];
+    const step = steps.find(s => s.status === 'running')
+      || [...steps].reverse().find(s => s.log_file);
+    if (!step) return;
+    const job = jobsState.jobs.find(j => j.key === step.job_key);
+    const live = step.status === 'running' && job?.running && job.run_id === step.run_id;
+    // A stale jobs response must not pin a run before its live transport is available.
+    if (step.status === 'running' && !live) return;
+    const key = JSON.stringify([run.run_id, step.job_key, step.run_id, live ? 'live' : step.log_file]);
+    if (key === state.followedRun) return;
+    state.followedRun = key;
+    showLog(step, run).catch(e => {
+      if (state.followedRun !== key) return;
+      state.followedRun = '';
+      state.signature = '';
+      showJobsError(e.message);
+    });
   }
 
   /** Reuse the fixed-size themed log viewport; historical logs use confined history access. */
@@ -144,7 +159,7 @@
     const requestId = ++state.logRequest;
     const selected = state.selected;
     const job = jobsState.jobs.find(j => j.key === step.job_key);
-    if (step.status === 'running' && job?.run_id === step.run_id) {
+    if (step.status === 'running' && job?.running && job.run_id === step.run_id) {
       openLogPanel(step.job_key, step.run_id);
       document.getElementById('group-log-slot').appendChild(document.getElementById('log-panel'));
     } else if (step.log_file) {
@@ -252,7 +267,14 @@
     if (a === 'log' || a === 'cancel') {
       const run = state.historyRun ? state.history.find(r => r.run_id === state.historyRun) : g.run;
       const step = run.steps[Number(el.dataset.step)];
-      if (a === 'log') { state.follow = false; document.getElementById('group-follow').checked = false; await showLog(step, run); }
+      if (a === 'log') {
+        const job = jobsState.jobs.find(j => j.key === step.job_key);
+        const currentLive = !state.historyRun && step.status === 'running'
+          && job?.running && job.run_id === step.run_id;
+        if (!currentLive) state.follow = false;
+        document.getElementById('group-follow').checked = state.follow;
+        await showLog(step, run);
+      }
       else { await request('/api/jobs/cancel', 'POST', { job_key: step.job_key, run_id: step.run_id }); await refreshJobs(); }
       return;
     }
