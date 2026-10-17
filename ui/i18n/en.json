@@ -3215,7 +3215,7 @@
     "scheduleOff": "Schedule disabled",
     "discard": "Discard unsaved group changes?",
     "empty": "No job groups configured yet.",
-    "edit": "Edit job group",
+    "edit": "Edit group",
     "groupStart": "Group start: {schedule}",
     "jobs": "jobs",
     "stopRequested": "Stop requested after current job",

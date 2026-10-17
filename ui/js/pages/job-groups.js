@@ -118,9 +118,9 @@
     const canRun = operator() && _isDataDirReady() && !g.missing_jobs?.length;
     el.innerHTML = sidebar() + `<section class="ui-workspace group-workspace">
       <header class="ui-workspace-header"><div class="ui-workspace-header__title"><span class="group-eyebrow">${escape(t('sequence'))}</span><h2>${escape(g.name)}</h2><p>${escape(g.description)}</p><span>${escape(t('groupStart', { schedule: scheduleText(g.schedule) }))} · ${g.jobs.length} ${escape(t('jobs'))}</span></div><div class="group-actions">
-      ${admin() ? button('edit', t('edit')) : ''}
-      ${running ? (operator() ? button('stop', g.run.stop_requested ? t('stopRequested') : t('stop'), g.run.stop_requested ? 'disabled' : '') : '') : (operator() ? button('start', t('start'), canRun ? '' : 'disabled', 'btn btn-primary') : '')}
-      ${admin() && !running ? button('delete', t('delete')) : ''}</div></header>
+      ${admin() ? button('edit', t('edit'), '', 'btn btn-secondary') : ''}
+      ${admin() && !running ? button('delete', t('delete'), '', 'btn btn-secondary') : ''}
+      ${running ? (operator() ? button('stop', g.run.stop_requested ? t('stopRequested') : t('stop'), g.run.stop_requested ? 'disabled' : '', 'btn btn-secondary') : '') : (operator() ? button('start', t('start'), canRun ? '' : 'disabled', 'btn btn-primary') : '')}</div></header>
       ${g.missing_jobs?.length ? `<div class="status-message error">${escape(t('missing'))}</div>` : ''}
       ${ownSchedule.length ? `<div class="status-message warning">${escape(t('additionalSchedules', { count: ownSchedule.length }))}</div>` : ''}
       <div class="group-run-header"><div><strong>${escape(t('execution'))}</strong> ${badge(run?.status, selectedIndex >= 0 ? t('progress', { current: selectedIndex + 1, total: steps.length }) : run ? status(run.status) : t('ready'))}</div>

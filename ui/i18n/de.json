@@ -3215,7 +3215,7 @@
     "scheduleOff": "Zeitplan deaktiviert",
     "discard": "Ungespeicherte Gruppenänderungen verwerfen?",
     "empty": "Noch keine Jobgruppe eingerichtet.",
-    "edit": "Jobgruppe bearbeiten",
+    "edit": "Gruppe bearbeiten",
     "groupStart": "Gruppenstart: {schedule}",
     "jobs": "Jobs",
     "stopRequested": "Stopp nach aktuellem Job angefordert",
