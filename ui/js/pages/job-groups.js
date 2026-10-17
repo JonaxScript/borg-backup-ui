@@ -1,7 +1,7 @@
 /** Ordered job groups sharing the existing job list, runner and themed log panel. */
 (function () {
   'use strict';
-  const state = { view: 'jobs', groups: [], hooks: {}, selected: '', editor: null, history: [], historyRun: '', follow: true, followedRun: '', signature: '', saving: false, logRequest: 0, picker: null };
+  const state = { view: 'jobs', groups: [], hooks: {}, selected: '', editor: null, history: [], historyRun: '', follow: true, followedRun: '', signature: '', saving: false, logRequest: 0, picker: null, editorBaseline: '', confirming: false };
   const t = (key, values) => jobsT('jobGroups.' + key, values);
   const escape = value => escHtml(String(value ?? ''));
   const admin = () => _coreState().currentRole === 'admin';
@@ -35,9 +35,14 @@
     if (state.view === 'groups' && !state.editor) render();
   }
 
-  /** Render a calm linked metadata line below the existing individual job identity. */
-  function membership(job) {
-    return (job.groups || []).map(g => `<div class="job-group-membership">↗ ${escape(t('groupLabel'))} <button class="job-group-link" data-group-action="open" data-group-id="${escape(g.id)}">${escape(g.name)}</button> · ${escape(t('step', { current: g.position, total: g.total }))}</div>`).join('');
+  /** Render group links; compact dashboard badges retain the full step in accessible text. */
+  function membership(job, compact = false) {
+    return (job.groups || []).map(g => {
+      const step = t('step', { current: g.position, total: g.total });
+      const detail = `${t('groupLabel')} ${g.name} · ${step}`;
+      if (compact) return `<div class="job-group-membership job-group-membership--compact" title="${escape(detail)}"><span aria-hidden="true">↗</span><button class="job-group-link" data-group-action="open" data-group-id="${escape(g.id)}" aria-label="${escape(detail)}">${escape(g.name)}</button><span class="job-group-position" aria-label="${escape(step)}">${escape(g.position)}/${escape(g.total)}</span></div>`;
+      return `<div class="job-group-membership">↗ ${escape(t('groupLabel'))} <button class="job-group-link" data-group-action="open" data-group-id="${escape(g.id)}">${escape(g.name)}</button> · ${escape(step)}</div>`;
+    }).join('');
   }
 
   /** Show group schedules separately from the unchanged individual schedule. */
@@ -46,8 +51,8 @@
   }
 
   /** Switch only the Jobs workspace; standalone job actions remain available. */
-  function view(next, selected) {
-    if (state.editor && !window.confirm(t('discard'))) return;
+  async function view(next, selected) {
+    if (!await confirmDiscardEditor()) return;
     state.editor = null;
     if (selected) { state.selected = selected; state.historyRun = ''; state.followedRun = ''; }
     state.view = next;
@@ -214,6 +219,8 @@
     state.editor = { ...JSON.parse(JSON.stringify(g)), ...parseSchedule(g.schedule.cron) };
     state.picker = { open: false, query: '', location: '', selected: [] };
     renderEditor();
+    readEditor();
+    state.editorBaseline = editorSnapshot();
   }
 
   /** Build the group form from its draft using existing Settings surfaces. */
@@ -282,6 +289,42 @@
     document.querySelector('[data-group-action="add"]').disabled = !state.picker.selected.length;
   }
 
+  /** Snapshot persisted editor fields; picker searches alone are not unsaved changes. */
+  function editorSnapshot() {
+    const g = state.editor;
+    return g ? JSON.stringify([g.name, g.description, g.jobs, g.on_error, g.schedule,
+      g.mode, g.time, g.day, g.weekday]) : '';
+  }
+
+  /** Check draft edits and pending job selections before leaving or unloading. */
+  function hasEditorChanges() {
+    if (!state.editor) return false;
+    readEditor();
+    return editorSnapshot() !== state.editorBaseline || !!state.picker?.selected.length;
+  }
+
+  /** Ask through the existing themed dialog; block duplicate prompts and restore focus. */
+  async function confirmAction(options) {
+    if (state.confirming) return false;
+    state.confirming = true;
+    const previous = document.activeElement;
+    try {
+      return !!await _openSettingsDialog({ ...options,
+        onOpen: ({ modal }) => modal.querySelector('#settings-dialog-cancel-btn')?.focus() });
+    } finally {
+      state.confirming = false;
+      if (previous?.isConnected) previous.focus();
+    }
+  }
+
+  /** Resolve true for a clean draft or explicit discard, false when editing should continue. */
+  async function confirmDiscardEditor() {
+    if (state.confirming) return false;
+    if (!hasEditorChanges()) return true;
+    return confirmAction({ title: jobsT('common.unsavedChangesTitle'), message: t('discard'),
+      confirmText: jobsT('common.discardChanges'), confirmClass: 'btn-danger' });
+  }
+
   /** Dispatch group actions; callers display rejected API requests in Jobs. */
   async function action(el) {
     const a = el.dataset.groupAction;
@@ -291,19 +334,19 @@
         await refreshJobs();
         if (_coreState().currentPage !== 'jobs') return;
       }
-      view('groups', el.dataset.groupId);
+      await view('groups', el.dataset.groupId);
       return;
     }
-    if (a === 'select') { view('groups', el.dataset.groupId); return; }
+    if (a === 'select') { await view('groups', el.dataset.groupId); return; }
     if (a === 'new' || a === 'edit') {
-      if (state.editor && !window.confirm(t('discard'))) return;
+      if (!await confirmDiscardEditor()) return;
       if (admin()) edit(a === 'new');
       return;
     }
     const g = group();
     if (a === 'start') { await request('/api/job-groups/run', 'POST', { id: g.id }); await refreshJobs(); await history(); return; }
     if (a === 'stop') { await request('/api/job-groups/stop', 'POST', { id: g.id, run_id: g.run.run_id }); await load(); return; }
-    if (a === 'delete') { if (window.confirm(t('deleteConfirm'))) { const result = await request('/api/job-groups', 'DELETE', { id: g.id }); await refreshJobs(); if (result.schedule_error) showJobsError(t('scheduleApplyFailed', { error: result.schedule_error })); } return; }
+    if (a === 'delete') { if (await confirmAction({ title: t('delete'), message: g.name + '\n\n' + t('deleteConfirm'), confirmText: t('delete'), confirmClass: 'btn-danger' })) { const result = await request('/api/job-groups', 'DELETE', { id: g.id }); await refreshJobs(); if (result.schedule_error) showJobsError(t('scheduleApplyFailed', { error: result.schedule_error })); } return; }
     if (a === 'log' || a === 'cancel') {
       const run = state.historyRun ? state.history.find(r => r.run_id === state.historyRun) : g.run;
       const step = run.steps[Number(el.dataset.step)];
@@ -320,7 +363,7 @@
     }
     if (!state.editor) return;
     readEditor();
-    if (a === 'discard') { if (window.confirm(t('discard'))) { state.editor = null; state.signature = ''; render(); } return; }
+    if (a === 'discard') { await canLeave(); return; }
     if (a === 'schedule') { showScheduleModal(el.dataset.jobKey, jobName(el.dataset.jobKey)); return; }
     const index = Number(el.dataset.step);
     if (a === 'picker-toggle') {
@@ -343,7 +386,7 @@
 
   document.addEventListener('click', event => {
     const tab = event.target.closest('[data-group-view]');
-    if (tab) view(tab.dataset.groupView);
+    if (tab) view(tab.dataset.groupView).catch(e => showJobsError(e.message));
     const el = event.target.closest('[data-group-action]');
     if (el) action(el).catch(e => showJobsError(e.message));
   });
@@ -414,11 +457,13 @@
     event.preventDefault(); readEditor();
     const [key] = state.editor.jobs.splice(dragged, 1); state.editor.jobs.splice(Number(row.dataset.groupDrag), 0, key); dragged = null; renderEditor();
   });
-  window.addEventListener('beforeunload', event => { if (state.editor) { event.preventDefault(); event.returnValue = ''; } });
-  /** Ask before leaving an unfinished group editor; retain it on cancellation. */
-  function canLeave() {
+  window.addEventListener('beforeunload', event => { if (hasEditorChanges()) { event.preventDefault(); event.returnValue = ''; } });
+  /** Resolve whether navigation may leave the editor; retain unsaved edits on cancellation.
+   * @returns {Promise<boolean>} True when navigation may continue.
+   */
+  async function canLeave() {
+    if (!await confirmDiscardEditor()) return false;
     if (!state.editor) return true;
-    if (!window.confirm(t('discard'))) return false;
     state.editor = null; state.signature = ''; render();
     return true;
   }

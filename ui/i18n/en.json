@@ -3186,6 +3186,7 @@
     }
   },
   "jobGroups": {
+    "groupStartLabel": "Group start",
     "addJobs": "Add jobs",
     "searchJobs": "Search jobs",
     "searchPlaceholder": "Name, archive prefix or location",

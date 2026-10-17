@@ -3186,6 +3186,7 @@
     }
   },
   "jobGroups": {
+    "groupStartLabel": "Gruppenstart",
     "addJobs": "Jobs hinzufügen",
     "searchJobs": "Jobs suchen",
     "searchPlaceholder": "Name, Archivpräfix oder Standort",

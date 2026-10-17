@@ -6,8 +6,9 @@ const test = require('node:test');
 function setup(language, globals = {}) {
   const labels = JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`, 'utf8'));
   const context = vm.createContext({
-    window: {BBUI: {}, addEventListener() {}, confirm: () => false},
-    document: {addEventListener() {}},
+    window: {BBUI: {}, addEventListener() {}, confirm: () => { throw new Error('Native dialogs are forbidden'); }},
+    document: {addEventListener() {}, getElementById: () => null},
+    _openSettingsDialog: async () => null,
     escHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
     jobsT: (key, params = {}) => (key.split('.').reduce((v, k) => v?.[k], labels) || key)
       .replace(/\{(\w+)\}/g, (_, name) => params[name] ?? ''),
@@ -40,10 +41,10 @@ for (const language of ['de', 'en']) {
     assert.ok(ui.schedules({groups: [{name: 'Nightly', schedule: {enabled: false, cron: '0 2 * * *'}}]})
       .includes(language === 'de' ? 'Zeitplan deaktiviert' : 'Schedule disabled'));
   });
-  test(`cancelled navigation retains the group editor (${language})`, () => {
+  test(`cancelled navigation retains the group editor (${language})`, async () => {
     const ui = setup(language);
     ui.state.editor = {name: 'Unsaved'};
-    assert.equal(ui.canLeave(), false);
+    assert.equal(await ui.canLeave(), false);
     assert.equal(ui.state.editor.name, 'Unsaved');
   });
 }
@@ -162,4 +163,33 @@ test('stopped groups select the last available log, not an unstarted pending job
   s.run.status = 'failed'; s.run.steps[1].status = 'failed'; s.jobs[1].running = false;
   s.ui.render(); await s.flush();
   assert.match(s.node('log-output').textContent, /appdata\.log/);
+});
+
+
+test('compact group badges retain full accessible identity and escape group names', () => {
+  const ui = setup('en');
+  const html = ui.membership({groups: [{id:'g',name:'<Local>',position:2,total:3}]}, true);
+  assert.ok(html.includes('job-group-membership--compact'));
+  assert.ok(html.includes('2/3'));
+  assert.ok(html.includes('Step 2 of 3'));
+  assert.ok(html.includes('&lt;Local>'));
+  assert.ok(!html.includes('<Local>'));
+});
+
+test('discarding awaits the themed dialog and retains the draft until confirmed', async () => {
+  let resolveDialog;
+  const prompts = [];
+  const ui = setup('en', {_openSettingsDialog: options => {
+    prompts.push(options);
+    return new Promise(resolve => { resolveDialog = resolve; });
+  }});
+  ui.state.editor = {name: 'Unsaved'};
+  const pending = ui.canLeave();
+  assert.equal(ui.state.editor.name, 'Unsaved');
+  assert.equal(prompts[0].confirmClass, 'btn-danger');
+  assert.equal(await ui.canLeave(), false, 'Do not open a second confirmation');
+  assert.equal(prompts.length, 1);
+  resolveDialog(true);
+  assert.equal(await pending, true);
+  assert.equal(ui.state.editor, null);
 });
