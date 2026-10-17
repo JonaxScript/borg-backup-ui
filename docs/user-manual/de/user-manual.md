@@ -498,7 +498,7 @@ Best Practices:
 Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
 
 1. Öffnen Sie **Jobs > Jobgruppen > Neue Gruppe** und geben Sie einen Namen ein.
-2. Fügen Sie die vorhandenen Jobs hinzu. Ordnen Sie sie mit den Pfeilen oder durch Ziehen von oben nach unten an.
+2. Öffnen Sie **Jobs hinzufügen**. Suchen Sie nach Name oder Archivpräfix, oder filtern Sie nach Standort. Markieren Sie einen oder mehrere Jobs und klicken Sie auf **Auswahl hinzufügen**. Die Auswahl bleibt beim Filtern erhalten; neue Jobs werden in der Auswahlreihenfolge hinten angehängt. Ordnen Sie sie mit den Pfeilen oder durch Ziehen von oben nach unten an.
 3. Aktivieren Sie bei Bedarf den **Gruppenzeitplan**. Wählen Sie täglich, wöchentlich, monatlich oder einen eigenen Cron-Ausdruck; es gilt die Serverzeit. Ohne Gruppenzeitplan bleibt der manuelle Gruppenstart verfügbar.
 4. Lassen Sie **Gruppe stoppen** bei Fehlern aktiviert oder wählen Sie ausdrücklich **Mit nächstem Job fortfahren**. Speichern Sie die Gruppe.
 5. Prüfen Sie die zusätzlich angezeigten Einzelzeitpläne und stimmen Sie diese auf die Gruppe ab. Ein deaktivierter Einzelzeitplan deaktiviert weder den Job noch seinen Start durch die Gruppe.

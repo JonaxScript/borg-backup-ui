@@ -1,7 +1,7 @@
 /** Ordered job groups sharing the existing job list, runner and themed log panel. */
 (function () {
   'use strict';
-  const state = { view: 'jobs', groups: [], hooks: {}, selected: '', editor: null, history: [], historyRun: '', follow: true, followedRun: '', signature: '', saving: false, logRequest: 0 };
+  const state = { view: 'jobs', groups: [], hooks: {}, selected: '', editor: null, history: [], historyRun: '', follow: true, followedRun: '', signature: '', saving: false, logRequest: 0, picker: null };
   const t = (key, values) => jobsT('jobGroups.' + key, values);
   const escape = value => escHtml(String(value ?? ''));
   const admin = () => _coreState().currentRole === 'admin';
@@ -212,6 +212,7 @@
     if (!g) return;
     closeLogPanel(); state.logRequest++; state.followedRun = '';
     state.editor = { ...JSON.parse(JSON.stringify(g)), ...parseSchedule(g.schedule.cron) };
+    state.picker = { open: false, query: '', location: '', selected: [] };
     renderEditor();
   }
 
@@ -221,13 +222,12 @@
     const pane = document.getElementById('job-groups-pane');
     const log = document.getElementById('log-panel');
     if (pane.contains(log)) pane.after(log);
-    const available = jobsState.jobs.filter(j => !g.jobs.includes(j.key));
     const withSchedules = g.jobs.filter(k => _coreSchedules()[k]?.enabled);
     pane.innerHTML = sidebar() + `<section class="ui-workspace group-workspace"><form id="group-editor"><header class="ui-workspace-header"><div class="ui-workspace-header__title"><span class="group-eyebrow">${escape(t('settings'))}</span><h2>${escape(g.id ? g.name : t('new'))}</h2><span class="ui-workspace-header__subtitle">${escape(t('nextRunChanges'))}</span></div><div class="group-actions">${button('discard', t('cancel'))}<button type="submit" class="btn btn-primary">${escape(t('save'))}</button></div></header><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('general'))}</h3></div><div class="group-section-body group-basics">
       <label>${escape(t('name'))}<input name="name" required maxlength="100" value="${escape(g.name)}"></label>
       <label>${escape(t('description'))}<textarea name="description" maxlength="2000">${escape(g.description)}</textarea></label>
-      </div></section><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('order'))}</h3><span>${escape(t('orderHint'))}</span></div><div class="group-section-body"><div class="group-editor-jobs">${g.jobs.map((key, i) => `<div class="group-editor-row" draggable="true" data-group-drag="${i}"><span class="group-drag-handle" title="${escape(t('drag'))}" aria-hidden="true">⠿</span><span class="group-order">${i + 1}</span>${jobIcon(key)}<div><strong>${escape(jobName(key))}</strong><small>${['pre', 'post'].filter(p => state.hooks[key]?.[p]).map(p => `${p === 'pre' ? 'Pre' : 'Post'}: ${escape(state.hooks[key][p])}`).join(' · ') || escape(t('noScripts'))}</small></div><div class="group-actions">${button('up', '↑', `data-step="${i}" aria-label="${escape(t('up'))}" ${i === 0 ? 'disabled' : ''}`)}${button('down', '↓', `data-step="${i}" aria-label="${escape(t('down'))}" ${i === g.jobs.length - 1 ? 'disabled' : ''}`)}${button('remove', t('remove'), `data-step="${i}"`)}</div></div>`).join('')}</div>
-      <div class="group-add ${available.length ? '' : 'hidden'}"><select id="group-add-job" aria-label="${escape(t('addJob'))}">${available.map(j => `<option value="${escape(j.key)}">${escape(j.name || j.display_name)} · ${escape(j.location)}${j.enabled === false ? ' · ' + escape(jobsT('jobs.disabled')) : ''}</option>`).join('')}</select>${button('add', t('addJob'), available.length ? '' : 'disabled')}</div>
+      </div></section><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('order'))}</h3><span>${escape(t('orderHint'))}</span></div><div class="group-section-body"><div class="group-editor-jobs">${g.jobs.map((key, i) => `<div class="group-editor-row" draggable="true" data-group-drag="${i}"><span class="group-drag-handle" title="${escape(t('drag'))}" aria-hidden="true">⠿</span><span class="group-order">${i + 1}</span>${jobIcon(key)}<div><strong>${escape(jobName(key))}</strong><small>${escape(jobsLocationLabel(jobsState.jobs.find(j => j.key === key)?.location))} · ${escape(jobsState.jobs.find(j => j.key === key)?.archive_prefix || '')}</small><small>${['pre', 'post'].filter(p => state.hooks[key]?.[p]).map(p => `${p === 'pre' ? 'Pre' : 'Post'}: ${escape(state.hooks[key][p])}`).join(' · ') || escape(t('noScripts'))}</small></div><div class="group-actions">${button('up', '↑', `data-step="${i}" aria-label="${escape(t('up'))}" ${i === 0 ? 'disabled' : ''}`)}${button('down', '↓', `data-step="${i}" aria-label="${escape(t('down'))}" ${i === g.jobs.length - 1 ? 'disabled' : ''}`)}${button('remove', t('remove'), `data-step="${i}"`)}</div></div>`).join('')}</div>
+      ${pickerMarkup()}
       <p class="group-help">${escape(t('jobSettings'))}</p>
       </div></section><div class="group-settings-columns"><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('schedule'))}</h3></div><div class="group-section-body"><label class="group-checkbox"><input type="checkbox" name="enabled" ${g.schedule.enabled ? 'checked' : ''}>${escape(t('scheduleEnabled'))}</label>
       <div id="group-schedule-fields" class="group-schedule-fields ${g.schedule.enabled ? '' : 'hidden'}"><label>${escape(t('frequency'))}<select name="mode">${['daily', 'weekly', 'monthly', 'custom'].map(mode => `<option value="${mode}" ${g.mode === mode ? 'selected' : ''}>${escape(t(mode))}</option>`).join('')}</select></label>
@@ -240,6 +240,46 @@
       <p class="group-help">${escape(t('scheduleUnchanged'))}</p>
       <div class="group-actions group-editor-footer">${button('discard', t('cancel'))}<button type="submit" class="btn btn-primary">${escape(t('save'))}</button></div>
     </form></section>`;
+  }
+
+  /** Return selectable existing jobs; group members cannot be added twice. */
+  function availableJobs() {
+    return jobsState.jobs.filter(j => !state.editor.jobs.includes(j.key));
+  }
+
+  /** Render the expandable picker; search/filter updates replace only its results. */
+  function pickerMarkup() {
+    const available = availableJobs();
+    const picker = state.picker;
+    if (!available.length) return `<p class="group-help">${escape(t('allJobsAdded'))}</p>`;
+    return `<div class="group-picker">
+      ${button('picker-toggle', t('addJobs'), `aria-expanded="${picker.open}" aria-controls="group-picker-panel"`, 'btn btn-secondary')}
+      <section id="group-picker-panel" class="group-picker-panel ${picker.open ? '' : 'hidden'}" aria-label="${escape(t('addJobs'))}">
+        <p class="group-help">${escape(t('pickerHint'))}</p>
+        <div class="group-picker-filters"><label>${escape(t('searchJobs'))}<input id="group-picker-query" type="search" autocomplete="off" value="${escape(picker.query)}" placeholder="${escape(t('searchPlaceholder'))}"></label>
+        <label>${escape(t('location'))}<select id="group-picker-location"><option value="">${escape(jobsT('jobs.allLocations'))}</option>${[...new Set(available.map(j => j.location || ''))].filter(Boolean).map(location => `<option value="${escape(location)}" ${picker.location === location ? 'selected' : ''}>${escape(jobsLocationLabel(location))}</option>`).join('')}</select></label></div>
+        <div id="group-picker-results" class="group-picker-results">${pickerResults()}</div>
+        <div class="group-picker-footer"><span id="group-picker-count" aria-live="polite">${escape(t('selectedJobs', { count: picker.selected.length }))}</span><div class="group-actions">${button('picker-toggle', t('cancel'))}${button('add', t('addSelection'), picker.selected.length ? '' : 'disabled', 'btn btn-primary')}</div></div>
+      </section></div>`;
+  }
+
+  /** Return escaped checkbox rows matching name, prefix and localized location. */
+  function pickerResults() {
+    const picker = state.picker;
+    const query = picker.query.trim().toLocaleLowerCase();
+    const available = availableJobs().filter(j => (!picker.location || j.location === picker.location)
+      && [j.name, j.display_name, j.archive_prefix, j.location, jobsLocationLabel(j.location)].join(' ').toLocaleLowerCase().includes(query));
+    return available.map(j => `<label class="group-picker-row ${picker.selected.includes(j.key) ? 'is-selected' : ''}">
+      <input type="checkbox" data-group-pick="${escape(j.key)}" ${picker.selected.includes(j.key) ? 'checked' : ''}>
+      ${jobIcon(j.key)}<span class="group-picker-identity"><strong>${escape(j.name || j.display_name || j.key)}</strong><small>${escape(j.archive_prefix || '')}</small></span>
+      <span class="group-picker-location">${escape(jobsLocationLabel(j.location))}${j.enabled === false ? `<small>${escape(jobsT('jobs.disabled'))}</small>` : ''}</span>
+    </label>`).join('') || `<p class="group-picker-empty" role="status">${escape(t('noMatchingJobs'))}</p>`;
+  }
+
+  /** Update the selected count without replacing the focused checkbox. */
+  function updatePickerSelection() {
+    document.getElementById('group-picker-count').textContent = t('selectedJobs', { count: state.picker.selected.length });
+    document.querySelector('[data-group-action="add"]').disabled = !state.picker.selected.length;
   }
 
   /** Dispatch group actions; callers display rejected API requests in Jobs. */
@@ -283,7 +323,18 @@
     if (a === 'discard') { if (window.confirm(t('discard'))) { state.editor = null; state.signature = ''; render(); } return; }
     if (a === 'schedule') { showScheduleModal(el.dataset.jobKey, jobName(el.dataset.jobKey)); return; }
     const index = Number(el.dataset.step);
-    if (a === 'add') { const key = document.getElementById('group-add-job').value; if (key && !state.editor.jobs.includes(key)) state.editor.jobs.push(key); }
+    if (a === 'picker-toggle') {
+      state.picker = { open: !state.picker.open, query: '', location: '', selected: [] };
+      renderEditor();
+      if (state.picker.open) document.getElementById('group-picker-query')?.focus();
+      else document.querySelector('[data-group-action="picker-toggle"]')?.focus();
+      return;
+    }
+    if (a === 'add') {
+      const available = new Set(availableJobs().map(j => j.key));
+      state.editor.jobs.push(...state.picker.selected.filter(key => available.has(key)));
+      state.picker = { open: false, query: '', location: '', selected: [] };
+    }
     if (a === 'remove') state.editor.jobs.splice(index, 1);
     if (a === 'up' && index > 0) [state.editor.jobs[index - 1], state.editor.jobs[index]] = [state.editor.jobs[index], state.editor.jobs[index - 1]];
     if (a === 'down' && index < state.editor.jobs.length - 1) [state.editor.jobs[index + 1], state.editor.jobs[index]] = [state.editor.jobs[index], state.editor.jobs[index + 1]];
@@ -296,7 +347,26 @@
     const el = event.target.closest('[data-group-action]');
     if (el) action(el).catch(e => showJobsError(e.message));
   });
+  document.addEventListener('keydown', event => {
+    if (event.target.id === 'group-picker-query' && event.key === 'Enter') event.preventDefault();
+  });
+  document.addEventListener('input', event => {
+    if (event.target.id !== 'group-picker-query' || !state.editor) return;
+    state.picker.query = event.target.value;
+    document.getElementById('group-picker-results').innerHTML = pickerResults();
+  });
   document.addEventListener('change', event => {
+    if (state.editor && event.target.id === 'group-picker-location') {
+      state.picker.location = event.target.value;
+      document.getElementById('group-picker-results').innerHTML = pickerResults();
+    }
+    if (state.editor && event.target.matches('[data-group-pick]')) {
+      const key = event.target.dataset.groupPick;
+      state.picker.selected = state.picker.selected.filter(value => value !== key);
+      if (event.target.checked) state.picker.selected.push(key);
+      event.target.closest('.group-picker-row').classList.toggle('is-selected', event.target.checked);
+      updatePickerSelection();
+    }
     if (event.target.id === 'group-follow') { state.follow = event.target.checked; state.followedRun = ''; state.signature = ''; render(); }
     if (event.target.id === 'group-history-select') { state.logRequest++; state.historyRun = event.target.value; closeLogPanel(); state.followedRun = ''; render(); }
     if (event.target.closest('#group-editor') && ['mode', 'enabled'].includes(event.target.name)) { readEditor(); renderEditor(); }

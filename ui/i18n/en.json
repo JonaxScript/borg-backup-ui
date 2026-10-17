@@ -3186,6 +3186,15 @@
     }
   },
   "jobGroups": {
+    "addJobs": "Add jobs",
+    "searchJobs": "Search jobs",
+    "searchPlaceholder": "Name, archive prefix or location",
+    "location": "Location",
+    "selectedJobs": "{count} jobs selected",
+    "addSelection": "Add selection",
+    "noMatchingJobs": "No matching jobs found.",
+    "allJobsAdded": "All existing jobs are already in this group.",
+    "pickerHint": "Select jobs to append together to the sequence. Your selection is retained when filtering.",
     "scheduleApplyFailed": "Change saved, but the schedule could not be installed: {error}",
     "drag": "Drag to change the order",
     "sequences": "Sequences",

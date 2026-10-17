@@ -490,7 +490,7 @@ Best practices:
 A job group runs existing jobs in a fixed order. Jobs retain their sources, repositories, maintenance and Pre/Post scripts. **admin** can configure groups; **operator** and **admin** can start and stop them. **viewer** can inspect progress and logs.
 
 1. Open **Jobs > Job groups > New group** and enter a name.
-2. Add existing jobs. Use the arrows or drag them into their execution order, from top to bottom.
+2. Open **Add jobs**. Search by name or archive prefix, or filter by location. Select one or more jobs and click **Add selection**. Selections are retained while filtering; new jobs are appended in selection order. Use the arrows or drag them into their execution order, from top to bottom.
 3. Enable the **Group schedule** if needed. Choose daily, weekly, monthly or a custom cron expression; server time applies. Manual group starts remain available without a group schedule.
 4. Keep **Stop group** on errors or explicitly select **Continue with next job**. Save the group.
 5. Review the additional individual schedules and coordinate them with the group. Disabling an individual schedule disables neither the job nor its group starts.

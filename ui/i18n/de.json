@@ -3186,6 +3186,15 @@
     }
   },
   "jobGroups": {
+    "addJobs": "Jobs hinzufügen",
+    "searchJobs": "Jobs suchen",
+    "searchPlaceholder": "Name, Archivpräfix oder Standort",
+    "location": "Standort",
+    "selectedJobs": "{count} Jobs ausgewählt",
+    "addSelection": "Auswahl hinzufügen",
+    "noMatchingJobs": "Keine passenden Jobs gefunden.",
+    "allJobsAdded": "Alle vorhandenen Jobs sind bereits in dieser Gruppe.",
+    "pickerHint": "Jobs auswählen und gemeinsam am Ende der Reihenfolge hinzufügen. Die Auswahl bleibt beim Filtern erhalten.",
     "scheduleApplyFailed": "Änderung gespeichert, aber der Zeitplan konnte nicht angewendet werden: {error}",
     "drag": "Ziehen, um die Reihenfolge zu ändern",
     "sequences": "Abläufe",
