@@ -487,6 +487,8 @@ Best practices:
 
 ### 3.8 Job Groups
 
+Job groups are available starting with stable `2026.10.17.1802`. The direct script editing described here extends this feature in change #573.
+
 A job group runs existing jobs in a fixed order. Jobs retain their sources, repositories, maintenance and Pre/Post scripts. **admin** can configure groups; **operator** and **admin** can start and stop them. **viewer** can inspect progress and logs.
 
 1. Open **Jobs > Job groups > New group** and enter a name.
