@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.17.1802">
+<!ENTITY version   "2026.10.18.1217">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.18.1217###
+### Improvements
+
+- View and edit shared job Pre/Post scripts and Post conditions directly from job groups. Changes are saved to the original job for individual and group starts; running jobs keep their script snapshot. Concurrent assignment edits are detected before saving. (#573)
+
 ###2026.10.17.1802###
 ### Bug Fixes
 
@@ -48,20 +53,6 @@
 
 - Rework German and English documentation with a complete first-backup/restore tutorial, recovery checklist, permissions and export reference, and precise restore-test limits. Correct job identity, wizard steps and scheduling guidance; refresh all existing screenshots and numbered guides as lossless PNGs, and add practical Pre/Post script and Grafana guides. (#560)
 
-###2026.10.09.1435###
-### Bug Fixes
-
-- Keep Unraid dashboard widget time labels current, distinguish skipped backups from warnings, clarify cached data and refresh times, and improve text and action-button contrast in light and dark themes. (#546)
-- Clearly identify Pre/Post failures and script exit codes in History and logs. A failed Pre reports that the backup was not started; log completion headings reflect failure, cancellation or warnings. (#550)
-- Restart Docker containers and VMs after archive creation, before retention, compaction, and repository checks, so maintenance no longer prolongs service downtime. (#552)
-
-### Improvements
-
-- Manage reusable Bash scripts in Settings and select general Pre/Post hooks in the job wizard. Pre runs before backup preparation; Post runs after maintenance and cleanup, optionally also on failure, skip or cancellation. Includes syntax validation, timeouts and separate script outcomes in history. Central edits apply to the next run; active runs retain their script snapshot. (#550)
-- Match the script editor to the shared Settings card layout and keep History detail backgrounds uniform, including optional script results. (#550)
-- Show which jobs use each script in a compact expandable list, including Pre/Post conditions, and add Bash syntax highlighting, line numbers and navigation to syntax errors in the editor. (#550)
-- Duplicate scripts and import/export Bash .sh files. Imports require a Bash shebang and valid syntax; duplicates and imports open unassigned drafts for review before saving. (#550)
-
 ]]>
 </CHANGES>
 
@@ -87,7 +78,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="f367bc30a9609007863889392dc75772"
+EXPECTED_MD5="e219c5b15a1d010e35c17415839c3631"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
