@@ -495,6 +495,8 @@ Best Practices:
 
 ### 3.8 Jobgruppen
 
+Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die hier beschriebene direkte Skriptbearbeitung ergänzt diese Funktion mit Änderung #573.
+
 Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
 
 1. Öffnen Sie **Jobs > Jobgruppen > Neue Gruppe** und geben Sie einen Namen ein.
