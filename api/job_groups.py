@@ -219,7 +219,8 @@ def list_groups(config):
         path = resolve_data_root(config) / 'config' / 'jobs' / (key + '.json')
         meta = _read(path) or {}
         hook = meta.get('hooks') or {}
-        hooks[key] = {p: scripts.get(hook.get(p), '') for p in ('pre', 'post')}
+        hooks[key] = {p: scripts.get(hook.get(p), hook.get(p) or '') for p in ('pre', 'post')}
+        hooks[key]['post_when'] = hook.get('post_when', 'success')
     return {'groups': [{**g, 'run': current_run(config, g['id']),
                        'missing_jobs': [k for k in g['jobs'] if k not in jobs]}
                       for g in definitions(config)['groups']], 'hooks': hooks}

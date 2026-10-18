@@ -8,6 +8,7 @@ import binascii
 import logging
 import os
 from pathlib import Path
+from datetime import datetime, timezone
 import re
 import selectors
 import signal
@@ -15,7 +16,7 @@ import subprocess
 import time
 import uuid
 
-from inventory_store import atomic_write_inventory, inventory_lock, read_inventory
+from inventory_store import atomic_write_json, atomic_write_inventory, inventory_lock, read_inventory
 from security_utils import mask_secrets
 
 _BASH_HEADER = re.compile(r'#![ \t]*(?:/(?:usr/)?bin/bash|/usr/bin/env[ \t]+bash)[ \t]*')
@@ -223,6 +224,63 @@ def snapshot_hooks(config: dict, value: object) -> tuple[dict, dict]:
                 raise ScriptValidationError('missing', 'Selected script no longer exists')
             scripts[phase] = {**validate_script(rows[hooks[phase]]), 'id': hooks[phase]}
     return hooks, scripts
+
+
+def _read_job_hooks(config: dict, job_id: str) -> tuple[Path, dict, dict]:
+    """Read canonical job metadata and normalized hooks; reject missing/invalid jobs.
+
+    Callers hold the configuration inventory lock when reading or updating.
+    """
+    from job_identity import metadata_job_id, validate_job_id
+    from jobs_api import resolve_data_root
+    key = validate_job_id(job_id)
+    path = resolve_data_root(config) / 'config' / 'jobs' / (key + '.json')
+    if not path.is_file():
+        raise ScriptValidationError('job_missing', 'Job no longer exists')
+    meta = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(meta, dict) or metadata_job_id(meta) != key:
+        raise ScriptValidationError('selection', 'Invalid job metadata')
+    return path, meta, normalize_hooks(meta.get('hooks'))
+
+
+def get_job_hooks(config: dict, job_id: str) -> dict:
+    """Return current shared job assignments and script choices without script source.
+
+    This administrator-only editor reads fresh values under the inventory lock.
+    Missing script references remain visible so they cannot be silently cleared.
+    """
+    with inventory_lock(store_path(config).parent):
+        _, meta, hooks = _read_job_hooks(config, job_id)
+        choices = [{'id': row['id'], 'name': row['name']}
+                   for row in list_scripts(config)['scripts']]
+        return {'job_id': meta['job_id'], 'name': meta.get('name', job_id),
+                'hooks': hooks, 'scripts': choices}
+
+
+def save_job_hooks(config: dict, payload: dict) -> dict:
+    """Update only one job's hooks and timestamp, preserving all other job fields.
+
+    Require the previously read hooks to detect concurrent assignment edits.
+    Validate references and atomically save under the shared inventory lock.
+    A stale edit raises HTTP 409 via ScriptValidationError. Runtime snapshots,
+    group definitions and schedules are never modified.
+    """
+    if (not isinstance(payload, dict) or not isinstance(payload.get('hooks'), dict)
+            or not isinstance(payload.get('expected_hooks'), dict)):
+        raise ScriptValidationError('selection', 'Current and requested job hooks are required')
+    expected = normalize_hooks(payload['expected_hooks'])
+    with inventory_lock(store_path(config).parent):
+        path, meta, current = _read_job_hooks(config, payload.get('job_id'))
+        if current != expected:
+            exc = ScriptValidationError('conflict', 'Job scripts changed. Close and reopen the editor to reload them.')
+            exc.api_status = 409
+            raise exc
+        hooks = normalize_hooks(payload['hooks'], config)
+        if hooks != current:
+            meta['hooks'] = hooks
+            meta['updated_at'] = datetime.now(timezone.utc).isoformat()
+            atomic_write_json(path, meta)
+        return {'saved': True, 'job_id': meta['job_id'], 'hooks': hooks}
 
 
 def run_hook(script: dict, phase: str, job_id: str, *, result: str = '', cancelled=None) -> dict:

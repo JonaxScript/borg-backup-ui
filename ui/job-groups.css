@@ -102,3 +102,12 @@
   .group-section-body .group-picker-row { grid-template-columns: 18px 34px minmax(0, 1fr); }
   .group-picker-location { grid-column: 3; text-align: left; }
 }
+
+/* Shared job script assignments are edited separately from group definitions. */
+.group-row-hooks { grid-column: 3 / -1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.group-hook-summary { overflow-wrap: anywhere; line-height: 1.5; }
+.group-row-hooks .group-hook-summary { flex: 1 1 260px; }
+.group-editor-row [data-group-action="scripts"] { margin-top: 8px; }
+.group-hook-fields { display: grid; gap: 8px; margin-top: 16px; }
+.group-hook-fields .form-label { margin: 8px 0 0; }
+.group-hook-fields select { width: 100%; min-width: 0; }

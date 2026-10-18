@@ -495,6 +495,8 @@ Best Practices:
 
 ### 3.8 Jobgruppen
 
+Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die hier beschriebene direkte Skriptbearbeitung ergänzt diese Funktion mit Änderung #573.
+
 Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
 
 1. Öffnen Sie **Jobs > Jobgruppen > Neue Gruppe** und geben Sie einen Namen ein.
@@ -503,6 +505,8 @@ Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs 
 4. Lassen Sie **Gruppe stoppen** bei Fehlern aktiviert oder wählen Sie ausdrücklich **Mit nächstem Job fortfahren**. Speichern Sie die Gruppe.
 5. Prüfen Sie die zusätzlich angezeigten Einzelzeitpläne und stimmen Sie diese auf die Gruppe ab. Ein deaktivierter Einzelzeitplan deaktiviert weder den Job noch seinen Start durch die Gruppe.
 6. Starten Sie die Gruppe manuell. Prüfen Sie den aktiven Schritt und das **Live-Log**. **Aktuellem Job folgen** wechselt die Logansicht beim nächsten Job und zeigt nach Gruppenende das letzte verfügbare Job-Log, auch wenn ein kurzer Job zwischen zwei Aktualisierungen abgeschlossen wurde. Ein Klick auf **Live-Log** des aktuellen Jobs behält aktiviertes Folgen bei; die Auswahl eines älteren Logs schaltet es aus. Die bisherigen Logfarben bleiben erhalten.
+
+**Job-Skripte direkt bearbeiten:** Die Gruppenübersicht und die Gruppeneinstellungen zeigen die aktuellen Pre-/Post-Skripte je Job. Als **admin** öffnen Sie **Skripte bearbeiten**, wählen vorhandene Skripte oder **Keines** und stellen die Post-Bedingung ein. **Im Job speichern** ändert den ursprünglichen Job sofort; die Änderung gilt auch für Einzelstarts und alle anderen Gruppen mit diesem Job. Das Speichern ist unabhängig vom Speichern der Gruppe; das Verwerfen von Gruppenänderungen macht eine bereits gespeicherte Skriptänderung nicht rückgängig. Bereits laufende Jobs behalten ihren Skriptstand. Noch nicht gestartete Jobs, auch spätere Schritte einer laufenden Gruppe, lesen die neuen Einstellungen beim Start. Die Anzeige beschreibt die aktuellen Job-Einstellungen, nicht die Skripte eines historischen Laufs. Bei gleichzeitiger Änderung derselben Zuordnung schließen und öffnen Sie die Bearbeitung erneut; fremde Änderungen werden nicht automatisch überschrieben.
 
 Unter **Einzeljobs** zeigt eine verlinkte Zeile die Gruppe und die Position, etwa „Gruppe: Lokale Sicherung · Schritt 1 von 3“. Einzelstart, Job-Einstellungen und Einzelzeitplan bleiben verfügbar. Der Gruppenlauf wartet auf das vollständige Prozessende einschließlich Wartung, Wiederanlauf, Aufräumen und Post-Skript. Erst danach startet der nächste Job. History und Berichte bleiben pro Job erhalten; die Gruppenzuordnung und ein eigener Gruppenverlauf ergänzen sie.
 

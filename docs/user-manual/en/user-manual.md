@@ -487,6 +487,8 @@ Best practices:
 
 ### 3.8 Job Groups
 
+Job groups are available starting with stable `2026.10.17.1802`. The direct script editing described here extends this feature in change #573.
+
 A job group runs existing jobs in a fixed order. Jobs retain their sources, repositories, maintenance and Pre/Post scripts. **admin** can configure groups; **operator** and **admin** can start and stop them. **viewer** can inspect progress and logs.
 
 1. Open **Jobs > Job groups > New group** and enter a name.
@@ -495,6 +497,8 @@ A job group runs existing jobs in a fixed order. Jobs retain their sources, repo
 4. Keep **Stop group** on errors or explicitly select **Continue with next job**. Save the group.
 5. Review the additional individual schedules and coordinate them with the group. Disabling an individual schedule disables neither the job nor its group starts.
 6. Start the group manually. Check the active step and **Live log**. **Follow current job** switches the log view when the next job starts and shows the last available job log after the group finishes, even when a short job completes between refreshes. Clicking the current job's **Live log** keeps following enabled; selecting an older log turns it off. Existing log colors are retained.
+
+**Edit job scripts directly:** The group overview and group settings show each job's current Pre/Post scripts. As **admin**, open **Edit scripts**, select existing scripts or **None**, and choose the Post condition. **Save to job** immediately updates the original job; the change also applies to individual starts and every other group using that job. Saving is independent of saving the group; discarding group changes does not undo a script assignment already saved to a job. Already running jobs retain their script snapshot. Jobs that have not started yet, including later steps of a running group, read the new settings when they start. The display describes current job settings, not the scripts used by a historical run. If another editor changes the same assignments, close and reopen the editor; concurrent changes are not silently overwritten.
 
 Under **Individual jobs**, a linked line identifies the group and position, for example “Group: Local backup · Step 1 of 3”. Individual starts, job settings and schedules remain available. The group waits for the complete child process to exit, including maintenance, workload recovery, cleanup and the Post script. Only then does the next job start. History and reports remain per job, supplemented by group context and a separate group run history.
 
