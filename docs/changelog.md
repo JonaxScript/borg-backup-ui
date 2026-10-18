@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Edit shared job scripts from job groups (#573)
+
+- Show current Pre/Post assignments and Post conditions in group overview and settings; edit the original job through an admin-only dialog with explicit shared scope.
+- Validate script references and reject stale assignments under the shared inventory lock. Update only hooks and the job timestamp, preserving other settings, schedules, group definitions and active script snapshots.
+- Document separate job/group saves and the effect on not-yet-started group members in German and English.
+
 ## Pending - Sequential job groups (#570)
 
 - Reference existing jobs by stable ID in ordered groups with independent schedules and stop/continue policies. Reuse the ordinary runner through full process completion, retaining existing resource locks and hook behavior.

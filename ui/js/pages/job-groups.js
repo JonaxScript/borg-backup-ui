@@ -21,7 +21,13 @@
   async function request(url, method = 'GET', body) {
     const response = await fetch(url, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
     const data = await response.json();
-    if (!response.ok || data.error) throw new Error(data.message || data.error?.message || data.error || `HTTP ${response.status}`);
+    if (!response.ok || data.error) {
+      const fallback = data.message || data.error?.message || data.error || `HTTP ${response.status}`;
+      const error = new Error(data.code?.startsWith('job_script_') && typeof apiErrorMessage === 'function'
+        ? apiErrorMessage(data, response.status, fallback) : fallback);
+      error.code = data.code || data.error?.code;
+      throw error;
+    }
     return data;
   }
 
@@ -91,6 +97,76 @@
     return `<span class="ui-badge ui-badge--${kind}">${escape(label || status(value))}</span>`;
   }
 
+  /** Display current shared job settings, separately from historical run results. */
+  function hookSummary(key) {
+    const hooks = state.hooks[key] || {};
+    return `<small class="group-hook-summary">${escape(t('currentScripts'))}: ${escape(t('preScript'))}: ${escape(hooks.pre || t('noScript'))} · ${escape(t('postScript'))}: ${escape(hooks.post || t('noScript'))}${hooks.post ? ' · ' + escape(t(hooks.post_when === 'always' ? 'postAlways' : 'postSuccess')) : ''}</small>`;
+  }
+
+  /** Build escaped script selections, preserving references missing from the inventory. */
+  function hookFields(choices, hooks) {
+    return ['pre', 'post'].map(phase => {
+      const rows = [...choices];
+      if (hooks[phase] && !rows.some(row => row.id === hooks[phase]))
+        rows.push({id: hooks[phase], name: t('missingScript', {id: hooks[phase]})});
+      return `<label class="form-label" for="group-hook-${phase}">${escape(t(phase + 'Script'))}</label><select class="form-select" id="group-hook-${phase}"><option value="">${escape(t('noScript'))}</option>${rows.map(row => `<option value="${escape(row.id)}" ${row.id === hooks[phase] ? 'selected' : ''}>${escape(row.name)}</option>`).join('')}</select>`;
+    }).join('') + `<label class="form-label" for="group-hook-post-when">${escape(t('postWhen'))}</label><select class="form-select" id="group-hook-post-when" ${hooks.post ? '' : 'disabled'}><option value="success" ${hooks.post_when === 'success' ? 'selected' : ''}>${escape(t('postSuccess'))}</option><option value="always" ${hooks.post_when === 'always' ? 'selected' : ''}>${escape(t('postAlways'))}</option></select>`;
+  }
+
+  /** Edit one original job through the themed dialog; retain drafts after failed saves.
+   * Only assignments are written. Concurrent assignment edits require reopening;
+   * polling can continue without replacing dialog fields or a group draft.
+   */
+  async function editHooks(key) {
+    if (!admin() || state.confirming) return;
+    state.confirming = true;
+    const previous = document.activeElement;
+    try {
+      const data = await request('/api/settings/job-hooks?job_id=' + encodeURIComponent(key));
+      let draft = { ...data.hooks }, error = '', conflict = false;
+      while (true) {
+        const selected = await _openSettingsDialog({
+          title: t('editScriptsTitle', {name: data.name}), confirmText: t('saveJobScripts'),
+          html: `<p>${escape(t('sharedScriptsHint'))}</p>${state.editor ? `<p>${escape(t('scriptSaveHint'))}</p>` : ''}<p>${escape(t('scriptRunHint'))}</p>${error ? `<p class="group-error" role="alert">${escape(error)}</p>` : ''}<div class="group-hook-fields">${hookFields(data.scripts, draft)}</div>`,
+          onOpen: ({modal, okBtn, addCleanup}) => {
+            const post = modal.querySelector('#group-hook-post');
+            const condition = modal.querySelector('#group-hook-post-when');
+            const update = () => { condition.disabled = !post.value; };
+            post.addEventListener('change', update);
+            addCleanup(() => post.removeEventListener('change', update));
+            okBtn.disabled = conflict;
+            modal.querySelector('#group-hook-pre').focus();
+          },
+          resolveValue: ({modal}) => ({
+            pre: modal.querySelector('#group-hook-pre').value,
+            post: modal.querySelector('#group-hook-post').value,
+            post_when: modal.querySelector('#group-hook-post-when').value,
+          }),
+        });
+        if (!selected) return;
+        draft = selected;
+        try {
+          const saved = await request('/api/settings/job-hooks', 'POST', {
+            job_id: key, expected_hooks: data.hooks, hooks: draft,
+          });
+          const name = id => data.scripts.find(row => row.id === id)?.name || id;
+          state.hooks[key] = {pre: name(saved.hooks.pre), post: name(saved.hooks.post), post_when: saved.hooks.post_when};
+          break;
+        } catch (e) {
+          error = e.message;
+          conflict = e.code === 'job_script_conflict';
+        }
+      }
+      state.signature = '';
+      if (state.editor) { readEditor(); renderEditor(); }
+      else render();
+      await load();
+    } finally {
+      state.confirming = false;
+      if (previous?.isConnected) previous.focus();
+    }
+  }
+
   /** Combine queue position and outcome without relying on color alone. */
   function stepMarker(step, index) {
     const value = step.status || 'pending';
@@ -103,7 +179,7 @@
     if (state.view !== 'groups') return;
     const el = document.getElementById('job-groups-pane');
     if (!el || state.editor) return;
-    const signature = JSON.stringify([state.groups, state.selected, state.historyRun, state.history, _coreState().currentRole, jobsState.jobs.map(j => [j.key, j.running, j.run_id, j.run_phase, j.cancel_allowed, j.cancel_requested])]);
+    const signature = JSON.stringify([state.groups, state.hooks, state.selected, state.historyRun, state.history, _coreState().currentRole, jobsState.jobs.map(j => [j.key, j.running, j.run_id, j.run_phase, j.cancel_allowed, j.cancel_requested])]);
     if (signature === state.signature) return;
     state.signature = signature;
     const log = document.getElementById('log-panel');
@@ -128,7 +204,7 @@
       <div class="group-run-list">${steps.map((step, index) => {
         const job = jobsState.jobs.find(j => j.key === step.job_key);
         const isLive = step.status === 'running' && job?.running && job.run_id === step.run_id;
-        return `<article class="group-run-row ${step.status === 'running' ? 'is-running' : ''}">${stepMarker(step, index)}${jobIcon(step.job_key)}<div class="group-job-title"><strong>${escape(jobName(step.job_key))}</strong><small>${escape(job?.archive_prefix || '')}</small><span>${escape(t('step', { current: index + 1, total: steps.length }))}</span>${step.error ? `<span class="group-error">${escape(step.error)}</span>` : ''}</div><div class="group-run-status">${badge(step.status)}${isLive && job.run_phase ? `<small>${escape(t('phases.' + job.run_phase) === 'jobGroups.phases.' + job.run_phase ? job.run_phase : t('phases.' + job.run_phase))}</small>` : ''}</div><div class="group-actions">${isLive || step.log_file ? button('log', isLive ? t('liveLog') : t('log'), `data-step="${index}"`) : ''}${isLive && operator() && job.cancel_allowed && !job.cancel_requested ? button('cancel', t('cancelJob'), `data-step="${index}"`) : ''}</div></article>`;
+        return `<article class="group-run-row ${step.status === 'running' ? 'is-running' : ''}">${stepMarker(step, index)}${jobIcon(step.job_key)}<div class="group-job-title"><strong>${escape(jobName(step.job_key))}</strong><small>${escape(job?.archive_prefix || '')}</small><span>${escape(t('step', { current: index + 1, total: steps.length }))}</span>${step.error ? `<span class="group-error">${escape(step.error)}</span>` : ''}</div><div class="group-run-status">${badge(step.status)}${isLive && job.run_phase ? `<small>${escape(t('phases.' + job.run_phase) === 'jobGroups.phases.' + job.run_phase ? job.run_phase : t('phases.' + job.run_phase))}</small>` : ''}</div><div class="group-actions">${isLive || step.log_file ? button('log', isLive ? t('liveLog') : t('log'), `data-step="${index}"`) : ''}${isLive && operator() && job.cancel_allowed && !job.cancel_requested ? button('cancel', t('cancelJob'), `data-step="${index}"`) : ''}</div>${!state.historyRun && job && g.jobs.includes(step.job_key) ? `<div class="group-row-hooks">${hookSummary(step.job_key)}${admin() ? button('scripts', t('editScripts'), `data-job-key="${escape(step.job_key)}"`) : ''}</div>` : ''}</article>`;
       }).join('')}</div>
       <label class="group-follow"><input id="group-follow" type="checkbox" ${state.follow ? 'checked' : ''}> ${escape(t('follow'))}</label><div id="group-log-slot"></div>
       <p class="group-help">${escape(t('coordination'))}</p>${run?.error ? `<p class="group-error">${escape(run.error)}</p>` : ''}
@@ -233,7 +309,7 @@
     pane.innerHTML = sidebar() + `<section class="ui-workspace group-workspace"><form id="group-editor"><header class="ui-workspace-header"><div class="ui-workspace-header__title"><span class="group-eyebrow">${escape(t('settings'))}</span><h2>${escape(g.id ? g.name : t('new'))}</h2><span class="ui-workspace-header__subtitle">${escape(t('nextRunChanges'))}</span></div><div class="group-actions">${button('discard', t('cancel'))}<button type="submit" class="btn btn-primary">${escape(t('save'))}</button></div></header><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('general'))}</h3></div><div class="group-section-body group-basics">
       <label>${escape(t('name'))}<input name="name" required maxlength="100" value="${escape(g.name)}"></label>
       <label>${escape(t('description'))}<textarea name="description" maxlength="2000">${escape(g.description)}</textarea></label>
-      </div></section><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('order'))}</h3><span>${escape(t('orderHint'))}</span></div><div class="group-section-body"><div class="group-editor-jobs">${g.jobs.map((key, i) => `<div class="group-editor-row" draggable="true" data-group-drag="${i}"><span class="group-drag-handle" title="${escape(t('drag'))}" aria-hidden="true">⠿</span><span class="group-order">${i + 1}</span>${jobIcon(key)}<div><strong>${escape(jobName(key))}</strong><small>${escape(jobsLocationLabel(jobsState.jobs.find(j => j.key === key)?.location))} · ${escape(jobsState.jobs.find(j => j.key === key)?.archive_prefix || '')}</small><small>${['pre', 'post'].filter(p => state.hooks[key]?.[p]).map(p => `${p === 'pre' ? 'Pre' : 'Post'}: ${escape(state.hooks[key][p])}`).join(' · ') || escape(t('noScripts'))}</small></div><div class="group-actions">${button('up', '↑', `data-step="${i}" aria-label="${escape(t('up'))}" ${i === 0 ? 'disabled' : ''}`)}${button('down', '↓', `data-step="${i}" aria-label="${escape(t('down'))}" ${i === g.jobs.length - 1 ? 'disabled' : ''}`)}${button('remove', t('remove'), `data-step="${i}"`)}</div></div>`).join('')}</div>
+      </div></section><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('order'))}</h3><span>${escape(t('orderHint'))}</span></div><div class="group-section-body"><div class="group-editor-jobs">${g.jobs.map((key, i) => `<div class="group-editor-row" draggable="true" data-group-drag="${i}"><span class="group-drag-handle" title="${escape(t('drag'))}" aria-hidden="true">⠿</span><span class="group-order">${i + 1}</span>${jobIcon(key)}<div><strong>${escape(jobName(key))}</strong><small>${escape(jobsLocationLabel(jobsState.jobs.find(j => j.key === key)?.location))} · ${escape(jobsState.jobs.find(j => j.key === key)?.archive_prefix || '')}</small>${hookSummary(key)}${admin() && jobsState.jobs.some(j => j.key === key) ? button('scripts', t('editScripts'), `data-job-key="${escape(key)}"`) : ''}</div><div class="group-actions">${button('up', '↑', `data-step="${i}" aria-label="${escape(t('up'))}" ${i === 0 ? 'disabled' : ''}`)}${button('down', '↓', `data-step="${i}" aria-label="${escape(t('down'))}" ${i === g.jobs.length - 1 ? 'disabled' : ''}`)}${button('remove', t('remove'), `data-step="${i}"`)}</div></div>`).join('')}</div>
       ${pickerMarkup()}
       <p class="group-help">${escape(t('jobSettings'))}</p>
       </div></section><div class="group-settings-columns"><section class="ui-panel group-section"><div class="ui-panel__header"><h3>${escape(t('schedule'))}</h3></div><div class="group-section-body"><label class="group-checkbox"><input type="checkbox" name="enabled" ${g.schedule.enabled ? 'checked' : ''}>${escape(t('scheduleEnabled'))}</label>
@@ -328,6 +404,7 @@
   /** Dispatch group actions; callers display rejected API requests in Jobs. */
   async function action(el) {
     const a = el.dataset.groupAction;
+    if (a === 'scripts') { await editHooks(el.dataset.jobKey); return; }
     if (a === 'open') {
       if (_coreState().currentPage !== 'jobs') {
         navigate('jobs');

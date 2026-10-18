@@ -50,7 +50,7 @@ for (const language of ['de', 'en']) {
 }
 
 /** Exercise production rendering and click dispatch with controllable polling snapshots. */
-function logScenario() {
+function logScenario(overrides = {}) {
   const elements = new Map();
   const listeners = {};
   const opened = [], fetched = [], errors = [];
@@ -79,6 +79,7 @@ function logScenario() {
       fetched.push(url);
       return {ok: true, json: async () => ({content: `saved ${url}`})};
     },
+    ...overrides,
   });
   Object.assign(ui.state, {view: 'groups', selected: 'g', groups: [{id: 'g', name: 'Local', jobs: ['0','1','2'], schedule: {}, run}]});
   const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -93,7 +94,7 @@ function logScenario() {
     run.steps[2] = {job_key: '2', run_id: 'run-2', status: 'success', log_file: 'photos.log'};
     jobs[1].running = false;
   };
-  return {ui, run, jobs, node, opened, fetched, errors, flush, clickLog, finish};
+  return {ui, run, jobs, node, opened, fetched, errors, flush, clickLog, finish, listeners};
 }
 
 test('following selects Photos when the final job starts and finishes between polls', async () => {
@@ -192,4 +193,112 @@ test('discarding awaits the themed dialog and retains the draft until confirmed'
   resolveDialog(true);
   assert.equal(await pending, true);
   assert.equal(ui.state.editor, null);
+});
+
+/** Drive real script-editor dispatch while emulating the existing themed dialog. */
+function scriptScenario({role = 'admin', edits = [], failSave = null} = {}) {
+  const initial = {pre: 'script-a', post: '', post_when: 'always'};
+  const choices = [{id: 'script-a', name: 'Original'}, {id: 'script-b', name: '<img src=x onerror=alert(1)>'}];
+  const dialogs = [], requests = [];
+  let saveAttempt = 0;
+  const s = logScenario({
+    _coreState: () => ({currentRole: role, currentPage: 'jobs'}),
+    _openSettingsDialog: async cfg => {
+      dialogs.push(cfg);
+      const change = edits.shift();
+      if (!change) return null;
+      const nodes = {
+        '#group-hook-pre': {value: change.pre, focus() {}},
+        '#group-hook-post': {value: change.post, addEventListener() {}, removeEventListener() {}},
+        '#group-hook-post-when': {value: change.post_when},
+      };
+      const modal = {querySelector: id => nodes[id]};
+      const okBtn = {};
+      cfg.onOpen({modal, okBtn, addCleanup() {}});
+      assert.ok(!okBtn.disabled, 'A non-conflicting edit can be submitted');
+      return cfg.resolveValue({modal});
+    },
+    fetch: async (url, options) => {
+      requests.push({url, options});
+      if (url === '/api/job-groups') return {ok: true, json: async () => ({groups: s.ui.state.groups, hooks: s.ui.state.hooks})};
+      if (options.method === 'GET') return {ok: true, json: async () => ({job_id: '0', name: '<Job>', hooks: initial, scripts: choices})};
+      if (failSave && saveAttempt++ === 0) return {ok: false, status: 409, json: async () => failSave};
+      return {ok: true, json: async () => ({saved: true, hooks: JSON.parse(options.body).hooks})};
+    },
+  });
+  s.ui.state.follow = false;
+  s.ui.state.hooks['0'] = {pre: 'Original', post: '', post_when: 'always'};
+  s.clickScripts = async () => {
+    const el = {dataset: {groupAction: 'scripts', jobKey: '0'}};
+    s.listeners.click({target: {closest: selector => selector === '[data-group-action]' ? el : null}});
+    await s.flush();
+  };
+  return {...s, dialogs, requests, initial};
+}
+
+test('group overview displays shared scripts and administrator editing actions', () => {
+  const s = scriptScenario();
+  s.ui.render();
+  assert.match(s.node('job-groups-pane').innerHTML, /Current job scripts: Pre: Original/);
+  assert.equal((s.node('job-groups-pane').innerHTML.match(/data-group-action="scripts"/g) || []).length, 3);
+  s.ui.state.hooks['0'].pre = 'Changed by another group';
+  s.ui.render();
+  assert.match(s.node('job-groups-pane').innerHTML, /Changed by another group/);
+});
+
+test('script edits persist to the job, retain the expected state and escape script names', async () => {
+  const desired = {pre: 'script-b', post: 'script-a', post_when: 'always'};
+  const s = scriptScenario({edits: [desired]});
+  await s.clickScripts();
+  assert.equal(s.dialogs.length, 1);
+  assert.match(s.dialogs[0].html, /all other job groups/);
+  assert.match(s.dialogs[0].html, /&lt;img/);
+  assert.ok(!s.dialogs[0].html.includes('<img'));
+  const write = s.requests.find(r => r.options.method === 'POST');
+  assert.deepEqual(JSON.parse(write.options.body), {job_id: '0', expected_hooks: s.initial, hooks: desired});
+  assert.equal(s.ui.state.hooks['0'].pre, '<img src=x onerror=alert(1)>');
+  assert.equal(s.ui.state.hooks['0'].post, 'Original');
+  assert.ok(!s.requests.some(r => r.url === '/api/job-groups' && r.options.method !== 'GET'));
+});
+
+test('choosing None removes job script assignments, while cancelling writes nothing', async () => {
+  const empty = {pre: '', post: '', post_when: 'always'};
+  const s = scriptScenario({edits: [empty]});
+  await s.clickScripts();
+  assert.equal(s.ui.state.hooks['0'].pre, '');
+  const cancelled = scriptScenario();
+  await cancelled.clickScripts();
+  assert.ok(cancelled.requests.every(r => r.options.method === 'GET'));
+});
+
+test('failed saves reopen the dialog with the draft and do not change displayed assignments', async () => {
+  const desired = {pre: 'script-b', post: '', post_when: 'always'};
+  const s = scriptScenario({edits: [desired], failSave: {code: 'job_script_conflict', message: 'Close and reopen'}});
+  await s.clickScripts();
+  assert.equal(s.dialogs.length, 2);
+  assert.match(s.dialogs[1].html, /Close and reopen/);
+  assert.match(s.dialogs[1].html, /value="script-b" selected/);
+  assert.equal(s.ui.state.hooks['0'].pre, 'Original');
+  const okBtn = {};
+  s.dialogs[1].onOpen({modal: {querySelector: () => ({addEventListener() {}, focus() {}})}, okBtn, addCleanup() {}});
+  assert.equal(okBtn.disabled, true, 'A conflict requires reloading before another save');
+});
+
+for (const role of ['operator', 'viewer']) {
+  test(`${role} sees current scripts but cannot edit`, async () => {
+    const s = scriptScenario({role});
+    s.ui.render();
+    assert.match(s.node('job-groups-pane').innerHTML, /Current job scripts/);
+    assert.ok(!s.node('job-groups-pane').innerHTML.includes('data-group-action="scripts"'));
+    await s.clickScripts();
+    assert.equal(s.requests.length, 0);
+  });
+}
+
+test('historical group runs do not present current assignments as historical scripts', () => {
+  const s = scriptScenario();
+  s.ui.state.historyRun = 'group-run';
+  s.ui.state.history = [s.run];
+  s.ui.render();
+  assert.ok(!s.node('job-groups-pane').innerHTML.includes('Current job scripts'));
 });

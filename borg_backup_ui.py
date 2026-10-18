@@ -963,6 +963,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/notification-reminders/diagnostics": self._get_notification_reminder_diagnostics,
                 "/api/jobs": self._get_jobs,
                 "/api/job-groups": self._get_job_groups,
+                "/api/settings/job-hooks": lambda: self._get_job_hooks(parsed.query),
                 "/api/job-groups/history": lambda: self._get_job_group_history(parsed.query),
                 "/api/jobs/running": self._get_running,
                 "/api/schedules": self._get_schedules,
@@ -1019,6 +1020,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         routes = {
             "/api/jobs/run": self._post_run_job,
             "/api/job-groups": self._save_job_group,
+            "/api/settings/job-hooks": self._save_job_hooks,
             "/api/job-groups/run": self._run_job_group,
             "/api/job-groups/stop": self._stop_job_group,
             "/api/jobs/cancel": self._post_cancel_job,
@@ -3450,6 +3452,17 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         if not sid:
             raise ValueError("session_id is required")
         return storagebox_deploy_cancel(sid)
+
+    def _get_job_hooks(self, query):
+        """Read shared job script assignments and safe choices for administrators."""
+        from job_scripts import get_job_hooks
+        return get_job_hooks(self.config, parse_qs(query).get("job_id", [""])[0])
+
+    def _save_job_hooks(self):
+        """Save explicit administrator edits without replacing unrelated job settings."""
+        self._require_data_dir_ready()
+        from job_scripts import save_job_hooks
+        return save_job_hooks(self.config, self._read_json_body())
 
     def _get_job_groups(self):
         """Expose group definitions and current runs to authenticated readers."""
