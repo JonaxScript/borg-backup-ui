@@ -295,7 +295,14 @@ def test_supported_imports_preserve_identity_and_old_imports_are_rejected(tmp_pa
     report = import_jobs_bundle(config, copied, mode='rename', dry_run=False)
     copied_id = report['report'][0]['new_job_key']
     assert copied_id != key
-    assert get_schedules(config)[copied_id] == bundle['schedules'][key]
+    # The copied job keeps its cron settings but must be applied locally first
+    # (#547); it must not inherit a different job's activation window.
+    assert get_schedules(config)[copied_id] == {
+        'cron': bundle['schedules'][key]['cron'],
+        'enabled': bundle['schedules'][key]['enabled'],
+        'pending_apply': True,
+    }
+    assert get_schedules(config)[key] == bundle['schedules'][key]
     repositories = {r['repository_key']: r for r in read_repository_store(config)['repositories']}
     assert repositories['separate']['used_by'] == [copied_id]
     assert set(repositories['shared']['used_by']) == set(ids.values())
