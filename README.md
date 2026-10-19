@@ -11,7 +11,7 @@ remains the backup engine; this project adds the Unraid-focused control layer
 around jobs, storage targets, schedules, restore workflows, checks, and support
 diagnostics.
 
-> Status: public beta, available through Unraid Community Apps. Start with
+> Available through Unraid Community Apps. Start with
 > non-critical data and verify a restore before relying on any backup setup.
 > This project is not affiliated with BorgBackup or other Borg UI projects.
 
@@ -51,7 +51,7 @@ metrics; Docker/VM behavior is explained through the job configuration.
 1. Open **Apps** in the Unraid web interface.
 2. Install **Python 3 for Unraid** if it is not already installed.
 3. Search for **Borg Backup UI** and open its Community Apps listing.
-4. Review the public beta notice and install the plugin.
+4. Install the plugin.
 5. Open **Settings > Borg Backup UI**, start the service, and complete the
    initial setup.
 
