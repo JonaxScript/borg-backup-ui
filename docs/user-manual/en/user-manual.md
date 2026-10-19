@@ -472,6 +472,12 @@ Forms and multi-step wizards with unsaved input do not close when the backdrop i
 
 Schedules can be changed in the job wizard or through job actions. When saved, the application's cron entry is updated.
 
+The schedule editor preserves custom expressions such as `15 3 * * 1,3,5` (Monday, Wednesday and Friday at 03:15). Expressions that cannot be represented by one preset stay **Custom**; switching modes refreshes the next-run preview immediately.
+
+For individual jobs, a new or changed enabled schedule, or re-enabling a schedule, starts a new overdue-monitoring window after successful installation in the server's crontab. Earlier occurrences of the new schedule are not counted as missed. The first applicable occurrence still becomes overdue after the configured tolerance if no later job status exists. Saving unchanged settings or restarting the service does not reset this window or clear a genuine overdue condition.
+
+Existing schedules retain their previous monitoring behavior until changed; their historical activation time cannot be reconstructed. A failed crontab update leaves the changed schedule saved but pending: the save reports an error and reminder diagnostics show **Schedule not applied**. No overdue reminders are sent for that pending schedule. The previous cron entry may still run. Correct the reported cause and save again, or reapply schedules by restarting the service. The successful retry establishes the new activation time. Imported new or changed schedules likewise become effective when successfully applied; imported activation timestamps are not reused.
+
 Best practices:
 
 - Test new jobs manually first.
@@ -487,7 +493,7 @@ Best practices:
 
 ### 3.8 Job Groups
 
-Job groups are available starting with stable `2026.10.17.1802`. The direct script editing described here extends this feature in change #573.
+Job groups are available starting with stable `2026.10.17.1802`. Direct script editing is available starting with stable `2026.10.18.1217` (#573).
 
 A job group runs existing jobs in a fixed order. Jobs retain their sources, repositories, maintenance and Pre/Post scripts. **admin** can configure groups; **operator** and **admin** can start and stop them. **viewer** can inspect progress and logs.
 

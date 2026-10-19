@@ -480,6 +480,12 @@ Formulare und mehrstufige Assistenten mit ungespeicherten Eingaben werden nicht 
 
 Zeitpläne können im Job-Wizard oder über die Job-Aktionen geändert werden. Beim Speichern wird der Cron-Eintrag für die Anwendung aktualisiert.
 
+Der Zeitplan-Editor erhält eigene Ausdrücke wie `15 3 * * 1,3,5` (Montag, Mittwoch und Freitag um 03:15). Ausdrücke, die sich nicht durch eine einzelne Vorgabe darstellen lassen, bleiben **Benutzerdefiniert**; beim Wechsel der Häufigkeit wird die Vorschau der nächsten Ausführung sofort aktualisiert.
+
+Bei Einzeljobs beginnt die Überfälligkeitsprüfung für einen neuen oder geänderten aktiven Zeitplan sowie nach erneutem Aktivieren erst mit der erfolgreichen Übernahme in die Crontab des Servers. Frühere Termine des neuen Plans zählen nicht als verpasst. Der erste gültige Termin wird weiterhin nach der eingestellten Toleranz überfällig, wenn kein späterer Jobstatus vorliegt. Unverändertes Speichern oder ein Dienstneustart setzen dieses Zeitfenster nicht zurück und löschen keine echte Überfälligkeit.
+
+Bestehende Zeitpläne behalten ihre bisherige Bewertung bis zu einer Änderung; ihr historischer Aktivierungszeitpunkt lässt sich nicht nachträglich bestimmen. Schlägt die Crontab-Aktualisierung fehl, bleibt der geänderte Plan gespeichert, aber ausstehend: Das Speichern meldet einen Fehler, und die Erinnerungsdiagnose zeigt **Zeitplan nicht übernommen**. Für diesen ausstehenden Plan werden keine Überfälligkeitserinnerungen gesendet. Der vorherige Cron-Eintrag kann weiterhin laufen. Beheben Sie die gemeldete Ursache und speichern Sie erneut oder übernehmen Sie die Zeitpläne durch einen Dienstneustart. Erst der erfolgreiche Versuch setzt den neuen Aktivierungszeitpunkt. Auch importierte neue oder geänderte Zeitpläne gelten erst nach erfolgreicher Übernahme; importierte Aktivierungszeitpunkte werden nicht wiederverwendet.
+
 Best Practices:
 
 - Neue Jobs zuerst manuell testen.
@@ -495,7 +501,7 @@ Best Practices:
 
 ### 3.8 Jobgruppen
 
-Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die hier beschriebene direkte Skriptbearbeitung ergänzt diese Funktion mit Änderung #573.
+Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die direkte Skriptbearbeitung ist ab Stable `2026.10.18.1217` verfügbar (#573).
 
 Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
 

@@ -2971,6 +2971,7 @@
       "reminderWaiting": "overdue, interval active",
       "reminderUnsupported": "Cron unsupported",
       "reminderMissingDue": "Due timestamp missing",
+      "reminderSchedulePending": "Schedule not applied",
       "reminderMissingStatus": "Status missing",
       "noDetails": "No details available.",
       "checkFailed": "Check failed",

@@ -2971,6 +2971,7 @@
       "reminderWaiting": "überfällig, Intervall aktiv",
       "reminderUnsupported": "Cron nicht unterstützt",
       "reminderMissingDue": "Termin fehlt",
+      "reminderSchedulePending": "Zeitplan nicht übernommen",
       "reminderMissingStatus": "Status fehlt",
       "noDetails": "Keine Details vorhanden.",
       "checkFailed": "Prüfung fehlgeschlagen",

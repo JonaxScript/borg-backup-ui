@@ -13,8 +13,12 @@ import json
 import re
 import shlex
 import subprocess
+from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from typing import List
+
+from inventory_store import atomic_write_json, inventory_lock
 
 
 _CRON_BEGIN = "# --- BORG-BACKUP-UI BEGIN ---"
@@ -25,6 +29,18 @@ _JOB_KEY_RX = re.compile(r"^[a-zA-Z0-9_.-]+$")
 def _schedules_path(config: dict) -> Path:
     base = Path(config.get("BACKUP_SCRIPTS_DIR", "/boot/config/borg-backup"))
     return base / "config" / "schedules.json"
+
+
+def _schedule_transaction(function):
+    """Wrap a config-first function in the reentrant inventory transaction.
+
+    Preserve its result/signature and propagate lock, storage and apply errors.
+    """
+    @wraps(function)
+    def locked(config, *args, **kwargs):
+        with inventory_lock(_schedules_path(config).parent):
+            return function(config, *args, **kwargs)
+    return locked
 
 
 def get_schedules(config: dict) -> dict:
@@ -38,11 +54,14 @@ def get_schedules(config: dict) -> dict:
         return {}
 
 
+@_schedule_transaction
 def save_schedule(config: dict, job_key: str, cron: str, enabled: bool) -> dict:
     """Validate, persist and install one job schedule into crontab.
 
     Returns saved/applied flags and the apply result. A crontab failure raises
-    RuntimeError after ``schedules.json`` has already been written.
+    RuntimeError after ``schedules.json`` has already been written. Changed
+    schedules remain pending until a successful apply; no-op saves preserve
+    their effective time and cannot clear an existing overdue condition.
     """
     job_key = validate_schedule_job_key(config, job_key)
     _validate_cron(cron)
@@ -56,6 +75,7 @@ def save_schedule(config: dict, job_key: str, cron: str, enabled: bool) -> dict:
     return {"saved": True, "applied": True, "apply_result": apply_result}
 
 
+@_schedule_transaction
 def delete_schedule(config: dict, job_key: str) -> dict:
     """Remove a job schedule from storage and reinstall the managed crontab.
 
@@ -72,6 +92,7 @@ def delete_schedule(config: dict, job_key: str) -> dict:
     return {"deleted": True, "applied": True, "apply_result": apply_result}
 
 
+@_schedule_transaction
 def prune_orphaned_schedules(config: dict, log_fn=None) -> dict:
     """
     Entfernt verwaiste Schedule-Keys, für die kein Job mehr existiert.
@@ -113,31 +134,50 @@ def prune_orphaned_schedules(config: dict, log_fn=None) -> dict:
     return {"changed": True, "removed_keys": removed_sorted}
 
 
+@_schedule_transaction
 def write_schedules(config: dict, schedules: dict, *, validate_known_jobs: bool = True) -> None:
     """Validate and replace ``schedules.json`` with normalized schedule rows.
 
     ``validate_known_jobs=False`` allows cleanup of orphaned entries without
     requiring their deleted jobs to resolve. Invalid cron expressions raise.
+    New/changed schedules are marked pending; activation metadata is taken
+    only from the existing local row, never from imports. Legacy rows are
+    left without an effective time until changed or re-enabled.
     """
+    previous = get_schedules(config)
     normalized: dict = {}
     for raw_key, raw_sched in (schedules or {}).items():
         key = validate_schedule_job_key(config, raw_key) if validate_known_jobs else _validate_job_key_text(raw_key)
         if not isinstance(raw_sched, dict):
             continue
-        cron = str(raw_sched.get("cron") or "").strip()
+        cron = " ".join(str(raw_sched.get("cron") or "").split())
         if cron:
             _validate_cron(cron)
-        normalized[key] = {"cron": cron, "enabled": bool(raw_sched.get("enabled", True))}
+        row = {"cron": cron, "enabled": bool(raw_sched.get("enabled", True))}
+        old = previous.get(key) or {}
+        unchanged = (" ".join(str(old.get("cron") or "").split()) == cron
+                     and bool(old.get("enabled", True)) == row["enabled"])
+        if unchanged:
+            for field in ("effective_since", "pending_apply"):
+                if field in old:
+                    row[field] = old[field]
+        elif row["enabled"]:
+            row["pending_apply"] = True
+        normalized[key] = row
     path = _schedules_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(normalized, indent=2, ensure_ascii=False), encoding="utf-8")
+    atomic_write_json(path, normalized)
 
 
+@_schedule_transaction
 def apply_all_schedules(config: dict) -> dict:
     """Install enabled individual, group and per-job restore-test entries in crontab.
 
     Validates keys, cron expressions and API port before updating the managed
-    crontab block. Returns the update result; failures propagate.
+    crontab block. After successful installation, pending schedules receive a
+    server-local effective timestamp. Reapplying unchanged schedules preserves
+    that timestamp. Return the crontab update result; failures propagate and
+    leave activation pending.
     """
     schedules = get_schedules(config)
     port = _validate_port(config.get("PORT", "8765"))
@@ -169,7 +209,17 @@ def apply_all_schedules(config: dict) -> dict:
             command = _build_schedule_command(f"http://127.0.0.1:{port}/api/job-groups/run", body, token_file)
             lines.append(f"{schedule['cron']} {command} >/dev/null 2>&1")
     lines.extend(restore_test_cron_lines(config).values())
-    return _update_crontab(lines)
+    result = _update_crontab(lines)
+    activated = False
+    effective_since = datetime.now().isoformat(timespec="seconds")
+    for sched in schedules.values():
+        if isinstance(sched, dict) and sched.get("pending_apply") and sched.get("enabled", True):
+            sched["effective_since"] = effective_since
+            sched.pop("pending_apply", None)
+            activated = True
+    if activated:
+        atomic_write_json(_schedules_path(config), schedules)
+    return result
 
 
 def validate_restore_test_cron(cron: str) -> str:

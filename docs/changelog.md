@@ -1,5 +1,13 @@
 # Changelog
 
+## Pending - Preserve custom schedules and their activation window (#547)
+
+- Preserve multi-weekday, step, range and month-end cron expressions in the individual job schedule editor; refresh previews when switching to custom mode and preserve Sunday zero.
+- Record optional local activation metadata only for new, changed or re-enabled schedules, after crontab installation succeeds. Unchanged saves/restarts preserve the window; existing rows remain unchanged until edited, so no historical activation time is invented and no startup data migration is needed.
+- Serialize schedule updates with the existing inventory lock and write atomically. Failed activation remains pending and visible in reminder diagnostics; imported activation metadata is never trusted.
+- Keep genuine missed-run detection and tolerance intact, including the first missed occurrence for newly activated schedules without a saved status.
+- Document schedule semantics in both manuals and identify the already released shared-script editing version without changing their historical documentation-review baseline.
+
 ## Pending - Edit shared job scripts from job groups (#573)
 
 - Show current Pre/Post assignments and Post conditions in group overview and settings; edit the original job through an admin-only dialog with explicit shared scope.
