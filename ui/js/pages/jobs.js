@@ -1244,10 +1244,11 @@ function closeScheduleModal(options = {}) {
   return true;
 }
 
+/** Select a frequency mode and immediately refresh its cron preview. */
 function setFrequency(freq) {
   scheduleModalState.frequency = freq;
   _applyFrequencyUI(freq);
-  if (freq !== 'custom') updateSchedulePreview();
+  updateSchedulePreview();
 }
 
 function _applyFrequencyUI(freq) {
@@ -1362,30 +1363,26 @@ function _onScheduleChanged(jobKey) {
 
 // ── Cron utilities ────────────────────────────────────────────────────────────
 
+/** Parse lossless daily/weekly/monthly presets; retain all other cron text as custom.
+ * Returns editor fields without narrowing lists, ranges, steps or wildcards.
+ */
 function parseCronToFrequency(cron) {
   const parts = (cron || '').trim().split(/\s+/);
   const result = { freq: 'custom', hour: 3, minute: 0, dom: 1, dow: 1 };
   if (parts.length !== 5) return result;
-
   const [minF, hrF, domF, monF, dowF] = parts;
-  const hour   = hrF  === '*' ? 3 : parseInt(hrF)  || 0;
-  const minute = minF === '*' ? 0 : parseInt(minF) || 0;
-  const dom    = domF === '*' ? 1 : parseInt(domF) || 1;
-  const dow    = dowF === '*' ? 1 : parseInt(dowF) || 1;
-
-  result.hour   = hour;
-  result.minute = minute;
-  result.dom    = dom;
-  result.dow    = dow;
-
-  if (domF === '*' && monF === '*' && dowF === '*') {
+  const integer = (field, lo, hi) => /^(0|[1-9]\d*)$/.test(field) && Number(field) >= lo && Number(field) <= hi;
+  if (!integer(minF, 0, 59) || !integer(hrF, 0, 23) || monF !== '*') return result;
+  result.hour = Number(hrF);
+  result.minute = Number(minF);
+  if (domF === '*' && dowF === '*') {
     result.freq = 'daily';
-  } else if (domF === '*' && monF === '*' && hrF !== '*' && minF !== '*') {
+  } else if (domF === '*' && integer(dowF, 0, 6)) {
     result.freq = 'weekly';
-  } else if (dowF === '*' && monF === '*' && domF !== '*') {
+    result.dow = Number(dowF);
+  } else if (dowF === '*' && integer(domF, 1, 28)) {
     result.freq = 'monthly';
-  } else {
-    result.freq = 'custom';
+    result.dom = Number(domF);
   }
   return result;
 }

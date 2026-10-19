@@ -1,5 +1,18 @@
 # Changelog
 
+## Pending - Handle VM shutdown failures (#541)
+
+- Explain why a VM backup could not start and recover VMs already stopped when another VM fails to shut down.
+- Add an optional wizard setting to force off VMs after the shutdown timeout, with a clear data-loss warning. It stays off for existing jobs.
+- Keep unresolved shutdowns and failed restarts visible for manual checking.
+
+## Pending - Fix backup schedules and overdue warnings (#547)
+
+- Custom schedules, such as Monday/Wednesday/Friday, no longer lose days when opened and saved.
+- The next backup time updates immediately when switching between schedule options.
+- Changing or re-enabling a schedule no longer causes false overdue warnings for times before the change. Genuinely missed backups are still reported.
+- Settings now show if a changed schedule could not be applied, so users know it needs attention.
+
 ## Pending - Edit shared job scripts from job groups (#573)
 
 - Show current Pre/Post assignments and Post conditions in group overview and settings; edit the original job through an admin-only dialog with explicit shared scope.

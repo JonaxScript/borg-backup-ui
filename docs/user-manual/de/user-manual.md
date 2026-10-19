@@ -352,9 +352,22 @@ Ist Docker- beziehungsweise VM-Steuerung deaktiviert, werden die zugehörigen Au
 
 > **Warnung:** Appdata- und VM-Backups können Warnungen oder inkonsistente Daten erzeugen, wenn während des Backups Dateien geändert werden. Stoppen Sie bei vollständigen Appdata- oder Domains-Backups möglichst alle betroffenen Dienste.
 
-Das planmäßige Herunterfahren einer VM wird als Information gemeldet. Erst ein fehlgeschlagener Shutdown oder Neustart erzeugt eine Warnung beziehungsweise einen Fehler. Es werden nur die vom Job gestoppten Container und VMs wieder gestartet, die vor diesem Lauf tatsächlich aktiv waren.
+Das planmäßige Herunterfahren einer VM wird als Information gemeldet. Ein fehlgeschlagener Shutdown oder Neustart sowie ein ausdrücklich erlaubtes hartes Ausschalten erzeugen eine Warnung beziehungsweise einen Fehler. Es werden nur die vom Job gestoppten Container und VMs wieder gestartet, die vor diesem Lauf tatsächlich aktiv waren.
 
 Nach Abschluss der Archiverstellung (`borg create`) werden die vom Job gestoppten Container und VMs sofort wieder gestartet, auch bei Borg-Warnungen. Erst danach laufen Aufbewahrung (`prune`), Speicherbereinigung (`compact`) und eine fällige Repository-Prüfung (`check`). Diese Wartung verlängert die Ausfallzeit der Dienste nicht. Bei Fehlern oder Abbruch der Archiverstellung erfolgt der Neustart weiterhin beim Aufräumen. Schlägt ein Neustart fehl, wird der Neustart auch für die andere Dienstgruppe versucht; der Lauf endet als Fehler und die Wartung wird nicht gestartet.
+
+#### VM-Shutdown-Fehler und optionales zwangsweises Ausschalten
+
+Im Wizard-Schritt **VMs** ist **VMs nach Ablauf des Shutdown-Zeitlimits zwangsweise ausschalten** standardmäßig aus. Die Freigabe wird pro Job gespeichert und in der Abschlussprüfung angezeigt. Bei bestehenden Jobs bleibt sie aus, bis Sie sie ausdrücklich aktivieren und den Job speichern. Sie gilt nur für VMs im gewählten Umfang dieses Jobs, die vor der Vorbereitung aktiv waren.
+
+- **Ohne zwangsweises Ausschalten:** Der Job fordert ein normales Herunterfahren an und wartet die unter **Einstellungen** konfigurierte Zeit **VM Shutdown Timeout (s)**. Bleibt eine betroffene VM aktiv, wird die Archiverstellung abgebrochen. Log, Verlauf und Fehlermeldung benennen die VM-Vorbereitung als Ursache sowie betroffene VM-Namen und Zeitlimit.
+- **Mit zwangsweisem Ausschalten:** Zunächst wird ebenfalls ein normales Herunterfahren angefordert und dasselbe Zeitlimit abgewartet. Danach werden noch aktive betroffene VMs hart ausgeschaltet (`virsh destroy`). Dabei werden weder VM-Definitionen noch virtuelle Festplatten gelöscht. Das Backup beginnt erst, wenn alle betroffenen VMs nachweislich inaktiv sind. Schlägt das harte Ausschalten fehl oder lässt sich der VM-Zustand nicht ermitteln, wird das Backup weiterhin abgebrochen. Pausierte VMs müssen vor dem Job manuell fortgesetzt oder heruntergefahren werden.
+
+> **Warnung:** Hartes Ausschalten entspricht dem Ziehen des Stromsteckers. Ungespeicherte Daten können verloren gehen; Dateisysteme, Datenbanken oder Anwendungen im Gast können beschädigt werden. Das Backup kann diesen unsauberen Zustand sichern. Aktivieren Sie die Option nur, wenn Sie dieses Risiko für die betroffenen VMs akzeptieren. Benötigt eine VM lediglich mehr Zeit, kann ein höheres Shutdown-Zeitlimit die bessere Wahl sein.
+
+Die Wiederanlaufinformation wird vor dem ersten Shutdown gespeichert. Stoppen einige VMs und eine andere nicht, versucht der Job, die bereits gestoppten VMs wieder zu starten. Ausstehende Shutdowns werden bis zu 30 weitere Sekunden beobachtet; fährt eine VM in dieser Zeit herunter, wird auch sie wieder gestartet. Ein weiterhin ausstehender Shutdown, ein unbekannter Zustand oder ein fehlgeschlagener Neustart bleibt unter **Systemzustand & Migration** sichtbar. Prüfen Sie die betroffene VM und starten Sie sie bei Bedarf manuell, bevor Sie den Eintrag als erledigt markieren. Bereits vor dem Job ausgeschaltete VMs werden nicht gestartet. Hartes Ausschalten erscheint als Warnung im Log. Ein Wiederanlauffehler ersetzt nicht die ursprüngliche Ursache des Abbruchs.
+
+Prüfen Sie bei importierten VMs auch die Gastintegration: Der QEMU Guest Agent kann fehlen, inaktiv oder falsch angebunden sein; außerdem kann der Gast ein ACPI-Ausschaltsignal ignorieren. Ein fehlender Guest Agent verhindert allein nicht jedes normale Herunterfahren, da libvirt auch ACPI unterstützt. Prüfen Sie Energieeinstellungen und Guest Agent, testen Sie das normale Herunterfahren in Unraid und lesen Sie das Job-Log, bevor Sie das harte Ausschalten erlauben. Siehe [libvirt-Dokumentation zum Herunterfahren](https://www.libvirt.org/manpages/virsh.html#shutdown).
 
 #### Neustart-Priorität für Docker-Container
 
@@ -480,6 +493,12 @@ Formulare und mehrstufige Assistenten mit ungespeicherten Eingaben werden nicht 
 
 Zeitpläne können im Job-Wizard oder über die Job-Aktionen geändert werden. Beim Speichern wird der Cron-Eintrag für die Anwendung aktualisiert.
 
+Der Zeitplan-Editor erhält eigene Ausdrücke wie `15 3 * * 1,3,5` (Montag, Mittwoch und Freitag um 03:15). Ausdrücke, die sich nicht durch eine einzelne Vorgabe darstellen lassen, bleiben **Benutzerdefiniert**; beim Wechsel der Häufigkeit wird die Vorschau der nächsten Ausführung sofort aktualisiert.
+
+Bei Einzeljobs beginnt die Überfälligkeitsprüfung für einen neuen oder geänderten aktiven Zeitplan sowie nach erneutem Aktivieren erst mit der erfolgreichen Übernahme in die Crontab des Servers. Frühere Termine des neuen Plans zählen nicht als verpasst. Der erste gültige Termin wird weiterhin nach der eingestellten Toleranz überfällig, wenn kein späterer Jobstatus vorliegt. Unverändertes Speichern oder ein Dienstneustart setzen dieses Zeitfenster nicht zurück und löschen keine echte Überfälligkeit.
+
+Bestehende Zeitpläne behalten ihre bisherige Bewertung bis zu einer Änderung; ihr historischer Aktivierungszeitpunkt lässt sich nicht nachträglich bestimmen. Schlägt die Crontab-Aktualisierung fehl, bleibt der geänderte Plan gespeichert, aber ausstehend: Das Speichern meldet einen Fehler, und die Erinnerungsdiagnose zeigt **Zeitplan nicht übernommen**. Für diesen ausstehenden Plan werden keine Überfälligkeitserinnerungen gesendet. Der vorherige Cron-Eintrag kann weiterhin laufen. Beheben Sie die gemeldete Ursache und speichern Sie erneut oder übernehmen Sie die Zeitpläne durch einen Dienstneustart. Erst der erfolgreiche Versuch setzt den neuen Aktivierungszeitpunkt. Auch importierte neue oder geänderte Zeitpläne gelten erst nach erfolgreicher Übernahme; importierte Aktivierungszeitpunkte werden nicht wiederverwendet.
+
 Best Practices:
 
 - Neue Jobs zuerst manuell testen.
@@ -495,7 +514,7 @@ Best Practices:
 
 ### 3.8 Jobgruppen
 
-Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die hier beschriebene direkte Skriptbearbeitung ergänzt diese Funktion mit Änderung #573.
+Jobgruppen sind seit Stable `2026.10.17.1802` verfügbar. Die direkte Skriptbearbeitung ist ab Stable `2026.10.18.1217` verfügbar (#573).
 
 Eine Jobgruppe führt vorhandene Jobs in einer festen Reihenfolge aus. Die Jobs behalten ihre Quellen, Repositorys, Wartung und Pre-/Post-Skripte. Gruppen lassen sich als **admin** einrichten; **operator** und **admin** können sie starten und stoppen. **viewer** kann Ablauf und Logs ansehen.
 

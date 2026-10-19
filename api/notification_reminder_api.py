@@ -313,12 +313,27 @@ def _backup_overdue_item(
     interval_hours: int,
     backup_tolerance_hours: int,
 ) -> dict[str, Any]:
+    """Evaluate missed runs since successful schedule activation, if known.
+
+    Legacy schedules keep their historical behavior. Pending cron changes do
+    not emit overdue reminders; the diagnostics expose their unapplied state.
+    Status timestamps remain the real backup timestamps, not activation times.
+    """
     from lib.notification_events import reminder_key
 
     cron = str(sched.get("cron") or "").strip()
     latest_expected_run = _latest_expected_run(cron, now)
     next_scheduled_run = _next_expected_run(cron, now)
     display_name = str(job.get("display_name") or job.get("name") or job_key)
+    if sched.get("pending_apply"):
+        return {
+            "type": "backup_overdue", "job_key": str(job_key),
+            "display_name": display_name, "cron": cron,
+            "state": "schedule_pending", "reason": "schedule_not_applied",
+        }
+    effective_since = _parse_status_time(str(sched.get("effective_since") or ""))
+    if effective_since is not None and latest_expected_run is not None and latest_expected_run < effective_since:
+        latest_expected_run = _next_expected_run(cron, effective_since)
     if latest_expected_run is None:
         return {
             "type": "backup_overdue",
@@ -330,7 +345,7 @@ def _backup_overdue_item(
         }
 
     last_ts = _parse_status_time(str(last.get("timestamp") or ""))
-    if last_ts is None:
+    if last_ts is None and effective_since is None:
         return {
             "type": "backup_overdue",
             "job_key": str(job_key),
