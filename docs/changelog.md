@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Handle VM shutdown failures (#541)
+
+- Explain why a VM backup could not start and recover VMs already stopped when another VM fails to shut down.
+- Add an optional wizard setting to force off VMs after the shutdown timeout, with a clear data-loss warning. It stays off for existing jobs.
+- Keep unresolved shutdowns and failed restarts visible for manual checking.
+
 ## Pending - Fix backup schedules and overdue warnings (#547)
 
 - Custom schedules, such as Monday/Wednesday/Friday, no longer lose days when opened and saved.
