@@ -11,10 +11,6 @@ remains the backup engine; this project adds the Unraid-focused control layer
 around jobs, storage targets, schedules, restore workflows, checks, and support
 diagnostics.
 
-> Available through Unraid Community Apps. Start with
-> non-critical data and verify a restore before relying on any backup setup.
-> This project is not affiliated with BorgBackup or other Borg UI projects.
-
 [Community Apps listing](https://ca.unraid.net/apps/borg-backup-ui-17vu3jm06a2wie) |
 [English manual](https://github.com/borgforge/borg-backup-ui/blob/main/docs/user-manual/en/user-manual.md) |
 [Deutsches Handbuch](https://github.com/borgforge/borg-backup-ui/blob/main/docs/user-manual/de/user-manual.md) |
