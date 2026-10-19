@@ -851,7 +851,7 @@
     "runtimeExceptSelectedDocker": "Alle außer ausgewählte Container",
     "runtimeAllVms": "Alle laufenden VMs",
     "vmForceStop": "VMs nach Ablauf des Shutdown-Zeitlimits zwangsweise ausschalten",
-    "vmForceStopHint": "Standardmäßig aus. Ohne diese Option wird das Backup abgebrochen, wenn eine VM nicht herunterfährt. Mit dieser Option werden betroffene VMs hart ausgeschaltet. Ungespeicherte Daten können verloren gehen; Dateisysteme und Anwendungen können beschädigt werden.",
+    "vmForceStopHint": "Standardmäßig aus. Ohne diese Option wird das Backup abgebrochen, wenn eine VM nicht herunterfährt. Mit dieser Option werden betroffene VMs hart ausgeschaltet. Ungespeicherte Daten können verloren gehen. Dateisysteme und Anwendungen können beschädigt werden.",
     "vmForceEnabled": "zwangsweises Ausschalten nach Zeitlimit erlaubt",
     "vmForceDisabled": "Abbruch bei überschrittenem Shutdown-Zeitlimit",
     "runtimeSelectedVms": "Nur ausgewählte VMs",
