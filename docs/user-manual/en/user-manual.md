@@ -139,11 +139,11 @@ The application supports the `admin`, `operator`, and `viewer` roles:
 
 General Unraid steps are covered by the official [Community Apps](https://docs.unraid.net/unraid-os/manual/applications/) and [plugins](https://docs.unraid.net/unraid-os/using-unraid-to/customize-your-experience/plugins/) guides.
 
-Borg Backup UI is in **public beta** and is installed through **Unraid Community Apps**. It requires **Unraid 6.12.5 or newer** and **Python 3.10 or newer**. Install the separate **Python 3 for Unraid** plugin from Community Apps first. BorgBackup itself is bundled with Borg Backup UI; no separate Borg or pip installation is required.
+Borg Backup UI is installed through **Unraid Community Apps**. It requires **Unraid 6.12.5 or newer** and **Python 3.10 or newer**. Install the separate **Python 3 for Unraid** plugin from Community Apps first. BorgBackup itself is bundled with Borg Backup UI; no separate Borg or pip installation is required.
 
 1. Open **Apps** in Unraid.
 2. Install **Python 3 for Unraid** if it is not already present.
-3. Search for **Borg Backup UI**, read the public-beta notice, and install the plugin.
+3. Search for **Borg Backup UI** and install the plugin.
 4. Open **Settings > Borg Backup UI**, start the service, and open the web interface.
 5. Create the first administrator account with a password of at least twelve characters.
 6. Select and confirm a concrete main directory for logs, status, and restore data.
