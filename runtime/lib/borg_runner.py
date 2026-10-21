@@ -268,14 +268,14 @@ class BorgRunner:
         Prüft Repository-Integrität (zeitgesteuert per Flag-Datei).
 
         Entspricht borg_check() in borg-common.sh.
+        Fortschritt wird nur als fluechtiger Status weitergegeben; im Log
+        stehen Warnungen/Fehler und eine abschliessende Ergebniszeile.
         Check wird übersprungen, wenn letzter Check kürzer als
         check_interval_days zurückliegt.
 
         Returns:
             Borg Exit-Code, oder 0 wenn Check übersprungen wurde
         """
-        if self.phase_callback:
-            self.phase_callback("borg_check")
         days_since = _days_since_flag(self.config.check_flag_file)
 
         if days_since < self.config.check_interval_days:
@@ -287,23 +287,28 @@ class BorgRunner:
             )
             return BORG_EXIT_OK
 
-        logger.info(
-            "Borg check: checking repository integrity "
-            "(last check %d days ago)...",
-            days_since,
-        )
-
-        cmd = ["borg", "check", "--repository-only", "--show-rc"]
+        if self.phase_callback:
+            self.phase_callback("borg_check")
+        started = time.monotonic()
+        cmd = ["borg", "check", "--repository-only", "--progress", "--log-json"]
         if self.config.repo:
             cmd.append(self.config.repo)
 
-        exit_code = _run_borg(cmd, self.process_controller)
+        try:
+            exit_code = _run_borg(cmd, self.process_controller)
+        finally:
+            _publish_check_progress(self.process_controller, None)
 
+        duration = int(time.monotonic() - started)
         if exit_code == BORG_EXIT_OK:
-            logger.info("Borg check succeeded - repository OK")
+            logger.info("Borg check succeeded - repository OK (duration: %ds)", duration)
             _touch_flag(self.config.check_flag_file)
+        elif exit_code == BORG_EXIT_CANCELLED:
+            logger.info("Borg check cancelled (duration: %ds)", duration)
+        elif exit_code == BORG_EXIT_WARNING:
+            logger.warning("Borg check completed with warnings (exit %d, duration: %ds)", exit_code, duration)
         else:
-            logger.error("ERROR: Borg check failed (exit %d)", exit_code)
+            logger.error("Borg check failed (exit %d, duration: %ds)", exit_code, duration)
 
         return exit_code
 
@@ -591,12 +596,53 @@ def convert_to_bytes(size_str: str) -> int:
 # Interne Hilfsfunktionen
 # ---------------------------------------------------------------------------
 
+def _publish_check_progress(process_controller, event: Optional[Dict]) -> None:
+    """Send transient check status when supported, without failing the backup.
+
+    None clears the status. Status write errors do not change the Borg result.
+    """
+    callback = getattr(process_controller, "update_check_progress", None)
+    if callable(callback):
+        try:
+            callback(event)
+        except (OSError, ValueError, TypeError):
+            # A transient UI status must not interrupt draining Borg's output.
+            pass
+
+
+def _consume_check_output(line: str, process_controller) -> None:
+    """Route check JSON progress to status and keep only diagnostics in the log.
+
+    Borg's plain-text startup/argument errors are retained. Malformed JSON is
+    ignored with a diagnostic, without leaking an unparsed progress payload.
+    Normal informational check messages are represented by the final summary.
+    """
+    try:
+        event = json.loads(line)
+    except (ValueError, TypeError):
+        if line.lstrip().startswith("{"):
+            logger.warning("Borg check returned an unreadable status message")
+        else:
+            logger.info("%s", line)
+        return
+    if not isinstance(event, dict):
+        return
+    kind = event.get("type", "")
+    if kind in ("progress_percent", "progress_message"):
+        _publish_check_progress(process_controller, event)
+    elif kind == "log_message":
+        level = str(event.get("levelname", "")).upper()
+        if level in {"WARNING", "ERROR", "CRITICAL"}:
+            logger.log(getattr(logging, level), "%s", event.get("message", ""))
+
+
 def _run_borg(cmd: List[str], process_controller=None) -> int:
     """
     Führt ein Borg-Kommando aus und streamt die Ausgabe mit Zeitstempel.
 
     Entspricht dem Pattern: borg ... 2>&1 | add_timestamp in borg-common.sh.
-    Kombiniert stdout und stderr, gibt jede Zeile mit Timestamp aus.
+    Kombiniert stdout und stderr. Check-JSON wird in fluechtigen Fortschritt
+    und Logdiagnostik aufgeteilt; andere Kommandos loggen jede Ausgabezeile.
 
     Returns:
         Exit-Code des Borg-Prozesses
@@ -636,7 +682,10 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
         for line in process.stdout:
             line = line.rstrip("\n")
             if line:
-                logger.info("%s", line)
+                if cmd[1:2] == ["check"] and "--log-json" in cmd:
+                    _consume_check_output(line, process_controller)
+                else:
+                    logger.info("%s", line)
     finally:
         process.wait()
         if process_controller is not None:

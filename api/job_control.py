@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import signal
@@ -64,6 +65,7 @@ class JobControl:
         self.cancel_file = self.run_dir / "cancel.request.json"
         self._process_lock = threading.Lock()
         self._active_process = None
+        self._last_check_progress_write = float("-inf")
         self._monitor_stop = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self.run_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -82,7 +84,11 @@ class JobControl:
         finished: bool = False,
         exit_code: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Persist the current phase and cancellation policy, returning its state."""
+        """Persist phase/cancellation policy and return the state.
+
+        Starts transient check timing for borg_check; all other phases and
+        finished runs clear check progress. Writes may raise OSError.
+        """
         previous = read_control_state(self.run_id, self.run_dir.parent)
         data: Dict[str, Any] = {
             "group_id": os.environ.get("BORG_UI_GROUP_ID", ""),
@@ -103,8 +109,51 @@ class JobControl:
             "finished": bool(finished),
             "exit_code": exit_code,
         }
+        # A phase transition must never retain the preceding check's percentage.
+        data["check_progress"] = ({
+            "started_at": time.time(), "updated_at": None, "percent": None,
+        } if phase == "borg_check" and not finished else None)
+        self._last_check_progress_write = float("-inf")
         _atomic_json(self.state_file, data)
         return data
+
+    def update_check_progress(self, event: Optional[Dict[str, Any]]) -> None:
+        """Persist transient Borg check progress with throttled status writes.
+
+        Accepts Borg progress events; None clears progress immediately. Only
+        finite counters are exposed, never Borg messages or repository paths.
+        Operation changes and step completion bypass throttling. A finished
+        step is indeterminate until another step or the process result arrives.
+        Writes can raise OSError; callers must keep progress failures non-fatal.
+        """
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        progress = state.get("check_progress")
+        if state.get("phase") != "borg_check" or state.get("finished") or not isinstance(progress, dict):
+            return
+        now = time.monotonic()
+        if event is None:
+            state["check_progress"] = None
+        else:
+            operation = event.get("operation")
+            if not isinstance(operation, int) or isinstance(operation, bool):
+                operation = None
+            finished = event.get("finished") is True
+            if (not finished and operation == progress.get("operation")
+                    and now - self._last_check_progress_write < 1.0):
+                return
+            percent = None
+            current, total = event.get("current"), event.get("total")
+            if (event.get("type") == "progress_percent" and not finished
+                    and type(current) in (int, float) and type(total) in (int, float)):
+                try:
+                    if math.isfinite(current) and math.isfinite(total) and 0 <= current <= total and total > 0:
+                        percent = round(100 * (current / total), 1)
+                except (OverflowError, ValueError):
+                    pass
+            progress.update(percent=percent, operation=operation, updated_at=time.time())
+        state["updated_at"] = _utc_now()
+        _atomic_json(self.state_file, state)
+        self._last_check_progress_write = now
 
     def is_cancel_requested(self) -> bool:
         return self.cancel_file.is_file()

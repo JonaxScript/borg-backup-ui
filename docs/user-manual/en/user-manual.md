@@ -348,6 +348,8 @@ A planned VM shutdown is reported as informational. A failed shutdown or restart
 
 Once archive creation (`borg create`) finishes, containers and VMs stopped by the job are restarted immediately, including when Borg reports warnings. Retention (`prune`), space reclamation (`compact`), and any due repository check (`check`) run afterwards and do not extend service downtime. If archive creation fails or is cancelled, cleanup still restarts the stopped workloads. If a restart fails, recovery is still attempted for the other workload type; the run ends as an error and maintenance does not start.
 
+During a due automatic integrity check, the job card and a separate status area above the live log show current check-step progress, elapsed check time and the age of the last Borg update. An indeterminate indicator appears when measurable progress is unavailable. The percentage applies to the current check step, not the entire backup run; remaining time is not estimated. Even 100% of a check step does not confirm successful completion of the check. Changing percentages are neither saved in the log nor included in its download. The log retains one final summary plus any warnings and errors.
+
 #### VM Shutdown Failures and Optional Force-Off
 
 In the wizard's **VMs** step, **Force off VMs after the shutdown timeout** is off by default. This permission is saved per job and shown in the final review; existing jobs remain off until you explicitly enable it and save the job. It applies only to VMs within that job's selected scope that were active before preparation.

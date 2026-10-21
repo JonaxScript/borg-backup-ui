@@ -22,7 +22,6 @@
       this.scrollTop = output.scrollTop;
       this.closed = false;
       this.sequence = 0;
-      this.statusKey = '';
       this.toolbar = document.getElementById('activity-log-tools');
       this.note = document.getElementById('activity-log-note');
       this.download = document.getElementById('activity-log-download');
@@ -76,11 +75,8 @@
         this.download.href = downloadUrl;
         this.downloadUrl = downloadUrl;
       }
-      const statusKey = JSON.stringify([data.running, data.exit_code, data.phase]);
-      if (statusKey !== this.statusKey) {
-        this.statusKey = statusKey;
-        this.onStatus(data);
-      }
+      // Status can change without log growth; also refresh elapsed/last-update ages.
+      this.onStatus(data);
       return data;
     }
 

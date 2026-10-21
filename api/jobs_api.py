@@ -52,6 +52,7 @@ def _control_state_for_run(run_id: str) -> dict:
         key: state.get(key)
         for key in (
             "phase",
+            "check_progress",
             "cancel_allowed",
             "cancellation_deferred",
             "cancel_requested",

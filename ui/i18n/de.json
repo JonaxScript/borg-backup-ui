@@ -626,6 +626,12 @@
     "repositoryRetentionHourlyLimit": "max. 1/Stunde"
   },
   "jobs": {
+    "checkRunning": "Integritätsprüfung läuft …",
+    "checkPercent": "Integritätsprüfung läuft · {percent} %",
+    "checkStep": "Fortschritt des aktuellen Prüfschritts",
+    "checkElapsed": "Laufzeit: {time}",
+    "checkUpdated": "Letzte Borg-Rückmeldung vor {time}",
+    "checkWaiting": "Warte auf Borg-Fortschrittsmeldung",
     "title": "Jobs",
     "subtitle": "Backup-Jobs starten und überwachen",
     "grouping": "Gruppierung",
