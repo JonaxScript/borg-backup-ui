@@ -180,7 +180,7 @@ async function refreshJobs() {
     await window.BBUI.jobGroups?.load();
     jobsState.loaded = true;
     renderJobsGrid(jobsState.jobs);
-    updateCheckProgressDisplays(runningData);
+    updateBorgProgressDisplays(runningData);
   } catch (err) {
     showJobsError(jobsT('jobs.loadError', { message: err.message }));
   } finally {
@@ -210,7 +210,7 @@ async function _pollRunningStates() {
     const res = await fetch('/api/jobs/running');
     if (!res.ok) return;
     const running = await res.json();
-    updateCheckProgressDisplays(running);
+    updateBorgProgressDisplays(running);
     const snapshot = JSON.stringify(running);
     if (snapshot === jobsState.lastRunningSnapshot) return;
     jobsState.lastRunningSnapshot = snapshot;
@@ -239,7 +239,7 @@ function jobRuntimeState(runtime, previous = {}) {
     run_id: runtime?.run_id ?? previous.run_id ?? '',
     run_file_activity: runtime ? runtime.file_activity === true : (previous.run_file_activity ?? false),
     run_phase: runtime?.phase ?? '',
-    check_progress: runtime?.check_progress ?? null,
+    borg_progress: runtime?.borg_progress ?? null,
     group_name: runtime?.group_name ?? '',
     group_run_id: runtime?.group_run_id ?? '',
     cancel_allowed: runtime?.cancel_allowed ?? false,
@@ -250,33 +250,56 @@ function jobRuntimeState(runtime, previous = {}) {
 }
 
 /**
- * Render check-step progress separately from persisted log text; no ETA is inferred.
- * @param {Object|null} runtime Active run with phase and transient check_progress.
+ * Render process progress after 60 seconds, separately from persisted log text.
+ * @param {Object|null} runtime Active run with phase and transient borg_progress.
  * @param {number} now Current Unix time in seconds for elapsed/last-update ages.
- * @returns {string} Escaped status markup, or an empty string outside an active check.
+ * @returns {string} Escaped status markup, or an empty string before 60 seconds or outside create/check.
  */
-function renderCheckProgress(runtime, now = Date.now() / 1000) {
-  const progress = runtime?.check_progress;
-  if (!runtime?.running || (runtime.phase ?? runtime.run_phase) !== 'borg_check' || !progress) return '';
-  const percent = typeof progress.percent === 'number' && Number.isFinite(progress.percent)
+function renderBorgProgress(runtime, now = Date.now() / 1000) {
+  const progress = runtime?.borg_progress;
+  const phase = runtime?.phase ?? runtime?.run_phase;
+  if (!runtime?.running || !['borg_create', 'borg_check'].includes(phase) || !progress) return '';
+  if (typeof progress.started_at !== 'number' || !Number.isFinite(progress.started_at)
+      || now - progress.started_at < 60) return '';
+  if (progress.phase && progress.phase !== phase) return '';
+  const creating = phase === 'borg_create';
+  const percent = !creating && typeof progress.percent === 'number' && Number.isFinite(progress.percent)
     ? Math.max(0, Math.min(100, progress.percent)) : null;
   const age = timestamp => Math.max(0, Math.floor(now - timestamp));
   const elapsed = typeof progress.started_at === 'number' && Number.isFinite(progress.started_at)
-    ? jobsT('jobs.checkElapsed', { time: checkProgressDuration(age(progress.started_at)) }) : '';
+    ? jobsT('jobs.borgElapsed', { time: borgProgressDuration(age(progress.started_at)) }) : '';
   const updated = typeof progress.updated_at === 'number' && Number.isFinite(progress.updated_at)
-    ? jobsT('jobs.checkUpdated', { time: checkProgressDuration(age(progress.updated_at)) })
-    : jobsT('jobs.checkWaiting');
-  const label = jobsT(percent === null ? 'jobs.checkRunning' : 'jobs.checkPercent', { percent });
-  return `<div class="check-progress">
+    ? jobsT('jobs.borgUpdated', { time: borgProgressDuration(age(progress.updated_at)) })
+    : jobsT('jobs.borgWaiting');
+  const label = jobsT(creating ? 'jobs.createRunning'
+    : (percent === null ? 'jobs.checkRunning' : 'jobs.checkPercent'), { percent });
+  const counters = [];
+  if (creating) {
+    if (Number.isSafeInteger(progress.nfiles) && progress.nfiles >= 0) {
+      counters.push(jobsT('jobs.createFiles', { count: progress.nfiles }));
+    }
+    if (Number.isSafeInteger(progress.original_size) && progress.original_size >= 0) {
+      counters.push(jobsT('jobs.createBytes', { size: borgProgressSize(progress.original_size) }));
+    }
+  }
+  const detail = creating ? counters.join(' · ') : jobsT('jobs.checkStep');
+  return `<div class="borg-progress">
     <strong>${escHtml(label)}</strong>
-    <progress max="100"${percent === null ? '' : ` value="${percent}"`} aria-label="${escHtml(jobsT('jobs.checkStep'))}"></progress>
-    <small>${escHtml(jobsT('jobs.checkStep'))}</small>
+    <progress max="100"${percent === null ? '' : ` value="${percent}"`} aria-label="${escHtml(jobsT(creating ? 'jobs.createRunning' : 'jobs.checkStep'))}"></progress>
+    ${detail ? `<small>${escHtml(detail)}</small>` : ''}
     <small>${escHtml([elapsed, updated].filter(Boolean).join(' · '))}</small>
   </div>`;
 }
 
+/** Format a validated non-negative byte count using binary units. */
+function borgProgressSize(bytes) {
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+  const index = bytes > 0 ? Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1) : 0;
+  return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
+}
+
 /** Format an elapsed duration without suggesting a remaining-time estimate. */
-function checkProgressDuration(seconds) {
+function borgProgressDuration(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor(seconds % 3600 / 60);
   const s = seconds % 60;
@@ -288,25 +311,25 @@ function checkProgressDuration(seconds) {
  * Refresh ages even when the runtime snapshot is unchanged; pin logs to one run.
  * @param {Object} running Runtime states keyed by job ID from the running API.
  */
-function updateCheckProgressDisplays(running) {
+function updateBorgProgressDisplays(running) {
   for (const job of jobsState.jobs) {
-    const target = document.getElementById(`job-check-progress-${job.key}`);
-    if (target) target.innerHTML = renderCheckProgress(running[job.key]);
+    const target = document.getElementById(`job-borg-progress-${job.key}`);
+    if (target) target.innerHTML = renderBorgProgress(running[job.key]);
   }
   if (!jobsState.logJobKey || jobsState.activityLog || jobsState.logFinished) return;
   const runtime = running[jobsState.logJobKey];
   if (!jobsState.logRunId && runtime?.run_id) jobsState.logRunId = runtime.run_id;
-  updateLogCheckProgress(runtime?.run_id === jobsState.logRunId ? runtime : null);
+  updateLogBorgProgress(runtime?.run_id === jobsState.logRunId ? runtime : null);
 }
 
 /**
  * Replace the live-log status field without appending anything to log output.
  * @param {Object|null} runtime Selected run state, or null to clear the display.
  */
-function updateLogCheckProgress(runtime) {
-  const target = document.getElementById('log-check-progress');
+function updateLogBorgProgress(runtime) {
+  const target = document.getElementById('log-borg-progress');
   if (!target) return;
-  const html = renderCheckProgress(runtime);
+  const html = renderBorgProgress(runtime);
   target.innerHTML = html;
   target.classList.toggle('hidden', !html);
 }
@@ -563,7 +586,7 @@ function renderJobCard(job) {
       <span class="jobs-redesign-label">${jobsT('jobs.operatingState')}</span>
       <span class="badge ${stateClass}"><span class="badge-dot"></span>${escHtml(stateLabel)}</span>
       <span class="jobs-redesign-detail">${escHtml(lastRunText)}</span>
-      <div id="job-check-progress-${escHtml(job.key)}">${renderCheckProgress(job)}</div>
+      <div id="job-borg-progress-${escHtml(job.key)}">${renderBorgProgress(job)}</div>
       ${job.running && job.group_name ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.startedBy', { name: job.group_name }))}</span>` : ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-policy">
@@ -1023,7 +1046,7 @@ function openLogPanel(jobKey, runId = '') {
   jobsState.logJobKey = jobKey;
   jobsState.logRunId = runId || job?.run_id || '';
   jobsState.logFinished = false;
-  updateLogCheckProgress(job?.run_id === jobsState.logRunId ? job : null);
+  updateLogBorgProgress(job?.run_id === jobsState.logRunId ? job : null);
   const title = jobsT('jobs.logTitle', { name: job ? (job.display_name || job.key) : jobKey });
 
   document.getElementById('log-panel-title-text').removeAttribute('data-i18n');
@@ -1055,7 +1078,7 @@ function openLogPanel(jobKey, runId = '') {
       output: document.getElementById('log-output'),
       onFollow: follow => { jobsState.logAutoScroll = follow; },
       onStatus: data => {
-        updateLogCheckProgress(data);
+        updateLogBorgProgress(data);
         if (data.running) return setLogStatus('running');
         if (data.exit_code === null) {
           const badge = document.getElementById('log-status-badge');
@@ -1199,7 +1222,7 @@ function scrollLogToBottom() {
 
 function setLogStatus(state, exitCode) {
   jobsState.logFinished = state !== 'running';
-  if (jobsState.logFinished) updateLogCheckProgress(null);
+  if (jobsState.logFinished) updateLogBorgProgress(null);
   const badge = document.getElementById('log-status-badge');
   if (!badge) return;
   const exit = String(exitCode ?? '');
@@ -1243,7 +1266,7 @@ function clearLog() {
 function closeLogPanel() {
   jobsState.logJobKey = '';
   jobsState.logRunId = '';
-  updateLogCheckProgress(null);
+  updateLogBorgProgress(null);
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   document.getElementById('log-panel').classList.add('hidden');

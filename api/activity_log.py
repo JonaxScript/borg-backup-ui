@@ -135,7 +135,7 @@ def resolve_activity_run(config: dict, job_key: str, run_id: str = "") -> tuple[
     control = read_control_state(run_id)
     if control.get("job_key") == job_key:
         state["phase"] = control.get("phase", "")
-        state["check_progress"] = control.get("check_progress")
+        state["borg_progress"] = control.get("borg_progress")
         if control.get("finished") and not state.get("running"):
             state["exit_code"] = control.get("exit_code")
     from activity_log_capture import capture_record, capture_path
@@ -223,7 +223,7 @@ def get_activity_window(config: dict, qs: dict) -> dict:
             "run_id": state["run_id"], "file_id": identity, "size": size,
             "running": bool(state.get("running")), "exit_code": state.get("exit_code"),
             "phase": state.get("phase", ""),
-            "check_progress": state.get("check_progress") if state.get("running") else None,
+            "borg_progress": state.get("borg_progress") if state.get("running") else None,
             "log_persistence_failed": bool(state.get("log_persistence_failed")),
         }
         if "status" in qs:

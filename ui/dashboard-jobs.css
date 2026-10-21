@@ -655,9 +655,9 @@
   .jobs-redesign-cell:last-child { border-bottom: 0; }
 }
 
-/* Transient integrity-check status, outside the retained log output. */
-.check-progress { display: grid; gap: 5px; width: 100%; margin-top: 8px; }
-.check-progress strong { font-size: 12px; overflow-wrap: anywhere; }
-.check-progress small { color: var(--text-muted); font-size: 11px; }
-.check-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
-#log-check-progress { padding: 0 16px 12px; border-bottom: 1px solid var(--border); }
+/* Transient Borg process status, outside the retained log output. */
+.borg-progress { display: grid; gap: 5px; width: 100%; margin-top: 8px; }
+.borg-progress strong { font-size: 12px; overflow-wrap: anywhere; }
+.borg-progress small { color: var(--text-muted); font-size: 11px; }
+.borg-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
+#log-borg-progress { padding: 0 16px 12px; border-bottom: 1px solid var(--border); }

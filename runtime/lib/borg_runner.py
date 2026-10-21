@@ -297,7 +297,7 @@ class BorgRunner:
         try:
             exit_code = _run_borg(cmd, self.process_controller)
         finally:
-            _publish_check_progress(self.process_controller, None)
+            _publish_borg_progress(self.process_controller, None)
 
         duration = int(time.monotonic() - started)
         if exit_code == BORG_EXIT_OK:
@@ -324,6 +324,8 @@ class BorgRunner:
 
         Entspricht dem 'borg create' Aufruf in allen Backup-Skripten.
         Exit 0 = OK, 1 = Warnungen (Backup nutzbar), ≥2 = Fehler.
+        JSON-Fortschritt wird nur als fluechtiger Prozessstatus weitergegeben.
+        Abschlussstatistik, Diagnostik und optionale Dateiaktivitaet bleiben im Log.
 
         Args:
             paths:          Zu sichernde Verzeichnisse
@@ -352,7 +354,8 @@ class BorgRunner:
         cmd = [
             "borg", "create",
             "--stats",
-            "--show-rc",
+            "--progress",
+            "--log-json",
             f"--compression={self.config.compression}",
             f"--checkpoint-interval={self.config.checkpoint_interval}",
             "--files-cache=ctime,size",
@@ -420,9 +423,10 @@ class BorgRunner:
             for line in process.stdout:
                 line = line.rstrip("\n")
                 if line:
-                    logger.info("%s", line)
+                    _consume_borg_output(line, self.process_controller, operation="create")
         finally:
             process.wait()
+            _publish_borg_progress(self.process_controller, None)
             if self.process_controller is not None:
                 self.process_controller.detach_process()
             wd_stop.set()
@@ -596,12 +600,12 @@ def convert_to_bytes(size_str: str) -> int:
 # Interne Hilfsfunktionen
 # ---------------------------------------------------------------------------
 
-def _publish_check_progress(process_controller, event: Optional[Dict]) -> None:
-    """Send transient check status when supported, without failing the backup.
+def _publish_borg_progress(process_controller, event: Optional[Dict]) -> None:
+    """Send transient Borg status when supported, without failing the backup.
 
     None clears the status. Status write errors do not change the Borg result.
     """
-    callback = getattr(process_controller, "update_check_progress", None)
+    callback = getattr(process_controller, "update_borg_progress", None)
     if callable(callback):
         try:
             callback(event)
@@ -610,29 +614,34 @@ def _publish_check_progress(process_controller, event: Optional[Dict]) -> None:
             pass
 
 
-def _consume_check_output(line: str, process_controller) -> None:
-    """Route check JSON progress to status and keep only diagnostics in the log.
+def _consume_borg_output(line: str, process_controller, *, operation: str = "check") -> None:
+    """Route Borg JSON progress to status without logging recurring counters.
 
-    Borg's plain-text startup/argument errors are retained. Malformed JSON is
-    ignored with a diagnostic, without leaking an unparsed progress payload.
-    Normal informational check messages are represented by the final summary.
+    operation is check or create. Create retains final stats and optional file
+    activity in their existing text format; check retains only diagnostics.
+    Plain-text startup/argument errors are retained. Malformed JSON is ignored
+    with a diagnostic, without leaking an unparsed progress payload.
     """
     try:
         event = json.loads(line)
     except (ValueError, TypeError):
         if line.lstrip().startswith("{"):
-            logger.warning("Borg check returned an unreadable status message")
+            logger.warning("Borg %s returned an unreadable status message", operation)
         else:
             logger.info("%s", line)
         return
     if not isinstance(event, dict):
         return
     kind = event.get("type", "")
-    if kind in ("progress_percent", "progress_message"):
-        _publish_check_progress(process_controller, event)
+    if kind in ("progress_percent", "progress_message", "archive_progress"):
+        _publish_borg_progress(process_controller, event)
+    elif kind == "file_status" and operation == "create":
+        status, path = event.get("status"), event.get("path")
+        if status in ("A", "M", "E") and isinstance(path, str):
+            logger.info("%s %s", status, path)
     elif kind == "log_message":
         level = str(event.get("levelname", "")).upper()
-        if level in {"WARNING", "ERROR", "CRITICAL"}:
+        if level in {"WARNING", "ERROR", "CRITICAL"} or (operation == "create" and level == "INFO"):
             logger.log(getattr(logging, level), "%s", event.get("message", ""))
 
 
@@ -683,7 +692,7 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
             line = line.rstrip("\n")
             if line:
                 if cmd[1:2] == ["check"] and "--log-json" in cmd:
-                    _consume_check_output(line, process_controller)
+                    _consume_borg_output(line, process_controller)
                 else:
                     logger.info("%s", line)
     finally:

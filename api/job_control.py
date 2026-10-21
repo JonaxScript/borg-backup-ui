@@ -65,7 +65,7 @@ class JobControl:
         self.cancel_file = self.run_dir / "cancel.request.json"
         self._process_lock = threading.Lock()
         self._active_process = None
-        self._last_check_progress_write = float("-inf")
+        self._last_borg_progress_write = float("-inf")
         self._monitor_stop = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self.run_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -86,8 +86,8 @@ class JobControl:
     ) -> Dict[str, Any]:
         """Persist phase/cancellation policy and return the state.
 
-        Starts transient check timing for borg_check; all other phases and
-        finished runs clear check progress. Writes may raise OSError.
+        Starts transient process timing for borg_create and borg_check; all
+        other phases and finished runs clear Borg progress. Writes may raise OSError.
         """
         previous = read_control_state(self.run_id, self.run_dir.parent)
         data: Dict[str, Any] = {
@@ -109,37 +109,41 @@ class JobControl:
             "finished": bool(finished),
             "exit_code": exit_code,
         }
-        # A phase transition must never retain the preceding check's percentage.
-        data["check_progress"] = ({
-            "started_at": time.time(), "updated_at": None, "percent": None,
-        } if phase == "borg_check" and not finished else None)
-        self._last_check_progress_write = float("-inf")
+        # A phase transition must never retain the preceding process's progress.
+        data["borg_progress"] = ({
+            "phase": phase, "started_at": time.time(), "updated_at": None, "percent": None,
+        } if phase in {"borg_create", "borg_check"} and not finished else None)
+        self._last_borg_progress_write = float("-inf")
         _atomic_json(self.state_file, data)
         return data
 
-    def update_check_progress(self, event: Optional[Dict[str, Any]]) -> None:
-        """Persist transient Borg check progress with throttled status writes.
+    def update_borg_progress(self, event: Optional[Dict[str, Any]]) -> None:
+        """Persist transient Borg process progress with throttled status writes.
 
         Accepts Borg progress events; None clears progress immediately. Only
         finite counters are exposed, never Borg messages or repository paths.
         Operation changes and step completion bypass throttling. A finished
         step is indeterminate until another step or the process result arrives.
+        Archive events expose only non-negative file/size counters, not paths.
         Writes can raise OSError; callers must keep progress failures non-fatal.
         """
         state = read_control_state(self.run_id, self.run_dir.parent)
-        progress = state.get("check_progress")
-        if state.get("phase") != "borg_check" or state.get("finished") or not isinstance(progress, dict):
+        progress = state.get("borg_progress")
+        if state.get("phase") not in {"borg_create", "borg_check"} or state.get("finished") or not isinstance(progress, dict):
             return
         now = time.monotonic()
         if event is None:
-            state["check_progress"] = None
+            state["borg_progress"] = None
         else:
+            kind = event.get("type")
+            if kind == "archive_progress" and state["phase"] != "borg_create":
+                return
             operation = event.get("operation")
             if not isinstance(operation, int) or isinstance(operation, bool):
                 operation = None
             finished = event.get("finished") is True
             if (not finished and operation == progress.get("operation")
-                    and now - self._last_check_progress_write < 1.0):
+                    and now - self._last_borg_progress_write < 1.0):
                 return
             percent = None
             current, total = event.get("current"), event.get("total")
@@ -150,10 +154,20 @@ class JobControl:
                         percent = round(100 * (current / total), 1)
                 except (OverflowError, ValueError):
                     pass
+            if state["phase"] == "borg_create":
+                percent = None
+            if kind == "archive_progress":
+                for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
+                    value = event.get(key)
+                    if type(value) is int and 0 <= value <= 2**53 - 1:
+                        progress[key] = value
+                if finished:
+                    for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
+                        progress.pop(key, None)
             progress.update(percent=percent, operation=operation, updated_at=time.time())
         state["updated_at"] = _utc_now()
         _atomic_json(self.state_file, state)
-        self._last_check_progress_write = now
+        self._last_borg_progress_write = now
 
     def is_cancel_requested(self) -> bool:
         return self.cancel_file.is_file()

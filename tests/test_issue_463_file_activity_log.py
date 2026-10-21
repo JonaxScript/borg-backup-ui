@@ -74,7 +74,8 @@ def test_borg_create_adds_only_list_filter_when_file_activity_is_enabled(
 
     assert "--list" in command
     assert "--filter=AME" in command
-    assert "--progress" not in command
+    assert "--progress" in command
+    assert "--log-json" in command
     assert "A mnt/user/new-file.txt" in caplog.text
     assert "M mnt/user/changed-file.txt" in caplog.text
 
@@ -84,7 +85,8 @@ def test_borg_create_keeps_file_activity_disabled_by_default(monkeypatch, tmp_pa
 
     assert "--list" not in command
     assert not any(argument.startswith("--filter") for argument in command)
-    assert "--progress" not in command
+    assert "--progress" in command
+    assert "--log-json" in command
     assert BorgConfig.from_config({}).file_activity is False
     assert BorgConfig.from_config({"BORG_FILE_ACTIVITY": "true"}).file_activity is True
 

@@ -70,7 +70,7 @@ function fixture() {
       let start = params.has('start') ? Number(params.get('start')) : Math.max(0, source.length - 65536);
       let end = Math.min(source.length, start + 65536);
       if (params.has('before')) { end = Number(params.get('before')); start = Math.max(0, end - 65536); }
-      const data = { start, end, text: source.subarray(start, end).toString(), size: source.length, running, exit_code: running ? null : 0, run_id: 'run-original', file_id: '1:2', phase: 'borg_check', check_progress: progress };
+      const data = { start, end, text: source.subarray(start, end).toString(), size: source.length, running, exit_code: running ? null : 0, run_id: 'run-original', file_id: '1:2', phase: 'borg_check', borg_progress: progress };
       if (params.has('status')) delete data.text;
       return { ok: true, json: async () => data };
     },
@@ -336,10 +336,10 @@ test('progress status refreshes without appending progress to the retained log',
   const original = f.output.textContent;
   f.setProgress({percent: 63});
   await poll(f);
-  assert.equal(f.statuses.at(-1).check_progress.percent, 63);
+  assert.equal(f.statuses.at(-1).borg_progress.percent, 63);
   f.setProgress({percent: 70});
   await poll(f);
-  assert.equal(f.statuses.at(-1).check_progress.percent, 70);
+  assert.equal(f.statuses.at(-1).borg_progress.percent, 70);
   assert.equal(f.output.textContent, original);
   const count = f.statuses.length;
   await poll(f);
