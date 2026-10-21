@@ -308,7 +308,7 @@ function borgProgressDuration(seconds) {
 }
 
 /**
- * Refresh ages even when the runtime snapshot is unchanged; pin logs to one run.
+ * Refresh job-card progress and ages even when the runtime snapshot is unchanged.
  * @param {Object} running Runtime states keyed by job ID from the running API.
  */
 function updateBorgProgressDisplays(running) {
@@ -316,22 +316,6 @@ function updateBorgProgressDisplays(running) {
     const target = document.getElementById(`job-borg-progress-${job.key}`);
     if (target) target.innerHTML = renderBorgProgress(running[job.key]);
   }
-  if (!jobsState.logJobKey || jobsState.activityLog || jobsState.logFinished) return;
-  const runtime = running[jobsState.logJobKey];
-  if (!jobsState.logRunId && runtime?.run_id) jobsState.logRunId = runtime.run_id;
-  updateLogBorgProgress(runtime?.run_id === jobsState.logRunId ? runtime : null);
-}
-
-/**
- * Replace the live-log status field without appending anything to log output.
- * @param {Object|null} runtime Selected run state, or null to clear the display.
- */
-function updateLogBorgProgress(runtime) {
-  const target = document.getElementById('log-borg-progress');
-  if (!target) return;
-  const html = renderBorgProgress(runtime);
-  target.innerHTML = html;
-  target.classList.toggle('hidden', !html);
 }
 
 // ── Jobs rendern ──────────────────────────────────────────────────────────────
@@ -1043,10 +1027,7 @@ function openLogPanel(jobKey, runId = '') {
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   const job = jobsState.jobs.find(j => j.key === jobKey);
-  jobsState.logJobKey = jobKey;
   jobsState.logRunId = runId || job?.run_id || '';
-  jobsState.logFinished = false;
-  updateLogBorgProgress(job?.run_id === jobsState.logRunId ? job : null);
   const title = jobsT('jobs.logTitle', { name: job ? (job.display_name || job.key) : jobKey });
 
   document.getElementById('log-panel-title-text').removeAttribute('data-i18n');
@@ -1078,7 +1059,6 @@ function openLogPanel(jobKey, runId = '') {
       output: document.getElementById('log-output'),
       onFollow: follow => { jobsState.logAutoScroll = follow; },
       onStatus: data => {
-        updateLogBorgProgress(data);
         if (data.running) return setLogStatus('running');
         if (data.exit_code === null) {
           const badge = document.getElementById('log-status-badge');
@@ -1221,8 +1201,6 @@ function scrollLogToBottom() {
 }
 
 function setLogStatus(state, exitCode) {
-  jobsState.logFinished = state !== 'running';
-  if (jobsState.logFinished) updateLogBorgProgress(null);
   const badge = document.getElementById('log-status-badge');
   if (!badge) return;
   const exit = String(exitCode ?? '');
@@ -1264,9 +1242,7 @@ function clearLog() {
 }
 
 function closeLogPanel() {
-  jobsState.logJobKey = '';
   jobsState.logRunId = '';
-  updateLogBorgProgress(null);
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   document.getElementById('log-panel').classList.add('hidden');

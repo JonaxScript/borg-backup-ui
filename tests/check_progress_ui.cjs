@@ -31,25 +31,20 @@ assert.match(html, /jobs.borgWaiting/);
 html = context.renderBorgProgress({...runtime, borg_progress: {percent: '63" onload="bad'}}, 200);
 assert.doesNotMatch(html, /onload| value=/);
 const state = context.window.BBUI.jobsState;
-state.jobs = [{key:'demo'}]; state.logJobKey = 'demo'; state.logRunId = 'first';
+state.jobs = [{key:'demo'}];
 element('log-output').textContent = 'Existing log\n';
 context.updateBorgProgressDisplays({demo:runtime});
 assert.match(element('job-borg-progress-demo').innerHTML, /value="63"/);
-assert.match(element('log-borg-progress').innerHTML, /value="63"/);
 context.updateBorgProgressDisplays({demo:{...runtime, borg_progress:{...runtime.borg_progress, percent:70}}});
-assert.match(element('log-borg-progress').innerHTML, /value="70"/);
-assert.doesNotMatch(element('log-borg-progress').innerHTML, /value="63"/);
+assert.match(element('job-borg-progress-demo').innerHTML, /value="70"/);
+assert.doesNotMatch(element('job-borg-progress-demo').innerHTML, /value="63"/);
 assert.equal(element('log-output').textContent, 'Existing log\n');
-context.updateBorgProgressDisplays({demo:{...runtime, run_id:'second'}});
-assert.equal(element('log-borg-progress').innerHTML, '', 'Never show a newer run inside an older log');
 context.updateBorgProgressDisplays({});
 assert.equal(element('job-borg-progress-demo').innerHTML, '');
-context.updateLogBorgProgress({...runtime, running:false});
-assert.equal(element('log-borg-progress').innerHTML, '');
-assert.ok(element('log-borg-progress').classes.has('hidden'));
+assert.ok(!nodes.has('log-borg-progress'), 'Progress never creates a live-log status field');
 console.log('Check progress: percentage, indeterminate state, age, run identity and log isolation passed.');
 
-// Visibility is per process, including late-opened logs. Never flash short runs.
+// Visibility is per process, independent of opening logs. Never flash short runs.
 assert.equal(context.renderBorgProgress(runtime, 159.999), '');
 assert.match(context.renderBorgProgress(runtime, 160), /value="63"/);
 assert.equal(context.renderBorgProgress({...runtime, running:false}, 160), '');
@@ -74,22 +69,24 @@ for(const fileActivity of [false,true]) {
   const job = {...runtime, key:'demo', location:'local', run_file_activity:fileActivity};
   state.jobs=[job];
   context.openLogPanel('demo');
-  assert.match(element('log-borg-progress').innerHTML, /value="63"/);
   if(!fileActivity) assert.match(state.activeEventSource.url, /run=first/);
   else {
     onStatus({...runtime, borg_progress:{...runtime.borg_progress, percent:70}});
-    assert.match(element('log-borg-progress').innerHTML, /value="70"/);
+    assert.ok(!nodes.has('log-borg-progress'));
   }
   context.closeLogPanel();
-  assert.equal(element('log-borg-progress').innerHTML, '');
+  assert.ok(!nodes.has('log-borg-progress'));
   job.borg_progress={...job.borg_progress, percent:75};
   context.openLogPanel('demo');
-  assert.match(element('log-borg-progress').innerHTML, /value="75"/);
+  context.updateBorgProgressDisplays({demo:job});
+  assert.match(element('job-borg-progress-demo').innerHTML, /value="75"/);
   assert.equal(element('log-output').textContent, '', 'Opening the log does not insert progress lines');
   context.closeLogPanel();
   job.borg_progress={started_at:Date.now()/1000, percent:1};
   context.openLogPanel('demo');
-  assert.equal(element('log-borg-progress').innerHTML, '', 'Short processes stay hidden on open');
+  context.updateBorgProgressDisplays({demo:job});
+  assert.equal(element('job-borg-progress-demo').innerHTML, '', 'Short processes stay hidden on open');
+  assert.ok(!nodes.has('log-borg-progress'));
   context.closeLogPanel();
 }
 console.log('Borg progress: 60-second per-process gate, create counters and late log opening passed.');
