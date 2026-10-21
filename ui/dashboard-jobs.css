@@ -478,7 +478,7 @@
 .jobs-redesign-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(15rem, 1.2fr) minmax(11rem, 0.75fr) minmax(15rem, 1fr) minmax(13rem, 0.8fr);
+  grid-template-columns: minmax(15rem, 1.2fr) minmax(19rem, 1.05fr) minmax(13rem, 0.7fr) minmax(13rem, 0.8fr);
   min-width: 0;
   border-bottom: 1px solid var(--ui-color-border);
 }
