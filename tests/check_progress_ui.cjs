@@ -127,6 +127,22 @@ assert.doesNotMatch(element('job-borg-progress-demo').innerHTML,/<progress/);
 console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and maintenance gate passed.');
 
 (async () => {
+  // Starting a job only refreshes the card. A log opens only after a click.
+  const savedRefresh = context.refreshJobs;
+  const savedOpen = context.openLogPanel;
+  let opened = 0, refreshed = 0;
+  context.closeModal = () => {};
+  context.refreshJobs = async () => {refreshed++;};
+  context.openLogPanel = () => {opened++;};
+  context.fetch = async () => ({ok:true,json:async()=>({})});
+  state.pendingJobKey = 'demo';
+  await context.confirmJobStart();
+  assert.equal(refreshed, 1);
+  assert.equal(opened, 0, 'Starting must not open a log');
+  context.onJobsGridClick({target:{closest:()=>({dataset:{jobsAction:'open-log',jobKey:'demo'}})}});
+  assert.equal(opened, 1, 'The explicit live-log button opens the log');
+  context.refreshJobs = savedRefresh;
+  context.openLogPanel = savedOpen;
   // A cron-run disappearing from the live API must reload its saved final result.
   context.window.BBUI.core = {state:{currentPage:'jobs'}};
   state.jobs=[{key:'demo',running:true,run_borg_steps:steps}];
@@ -188,3 +204,25 @@ assert.match(context.renderBorgRun(failedLater,200),/jobs.borgCompletedAt/);
 assert.match(context.renderBorgRun(failedLater,200),/jobs.workflow.lastSuccess/);
 assert.match(context.renderBorgRun(failedLater,200),/is-interrupted/);
 console.log('Configured workflow: named steps, SVG states, disclosure persistence, escaped details and last success passed.');
+
+// Compact results distinguish original/processed data from new deduplicated data.
+const successView = {state:'success',status:'Success'};
+const dataDetails=context.jobStepDetails({id:'create',exit_code:0,details:{nfiles:1000,original_size:1073741824,deduplicated_size:1024}},successView);
+assert.match(dataDetails,/jobs.createFiles 1,000/);
+assert.match(dataDetails,/jobs.createBytes 1.0 GiB/);
+assert.match(dataDetails,/jobs.workflow.newData 1.0 KiB/);
+assert.doesNotMatch(dataDetails,/exitCode|Success/);
+assert.match(context.jobStepDetails({id:'compact',details:{freed_bytes:0}},successView),/jobs.workflow.freedSpace 0 B/);
+assert.doesNotMatch(context.jobStepDetails({id:'compact'},successView),/freedSpace/);
+assert.match(context.jobStepDetails({id:'create',exit_code:2,details:{nfiles:2}}, {state:'error',status:'Failed'}),/Failed.*exitCode 2/);
+assert.doesNotMatch(context.jobStepDetails({id:'create',details:{original_size:-1,deduplicated_size:'bogus'}},successView),/createBytes|newData/);
+// Empty destination sections never render, while selected locations need no duplicate header.
+assert.equal(context.renderJobsLocationGroup('smb',[]),'');
+context.locationIcon=()=>'';
+context.renderJobCard=job=>`<article>${job.key}</article>`;
+state.selectedLocation='all';
+assert.match(context.renderJobsLocationGroup('usb',[{key:'a'},{key:'b'}]),/jobs-location-group__header/);
+state.selectedLocation='usb';
+assert.doesNotMatch(context.renderJobsLocationGroup('usb',[{key:'a'}]),/jobs-location-group__header/);
+state.selectedLocation='all';
+console.log('Compact metrics, empty locations and explicit log opening passed.');

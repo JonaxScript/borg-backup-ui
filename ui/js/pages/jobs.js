@@ -288,11 +288,14 @@ function renderBorgProgress(runtime, now = Date.now() / 1000) {
   const counters = [];
   if (creating) {
     if (Number.isSafeInteger(progress.nfiles) && progress.nfiles >= 0) {
-      counters.push(jobsT('jobs.createFiles', { count: progress.nfiles }));
+      counters.push(jobsT('jobs.createFiles', { count: jobMetricNumber(progress.nfiles) }));
     }
     if (Number.isSafeInteger(progress.original_size) && progress.original_size >= 0) {
       counters.push(jobsT('jobs.createBytes', { size: borgProgressSize(progress.original_size) }));
     }
+  }
+  if (creating && Number.isSafeInteger(progress.deduplicated_size) && progress.deduplicated_size >= 0) {
+    counters.push(jobsT('jobs.workflow.newData', {size: borgProgressSize(progress.deduplicated_size)}));
   }
   const detail = creating ? counters.join(' · ') : jobsT(maintenance ? 'jobs.borgCurrentStep' : 'jobs.checkStep');
   return `<div class="borg-progress">
@@ -303,11 +306,21 @@ function renderBorgProgress(runtime, now = Date.now() / 1000) {
   </div>`;
 }
 
+/** Format a measured value in the selected UI language.
+ * @param {number} value Validated count or size to display.
+ * @param {number} digits Number of fractional digits (zero for counts).
+ * @returns {string} Localized number without a unit.
+ */
+function jobMetricNumber(value, digits = 0) {
+  const language = window.BBUI?.components?.i18n?.getLanguage?.() === 'de' ? 'de' : 'en';
+  return new Intl.NumberFormat(language, {minimumFractionDigits:digits, maximumFractionDigits:digits}).format(value);
+}
+
 /** Format a validated non-negative byte count using binary units. */
 function borgProgressSize(bytes) {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
   const index = bytes > 0 ? Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1) : 0;
-  return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
+  return `${jobMetricNumber(bytes / 1024 ** index, index ? 1 : 0)} ${units[index]}`;
 }
 
 /** Format an elapsed duration without suggesting a remaining-time estimate. */
@@ -363,7 +376,7 @@ function jobStepView(step, job, now) {
   return {state, status, duration, label};
 }
 
-/** Render only allowlisted measured details, never raw command/script output. */
+/** Format allowlisted measured results, keeping problems but omitting redundant success/exit 0. */
 function jobStepDetails(step, view) {
   const details = step.details || {};
   const parts = [];
@@ -373,14 +386,16 @@ function jobStepDetails(step, view) {
       : jobsT('jobs.workflow.targets', {count: details.target_count}));
   }
   if (count('forced_count') && details.forced_count) parts.push(jobsT('jobs.workflow.forced', {count: details.forced_count}));
-  if (count('nfiles')) parts.push(jobsT('jobs.createFiles', {count: details.nfiles}));
+  if (count('nfiles')) parts.push(jobsT('jobs.createFiles', {count: jobMetricNumber(details.nfiles)}));
   if (count('original_size')) parts.push(jobsT('jobs.createBytes', {size: borgProgressSize(details.original_size)}));
+  if (count('deduplicated_size')) parts.push(jobsT('jobs.workflow.newData', {size: borgProgressSize(details.deduplicated_size)}));
+  if (count('freed_bytes')) parts.push(jobsT('jobs.workflow.freedSpace', {size: borgProgressSize(details.freed_bytes)}));
   if (count('kept_archives')) parts.push(jobsT('jobs.workflow.kept', {count: details.kept_archives}));
   if (count('pruned_archives')) parts.push(jobsT('jobs.workflow.pruned', {count: details.pruned_archives}));
   if (['pre_script', 'post_script'].includes(step.id) && typeof details.script_name === 'string' && details.script_name) parts.push(details.script_name);
-  if (Number.isInteger(step.exit_code)) parts.push(jobsT('jobs.workflow.exitCode', {code: step.exit_code}));
+  if (Number.isInteger(step.exit_code) && step.exit_code !== 0) parts.push(jobsT('jobs.workflow.exitCode', {code: step.exit_code}));
   if (details.hook_status === 'timeout') parts.push(jobsT('jobs.workflow.timeout'));
-  return [view.status, ...parts].join(' · ');
+  return (view.state === 'success' && parts.length ? parts : [view.status, ...parts]).join(' · ');
 }
 
 /** Format stored local timestamps and a live relative age in the selected language. */
@@ -416,7 +431,7 @@ const jobWorkflowOpen = new Set();
 function renderBorgRun(job, now = Date.now() / 1000) {
   const steps = jobWorkflowSteps(job);
   const footer = renderJobBackupFooter(job, now);
-  if (!steps.length) return footer;
+  if (!steps.length) return footer ? `<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div></div>` : '';
   const opened = jobWorkflowOpen.has(job.key);
   const items = steps.map(step => {
     const view = jobStepView(step, job, now);
@@ -426,12 +441,19 @@ function renderBorgRun(job, now = Date.now() / 1000) {
       <span class="borg-step-duration">${escHtml(view.duration)}</span></li>`;
   }).join('');
   const details = opened ? `<div class="job-workflow-details" id="job-step-details-${escHtml(job.key)}"><table>
-    <caption>${jobsT('jobs.workflow.details')}</caption><thead><tr><th>${jobsT('jobs.workflow.step')}</th><th>${jobsT('jobs.workflow.result')}</th></tr></thead>
-    <tbody>${steps.map(step => {const view = jobStepView(step, job, now); return `<tr class="is-${view.state}"><th scope="row">${escHtml(view.label)}</th><td>${escHtml(jobStepDetails(step, view))}</td></tr>`;}).join('')}</tbody>
+    <caption>${jobsT('jobs.workflow.details')}</caption>
+    <colgroup><col class="job-detail-step-col"><col><col class="job-detail-duration-col"></colgroup>
+    <thead class="job-details-sr"><tr><th>${jobsT('jobs.workflow.step')}</th><th>${jobsT('jobs.workflow.result')}</th><th>${jobsT('jobs.workflow.duration')}</th></tr></thead>
+    <tbody>${steps.map(step => {
+      const view = jobStepView(step, job, now);
+      const duration = ['skipped', 'pending', 'interrupted'].includes(view.state) ? '—' : view.duration;
+      const explanation = step.id === 'create' ? jobsT('jobs.workflow.createMeaning') : step.id === 'compact' ? jobsT('jobs.workflow.compactMeaning') : '';
+      return `<tr class="is-${view.state}"><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
+    }).join('')}</tbody>
     </table></div>` : `<div id="job-step-details-${escHtml(job.key)}" hidden></div>`;
   return `<ol class="borg-stepper" style="--workflow-cols:${Math.min(6, steps.length)}" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
-    <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button>
-    ${details}${footer}`;
+    ${details}<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div>
+    <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button></div>`;
 }
 
 /** Identify the current configured action immediately; Borg counters wait 60 seconds. */
@@ -596,15 +618,17 @@ function updateJobsSelection(visible) {
   if (count) count.textContent = jobsCount(visible.length);
 }
 
+/** Group only populated destinations; selected locations already have a page heading. */
 function renderJobsLocationGroup(location, jobs) {
+  if (!jobs.length) return '';
   return `<section class="jobs-location-group">
-    <header class="jobs-location-group__header">
+    ${jobsState.selectedLocation === 'all' ? `<header class="jobs-location-group__header">
       <div class="jobs-location-group__identity">
         <span class="location-nav-glyph ${location}">${jobsLocationGlyph(location)}</span>
         <span><h3>${escHtml(jobsLocationName(location))}</h3><small>${escHtml(jobsCount(jobs.length))}</small></span>
       </div>
       <span class="ui-badge">${jobs.length}</span>
-    </header>
+    </header>` : ''}
     <div class="jobs-location-group__body">${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
   </section>`;
 }
@@ -692,7 +716,7 @@ function renderJobCard(job) {
     ? `<div class="jobs-running-actions">
          <div class="jobs-running-state"><span class="running-dot"></span><span>${jobsT('jobs.running')}</span></div>
          <div class="jobs-running-buttons">
-           ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLog')}</button>`}
+           ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLiveLog')}</button>`}
            ${cancelButton}
          </div>
          ${cancelStatus ? `<div class="jobs-running-message">${escHtml(cancelStatus)}</div>` : ''}
@@ -1177,7 +1201,6 @@ async function confirmJobStart() {
     if (!res.ok) throw new Error(apiErrorMessage(data, res.status));
 
     await refreshJobs();
-    openLogPanel(jobKey);
   } catch (err) {
     showJobsError(jobsT('jobs.startFailed', { message: err.message }));
   } finally {

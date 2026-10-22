@@ -697,7 +697,8 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
     check, which retains only diagnostics. Empty INFO messages and INFO from
     borg.output.progress (including cache activity) are suppressed; warnings
     and errors from that logger are retained. An optional controller receives
-    numeric create/prune details in memory, including final create statistics;
+    numeric create/prune/compact details in memory, including final create
+    statistics and Borg's approximate reclaimed repository bytes;
     archive names, paths and raw messages are never copied to those details.
     Plain-text startup/argument errors are retained. Malformed JSON is ignored
     with a diagnostic, without leaking an unparsed progress payload.
@@ -739,6 +740,14 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
                 details["pruned_archives"] = int(pruned.group(1))
             elif counts and int(counts.group(3)) == 0:
                 details["pruned_archives"] = 0
+        elif kind == "log_message" and operation == "compact" and str(event.get("levelname", "")).upper() == "INFO":
+            # Match Borg's final repository statistic, not unrelated log numbers.
+            freed = re.search(r"\bcompaction freed about (\d+(?:\.\d+)?) (B|kB|[KMGTPE]i?B) repository space\.", str(event.get("message", "")))
+            if freed and freed.group(2) in _UNIT_MULTIPLIERS:
+                try:
+                    details["freed_bytes"] = convert_to_bytes(" ".join(freed.groups()))
+                except (ValueError, OverflowError):
+                    pass
         if details:
             try:
                 detail_callback(details)

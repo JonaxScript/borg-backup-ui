@@ -628,7 +628,7 @@
   "jobs": {
     "createRunning": "Archiv erstellen (borg create)",
     "createFiles": "{count} Dateien verarbeitet",
-    "createBytes": "Daten: {size}",
+    "createBytes": "Originaldaten: {size}",
     "checkRunning": "Integritätsprüfung (borg check) läuft …",
     "checkPercent": "Integritätsprüfung (borg check) · {percent} %",
     "checkStep": "Fortschritt des aktuellen Prüfschritts",
@@ -659,7 +659,7 @@
     "locationLocal": "Lokal",
     "locationUsb": "USB",
     "locationSmb": "SMB",
-    "locationStoragebox": "Storagebox",
+    "locationStoragebox": "Storagebox (SSH)",
     "compressionShort": "Comp:",
     "retentionShort": "Ret:",
     "nextRun": "Nächster Lauf: {date}",
@@ -710,7 +710,7 @@
     "vmWarning": "Laufende <strong>VMs werden heruntergefahren</strong> und nach dem Backup neu gestartet.",
     "vmSelectedWarning": "Ausgewählte VMs werden <strong>heruntergefahren</strong> und nach dem Backup neu gestartet: {names}.",
     "runtimeSelectionStored": "Auswahl aus den Job-Einstellungen",
-    "liveLogInfo": "Die Log-Ausgabe wird live im Browser angezeigt.",
+    "liveLogInfo": "Das Live-Log öffnen Sie bei Bedarf über „Live-Log anzeigen“.",
     "deletePassphrase": "Passphrase-Datei ebenfalls löschen",
     "deleteTitle": "Job-Skript löschen",
     "deleteDescription": "Soll der Job „{name}“ wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -801,8 +801,14 @@
         "start_docker": "Docker starten",
         "stop_vms": "VMs stoppen",
         "start_vms": "VMs starten"
-      }
-    }
+      },
+      "duration": "Laufzeit",
+      "newData": "Neu gespeichert (dedupliziert): {size}",
+      "freedSpace": "Ca. {size} freigegeben",
+      "createMeaning": "Verarbeitete Dateien einschließlich unveränderter Dateien. Originaldaten sind die unkomprimierte Datenmenge; neu gespeichert sind die laut Borg zusätzlich gespeicherten, deduplizierten und komprimierten Daten, nicht die gesamte Archivgröße oder eine Dateisystemmessung.",
+      "compactMeaning": "Von Borg geschätzter freigegebener Repository-Speicherplatz."
+    },
+    "showLiveLog": "Live-Log anzeigen"
   },
   "schedule": {
     "title": "Zeitplan",

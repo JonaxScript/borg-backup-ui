@@ -628,7 +628,7 @@
   "jobs": {
     "createRunning": "Creating archive (borg create)",
     "createFiles": "{count} files processed",
-    "createBytes": "Data: {size}",
+    "createBytes": "Original data: {size}",
     "checkRunning": "Integrity check (borg check) running …",
     "checkPercent": "Integrity check (borg check) · {percent} %",
     "checkStep": "Current check-step progress",
@@ -659,7 +659,7 @@
     "locationLocal": "Local",
     "locationUsb": "USB",
     "locationSmb": "SMB",
-    "locationStoragebox": "Storagebox",
+    "locationStoragebox": "Storagebox (SSH)",
     "compressionShort": "Comp:",
     "retentionShort": "Ret:",
     "nextRun": "Next run: {date}",
@@ -710,7 +710,7 @@
     "vmWarning": "Running <strong>VMs will be shut down</strong> and restarted after the backup.",
     "vmSelectedWarning": "Selected VMs will be <strong>shut down</strong> and restarted after the backup: {names}.",
     "runtimeSelectionStored": "selection from the job settings",
-    "liveLogInfo": "Log output will be shown live in the browser.",
+    "liveLogInfo": "Open the live log when needed using “Show live log”.",
     "deletePassphrase": "Also delete passphrase file",
     "deleteTitle": "Delete job script",
     "deleteDescription": "Delete job “{name}”? This action cannot be undone.",
@@ -801,8 +801,14 @@
         "start_docker": "Start Docker",
         "stop_vms": "Stop VMs",
         "start_vms": "Start VMs"
-      }
-    }
+      },
+      "duration": "Duration",
+      "newData": "New data (deduplicated): {size}",
+      "freedSpace": "Approx. {size} freed",
+      "createMeaning": "Processed files include unchanged files. Original data is the uncompressed amount; new data is the additional deduplicated and compressed data reported by Borg, not the total archive size or a filesystem measurement.",
+      "compactMeaning": "Repository space reclaimed as estimated by Borg."
+    },
+    "showLiveLog": "Show live log"
   },
   "schedule": {
     "title": "Schedule",

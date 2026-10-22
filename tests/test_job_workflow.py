@@ -200,6 +200,41 @@ def test_real_borg_workflow_keeps_measured_details(tmp_path, monkeypatch):
     assert steps['create']['details']['original_size']>0
     assert steps['prune']['details']['kept_archives']==1
     assert steps['prune']['details']['pruned_archives']==1
+    assert steps['compact']['details']['freed_bytes']>0
+    assert 'deduplicated_size' in steps['create']['details']
     assert 'source.txt' not in json.dumps(workflow.steps)
     control.update_phase('completed',cancel_allowed=False,finished=True)
     assert json.loads(control.state_file.read_text())['job_steps']==workflow.steps
+    # Repeating unchanged contents still counts the files/original data, but
+    # requires much less new deduplicated data than a full archive transfer.
+    source.write_bytes(bytes(range(256)) * 4096)
+    assert runner.create([source], 'data-first') == 0
+    assert runner.create([source], 'data-unchanged') == 0
+    details = control.get_borg_details()
+    assert details['nfiles'] == 1
+    assert details['original_size'] >= source.stat().st_size
+    assert details['deduplicated_size'] < details['original_size'] / 10
+
+@pytest.mark.parametrize('message,expected', [
+    ('Repository compaction freed about 12.6 GB repository space.', 12_600_000_000),
+    ('Remote: Repository compaction freed about 1.21 kB repository space.', 1210),
+    ('compaction freed about 0 B repository space.', 0),
+    ('compaction freed about 3.16 kB repository space.', 3160),
+    ('Repository compaction freed about 1.5 MiB repository space.', 1572864),
+    ('Repository compaction freed about -1 GB repository space.', None),
+    ('Repository compaction freed about 1 XB repository space.', None),
+    ('Repository compaction freed about 1.2.3 GB repository space.', None),
+    ('Compacting segments 63%', None),
+    ('compaction freed about ' + '9' * 400 + ' GB repository space.', None),
+])
+def test_compact_records_only_reported_reclaimed_space(tmp_path, message, expected):
+    """Missing or malformed statistics stay unknown; an actual zero stays zero."""
+    control = job_control.JobControl('files_local', 'compact-details', tmp_path / 'control')
+    control.update_phase('borg_compact', cancel_allowed=True)
+    event = {'type': 'log_message', 'name': 'borg.repository', 'levelname': 'INFO', 'message': message}
+    borg_runner._consume_borg_output(json.dumps(event), control, operation='compact')
+    assert control.get_borg_details() == ({} if expected is None else {'freed_bytes': expected})
+    control.update_phase('borg_check', cancel_allowed=True)
+    assert control.get_borg_details() == {}, 'Reclaimed space must not leak into a later step'
+    borg_runner._consume_borg_output(json.dumps(event), control, operation='check')
+    assert control.get_borg_details() == {}
