@@ -788,6 +788,8 @@
       "lastSuccess": "Letztes erfolgreiches Backup: {date}",
       "noSuccess": "Letztes erfolgreiches Backup: noch kein Ergebnis vorhanden",
       "targets": "Betroffene Dienste: {count}",
+      "targetsStopped": "{done} von {total} Diensten gestoppt",
+      "targetsStarted": "{done} von {total} Diensten gestartet",
       "targetsDone": "{done} von {total} Diensten abgeschlossen",
       "forced": "Davon erzwungen gestoppt: {count}",
       "kept": "{count} Archive behalten",

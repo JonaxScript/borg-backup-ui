@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Stable live workflow updates (#579)
+
+- Reconcile job-card DOM nodes in place to preserve running animations, progress elements and focused controls.
+- Load final reports before replacing the live workflow, serialize polls and discard stale refresh responses.
+- Put create counters on separate lines and distinguish stopped/started service counts in German and English.
+
 ## Pending - Handle VM shutdown failures (#541)
 
 - Explain why a VM backup could not start and recover VMs already stopped when another VM fails to shut down.

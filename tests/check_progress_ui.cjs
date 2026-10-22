@@ -16,6 +16,8 @@ const context = vm.createContext({
   escHtml: value => String(value).replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
 });
 vm.runInContext(fs.readFileSync('ui/js/pages/jobs.js', 'utf8'), context);
+// This suite uses a string-only DOM; real node reconciliation is covered separately.
+context.patchJobMarkup = (target, html) => {target.innerHTML = html;};
 const runtime = {running: true, phase: 'borg_check', run_id: 'first', borg_progress: {percent: 63, started_at: 100, updated_at: 180}};
 let html = context.renderBorgProgress(runtime, 200);
 assert.match(html, /value="63"/);
@@ -149,10 +151,15 @@ console.log('Four-step timeline: durations, saved results, skip/warning/error st
   state.lastRunningSnapshot='previous';
   context.fetch=async()=>({ok:true,json:async()=>({})});
   context.renderJobsGrid=()=>{};
-  let scheduled;
-  context.setTimeout=(callback)=>{scheduled=callback;};
+  let finishedRefresh = false;
+  context.refreshJobs = async () => {
+    finishedRefresh = true;
+    assert.equal(state.jobs[0].running, true, 'Keep the live ledger until the report is available');
+    assert.ok(state.jobs[0].run_borg_steps.create);
+  };
   await context._pollRunningStates();
-  assert.equal(typeof scheduled,'function','Finishing cron jobs must refresh saved results');
+  assert.equal(finishedRefresh, true, 'Finishing cron jobs must immediately load saved results');
+  context.refreshJobs = savedRefresh;
   // Simulate a full reload after server restart with only a saved report.
   context.window.BBUI.core.updateDataDirWarning=async()=>{};
   context.window.BBUI.core.setSchedulesData=()=>{};
@@ -226,3 +233,11 @@ state.selectedLocation='usb';
 assert.doesNotMatch(context.renderJobsLocationGroup('usb',[{key:'a'}]),/jobs-location-group__header/);
 state.selectedLocation='all';
 console.log('Compact metrics, empty locations and explicit log opening passed.');
+
+for (const id of ['stop_docker', 'stop_vms', 'start_docker', 'start_vms']) {
+  assert.match(context.jobStepDetails({id,details:{target_count:31,completed_count:30}},successView),
+    new RegExp(`jobs.workflow.${id.startsWith('stop') ? 'targetsStopped' : 'targetsStarted'} 30 31`));
+}
+const metricLines = context.renderBorgProgress({...creating,borg_progress:{...creating.borg_progress,deduplicated_size:1024}},200);
+assert.equal((metricLines.match(/class="borg-progress-metric"/g)||[]).length,3);
+assert.doesNotMatch(metricLines,/createFiles[^<]* · /);

@@ -788,6 +788,8 @@
       "lastSuccess": "Last successful backup: {date}",
       "noSuccess": "Last successful backup: no result available yet",
       "targets": "Affected services: {count}",
+      "targetsStopped": "{done} of {total} services stopped",
+      "targetsStarted": "{done} of {total} services started",
       "targetsDone": "{done} of {total} services completed",
       "forced": "Force-stopped: {count}",
       "kept": "{count} archives kept",
