@@ -683,6 +683,12 @@ def main() -> int:
         job_config.exclude_paths.append(job_config.log_file.parent)
     from lifecycle_log import emit_lifecycle
     borg_config = BorgConfig.from_config(env)
+    from lib.job_workflow import JobWorkflow
+    workflow = JobWorkflow.configured(
+        hooks=meta.get("hooks"), docker=_runtime_control(meta, "docker")["mode"] != "none",
+        vms=_runtime_control(meta, "vm")["mode"] != "none",
+        prune=BorgRunner(borg_config).retention().get("mode") != "all", controller=control,
+    )
     mail_config = MailConfig.from_config(env)
 
     data_root = Path(str(env.get("BACKUP_SCRIPTS_DIR") or backup_scripts_dir))
@@ -707,6 +713,8 @@ def main() -> int:
     ok, reason = lock_set.acquire(resources)
     if not ok:
         skipped_job = BackupJob(job_config, mail_config=mail_config, notification_config=env)
+        skipped_job.workflow = workflow
+        workflow.finalize("not_run")
         skipped_job.record_prestart_skip(reason)
         logging.warning("Job is being skipped: %s", reason)
         control.update_phase("skipped", cancel_allowed=False, finished=True, exit_code=2)
@@ -757,7 +765,10 @@ def main() -> int:
                 outcome = "skipped" if job._skip_finish else (
                     "cancelled" if job._cancelled else
                     "success" if job.exit_code == 0 else "warning" if job.exit_code == 1 else "failed")
-                job.record_hook_result("post", run_hook(scripts["post"], "post", job_key, result=outcome))
+                with workflow.track("post_script"):
+                    job.record_hook_result("post", run_hook(scripts["post"], "post", job_key, result=outcome))
+            elif workflow.get("post_script") is not None:
+                workflow.update("post_script", status="skipped", reason="post_condition")
 
     def execute_backup(job):
         """Execute the backup body; the context manager always completes cleanup."""
@@ -819,7 +830,9 @@ def main() -> int:
             borg_config,
             process_controller=control,
             phase_callback=set_phase,
+            workflow=workflow,
         )
+        job.borg_steps = runner.steps
         create_exit = runner.create(
             job_config.backup_paths,
             archive_prefix,
@@ -872,14 +885,16 @@ def main() -> int:
             mail_config=mail_config, notification_config=env,
             phase_callback=set_phase, completion_callback=complete_job,
         ) as job:
+            job.workflow = workflow
             hooks, scripts = snapshot_hooks({"BACKUP_SCRIPTS_DIR": str(data_root)}, meta.get("hooks"))
             if control.is_cancel_requested():
                 job.set_cancelled()
             else:
                 if "pre" in scripts:
                     set_phase("pre_script")
-                    job.record_hook_result("pre", run_hook(scripts["pre"], "pre", job_key,
-                                                           cancelled=control.is_cancel_requested))
+                    with workflow.track("pre_script"):
+                        job.record_hook_result("pre", run_hook(scripts["pre"], "pre", job_key,
+                                                               cancelled=control.is_cancel_requested))
                 pre_ok = "pre" not in scripts or job.hook_results["pre"]["status"] == "success"
                 if pre_ok and not control.is_cancel_requested():
                     set_phase("mounting")
@@ -912,6 +927,7 @@ def main() -> int:
                 terminal_phase = "cancelled" if result_code == 130 else (
                     "skipped" if job is not None and job._skip_finish else
                     "completed" if result_code < 2 else "failed")
+                workflow.finalize("after_cancel" if result_code == 130 else "not_run")
                 control.update_phase(terminal_phase, cancel_allowed=False, finished=True, exit_code=result_code)
 
 

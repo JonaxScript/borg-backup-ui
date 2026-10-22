@@ -127,6 +127,10 @@ class BackupStatus:
     file_activity: bool = False
     hook_results: dict = field(default_factory=dict)
     backup_exit_code: Optional[int] = None
+    # Optional per-command results; absent on reports created by older versions.
+    borg_steps: dict = field(default_factory=dict)
+    job_steps: list = field(default_factory=list)
+    last_successful_backup: dict = field(default_factory=dict)
 
     # Pfad der Quelldatei (nicht serialisiert)
     source_path: Optional[Path] = field(default=None, repr=False, compare=False)
@@ -150,6 +154,9 @@ class BackupStatus:
         obj.file_activity = data.get("file_activity") is True
         obj.hook_results = data.get("hook_results") if isinstance(data.get("hook_results"), dict) else {}
         obj.backup_exit_code = data.get("backup_exit_code")
+        obj.borg_steps = data.get("borg_steps") if isinstance(data.get("borg_steps"), dict) else {}
+        obj.job_steps = data.get("job_steps") if isinstance(data.get("job_steps"), list) else []
+        obj.last_successful_backup = data.get("last_successful_backup") if isinstance(data.get("last_successful_backup"), dict) else {}
         obj.backup_type = str(data.get("backup_type", "unknown"))
         obj.location = str(data.get("location", "unknown"))
         obj.timestamp = str(data.get("timestamp", ""))
@@ -218,8 +225,22 @@ class BackupStatus:
         return max(0, (ref - ts).days)
 
     def save(self, status_dir: Path) -> Path:
-        """Schreibt Status als JSON-Datei in status_dir. Gibt den Dateipfad zurück."""
+        """Save a report, carrying forward this job's last successful backup.
+
+        The embedded summary survives normal history retention. Existing reports
+        are read without modification; unavailable/invalid records are ignored.
+        """
         ensure_status_storage_directory(status_dir)
+        candidates = [self]
+        if self.key:
+            for existing in status_dir.glob("*.status"):
+                try:
+                    previous = BackupStatus.from_file(existing)
+                    if previous.key == self.key:
+                        candidates.append(previous)
+                except (ValueError, TypeError, OSError):
+                    continue
+        self.last_successful_backup = latest_successful_backup(candidates)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         from job_identity import job_file_component
         identity = job_file_component(self.job_name, self.location, self.job_id)
@@ -228,6 +249,33 @@ class BackupStatus:
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         logger.info("Saved backup status: %s", path)
         return path
+
+
+def latest_successful_backup(statuses) -> dict:
+    """Return the newest valid successful summary from reports of one job.
+
+    Callers must group by job identity. Warning/error/skipped runs cannot advance
+    this timestamp, but can carry a prior success after its report was pruned.
+    """
+    candidates = []
+    for report in statuses:
+        if report.status == "success" and report.exit_code == 0:
+            candidates.append({"timestamp": report.timestamp, "duration_seconds": report.duration_seconds,
+                               "run_id": report.run_id})
+        if isinstance(report.last_successful_backup, dict):
+            candidates.append(report.last_successful_backup)
+    valid = []
+    for candidate in candidates:
+        stamp = candidate.get("timestamp")
+        duration = candidate.get("duration_seconds")
+        if not isinstance(stamp, str) or type(duration) is not int or duration < 0:
+            continue
+        parsed = BackupStatus(timestamp=stamp).timestamp_dt
+        if parsed is None:
+            continue
+        valid.append((parsed, {"timestamp": stamp, "duration_seconds": duration,
+                               "run_id": str(candidate.get("run_id") or "")}))
+    return max(valid, key=lambda item: item[0])[1] if valid else {}
 
 
 @dataclass

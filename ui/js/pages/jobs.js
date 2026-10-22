@@ -20,6 +20,9 @@ window.BBUI.jobsState = window.BBUI.jobsState || {
   confirmCloseSnapshot: '',
 };
 const jobsState = window.BBUI.jobsState;
+let jobsRefreshRevision = 0;
+let jobsRefreshPending = 0;
+let jobsPollPending = false;
 const JOBS_LOCATION_ORDER = ['local', 'usb', 'smb', 'storagebox', 'utility'];
 
 window.BBUI.scheduleModalState = window.BBUI.scheduleModalState || {
@@ -136,18 +139,21 @@ function jobRuntimeWarningText(job, kind) {
 
 /** Load jobs, run status and schedules, then refresh the jobs workspace. */
 async function refreshJobs() {
+  const revision = ++jobsRefreshRevision;
+  jobsRefreshPending++;
   const btn = document.getElementById('jobs-refresh-btn');
   if (btn) btn.classList.add('loading');
   hideJobsMessage();
 
   try {
     await window.BBUI.core.updateDataDirWarning();
-    const [jobsRes, statusRes, schedRes, runningRes] = await Promise.all([
+    const [jobsRes, schedRes, runningRes] = await Promise.all([
       fetch('/api/jobs'),
-      fetch('/api/status'),
       fetch('/api/schedules'),
       fetch('/api/jobs/running'),
     ]);
+    // Read the saved report after runtime state so a completed run is published atomically.
+    const statusRes = await fetch('/api/status');
     if (!jobsRes.ok) throw new Error(`Jobs: HTTP ${jobsRes.status}`);
     if (!statusRes.ok) throw new Error(`Status: HTTP ${statusRes.status}`);
     if (!runningRes.ok) throw new Error(`Running jobs: HTTP ${runningRes.status}`);
@@ -157,9 +163,11 @@ async function refreshJobs() {
     const runningData = await runningRes.json();
     if (schedRes.ok) {
       const nextSchedules = await schedRes.json();
-      _coreSetSchedules(nextSchedules);
+      if (revision === jobsRefreshRevision) _coreSetSchedules(nextSchedules);
     }
 
+    await window.BBUI.jobGroups?.load();
+    if (revision !== jobsRefreshRevision) return;
     const statusMap = {};
     for (const b of (statusData.backups || [])) {
       statusMap[b.key] = b;
@@ -172,18 +180,25 @@ async function refreshJobs() {
         last_time_ago:  statusMap[j.key].time_ago,
         last_timestamp: statusMap[j.key].timestamp,
         last_exit_code: statusMap[j.key].exit_code,
+        last_borg_steps: statusMap[j.key].borg_steps || {},
+        last_job_steps: statusMap[j.key].job_steps || [],
+        last_successful_backup: statusMap[j.key].last_successful_backup || {},
+        last_duration_seconds: statusMap[j.key].duration_seconds,
+        last_run_id: statusMap[j.key].run_id || '',
+        last_log_file: statusMap[j.key].log_file || '',
       } : {},
-      ...jobRuntimeState(runningData[j.key]),
+      ...jobRuntimeState(runningData[j.key], j),
     }));
     jobsState.lastRunningSnapshot = JSON.stringify(runningData);
 
-    await window.BBUI.jobGroups?.load();
     jobsState.loaded = true;
     renderJobsGrid(jobsState.jobs);
+    updateBorgProgressDisplays(runningData);
   } catch (err) {
-    showJobsError(jobsT('jobs.loadError', { message: err.message }));
+    if (revision === jobsRefreshRevision) showJobsError(jobsT('jobs.loadError', { message: err.message }));
   } finally {
-    if (btn) btn.classList.remove('loading');
+    jobsRefreshPending--;
+    if (btn && !jobsRefreshPending) btn.classList.remove('loading');
   }
 }
 
@@ -201,32 +216,35 @@ function stopJobsPolling() {
   }
 }
 
+/** Poll one snapshot at a time; publish finished runs together with their saved report. */
 async function _pollRunningStates() {
-  const coreState = _coreState();
-  if (coreState.currentPage !== 'jobs') return;
+  if (_coreState().currentPage !== 'jobs' || jobsPollPending || jobsRefreshPending) return;
+  jobsPollPending = true;
+  const revision = jobsRefreshRevision;
   try {
     await window.BBUI.jobGroups?.load();
     const res = await fetch('/api/jobs/running');
     if (!res.ok) return;
     const running = await res.json();
-    const snapshot = JSON.stringify(running);
-    if (snapshot === jobsState.lastRunningSnapshot) return;
-    jobsState.lastRunningSnapshot = snapshot;
-
-    jobsState.jobs = jobsState.jobs.map(j => ({
-      ...j,
-      ...jobRuntimeState(running[j.key], j),
-    }));
-    renderJobsGrid(jobsState.jobs);
-
-    const anyJustFinished = jobsState.jobs.some(
-      j => !j.running && running[j.key] && running[j.key].exit_code !== null
-    );
-    if (anyJustFinished) {
-      setTimeout(refreshJobs, 1500);
+    if (revision !== jobsRefreshRevision) return;
+    const runFinished = jobsState.jobs.some(j => j.running && !running[j.key]?.running);
+    if (runFinished) {
+      // Keep the existing timeline on screen until the completed report is loaded.
+      await refreshJobs();
+      return;
     }
+    const snapshot = JSON.stringify(running);
+    if (snapshot === jobsState.lastRunningSnapshot) {
+      updateBorgProgressDisplays(running);
+      return;
+    }
+    jobsState.lastRunningSnapshot = snapshot;
+    jobsState.jobs = jobsState.jobs.map(j => ({...j, ...jobRuntimeState(running[j.key], j)}));
+    renderJobsGrid(jobsState.jobs);
   } catch {
-    // Netzwerkfehler ignorieren
+    // Keep the last displayed state on transient network errors; retry next poll.
+  } finally {
+    jobsPollPending = false;
   }
 }
 
@@ -237,6 +255,10 @@ function jobRuntimeState(runtime, previous = {}) {
     run_id: runtime?.run_id ?? previous.run_id ?? '',
     run_file_activity: runtime ? runtime.file_activity === true : (previous.run_file_activity ?? false),
     run_phase: runtime?.phase ?? '',
+    borg_progress: runtime?.borg_progress ?? null,
+    run_borg_steps: runtime?.running ? (runtime.borg_steps ?? {}) : {},
+    run_job_steps: runtime?.running ? (runtime.job_steps ?? []) : [],
+    run_start_time: runtime?.start_time ?? previous.run_start_time ?? '',
     group_name: runtime?.group_name ?? '',
     group_run_id: runtime?.group_run_id ?? '',
     cancel_allowed: runtime?.cancel_allowed ?? false,
@@ -244,6 +266,275 @@ function jobRuntimeState(runtime, previous = {}) {
     cancel_requested: runtime?.cancel_requested ?? false,
     cancel_message_key: runtime?.message_key ?? '',
   };
+}
+
+/**
+ * Render process progress after 60 seconds, separately from persisted log text.
+ * @param {Object|null} runtime Active run with phase and transient borg_progress.
+ * @param {number} now Current Unix time in seconds for elapsed/last-update ages.
+ * @returns {string} Escaped status markup, or an empty string before 60 seconds or outside a supported Borg process.
+ */
+function renderBorgProgress(runtime, now = Date.now() / 1000) {
+  const progress = runtime?.borg_progress;
+  const phase = runtime?.phase ?? runtime?.run_phase;
+  if (!runtime?.running || !['borg_create', 'borg_prune', 'borg_compact', 'borg_check'].includes(phase) || !progress) return '';
+  if (typeof progress.started_at !== 'number' || !Number.isFinite(progress.started_at)
+      || now - progress.started_at < 60) return '';
+  if (progress.phase && progress.phase !== phase) return '';
+  const creating = phase === 'borg_create';
+  const maintenance = ['borg_prune', 'borg_compact'].includes(phase);
+  // Maintenance shows details only if Borg has actually emitted progress.
+  if (maintenance && (typeof progress.updated_at !== 'number' || !Number.isFinite(progress.updated_at))) return '';
+  const percent = !creating && typeof progress.percent === 'number' && Number.isFinite(progress.percent)
+    ? Math.max(0, Math.min(100, progress.percent)) : null;
+  const age = timestamp => Math.max(0, Math.floor(now - timestamp));
+  const elapsed = typeof progress.started_at === 'number' && Number.isFinite(progress.started_at)
+    ? jobsT('jobs.borgElapsed', { time: borgProgressDuration(age(progress.started_at)) }) : '';
+  const updated = typeof progress.updated_at === 'number' && Number.isFinite(progress.updated_at)
+    ? jobsT('jobs.borgUpdated', { time: borgProgressDuration(age(progress.updated_at)) })
+    : jobsT('jobs.borgWaiting');
+  const label = jobsT(maintenance ? `jobs.${phase === 'borg_prune' ? 'prune' : 'compact'}Running` : (creating ? 'jobs.createTitle' : 'jobs.checkTitle'));
+  const counters = [];
+  if (creating) {
+    if (Number.isSafeInteger(progress.nfiles) && progress.nfiles >= 0) {
+      counters.push(jobsT('jobs.createFiles', { count: jobMetricNumber(progress.nfiles) }));
+    }
+    if (Number.isSafeInteger(progress.original_size) && progress.original_size >= 0) {
+      counters.push(jobsT('jobs.createBytes', { size: borgProgressSize(progress.original_size) }));
+    }
+  }
+  if (creating && Number.isSafeInteger(progress.deduplicated_size) && progress.deduplicated_size >= 0) {
+    counters.push(jobsT('jobs.workflow.newData', {size: borgProgressSize(progress.deduplicated_size)}));
+  }
+  const details = creating ? counters : [jobsT(maintenance ? 'jobs.borgCurrentStep' : 'jobs.checkStep')];
+  return `<div class="borg-progress">
+    <div class="borg-progress-heading"><strong>${escHtml(label)}</strong>${percent === null ? '' : `<strong>${escHtml(percent)} %</strong>`}</div>
+    <progress max="100"${percent === null ? '' : ` value="${percent}"`} aria-label="${escHtml(jobsT(creating ? 'jobs.createRunning' : 'jobs.borgCurrentStep'))}"></progress>
+    ${details.map(detail => `<small class="borg-progress-metric">${escHtml(detail)}</small>`).join('')}
+    <small>${escHtml([elapsed, updated].filter(Boolean).join(' · '))}</small>
+  </div>`;
+}
+
+/** Format a measured value in the selected UI language.
+ * @param {number} value Validated count or size to display.
+ * @param {number} digits Number of fractional digits (zero for counts).
+ * @returns {string} Localized number without a unit.
+ */
+function jobMetricNumber(value, digits = 0) {
+  const language = window.BBUI?.components?.i18n?.getLanguage?.() === 'de' ? 'de' : 'en';
+  return new Intl.NumberFormat(language, {minimumFractionDigits:digits, maximumFractionDigits:digits}).format(value);
+}
+
+/** Format a validated non-negative byte count using binary units. */
+function borgProgressSize(bytes) {
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+  const index = bytes > 0 ? Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1) : 0;
+  return `${jobMetricNumber(bytes / 1024 ** index, index ? 1 : 0)} ${units[index]}`;
+}
+
+/** Format an elapsed duration without suggesting a remaining-time estimate. */
+function borgProgressDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  const s = seconds % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Return this run's ordered steps; older reports retain only their known Borg ledger. */
+function jobWorkflowSteps(job) {
+  const configured = job.running ? job.run_job_steps : job.last_job_steps;
+  const allowed = ['pre_script', 'stop_docker', 'stop_vms', 'create', 'start_docker', 'start_vms', 'prune', 'compact', 'check', 'post_script'];
+  if (Array.isArray(configured) && configured.length) {
+    return configured.filter(step => step && allowed.includes(step.id));
+  }
+  const legacy = job.running ? job.run_borg_steps : job.last_borg_steps;
+  return legacy && typeof legacy === 'object'
+    ? ['create', 'prune', 'compact', 'check'].filter(id => legacy[id]).map(id => ({...legacy[id], id})) : [];
+}
+
+/** Accessible, shape-distinct SVG symbols; running alone uses a rotating ring. */
+function jobStepIcon(state) {
+  const circle = '<circle cx="12" cy="12" r="9"/>';
+  const paths = {
+    success: circle + '<path d="m8 12 3 3 5-6"/>',
+    error: circle + '<path d="m9 9 6 6m0-6-6 6"/>',
+    warning: '<path d="m12 3 10 18H2Z"/><path d="M12 9v5m0 3v.1"/>',
+    interrupted: '<path d="m12 3 10 18H2Z"/><path d="M12 9v5m0 3v.1"/>',
+    cancelled: circle + '<rect x="9" y="9" width="6" height="6"/>',
+    skipped: circle + '<path d="M8 12h8"/>', pending: circle,
+    running: '<circle class="job-step-ring-track" cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9"/>',
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[state] || circle}</svg>`;
+}
+
+/** Resolve labels and measured duration without inferring a terminal success. */
+function jobStepView(step, job, now) {
+  const allowed = ['success', 'warning', 'error', 'cancelled', 'skipped', 'pending', 'running', 'interrupted'];
+  let state = allowed.includes(step.status) ? step.status : 'pending';
+  if (state === 'running' && !job.running) state = 'interrupted';
+  const reasons = ['not_due', 'keep_all', 'not_run', 'after_cancel', 'post_condition', 'unavailable'];
+  let reason = state === 'skipped' && reasons.includes(step.reason) ? step.reason : state;
+  if (state === 'pending' && !job.running) reason = 'not_run';
+  const status = jobsT(`jobs.borgStep.${reason}`);
+  const valid = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  const seconds = state === 'running' && valid(step.started_at) ? Math.max(0, now - step.started_at) : step.duration_seconds;
+  const duration = !['skipped', 'pending', 'interrupted'].includes(state) && valid(seconds)
+    ? borgProgressDuration(Math.floor(seconds)) : status;
+  const label = ['create', 'prune', 'compact', 'check'].includes(step.id) ? `borg ${step.id}` : jobsT(`jobs.workflow.names.${step.id}`);
+  return {state, status, duration, label};
+}
+
+/** Format allowlisted measured results, keeping problems but omitting redundant success/exit 0. */
+function jobStepDetails(step, view) {
+  const details = step.details || {};
+  const parts = [];
+  const count = key => Number.isSafeInteger(details[key]) && details[key] >= 0;
+  if (count('target_count')) {
+    const action = ['stop_docker', 'stop_vms'].includes(step.id) ? 'targetsStopped'
+      : ['start_docker', 'start_vms'].includes(step.id) ? 'targetsStarted' : 'targetsDone';
+    parts.push(count('completed_count') ? jobsT(`jobs.workflow.${action}`, {done: details.completed_count, total: details.target_count})
+      : jobsT('jobs.workflow.targets', {count: details.target_count}));
+  }
+  if (count('forced_count') && details.forced_count) parts.push(jobsT('jobs.workflow.forced', {count: details.forced_count}));
+  if (count('nfiles')) parts.push(jobsT('jobs.createFiles', {count: jobMetricNumber(details.nfiles)}));
+  if (count('original_size')) parts.push(jobsT('jobs.createBytes', {size: borgProgressSize(details.original_size)}));
+  if (count('deduplicated_size')) parts.push(jobsT('jobs.workflow.newData', {size: borgProgressSize(details.deduplicated_size)}));
+  if (count('freed_bytes')) parts.push(jobsT('jobs.workflow.freedSpace', {size: borgProgressSize(details.freed_bytes)}));
+  if (count('kept_archives')) parts.push(jobsT('jobs.workflow.kept', {count: details.kept_archives}));
+  if (count('pruned_archives')) parts.push(jobsT('jobs.workflow.pruned', {count: details.pruned_archives}));
+  if (['pre_script', 'post_script'].includes(step.id) && typeof details.script_name === 'string' && details.script_name) parts.push(details.script_name);
+  if (Number.isInteger(step.exit_code) && step.exit_code !== 0) parts.push(jobsT('jobs.workflow.exitCode', {code: step.exit_code}));
+  if (details.hook_status === 'timeout') parts.push(jobsT('jobs.workflow.timeout'));
+  return (view.state === 'success' && parts.length ? parts : [view.status, ...parts]).join(' · ');
+}
+
+/** Format stored local timestamps and a live relative age in the selected language. */
+function jobBackupDate(timestamp, now) {
+  const date = new Date(String(timestamp || '').replace(' ', 'T'));
+  if (!Number.isFinite(date.getTime())) return '';
+  const language = window.BBUI?.components?.i18n?.getLanguage?.() === 'en' ? 'en' : 'de';
+  const seconds = Math.max(0, Math.floor(now - date.getTime() / 1000));
+  const [unit, divisor] = seconds >= 86400 ? ['day', 86400] : seconds >= 3600 ? ['hour', 3600] : seconds >= 60 ? ['minute', 60] : ['second', 1];
+  return `${date.toLocaleString(language, {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'})} · ${new Intl.RelativeTimeFormat(language, {numeric:'always'}).format(-Math.floor(seconds / divisor), unit)}`;
+}
+
+/** Keep the last successful backup visible independently of the latest run outcome. */
+function renderJobBackupFooter(job, now) {
+  const success = job.last_successful_backup?.timestamp ? job.last_successful_backup
+    : job.last_status === 'success' ? {timestamp:job.last_timestamp, duration_seconds:job.last_duration_seconds} : null;
+  const lines = [];
+  const line = (key, stamp, duration) => {
+    const date = jobBackupDate(stamp, now);
+    if (!date) return '';
+    const measured = typeof duration === 'number' && Number.isFinite(duration) && duration >= 0;
+    return jobsT(key, {date}) + (measured ? ' · ' + jobsT('jobs.borgTotalDuration', {time:borgProgressDuration(Math.floor(duration))}) : '');
+  };
+  if (!job.running && job.last_timestamp && job.last_timestamp !== success?.timestamp) lines.push(line('jobs.borgCompletedAt', job.last_timestamp, job.last_duration_seconds));
+  if (success) lines.push(line('jobs.workflow.lastSuccess', success.timestamp, success.duration_seconds));
+  else if (job.last_timestamp || jobWorkflowSteps(job).length) lines.push(jobsT('jobs.workflow.noSuccess'));
+  return lines.filter(Boolean).map(text => `<small class="borg-run-summary">${escHtml(text)}</small>`).join('');
+}
+
+const jobWorkflowOpen = new Set();
+
+/** Render the permanently named timeline and optional details below the full job row. */
+function renderBorgRun(job, now = Date.now() / 1000) {
+  const steps = jobWorkflowSteps(job);
+  const footer = renderJobBackupFooter(job, now);
+  if (!steps.length) return footer ? `<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div></div>` : '';
+  const opened = jobWorkflowOpen.has(job.key);
+  const items = steps.map(step => {
+    const view = jobStepView(step, job, now);
+    return `<li class="borg-step is-${view.state}" data-step="${escHtml(step.id)}"${view.state === 'running' ? ' aria-current="step"' : ''} title="${escHtml(view.status)}">
+      <span class="borg-step-dot" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>
+      <span class="borg-step-command">${escHtml(view.label)}</span>
+      <span class="borg-step-duration">${escHtml(view.duration)}</span></li>`;
+  }).join('');
+  const details = opened ? `<div class="job-workflow-details" id="job-step-details-${escHtml(job.key)}"><table>
+    <caption>${jobsT('jobs.workflow.details')}</caption>
+    <colgroup><col class="job-detail-step-col"><col><col class="job-detail-duration-col"></colgroup>
+    <thead class="job-details-sr"><tr><th>${jobsT('jobs.workflow.step')}</th><th>${jobsT('jobs.workflow.result')}</th><th>${jobsT('jobs.workflow.duration')}</th></tr></thead>
+    <tbody>${steps.map(step => {
+      const view = jobStepView(step, job, now);
+      const duration = ['skipped', 'pending', 'interrupted'].includes(view.state) ? '—' : view.duration;
+      const explanation = step.id === 'create' ? jobsT('jobs.workflow.createMeaning') : step.id === 'compact' ? jobsT('jobs.workflow.compactMeaning') : '';
+      return `<tr class="is-${view.state}" data-step="${escHtml(step.id)}"><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
+    }).join('')}</tbody>
+    </table></div>` : `<div id="job-step-details-${escHtml(job.key)}" hidden></div>`;
+  return `<ol class="borg-stepper" style="--workflow-cols:${Math.min(6, steps.length)}" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
+    ${details}<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div>
+    <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button></div>`;
+}
+
+/** Identify the current configured action immediately; Borg counters wait 60 seconds. */
+function renderJobOperation(job, now = Date.now() / 1000) {
+  const active = job.running && jobWorkflowSteps(job).find(step => step.status === 'running');
+  const view = active && jobStepView(active, job, now);
+  const progress = renderBorgProgress(job, now);
+  let html = view ? `<div class="job-active-step"><strong>${escHtml(view.label)}</strong>${progress ? '' : `<small>${escHtml(jobsT('jobs.borgElapsed', {time:view.duration}))}</small>`}</div>` : '';
+  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
+    html += `<div class="job-active-step"><strong>${escHtml(jobsT(`jobGroups.phases.${job.run_phase}`))}</strong></div>`;
+  }
+  html += progress;
+  const start = Date.parse(job.run_start_time || '');
+  if (job.running && Number.isFinite(start)) html += `<small class="borg-run-summary">${escHtml(jobsT('jobs.borgTotalElapsed', {time:borgProgressDuration(Math.max(0, Math.floor(now - start/1000)))}))}</small>`;
+  return html;
+}
+
+/**
+ * Reconcile generated job markup in place, preserving animations and focused controls.
+ * Keys are local element IDs or step IDs; unchanged attributes are never rewritten.
+ * Only trusted render-function markup is accepted. Event delegation remains on the grid.
+ * @param {Element} target Existing job view container.
+ * @param {string} html Escaped markup produced by the job renderers.
+ */
+function patchJobMarkup(target, html) {
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const key = node => node.nodeType === 1 ? node.id || node.getAttribute('data-step') || '' : '';
+  const compatible = (a, b) => a && a.nodeType === b.nodeType && a.nodeName === b.nodeName && key(a) === key(b);
+  const sync = (parent, desired) => {
+    let cursor = parent.firstChild;
+    for (const next of Array.from(desired.childNodes)) {
+      let current = cursor;
+      if (!compatible(current, next)) {
+        current = key(next) ? Array.from(parent.childNodes).find(node => compatible(node, next)) : null;
+        if (current) parent.insertBefore(current, cursor);
+        else {
+          parent.insertBefore(next.cloneNode(true), cursor);
+          continue;
+        }
+      }
+      if (current.nodeType === 1) {
+        for (const attr of Array.from(current.attributes)) {
+          if (!next.hasAttribute(attr.name)) current.removeAttribute(attr.name);
+        }
+        for (const attr of Array.from(next.attributes)) {
+          if (current.getAttribute(attr.name) !== attr.value) current.setAttribute(attr.name, attr.value);
+        }
+        sync(current, next);
+      } else if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+      cursor = current.nextSibling;
+    }
+    while (cursor) {
+      const next = cursor.nextSibling;
+      parent.removeChild(cursor);
+      cursor = next;
+    }
+  };
+  sync(target, template.content);
+}
+
+/** Refresh counters and relative ages without replacing the running SVG or progress element. */
+function updateBorgProgressDisplays(running) {
+  for (const job of jobsState.jobs) {
+    const current = {...job, ...jobRuntimeState(running[job.key], job)};
+    const progress = document.getElementById(`job-borg-progress-${job.key}`);
+    if (progress) patchJobMarkup(progress, renderJobOperation(current));
+    const target = document.getElementById(`job-workflow-${job.key}`);
+    if (target) patchJobMarkup(target, renderBorgRun(current));
+  }
 }
 
 // ── Jobs rendern ──────────────────────────────────────────────────────────────
@@ -298,10 +589,10 @@ function renderJobsGrid(jobs) {
     const groups = jobsState.selectedLocation === 'all'
       ? JOBS_LOCATION_ORDER
       : [jobsState.selectedLocation];
-    el.innerHTML = groups.map((location) => {
+    patchJobMarkup(el, groups.map((location) => {
       const locationJobs = visible.filter((job) => jobsLocationKey(job) === location);
       return locationJobs.length ? renderJobsLocationGroup(location, locationJobs) : '';
-    }).join('');
+    }).join(''));
   }
 
   if (rescuedSlotId) {
@@ -375,15 +666,17 @@ function updateJobsSelection(visible) {
   if (count) count.textContent = jobsCount(visible.length);
 }
 
+/** Group only populated destinations; selected locations already have a page heading. */
 function renderJobsLocationGroup(location, jobs) {
-  return `<section class="jobs-location-group">
-    <header class="jobs-location-group__header">
+  if (!jobs.length) return '';
+  return `<section class="jobs-location-group" id="jobs-location-${escHtml(location)}">
+    ${jobsState.selectedLocation === 'all' ? `<header class="jobs-location-group__header">
       <div class="jobs-location-group__identity">
         <span class="location-nav-glyph ${location}">${jobsLocationGlyph(location)}</span>
         <span><h3>${escHtml(jobsLocationName(location))}</h3><small>${escHtml(jobsCount(jobs.length))}</small></span>
       </div>
       <span class="ui-badge">${jobs.length}</span>
-    </header>
+    </header>` : ''}
     <div class="jobs-location-group__body">${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
   </section>`;
 }
@@ -450,7 +743,7 @@ function renderJobCard(job) {
     : job.enabled === false
       ? jobsT('jobs.disabled')
       : job.last_status
-        ? statusLabel(job.last_status)
+        ? (job.last_status === 'success' && jobWorkflowSteps(job).length ? jobsT('jobs.borgSuccessful') : statusLabel(job.last_status))
         : jobsT('jobs.ready');
   const lastRunText = job.last_status
     ? `${jobsT('jobs.lastRun')} ${job.last_time_ago || '—'}`
@@ -471,17 +764,17 @@ function renderJobCard(job) {
     ? `<div class="jobs-running-actions">
          <div class="jobs-running-state"><span class="running-dot"></span><span>${jobsT('jobs.running')}</span></div>
          <div class="jobs-running-buttons">
-           ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLog')}</button>`}
+           ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLiveLog')}</button>`}
            ${cancelButton}
          </div>
          ${cancelStatus ? `<div class="jobs-running-message">${escHtml(cancelStatus)}</div>` : ''}
        </div>`
-    : `<button class="btn btn-primary" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" ${effectiveStartDisabled ? `disabled title="${job.enabled === false ? jobsT('jobs.disabled') : jobsT('jobs.dataDirRequired')}"` : ''}>
+    : `<div class="jobs-completed-actions"><button class="btn btn-primary" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" ${effectiveStartDisabled ? `disabled title="${job.enabled === false ? jobsT('jobs.disabled') : jobsT('jobs.dataDirRequired')}"` : ''}>
          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
            <polygon points="5 3 19 12 5 21 5 3"/>
          </svg>
          ${jobsT('jobs.startAction')}
-       </button>`;
+       </button>${job.last_log_file && jobWorkflowSteps(job).length ? `<button class="btn btn-secondary btn-sm" data-jobs-action="open-saved-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLog')}</button>` : ''}</div>`;
 
   return `<article class="jobs-redesign-row ${isRunning ? 'is-running' : ''} ${job.enabled === false ? 'is-disabled' : ''}" id="job-card-${escHtml(job.key)}">
     <div class="jobs-redesign-cell jobs-redesign-main">
@@ -497,7 +790,8 @@ function renderJobCard(job) {
     <div class="jobs-redesign-cell jobs-redesign-operation">
       <span class="jobs-redesign-label">${jobsT('jobs.operatingState')}</span>
       <span class="badge ${stateClass}"><span class="badge-dot"></span>${escHtml(stateLabel)}</span>
-      <span class="jobs-redesign-detail">${escHtml(lastRunText)}</span>
+      ${!jobWorkflowSteps(job).length ? `<span class="jobs-redesign-detail">${escHtml(lastRunText)}</span>` : ''}
+      <div id="job-borg-progress-${escHtml(job.key)}">${renderJobOperation(job)}</div>
       ${job.running && job.group_name ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.startedBy', { name: job.group_name }))}</span>` : ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-policy">
@@ -550,6 +844,7 @@ function renderJobCard(job) {
             </div>
           </div>
     </div>
+    <div class="job-workflow" id="job-workflow-${escHtml(job.key)}">${renderBorgRun(job)}</div>
   </article>`;
 }
 
@@ -635,8 +930,23 @@ function onJobsGridClick(event) {
   const action = btn.dataset.jobsAction || '';
   const jobKey = btn.dataset.jobKey || '';
 
+  if (action === 'toggle-workflow') {
+    jobWorkflowOpen.has(jobKey) ? jobWorkflowOpen.delete(jobKey) : jobWorkflowOpen.add(jobKey);
+    const job = jobsState.jobs.find(item => item.key === jobKey);
+    const target = document.getElementById(`job-workflow-${jobKey}`);
+    if (job && target) {
+      patchJobMarkup(target, renderBorgRun(job));
+      target.querySelector?.('[data-jobs-action="toggle-workflow"]')?.focus({preventScroll:true});
+    }
+    return;
+  }
   if (action === 'open-wizard') return openWizard();
   if (action === 'open-log') return openLogPanel(jobKey);
+  if (action === 'open-saved-log') {
+    const logFile = jobsState.jobs.find(job => job.key === jobKey)?.last_log_file;
+    if (logFile) window.BBUI?.components?.logViewer?.open?.(logFile);
+    return;
+  }
   if (action === 'start-job') return showStartModal(jobKey);
   if (action === 'cancel-job') return showCancelJobModal(jobKey);
   if (action === 'toggle-menu') return toggleJobMenu(event, jobKey);
@@ -939,7 +1249,6 @@ async function confirmJobStart() {
     if (!res.ok) throw new Error(apiErrorMessage(data, res.status));
 
     await refreshJobs();
-    openLogPanel(jobKey);
   } catch (err) {
     showJobsError(jobsT('jobs.startFailed', { message: err.message }));
   } finally {
@@ -954,6 +1263,7 @@ function openLogPanel(jobKey, runId = '') {
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   const job = jobsState.jobs.find(j => j.key === jobKey);
+  jobsState.logRunId = runId || job?.run_id || '';
   const title = jobsT('jobs.logTitle', { name: job ? (job.display_name || job.key) : jobKey });
 
   document.getElementById('log-panel-title-text').removeAttribute('data-i18n');
@@ -981,7 +1291,7 @@ function openLogPanel(jobKey, runId = '') {
   if (job?.run_file_activity) {
     jobsState.activityLog = window.BBUI.components.activityLog.create({
       job: jobKey,
-      run: job.run_id,
+      run: jobsState.logRunId,
       output: document.getElementById('log-output'),
       onFollow: follow => { jobsState.logAutoScroll = follow; },
       onStatus: data => {
@@ -1002,7 +1312,7 @@ function openLogPanel(jobKey, runId = '') {
     return;
   }
 
-  const es = new EventSource(`/api/jobs/log/stream?job=${encodeURIComponent(jobKey)}${runId ? '&run=' + encodeURIComponent(runId) : ''}`);
+  const es = new EventSource(`/api/jobs/log/stream?job=${encodeURIComponent(jobKey)}${jobsState.logRunId ? '&run=' + encodeURIComponent(jobsState.logRunId) : ''}`);
   jobsState.activeEventSource = es;
   jobsState.logAutoScroll = true;
 
@@ -1168,6 +1478,7 @@ function clearLog() {
 }
 
 function closeLogPanel() {
+  jobsState.logRunId = '';
   jobsState.activityLog?.close();
   jobsState.activityLog = null;
   document.getElementById('log-panel').classList.add('hidden');

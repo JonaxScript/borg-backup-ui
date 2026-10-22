@@ -375,3 +375,24 @@ def test_saved_history_references_retained_log_while_active_reads_use_ram(tmp_pa
     assert status['status'] == 'warning'
     assert 'source changed' in status['error_message']
     assert not retained.exists()
+
+
+def test_borg_progress_updates_without_activity_log_growth(activity, monkeypatch):
+    config, path, params, manager = activity
+    run_id = params['run'][0]
+    path.write_text('Existing retained log\n')
+    monkeypatch.setattr(manager, 'get_state', lambda _job: {
+        'running': True, 'run_id': run_id, 'file_activity': True,
+        'log_file': str(path), 'exit_code': None,
+    })
+    control = {'job_key': 'files_local', 'phase': 'borg_check',
+               'borg_progress': {'percent': 63, 'started_at': 100, 'updated_at': 120}}
+    monkeypatch.setattr('job_control.read_control_state', lambda _run: control)
+    first = activity_log.get_activity_window(config, params)
+    control['borg_progress']['percent'] = 70
+    second = activity_log.get_activity_window(config, {**params, 'status': ['1']})
+    assert first['text'] == 'Existing retained log\n'
+    assert second['borg_progress']['percent'] == 70
+    assert first['size'] == second['size']
+    assert 'text' not in second
+    assert path.read_text() == first['text']

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import math
 import os
 import re
 import signal
@@ -64,6 +66,7 @@ class JobControl:
         self.cancel_file = self.run_dir / "cancel.request.json"
         self._process_lock = threading.Lock()
         self._active_process = None
+        self._last_borg_progress_write = float("-inf")
         self._monitor_stop = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self.run_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -82,7 +85,13 @@ class JobControl:
         finished: bool = False,
         exit_code: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Persist the current phase and cancellation policy, returning its state."""
+        """Persist phase/cancellation policy and return the state.
+
+        Starts transient timing for each Borg command. Other phases and finished
+        runs clear progress while preserving command and configured job steps.
+        In-memory detail counters reset at each phase boundary.
+        Writes may raise OSError.
+        """
         previous = read_control_state(self.run_id, self.run_dir.parent)
         data: Dict[str, Any] = {
             "group_id": os.environ.get("BORG_UI_GROUP_ID", ""),
@@ -103,8 +112,97 @@ class JobControl:
             "finished": bool(finished),
             "exit_code": exit_code,
         }
+        data["job_steps"] = previous.get("job_steps", [])
+        self._borg_details = {}
+        data["borg_steps"] = previous.get("borg_steps", {
+            name: {"status": "pending"} for name in ("create", "prune", "compact", "check")
+        })
+        # A phase transition must never retain the preceding process's progress.
+        data["borg_progress"] = ({
+            "phase": phase, "started_at": time.time(), "updated_at": None, "percent": None,
+        } if phase in {"borg_create", "borg_prune", "borg_compact", "borg_check"} and not finished else None)
+        self._last_borg_progress_write = float("-inf")
         _atomic_json(self.state_file, data)
         return data
+
+    def update_job_steps(self, steps: list) -> None:
+        """Persist ordered configured workflow steps; phase updates preserve them."""
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        state["job_steps"] = copy.deepcopy(steps)
+        _atomic_json(self.state_file, state)
+
+    def update_borg_details(self, details: dict) -> None:
+        """Accumulate numeric command results in memory, without per-line disk I/O."""
+        if not hasattr(self, "_borg_details"):
+            self._borg_details = {}
+        self._borg_details.update({key: value for key, value in details.items()
+                                   if type(value) is int and value >= 0})
+
+    def get_borg_details(self) -> dict:
+        """Return the current command's counters, reset on phase transitions."""
+        return dict(getattr(self, "_borg_details", {}))
+
+    def update_borg_steps(self, steps: Dict[str, Any]) -> None:
+        """Persist the runner's command ledger separately from transient progress.
+
+        Called at command boundaries, including skips; phase updates preserve it.
+        Raises OSError on write failures, which callers must keep non-fatal.
+        """
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        state["borg_steps"] = copy.deepcopy(steps)
+        _atomic_json(self.state_file, state)
+
+    def update_borg_progress(self, event: Optional[Dict[str, Any]]) -> None:
+        """Persist transient Borg process progress with throttled status writes.
+
+        Accepts Borg progress events; None clears progress immediately. Only
+        finite counters are exposed, never Borg messages or repository paths.
+        Operation changes and step completion bypass throttling. A finished
+        step is indeterminate until another step or the process result arrives.
+        Archive events expose only non-negative file/size counters, not paths.
+        Writes can raise OSError; callers must keep progress failures non-fatal.
+        """
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        progress = state.get("borg_progress")
+        if state.get("phase") not in {"borg_create", "borg_prune", "borg_compact", "borg_check"} or state.get("finished") or not isinstance(progress, dict):
+            return
+        now = time.monotonic()
+        if event is None:
+            state["borg_progress"] = None
+        else:
+            kind = event.get("type")
+            if kind == "archive_progress" and state["phase"] != "borg_create":
+                return
+            operation = event.get("operation")
+            if not isinstance(operation, int) or isinstance(operation, bool):
+                operation = None
+            finished = event.get("finished") is True
+            if (not finished and operation == progress.get("operation")
+                    and now - self._last_borg_progress_write < 1.0):
+                return
+            percent = None
+            current, total = event.get("current"), event.get("total")
+            if (event.get("type") == "progress_percent" and not finished
+                    and type(current) in (int, float) and type(total) in (int, float)):
+                try:
+                    if math.isfinite(current) and math.isfinite(total) and 0 <= current <= total and total > 0:
+                        percent = round(100 * (current / total), 1)
+                except (OverflowError, ValueError):
+                    pass
+            if state["phase"] == "borg_create":
+                percent = None
+            if kind == "archive_progress":
+                for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
+                    value = event.get(key)
+                    if type(value) is int and 0 <= value <= 2**53 - 1:
+                        progress[key] = value
+                if finished:
+                    for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
+                        progress.pop(key, None)
+            progress.update(percent=percent, operation=operation, updated_at=time.time())
+        state["updated_at"] = _utc_now()
+        _atomic_json(self.state_file, state)
+        self._last_borg_progress_write = now
 
     def is_cancel_requested(self) -> bool:
         return self.cancel_file.is_file()
