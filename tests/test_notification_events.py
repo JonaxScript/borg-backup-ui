@@ -717,6 +717,47 @@ def test_backup_overdue_reminder_uses_supported_schedules(monkeypatch, tmp_path)
     assert calls == ["Borg Backup UI: Backup overdue"]
 
 
+def test_backup_overdue_reminder_passes_custom_text_context(monkeypatch, tmp_path):
+    events = []
+    monkeypatch.setattr(
+        "lib.notification_events.send_event",
+        lambda config, event, *, mail_config=None: events.append(event) or {"unraid": True, "email": False, "apprise": False},
+    )
+    monkeypatch.setattr(notification_reminder_api, "datetime", _FixedDateTime)
+    monkeypatch.setattr("schedule_api.get_schedules", lambda cfg: {"appdata_local": {"enabled": True, "cron": "0 2 * * *"}})
+    monkeypatch.setattr("jobs_api.list_jobs", lambda cfg, opts: [{
+        "key": "appdata_local",
+        "display_name": "Appdata",
+        "enabled": True,
+        "location": "usb",
+        "repo_path": "/mnt/disks/usb/borg-appdata",
+    }])
+    monkeypatch.setattr("status_api.get_status_data", lambda cfg: {"backups": [{"key": "appdata_local", "timestamp": "2026-06-27 02:00:00"}]})
+
+    notification_reminder_api.run_due_notification_reminders({
+        "BACKUP_SCRIPTS_DIR": str(tmp_path),
+        "NOTIFY_UNRAID_EVENTS": "backup_overdue",
+        "NOTIFY_EMAIL_EVENTS": "",
+    })
+
+    overdue = [event for event in events if event.event_type == "backup_overdue"]
+    assert len(overdue) == 1
+    assert overdue[0].title == "Borg Backup UI: Backup overdue"
+    assert "Target: borg-appdata" in overdue[0].message
+    assert overdue[0].template_context == {
+        "job": "Appdata",
+        "status": "Overdue",
+        "time": "2026-06-29 12:00",
+        "duration": "0 sec",
+        "target": "USB / borg-appdata",
+        "location": "USB",
+        "repository": "/mnt/disks/usb/borg-appdata",
+        "archive": "",
+        "error": "Scheduled backup missed the expected run at 2026-06-29 02:00:00.",
+        "exit_code": "",
+    }
+
+
 def test_backup_overdue_uses_expected_run_and_configured_tolerance(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr("lib.notification_events.notify", lambda **kwargs: calls.append(kwargs["subject"]) or True)

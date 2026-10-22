@@ -1033,6 +1033,8 @@ Konfigurierbare Ereignisse können unter anderem sein:
 
 Die Reminder-Einstellungen gelten kanalübergreifend. Das Reminder-Intervall verhindert, dass dieselbe Überfälligkeit ständig erneut gemeldet wird. Die Backup-Überfälligkeits-Toleranz legt fest, ab wann ein geplanter Backup-Lauf nach seiner erwarteten Startzeit als überfällig gilt.
 
+**Eigene Benachrichtigungstexte:** Unter **Benachrichtigungstexte** lassen sich Titel und Nachricht der Backup-Ereignisse erfolgreich, Warnung, fehlgeschlagen, übersprungen und überfällig ersetzen. Die Texte gelten für Unraid, E-Mail und Apprise. Leere Felder behalten den Standardtext; **Standardtext verwenden** stellt ihn wieder her. Platzhalter wie `{job}`, `{status}`, `{time}`, `{duration}`, `{target}`, `{archive}`, `{error}` und `{hostname}` werden beim Versand ersetzt, `{default_message}` fügt die vollständige Standardnachricht ein. Die Karte listet alle Platzhalter und zeigt für jeden Text eine Vorschau mit Beispielwerten. Unbekannte Platzhalter bleiben unverändert, und ein Text, der leer ergibt, fällt auf den Standardtext zurück. Eingesetzte Werte wie Status und Fehlermeldungen sind immer englisch. E-Mails aus Backup-Läufen enthalten weiterhin den Log-Auszug, und Restore-Test-Benachrichtigungen behalten ihre Standardtexte. Die Texte liegen in `config/notification-templates.json` im Datenverzeichnis des Plugins und sind im Support-Paket enthalten.
+
 > **Hinweis:** Testnachrichten prüfen nur den Versandkanal. Sie ersetzen keinen echten Backup- oder Restore-Test.
 
 ### Prometheus und Grafana
@@ -1447,7 +1449,8 @@ oder Screenshots weiter.
 
 1. Öffnen Sie **Einstellungen > Benachrichtigungen**.
 2. Konfigurieren Sie Unraid, E-Mail/SMTP oder ein Apprise-Profil.
-3. Wählen Sie Ereignisse, Reminder-Abstand und Backup-Toleranz. Speichern Sie.
+3. Wählen Sie Ereignisse, Reminder-Abstand und Backup-Toleranz. Passen Sie bei
+   Bedarf Titel und Nachricht unter **Benachrichtigungstexte** an. Speichern Sie.
 4. Senden Sie eine Testnachricht und bestätigen Sie den Empfang am Ziel.
 5. Prüfen Sie **Einstellungen > Erweitert > Notification Reminder** sowie beim
    nächsten echten Lauf dessen Ergebnis und Zustellung.

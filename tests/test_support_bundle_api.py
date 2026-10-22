@@ -115,6 +115,10 @@ def test_support_bundle_contains_sanitized_config_and_jobs(tmp_path: Path, monke
             "selected_events": ["backup_failed"],
         }],
     }) + "\n", encoding="utf-8")
+    (config_dir / "notification-templates.json").write_text(json.dumps({
+        "schema_version": 1,
+        "templates": [{"event": "backup_failed", "title": "{job} failed", "message": "{error}"}],
+    }) + "\n", encoding="utf-8")
     (config_dir / "notification-deliveries.json").write_text(json.dumps({
         "schema_version": 1,
         "deliveries": [{
@@ -187,6 +191,7 @@ def test_support_bundle_contains_sanitized_config_and_jobs(tmp_path: Path, monke
         assert "config/storages.sanitized.json" in names
         assert "config/repositories.sanitized.json" in names
         assert "config/apprise-profiles.sanitized.json" in names
+        assert "config/notification-templates.sanitized.json" in names
         assert "config/notification-deliveries.sanitized.json" in names
         assert "config/migration-state.sanitized.json" in names
         assert "config/migrations.log.sanitized.jsonl" in names

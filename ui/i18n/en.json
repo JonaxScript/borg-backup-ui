@@ -235,7 +235,11 @@
       "job_script_import_file": "Select a Bash file with the .sh extension.",
       "job_script_import_size": "The script file must contain 1–65536 bytes (64 KiB maximum).",
       "job_script_import_text": "The file must contain UTF-8 text without binary control characters.",
-      "job_script_import_bash": "The first line must specify Bash: #!/bin/bash, #!/usr/bin/bash or #!/usr/bin/env bash (without additional options)."
+      "job_script_import_bash": "The first line must specify Bash: #!/bin/bash, #!/usr/bin/bash or #!/usr/bin/env bash (without additional options).",
+      "notification_template_event": "The notification texts contain an unknown or repeated event.",
+      "notification_template_title": "Notification titles must be a single line with at most {max} characters.",
+      "notification_template_message": "Notification messages must not exceed {max} characters.",
+      "notification_template_payload": "The notification texts have an invalid format."
     },
     "messages": {
       "smb_already_mounted": "The SMB share is already mounted.",
@@ -2831,6 +2835,33 @@
       "savedDirectories": "Settings saved. Active directories: {directories}",
       "savedMountsRemoved": "Settings saved. SMB mount points removed: {paths}",
       "credentialsRemoved": "SMB credentials removed: {paths}"
+    },
+    "notificationTemplates": {
+      "title": "Notification texts",
+      "hint": "Replace the default title and message of backup notifications for Unraid, email and Apprise. Empty fields keep the default text. Emails from backup runs still include the log excerpt.",
+      "unreadable": "The saved notification texts could not be read. Default texts are used, and saving does not change the file. Check notification-templates.json in the configuration folder.",
+      "placeholdersTitle": "Available placeholders",
+      "custom": "Custom",
+      "default": "Default",
+      "titleLabel": "Title",
+      "messageLabel": "Message",
+      "preview": "Preview with sample values",
+      "reset": "Use default text",
+      "placeholders": {
+        "job": "Job name",
+        "status": "Result, e.g. Successful or Error",
+        "time": "Time of the event",
+        "duration": "Backup duration",
+        "target": "Storage location and repository name",
+        "location": "Storage location, e.g. USB or SSH",
+        "repository": "Repository path",
+        "archive": "Created archive",
+        "error": "Error or reason",
+        "exit_code": "Exit code of the job",
+        "hostname": "Server name",
+        "default_title": "Default title of the event",
+        "default_message": "Default message of the event"
+      }
     },
     "apprise": {
       "needsAttention": "Needs attention",

@@ -3029,17 +3029,25 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             cleanup_removed_smb_secrets,
         )
         from storage_objects_api import replace_profile_storages, settings_profiles_from_storages
+        from notification_templates_api import normalize_notification_templates, save_notification_templates
         body = self._read_json_body()
         updates = body.get("updates", {})
         profile_updates = body.get("profile_updates", {})
+        notification_templates = body.get("notification_templates")
         smb_cleanup_keys = body.get("smb_cleanup_keys", [])
         smb_secret_cleanup_keys = body.get("smb_secret_cleanup_keys", [])
         if not isinstance(updates, dict):
             raise ValueError("updates must be an object")
         if not isinstance(profile_updates, dict):
             raise ValueError("profile_updates must be an object")
-        if not updates and not profile_updates:
-            raise ValueError("updates or profile_updates is required")
+        if not updates and not profile_updates and notification_templates is None:
+            raise ValueError("updates, profile_updates or notification_templates is required")
+        # Validate custom texts before anything is written.
+        template_rows = (
+            normalize_notification_templates(notification_templates)
+            if notification_templates is not None
+            else None
+        )
         if smb_cleanup_keys is None:
             smb_cleanup_keys = []
         if smb_secret_cleanup_keys is None:
@@ -3110,6 +3118,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             validate_storage_profile_usage_before_save(self.config, normalized_storage)
             replace_profile_storages(self.config, "storagebox", normalized_storage)
         write_conf(self.config, updates, snapshot_reason="Manual change")
+        if template_rows is not None:
+            save_notification_templates(self.config, template_rows)
         repository_refresh_keys = {
             "REPOSITORY_INFO_REFRESH_ENABLED",
             "REPOSITORY_INFO_REFRESH_INTERVAL_HOURS",

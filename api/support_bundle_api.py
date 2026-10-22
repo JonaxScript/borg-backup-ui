@@ -209,6 +209,7 @@ def create_support_bundle(config: dict, *, app_version: str = "") -> dict:
             "job-groups.json",
             "repositories.json",
             "apprise-profiles.json",
+            "notification-templates.json",
             "notification-deliveries.json",
             "migration-state.json",
         ):

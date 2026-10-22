@@ -829,6 +829,8 @@ def get_settings_data(ui_config: dict, include_storagebox_setup: bool = True) ->
         # Normal settings reads must never wait for a remote SSH probe. Explicit
         # connection tests remain available through the storage profile actions.
         data["storagebox_setup"] = get_storagebox_setup_status(ui_config, probe_auth=False)
+    from notification_templates_api import get_notification_template_settings
+    data["notification_templates"] = get_notification_template_settings(ui_config)
     from storage_objects_api import settings_profiles_from_storages
     canonical_profiles = settings_profiles_from_storages(ui_config)
     from repositories_api import read_repository_store

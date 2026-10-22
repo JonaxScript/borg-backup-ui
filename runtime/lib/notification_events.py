@@ -13,7 +13,7 @@ import os
 import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -22,6 +22,7 @@ import subprocess
 import sys
 
 from lib.apprise_adapter import AppriseAdapterError, send_notification
+from lib.notification_templates import render_notification_text
 from lib.notifications import MailConfig, notify, send_mail
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,11 @@ MAX_EMAIL_LOG_CHARS = 40_000
 
 @dataclass
 class NotificationEvent:
-    """Logical notification and backup context shared by all delivery channels."""
+    """Logical notification and backup context shared by all delivery channels.
+
+    ``template_context`` holds placeholder values for custom notification
+    texts. Events without it always use their own title and message.
+    """
     event_type: str
     title: str
     message: str
@@ -51,6 +56,7 @@ class NotificationEvent:
     exit_code: int = 0
     source: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    template_context: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -88,12 +94,15 @@ def send_event(
 
     Returns per-channel delivery booleans; an empty event type delivers
     nothing. Email needs ``mail_config``. Apprise may queue asynchronously,
-    and the outcome is recorded in the lifecycle log when applicable.
+    and the outcome is recorded in the lifecycle log when applicable. A saved
+    custom text replaces title and message on every channel when the event
+    carries a template context.
     """
     results = {"unraid": False, "email": False, "apprise": False}
     event_type = str(event.event_type or "").strip()
     if not event_type:
         return results
+    event = _with_custom_text(config, event)
 
     if event_type in event_set(config, "NOTIFY_UNRAID_EVENTS", DEFAULT_UNRAID_EVENTS):
         results["unraid"] = notify(
@@ -124,6 +133,26 @@ def send_event(
     )
     _emit_lifecycle_notification(event, results, apprise_result)
     return results
+
+
+def _with_custom_text(config: dict, event: NotificationEvent) -> NotificationEvent:
+    if not event.template_context:
+        return event
+    try:
+        title, message = render_notification_text(
+            config,
+            event.event_type,
+            event.title,
+            event.message,
+            event.template_context,
+        )
+    except Exception as exc:  # noqa: BLE001 - custom texts must never block delivery
+        logger.warning("Custom notification text skipped (event=%s): %s", event.event_type, _safe_error(exc))
+        return event
+    if title == event.title and message == event.message:
+        return event
+    logger.info("Custom notification text applied (event=%s)", event.event_type)
+    return replace(event, title=title, message=message)
 
 
 def _emit_lifecycle_notification(event: NotificationEvent, results: dict[str, bool], apprise_result: AppriseEventResult) -> None:

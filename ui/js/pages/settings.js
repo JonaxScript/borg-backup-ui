@@ -4927,9 +4927,165 @@ function renderSettingsUnraidNotifications(s) {
     </div>`);
 }
 
+/**
+ * Render editable custom texts for backup notification events.
+ * @param {object} config `notification_templates` from the settings payload.
+ * @returns {string} Card HTML; fields are disabled when saved texts are unreadable.
+ */
+function renderSettingsNotificationTemplates(config) {
+  const events = Array.isArray(config.events) ? config.events : [];
+  const labels = Object.fromEntries(notificationEventOptions());
+  const readable = config.readable !== false;
+  const rows = events.map((event) => _renderNotificationTemplateRow(event, labels[event] || event, config, readable)).join('');
+  return settingsCard(settingsT('notificationTemplates.title'),
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>`,
+    `<div class="settings-body notification-templates" data-notification-templates="${readable ? 'ready' : 'unreadable'}">
+      <div class="status-message info">${escHtml(settingsT('notificationTemplates.hint'))}</div>
+      ${readable ? '' : `<div class="status-message error-state">${escHtml(settingsT('notificationTemplates.unreadable'))}</div>`}
+      ${_renderNotificationTemplatePlaceholders(config.placeholders)}
+      ${rows}
+    </div>`);
+}
+
+function _renderNotificationTemplatePlaceholders(placeholders) {
+  const items = (Array.isArray(placeholders) ? placeholders : []).map((name) => `
+    <div><dt><code>{${escHtml(name)}}</code></dt><dd>${escHtml(settingsT(`notificationTemplates.placeholders.${name}`))}</dd></div>`).join('');
+  return `<details class="notification-template-placeholders">
+    <summary>${escHtml(settingsT('notificationTemplates.placeholdersTitle'))}</summary>
+    <dl>${items}</dl>
+  </details>`;
+}
+
+function _renderNotificationTemplateRow(event, label, config, readable) {
+  const saved = config.templates?.[event] || {};
+  const example = config.examples?.[event] || {};
+  const limits = config.limits || {};
+  const title = String(saved.title || '');
+  const message = String(saved.message || '');
+  const custom = !!(title.trim() || message.trim());
+  const preview = _notificationTemplatePreview(example, title, message);
+  const id = `notification-template-${event}`;
+  const disabled = readable ? '' : 'disabled';
+  return `<details class="notification-template" data-notification-template-event="${escAttr(event)}" ${custom ? 'open' : ''}>
+    <summary>
+      <span>${escHtml(label)}</span>
+      <span class="badge notification-template-state ${custom ? 'is-custom' : ''}" data-notification-template-state>${escHtml(settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default'))}</span>
+    </summary>
+    <div class="notification-template-fields">
+      <div class="form-group">
+        <label class="form-label" for="${id}-title">${escHtml(settingsT('notificationTemplates.titleLabel'))}</label>
+        <input class="form-input" type="text" id="${id}-title" maxlength="${Number(limits.title) || 200}"
+          data-notification-template-field="title" value="${escAttr(title)}" placeholder="${escAttr(example.title)}"
+          oninput="onNotificationTemplateInput(this)" ${disabled}>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="${id}-message">${escHtml(settingsT('notificationTemplates.messageLabel'))}</label>
+        <textarea class="form-input mono" id="${id}-message" rows="6" maxlength="${Number(limits.message) || 2000}"
+          data-notification-template-field="message" placeholder="${escAttr(example.message)}"
+          oninput="onNotificationTemplateInput(this)" ${disabled}>${escHtml(message)}</textarea>
+      </div>
+      <div class="notification-template-preview" aria-live="polite">
+        <small>${escHtml(settingsT('notificationTemplates.preview'))}</small>
+        <strong data-notification-template-preview="title">${escHtml(preview.title)}</strong>
+        <pre data-notification-template-preview="message">${escHtml(preview.message)}</pre>
+      </div>
+      <div>
+        <button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-reset" ${disabled}>${escHtml(settingsT('notificationTemplates.reset'))}</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+/**
+ * Replace known `{name}` placeholders in one pass, like the backend renderer.
+ * @param {string} text Custom text.
+ * @param {object} values Placeholder values; unknown placeholders stay unchanged.
+ * @returns {string} Rendered text.
+ */
+function _renderNotificationTemplateText(text, values) {
+  return String(text || '').replace(/\{([a-z_]+)\}/g, (match, name) => (
+    Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
+  ));
+}
+
+/**
+ * Render the title and message a sample backup would send.
+ * @param {object} example Server example with `title`, `message` and `values`.
+ * @param {string} title Custom title; empty keeps the default.
+ * @param {string} message Custom message; empty keeps the default.
+ * @returns {{title: string, message: string}} Preview text.
+ */
+function _notificationTemplatePreview(example, title, message) {
+  const values = example?.values && typeof example.values === 'object' ? example.values : {};
+  const renderedTitle = _renderNotificationTemplateText(String(title || '').trim(), values)
+    .split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(' ');
+  const renderedMessage = _renderNotificationTemplateText(String(message || '').trim(), values).trim();
+  return {
+    title: renderedTitle || String(example?.title || ''),
+    message: renderedMessage || String(example?.message || ''),
+  };
+}
+
+function _refreshNotificationTemplateRow(row) {
+  const event = row.dataset.notificationTemplateEvent || '';
+  const title = row.querySelector('[data-notification-template-field="title"]')?.value || '';
+  const message = row.querySelector('[data-notification-template-field="message"]')?.value || '';
+  const example = settingsState.data?.notification_templates?.examples?.[event] || {};
+  const preview = _notificationTemplatePreview(example, title, message);
+  const previewTitle = row.querySelector('[data-notification-template-preview="title"]');
+  const previewMessage = row.querySelector('[data-notification-template-preview="message"]');
+  if (previewTitle) previewTitle.textContent = preview.title;
+  if (previewMessage) previewMessage.textContent = preview.message;
+  const custom = !!(title.trim() || message.trim());
+  const badge = row.querySelector('[data-notification-template-state]');
+  if (badge) {
+    badge.classList.toggle('is-custom', custom);
+    badge.textContent = settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default');
+  }
+}
+
+/** Update preview and state of one custom notification text after an edit. */
+function onNotificationTemplateInput(field) {
+  const row = field?.closest?.('[data-notification-template-event]');
+  if (row) _refreshNotificationTemplateRow(row);
+  markSettingsDirty();
+}
+
+/** Clear one custom notification text so the default text is used after saving. */
+function resetNotificationTemplate(button) {
+  const row = button?.closest?.('[data-notification-template-event]');
+  if (!row) return;
+  row.querySelectorAll('[data-notification-template-field]').forEach((field) => { field.value = ''; });
+  _refreshNotificationTemplateRow(row);
+  markSettingsDirty();
+}
+
+/**
+ * Collect custom notification texts below a settings panel.
+ * @param {Element|null} panel Active settings panel.
+ * @returns {object|null} Texts by event, or null when the card is missing or
+ *   the saved texts were unreadable and must not be overwritten.
+ */
+function collectNotificationTemplates(panel) {
+  const root = panel?.querySelector?.('[data-notification-templates="ready"]');
+  if (!root) return null;
+  const templates = {};
+  root.querySelectorAll('[data-notification-template-event]').forEach((row) => {
+    templates[row.dataset.notificationTemplateEvent] = {
+      title: row.querySelector('[data-notification-template-field="title"]')?.value || '',
+      message: row.querySelector('[data-notification-template-field="message"]')?.value || '',
+    };
+  });
+  return templates;
+}
+
 function renderSettingsNotifications(data) {
   return `
     ${renderSettingsNotificationReminders(data.unraid_notifications || {})}
+    ${renderSettingsNotificationTemplates(data.notification_templates || {})}
     ${renderSettingsSMTP(data.smtp || {})}
     ${renderSettingsUnraidNotifications(data.unraid_notifications || {})}
     ${renderSettingsAppriseProfiles()}`;
@@ -6114,6 +6270,7 @@ async function onSettingsContentClick(event) {
   if (action === 'restore-config-backup') return restoreSettingsConfigBackup(el.dataset.backupName || '');
   if (action === 'delete-config-backup') return deleteSettingsConfigBackup(el.dataset.backupName || '');
   if (action === 'send-test-email') return sendTestEmail();
+  if (action === 'notification-template-reset') return resetNotificationTemplate(el);
   if (action === 'apprise-profile-select') {
     if (settingsState.appriseDraftProfile) return;
     settingsState.appriseSelectedProfileId = el.dataset.appriseProfileId || '';
@@ -7198,6 +7355,7 @@ async function saveSettings() {
   if (activeTab === 'usb') profileUpdates.usb = getUsbProfilesFromDom();
   if (activeTab === 'smb') profileUpdates.smb = getSmbProfilesFromDom();
   if (activeTab === 'storagebox') profileUpdates.storagebox = getStorageProfilesFromDom();
+  const notificationTemplates = activeTab === 'notifications' ? collectNotificationTemplates(activePanel) : null;
   if (Object.prototype.hasOwnProperty.call(updates, 'GLOBAL_DATA_DIR') && !String(updates.GLOBAL_DATA_DIR || '').trim()) {
     showMsg('settings-message', 'error', settingsT('forms.dataDirRequired'));
     return false;
@@ -7231,6 +7389,7 @@ async function saveSettings() {
       body: JSON.stringify({
         updates,
         profile_updates: profileUpdates,
+        ...(notificationTemplates ? { notification_templates: notificationTemplates } : {}),
         smb_cleanup_keys: settingsState.smbCleanupKeys || [],
         smb_secret_cleanup_keys: settingsState.smbSecretCleanupKeys || [],
       }),
@@ -7301,6 +7460,7 @@ async function reloadSettingsDataAfterSave(profileType = '') {
 window.onAppriseProviderFilterChange = onAppriseProviderFilterChange;
 window.onAppriseProviderSelect = onAppriseProviderSelect;
 window.onRepositoryRefreshEnabledToggle = onRepositoryRefreshEnabledToggle;
+window.onNotificationTemplateInput = onNotificationTemplateInput;
 
 /** Fetch administrator script definitions; display errors without replacing saved scripts. */
 async function loadSettingsScripts(selected = '') {
