@@ -296,6 +296,8 @@ class BackupJob:
         self.phase_callback = phase_callback
         self.completion_callback = completion_callback
         self.hook_results: dict = {}
+        # Shared runner ledger; saved with the final report after service recovery.
+        self.borg_steps: dict = {name: {"status": "pending"} for name in ("create", "prune", "compact", "check")}
         self.backup_exit_code: int | None = None
         self._completion_repo_info = None
 
@@ -1172,6 +1174,7 @@ class BackupJob:
             exit_code=0,
             status="skipped",
             hook_results=self.hook_results,
+            borg_steps=self.borg_steps,
             error_message=f"Skipped: {reason}",
             skip_reason_code=reason_code,
             skip_reason_text=reason,
@@ -1266,7 +1269,7 @@ class BackupJob:
             logger.warning("Notification event failed: %s", exc)
 
     def _save_status(self, duration: int) -> Path | None:
-        """Erstellt und speichert BackupStatus-JSON-Datei."""
+        """Save the final status including measured Borg steps; return its path or None on I/O failure."""
         from lib.status import BackupStatus
 
         exit_code = self._borg_exit
@@ -1315,6 +1318,7 @@ class BackupJob:
             failure_code=self._failure_code,
             missing_source_paths=self._missing_source_paths,
             hook_results=self.hook_results,
+            borg_steps=self.borg_steps,
             backup_exit_code=self.backup_exit_code,
             error_message=error_msg,
             log_file=str(self.config.retained_log_file or self.config.log_file),

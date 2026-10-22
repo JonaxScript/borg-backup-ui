@@ -90,3 +90,62 @@ for(const fileActivity of [false,true]) {
   context.closeLogPanel();
 }
 console.log('Borg progress: 60-second per-process gate, create counters and late log opening passed.');
+
+// The four-step ledger persists independently of transient progress.
+const steps = {create:{status:'success',duration_seconds:492},prune:{status:'warning',duration_seconds:18},
+  compact:{status:'skipped',reason:'keep_all'},check:{status:'running',started_at:100}};
+let timeline = context.renderBorgRun({...runtime, run_borg_steps:steps}, 159);
+assert.equal((timeline.match(/class="borg-step is-/g)||[]).length,4);
+assert.match(timeline, /8:12/);
+assert.match(timeline, /is-warning/);
+assert.match(timeline, /is-skipped/);
+assert.match(timeline, /jobs.borgStep.keep_all/);
+assert.doesNotMatch(timeline, /<progress/,'The stepper is visible immediately; detailed progress waits 60 seconds');
+timeline = context.renderBorgRun({...runtime,run_borg_steps:steps},160);
+assert.match(timeline, /<progress/);
+const saved = {...steps,check:{status:'error',duration_seconds:193}};
+const completed = {running:false,last_borg_steps:saved,last_timestamp:'2026-10-22 14:32:00',last_duration_seconds:768};
+timeline = context.renderBorgRun(completed,500);
+assert.match(timeline,/is-error/);
+assert.match(timeline,/3:13/);
+assert.match(timeline,/jobs.borgTotalDuration 12:48/);
+assert.doesNotMatch(timeline,/<progress|aria-current/);
+assert.equal(context.renderBorgRun({running:false,last_status:'success'},500),'','Old successful reports must not invent step successes');
+assert.equal(context.renderBorgRun({...completed,running:true,run_borg_steps:{}},500),'','New runs never show old completed steps');
+assert.match(context.renderBorgRun({running:false,last_borg_steps:steps},500),/is-interrupted/);
+for(const phase of ['borg_prune','borg_compact']) {
+  const maintenance={running:true,phase,borg_progress:{phase,started_at:100,updated_at:110,percent:40}};
+  assert.equal(context.renderBorgProgress(maintenance,159),'');
+  assert.match(context.renderBorgProgress(maintenance,160),/value="40"/);
+  assert.equal(context.renderBorgProgress({...maintenance,borg_progress:{...maintenance.borg_progress,updated_at:null}},200),'','Do not invent maintenance progress without events');
+}
+// The regular timer must preserve completed results even with no live state.
+state.jobs=[{key:'demo',...completed}];
+context.updateBorgProgressDisplays({});
+assert.match(element('job-borg-progress-demo').innerHTML,/is-error/);
+assert.doesNotMatch(element('job-borg-progress-demo').innerHTML,/<progress/);
+console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and maintenance gate passed.');
+
+(async () => {
+  // A cron-run disappearing from the live API must reload its saved final result.
+  context.window.BBUI.core = {state:{currentPage:'jobs'}};
+  state.jobs=[{key:'demo',running:true,run_borg_steps:steps}];
+  state.lastRunningSnapshot='previous';
+  context.fetch=async()=>({ok:true,json:async()=>({})});
+  context.renderJobsGrid=()=>{};
+  let scheduled;
+  context.setTimeout=(callback)=>{scheduled=callback;};
+  await context._pollRunningStates();
+  assert.equal(typeof scheduled,'function','Finishing cron jobs must refresh saved results');
+  // Simulate a full reload after server restart with only a saved report.
+  context.window.BBUI.core.updateDataDirWarning=async()=>{};
+  context.window.BBUI.core.setSchedulesData=()=>{};
+  context.fetch=async url=>({ok:true,json:async()=>url==='/api/jobs'?{jobs:[{key:'demo'}]}:
+    url==='/api/status'?{backups:[{key:'demo',status:'success',timestamp:'2026-10-22 14:32:00',duration_seconds:768,borg_steps:saved,run_id:'finished-579'}]}:{}});
+  context.hideJobsMessage=()=>{};
+  context.showJobsError=message=>{throw Error(message);};
+  await context.refreshJobs();
+  assert.match(element('job-borg-progress-demo').innerHTML,/is-error/);
+  assert.match(element('job-borg-progress-demo').innerHTML,/12:48/);
+  console.log('Cron completion refresh and persisted timeline after full page reload passed.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -820,6 +820,7 @@ def main() -> int:
             process_controller=control,
             phase_callback=set_phase,
         )
+        job.borg_steps = runner.steps
         create_exit = runner.create(
             job_config.backup_paths,
             archive_prefix,

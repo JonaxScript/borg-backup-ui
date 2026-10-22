@@ -660,3 +660,32 @@
 .borg-progress strong { font-size: 12px; overflow-wrap: anywhere; }
 .borg-progress small { color: var(--text-muted); font-size: 11px; }
 .borg-progress progress { width: 100%; height: 8px; accent-color: var(--accent); }
+
+
+/* Measured Borg command results remain visible after the run completes. */
+.jobs-redesign-operation > [id^="job-borg-progress-"] { width: 100%; min-width: 0; }
+.borg-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; padding: 0; margin: 12px 0; gap: 4px; width: 100%; }
+.borg-step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 5px; min-width: 0; font-size: 11px; }
+.borg-step:not(:last-child)::after { content: ''; position: absolute; top: 11px; height: 2px; background: var(--ui-color-border); left: calc(50% + 15px); width: calc(100% - 26px); }
+.borg-step-dot { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--bg-base); border: 1px solid var(--border); color: var(--text-muted); font-size: 14px; font-weight: 600; flex-shrink: 0; }
+.borg-step.is-success .borg-step-dot { background: var(--success); color: #fff; border-color: var(--success); }
+.borg-step.is-running .borg-step-dot { background: var(--accent); border: 3px solid var(--bg-surface); box-shadow: 0 0 0 2px var(--accent); }
+.borg-step.is-warning .borg-step-dot, .borg-step.is-interrupted .borg-step-dot { background: var(--warning); color: var(--bg-base); }
+.borg-step.is-error .borg-step-dot { background: var(--error); color: #fff; }
+.borg-step.is-cancelled .borg-step-dot { color: var(--warning); }
+.borg-step-command { color: var(--text-secondary); overflow-wrap: normal; }
+.borg-step.is-running .borg-step-command { color: var(--text-primary); font-weight: 600; }
+.borg-step-duration { color: var(--text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.borg-run-summary { display: block; margin-top: 12px; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.borg-progress-heading { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.borg-progress-heading > :last-child { flex-shrink: 0; }
+.borg-progress progress { display: block; appearance: none; border: none; border-radius: 8px; overflow: hidden; background: var(--border); }
+.borg-progress progress::-webkit-progress-bar { background: var(--border); border-radius: 8px; }
+.borg-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 8px; }
+.borg-progress progress::-moz-progress-bar { background: var(--accent); border-radius: 8px; }
+.borg-progress progress:indeterminate { background: linear-gradient(90deg, transparent 0 30%, var(--accent) 30% 60%, transparent 60%) var(--border); background-size: 200% 100%; animation: borg-progress-activity 2s ease-in-out infinite alternate; }
+.borg-progress progress:indeterminate::-webkit-progress-bar { background: transparent; }
+@keyframes borg-progress-activity { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .borg-progress progress:indeterminate { animation: none; } }
+
+.jobs-completed-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }

@@ -53,6 +53,7 @@ def _control_state_for_run(run_id: str) -> dict:
         for key in (
             "phase",
             "borg_progress",
+            "borg_steps",
             "cancel_allowed",
             "cancellation_deferred",
             "cancel_requested",
@@ -976,7 +977,8 @@ def discover_jobs(scripts_dir: Path, data_root: Path | None = None) -> List[JobI
 def list_jobs(config: dict, latest_statuses: dict) -> List[dict]:
     """
     Gibt alle erkannten Jobs als JSON-serialisierbares Dict zurück,
-    angereichert mit dem letzten Backup-Status.
+    angereichert mit dem letzten Backup-Status einschließlich optionaler
+    Borg-Einzelschritte, Gesamtdauer, Run-ID und gespeichertem Logpfad.
     """
     scripts_dir = resolve_scripts_dir(config)
     data_root = resolve_data_root(config)
@@ -1056,6 +1058,10 @@ def list_jobs(config: dict, latest_statuses: dict) -> List[dict]:
                 "last_time_ago": last["time_ago"] if last else None,
                 "last_timestamp": last["timestamp"] if last else None,
                 "last_exit_code": last["exit_code"] if last else None,
+                "last_borg_steps": last.get("borg_steps", {}) if last else {},
+                "last_duration_seconds": last.get("duration_seconds") if last else None,
+                "last_run_id": last.get("run_id", "") if last else "",
+                "last_log_file": last.get("log_file", "") if last else "",
                 # Aktueller Laufzustand
                 "running": run_state.get("running", False),
                 "run_start_time": run_state.get("start_time"),

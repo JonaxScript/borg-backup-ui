@@ -25,6 +25,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
+from functools import wraps
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -173,9 +174,46 @@ class BorgStats:
 # Öffentliche API
 # ---------------------------------------------------------------------------
 
+def _tracked_borg_step(name):
+    """Record command outcome and monotonic duration, preserving return/exception semantics.
+
+    The runner retains all four steps for the saved report and optionally
+    publishes snapshots through JobControl. UI write failures remain non-fatal.
+    """
+    def decorate(method):
+        @wraps(method)
+        def tracked(self, *args, **kwargs):
+            started = time.monotonic()
+            step = {"status": "running", "started_at": time.time()}
+            self.steps[name] = step
+            self._publish_steps()
+            try:
+                code = method(self, *args, **kwargs)
+            except BaseException:
+                step["status"] = "cancelled" if (
+                    self.process_controller is not None
+                    and self.process_controller.is_cancel_requested()
+                ) else "error"
+                raise
+            else:
+                if step["status"] != "skipped":
+                    step["status"] = {0: "success", 1: "warning", 130: "cancelled"}.get(code, "error")
+                    step["exit_code"] = code
+                return code
+            finally:
+                if step["status"] != "skipped":
+                    step["duration_seconds"] = round(max(0, time.monotonic() - started), 3)
+                    step["finished_at"] = time.time()
+                self._publish_steps()
+                _publish_borg_progress(self.process_controller, None)
+        return tracked
+    return decorate
+
+
 class BorgRunner:
     """
-    Führt Borg-Operationen (prune, compact, check) aus.
+    Führt Borg-Operationen aus und hält Ergebnisse/Laufzeiten in ``steps``.
+    Optionale UI-Fortschrittsmeldungen werden getrennt von Logs verarbeitet.
 
     Typischer Workflow in einem Backup-Skript:
         runner = BorgRunner(BorgConfig.from_config(cfg))
@@ -188,6 +226,22 @@ class BorgRunner:
         self.config = config or BorgConfig()
         self.process_controller = process_controller
         self.phase_callback = phase_callback
+        self.steps = {name: {"status": "pending"} for name in ("create", "prune", "compact", "check")}
+
+    def _publish_steps(self) -> None:
+        """Publish the small command ledger when supported; never fail a backup on UI I/O."""
+        callback = getattr(self.process_controller, "update_borg_steps", None)
+        if callable(callback):
+            try:
+                callback(self.steps)
+            except (OSError, ValueError, TypeError):
+                pass
+
+    def _skip_step(self, name: str, reason: str) -> None:
+        """Record an explicit policy skip, without a fabricated execution duration."""
+        self.steps[name].clear()
+        self.steps[name].update(status="skipped", reason=reason)
+        self._publish_steps()
 
     def retention(self):
         return normalize_retention(self.config.retention_policy if self.config.retention_policy is not None else {
@@ -195,6 +249,7 @@ class BorgRunner:
             for period in ("daily", "weekly", "monthly", "yearly")
         })
 
+    @_tracked_borg_step("prune")
     def prune(self, archive_prefix: str = "") -> int:
         """
         Löscht alte Backups nach der konfigurierten Retention Policy.
@@ -219,7 +274,7 @@ class BorgRunner:
         archive_prefix = str(archive_prefix or "").strip()
         logger.info("Borg prune: archive filter %s; %s", f"{archive_prefix}-*" if archive_prefix else "all", " ".join(args))
         cmd = [
-            "borg", "prune", "--verbose", "--list", "--show-rc",
+            "borg", "prune", "--verbose", "--list", "--progress", "--log-json",
             *(["--glob-archives", f"{archive_prefix}-*"] if archive_prefix else []),
             *args,
         ]
@@ -237,6 +292,7 @@ class BorgRunner:
 
         return exit_code
 
+    @_tracked_borg_step("compact")
     def compact(self) -> int:
         """
         Gibt ungenutzten Speicherplatz im Repository frei.
@@ -244,13 +300,13 @@ class BorgRunner:
         Entspricht borg_compact() in borg-common.sh.
 
         Returns:
-            Borg Exit-Code (0 = OK, >0 = Fehler)
+            Borg Exit-Code (0 = OK, 1 = Warnung, >=2 = Fehler)
         """
         if self.phase_callback:
             self.phase_callback("borg_compact")
         logger.info("Borg compact: reclaiming unused space...")
 
-        cmd = ["borg", "compact", "--verbose", "--show-rc"]
+        cmd = ["borg", "compact", "--verbose", "--progress", "--log-json"]
         if self.config.repo:
             cmd.append(self.config.repo)
 
@@ -258,11 +314,14 @@ class BorgRunner:
 
         if exit_code == BORG_EXIT_OK:
             logger.info("Borg compact succeeded")
+        elif exit_code == BORG_EXIT_WARNING:
+            logger.warning("Borg compact completed with warnings (exit 1)")
         else:
             logger.warning("WARNING: Borg compact failed (exit %d)", exit_code)
 
         return exit_code
 
+    @_tracked_borg_step("check")
     def check(self) -> int:
         """
         Prüft Repository-Integrität (zeitgesteuert per Flag-Datei).
@@ -279,6 +338,7 @@ class BorgRunner:
         days_since = _days_since_flag(self.config.check_flag_file)
 
         if days_since < self.config.check_interval_days:
+            self._skip_step("check", "not_due")
             logger.info(
                 "Borg check skipped (last check %d days ago, "
                 "interval: %d days)",
@@ -312,6 +372,7 @@ class BorgRunner:
 
         return exit_code
 
+    @_tracked_borg_step("create")
     def create(
         self,
         paths: List[Path],
@@ -465,6 +526,7 @@ class BorgRunner:
         policy = self.retention()
         if policy.get("mode") == "all":
             logger.info("Retention: %s", retention_description(policy))
+            self._skip_step("prune", "keep_all")
         steps = [
             *([] if policy.get("mode") == "all" else [("prune", lambda: self.prune(archive_prefix))]),
             ("compact", self.compact),
@@ -617,8 +679,9 @@ def _publish_borg_progress(process_controller, event: Optional[Dict]) -> None:
 def _consume_borg_output(line: str, process_controller, *, operation: str = "check") -> None:
     """Route Borg JSON progress to status without logging recurring counters.
 
-    operation is check or create. Create retains final stats and optional file
-    activity in their existing text format; check retains only diagnostics.
+    operation identifies create, prune, compact or check. Create retains final
+    stats and optional file activity; maintenance retains INFO messages except
+    check, which retains only diagnostics.
     Plain-text startup/argument errors are retained. Malformed JSON is ignored
     with a diagnostic, without leaking an unparsed progress payload.
     """
@@ -641,7 +704,7 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
             logger.info("%s %s", status, path)
     elif kind == "log_message":
         level = str(event.get("levelname", "")).upper()
-        if level in {"WARNING", "ERROR", "CRITICAL"} or (operation == "create" and level == "INFO"):
+        if level in {"WARNING", "ERROR", "CRITICAL"} or (operation in {"create", "prune", "compact"} and level == "INFO"):
             logger.log(getattr(logging, level), "%s", event.get("message", ""))
 
 
@@ -650,7 +713,7 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
     Führt ein Borg-Kommando aus und streamt die Ausgabe mit Zeitstempel.
 
     Entspricht dem Pattern: borg ... 2>&1 | add_timestamp in borg-common.sh.
-    Kombiniert stdout und stderr. Check-JSON wird in fluechtigen Fortschritt
+    Kombiniert stdout und stderr. Borg-JSON wird in fluechtigen Fortschritt
     und Logdiagnostik aufgeteilt; andere Kommandos loggen jede Ausgabezeile.
 
     Returns:
@@ -691,8 +754,8 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
         for line in process.stdout:
             line = line.rstrip("\n")
             if line:
-                if cmd[1:2] == ["check"] and "--log-json" in cmd:
-                    _consume_borg_output(line, process_controller)
+                if "--log-json" in cmd:
+                    _consume_borg_output(line, process_controller, operation=cmd[1])
                 else:
                     logger.info("%s", line)
     finally:

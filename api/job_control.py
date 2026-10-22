@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -86,8 +87,9 @@ class JobControl:
     ) -> Dict[str, Any]:
         """Persist phase/cancellation policy and return the state.
 
-        Starts transient process timing for borg_create and borg_check; all
-        other phases and finished runs clear Borg progress. Writes may raise OSError.
+        Starts transient timing for each Borg command. Other phases and finished
+        runs clear progress while preserving the command outcome ledger.
+        Writes may raise OSError.
         """
         previous = read_control_state(self.run_id, self.run_dir.parent)
         data: Dict[str, Any] = {
@@ -109,13 +111,26 @@ class JobControl:
             "finished": bool(finished),
             "exit_code": exit_code,
         }
+        data["borg_steps"] = previous.get("borg_steps", {
+            name: {"status": "pending"} for name in ("create", "prune", "compact", "check")
+        })
         # A phase transition must never retain the preceding process's progress.
         data["borg_progress"] = ({
             "phase": phase, "started_at": time.time(), "updated_at": None, "percent": None,
-        } if phase in {"borg_create", "borg_check"} and not finished else None)
+        } if phase in {"borg_create", "borg_prune", "borg_compact", "borg_check"} and not finished else None)
         self._last_borg_progress_write = float("-inf")
         _atomic_json(self.state_file, data)
         return data
+
+    def update_borg_steps(self, steps: Dict[str, Any]) -> None:
+        """Persist the runner's command ledger separately from transient progress.
+
+        Called at command boundaries, including skips; phase updates preserve it.
+        Raises OSError on write failures, which callers must keep non-fatal.
+        """
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        state["borg_steps"] = copy.deepcopy(steps)
+        _atomic_json(self.state_file, state)
 
     def update_borg_progress(self, event: Optional[Dict[str, Any]]) -> None:
         """Persist transient Borg process progress with throttled status writes.
@@ -129,7 +144,7 @@ class JobControl:
         """
         state = read_control_state(self.run_id, self.run_dir.parent)
         progress = state.get("borg_progress")
-        if state.get("phase") not in {"borg_create", "borg_check"} or state.get("finished") or not isinstance(progress, dict):
+        if state.get("phase") not in {"borg_create", "borg_prune", "borg_compact", "borg_check"} or state.get("finished") or not isinstance(progress, dict):
             return
         now = time.monotonic()
         if event is None:

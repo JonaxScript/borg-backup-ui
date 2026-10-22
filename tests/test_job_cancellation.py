@@ -179,7 +179,7 @@ def test_jobs_page_keeps_runtime_state_during_full_refresh():
     refresh_source = jobs[refresh_start:refresh_end]
 
     assert "fetch('/api/jobs/running')" in refresh_source
-    assert "jobRuntimeState(runningData[j.key])" in refresh_source
+    assert "jobRuntimeState(runningData[j.key], j)" in refresh_source
     assert "setInterval(_pollRunningStates, 3_000)" in jobs
 
 

@@ -751,6 +751,29 @@
     "phases": {
       "pre_script": "Pre-Skript",
       "post_script": "Post-Skript"
+    },
+    "createTitle": "Archiv erstellen",
+    "checkTitle": "Integritätsprüfung",
+    "pruneRunning": "Alte Archive entfernen",
+    "compactRunning": "Speicher freigeben",
+    "borgCurrentStep": "Fortschritt des aktuellen Arbeitsschritts",
+    "borgSteps": "Borg-Ablauf",
+    "borgSuccessful": "Erfolgreich",
+    "borgTotalElapsed": "Gesamtlaufzeit: {time}",
+    "borgTotalDuration": "Gesamtdauer: {time}",
+    "borgCompletedAt": "Letzter Lauf: {date}",
+    "borgStep": {
+      "success": "Erfolgreich",
+      "warning": "Mit Warnungen",
+      "error": "Fehlgeschlagen",
+      "cancelled": "Abgebrochen",
+      "skipped": "Übersprungen",
+      "pending": "Ausstehend",
+      "running": "Läuft",
+      "interrupted": "Unterbrochen",
+      "not_due": "Nicht fällig",
+      "keep_all": "Alle behalten",
+      "not_run": "Nicht ausgeführt"
     }
   },
   "schedule": {
@@ -2306,7 +2329,6 @@
       "groupImported": "Gruppe „{name}“ übernommen",
       "groupSkipped": "Gruppe „{name}“ ausgelassen (bereits vorhanden oder unvollständige Jobauswahl)",
       "groupScheduleError": "Gruppen gespeichert, Zeitplaninstallation fehlgeschlagen: {error}",
-
       "title": "Import / Export",
       "description": "Verschlüsselter Transfer: Jobs + Passphrases, Borg-Keys sowie SMB/SSH-Profile + Credentials/Keys.",
       "supportBundle": "Supportpaket erstellen",
@@ -3237,7 +3259,6 @@
     "behavior": "Ablauf bei Fehlern",
     "execution": "Ausführung",
     "orderHint": "Die Jobs werden von oben nach unten ausgeführt.",
-
     "individual": "Einzeljobs",
     "title": "Jobgruppen",
     "new": "Neue Gruppe",

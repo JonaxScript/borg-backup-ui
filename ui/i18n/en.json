@@ -751,6 +751,29 @@
     "phases": {
       "pre_script": "Pre script",
       "post_script": "Post script"
+    },
+    "createTitle": "Create archive",
+    "checkTitle": "Integrity check",
+    "pruneRunning": "Remove old archives",
+    "compactRunning": "Reclaim space",
+    "borgCurrentStep": "Progress of the current operation",
+    "borgSteps": "Borg steps",
+    "borgSuccessful": "Successful",
+    "borgTotalElapsed": "Total elapsed: {time}",
+    "borgTotalDuration": "Total duration: {time}",
+    "borgCompletedAt": "Last run: {date}",
+    "borgStep": {
+      "success": "Successful",
+      "warning": "With warnings",
+      "error": "Failed",
+      "cancelled": "Cancelled",
+      "skipped": "Skipped",
+      "pending": "Pending",
+      "running": "Running",
+      "interrupted": "Interrupted",
+      "not_due": "Not due",
+      "keep_all": "Keep all",
+      "not_run": "Not executed"
     }
   },
   "schedule": {
@@ -2306,7 +2329,6 @@
       "groupImported": "Group \"{name}\" imported",
       "groupSkipped": "Group \"{name}\" skipped (already exists or incomplete job selection)",
       "groupScheduleError": "Groups saved; schedule installation failed: {error}",
-
       "title": "Import / Export",
       "description": "Encrypted transfer: jobs + passphrases, Borg keys, and SMB/SSH profiles + credentials/keys.",
       "supportBundle": "Create support bundle",
@@ -3237,7 +3259,6 @@
     "behavior": "Error handling",
     "execution": "Execution",
     "orderHint": "Jobs run in the order shown, from top to bottom.",
-
     "individual": "Individual jobs",
     "title": "Job groups",
     "new": "New group",

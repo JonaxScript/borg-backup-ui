@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[str, Any]:
     """
     Lädt alle aktuellen Backup-Status und gibt Dashboard-Daten zurück.
+    Optionale Borg-Einzelschritte, Run-ID und Logpfad bleiben für Jobkarten erhalten.
 
     Gibt zurück:
         {
@@ -75,6 +76,9 @@ def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[st
             {
                 "key": key,
                 "job_id": st.job_id,
+                "run_id": st.run_id,
+                "log_file": st.log_file,
+                "borg_steps": st.borg_steps,
                 "group_id": getattr(st, "group_id", ""),
                 "group_name": getattr(st, "group_name", ""),
                 "group_run_id": getattr(st, "group_run_id", ""),
