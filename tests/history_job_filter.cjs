@@ -40,7 +40,7 @@ test('History distinguishes same-name jobs and preserves IDs on refresh and lang
 
   await context.refreshHistory();
   assert.match(filter.innerHTML, />Alle Jobs<\/option>/);
-  for (const [index, location] of ['Lokal', 'USB', 'SMB', 'Storagebox'].entries()) {
+  for (const [index, location] of ['Lokal', 'USB', 'SMB', 'Storagebox (SSH)'].entries()) {
     assert.ok(filter.innerHTML.includes(`value="${jobs[index].job_id}">Appdata – ${location}</option>`));
   }
   assert.ok(filter.innerHTML.includes('&lt;Docs &amp; Photos&gt; – USB'));
@@ -53,6 +53,7 @@ test('History distinguishes same-name jobs and preserves IDs on refresh and lang
   listeners['bbui:language-changed']();
   assert.match(filter.innerHTML, />All jobs<\/option>/);
   assert.ok(filter.innerHTML.includes('Appdata – Local'));
+  assert.ok(filter.innerHTML.includes('Appdata – Storagebox (SSH)'));
   assert.equal(filter.value, jobs[1].job_id);
   assert.equal(requests.length, 2);
 
