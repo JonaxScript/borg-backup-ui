@@ -144,6 +144,11 @@ def test_real_borg_prune_compact_progress_is_not_written_to_log(tmp_path, monkey
     assert all(e['type'].startswith('progress_') for e in prune_events + compact_events)
     assert 'progress_percent' not in caplog.text and 'progress_message' not in caplog.text
     assert 'Borg prune succeeded' in caplog.text and 'Borg compact succeeded' in caplog.text
+    assert 'Keeping archive' in caplog.text and 'Pruning archive (1/1)' in caplog.text
+    assert 'Initializing cache transaction' not in caplog.text
+    assert 'Saving chunks cache' not in caplog.text and 'Saving cache config' not in caplog.text
+    assert all(record.getMessage().strip() for record in caplog.records
+               if record.name == borg_runner.logger.name and record.levelno == logging.INFO)
     assert runner.steps['prune']['status'] == runner.steps['compact']['status'] == 'success'
     archives=json.loads(subprocess.check_output([borg,'list','--json',str(repo)]))['archives']
     assert len(archives) == 1

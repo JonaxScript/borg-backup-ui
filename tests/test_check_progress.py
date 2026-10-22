@@ -110,6 +110,41 @@ def test_status_write_failure_does_not_abort_check_output(caplog):
     assert not caplog.records
 
 
+@pytest.mark.parametrize('operation', ['create', 'prune', 'compact', 'check'])
+def test_empty_info_and_borg_progress_logger_do_not_pollute_log(control, caplog, operation):
+    messages = [
+        '', ' \t\r\n',
+        'Initializing cache transaction: Reading config',
+        'Initializing cache transaction: Reading chunks',
+        'Initializing cache transaction: Reading files',
+        'Saving chunks cache', 'Saving cache config',
+    ]
+    with caplog.at_level(logging.INFO, logger=borg_runner.logger.name):
+        for message in messages:
+            borg_runner._consume_borg_output(json.dumps(dict(
+                type='log_message', levelname='INFO', name='borg.output.progress', message=message,
+            )), control, operation=operation)
+        for message in ('', ' \t\r\n'):
+            borg_runner._consume_borg_output(json.dumps(dict(
+                type='log_message', levelname='INFO', name='borg.archiver', message=message,
+            )), control, operation=operation)
+            borg_runner._consume_borg_output(message, control, operation=operation)
+        expected = []
+        for level in ('WARNING', 'ERROR', 'CRITICAL'):
+            message = f'Cache diagnostic: {level}'
+            expected.append(message)
+            borg_runner._consume_borg_output(json.dumps(dict(
+                type='log_message', levelname=level, name='borg.output.progress', message=message,
+            )), control, operation=operation)
+        if operation != 'check':
+            for message in ('Keeping archive: example', 'Pruning archive (1/1): example'):
+                expected.append(message)
+                borg_runner._consume_borg_output(json.dumps(dict(
+                    type='log_message', levelname='INFO', name='borg.output.list', message=message,
+                )), control, operation=operation)
+    assert [record.getMessage() for record in caplog.records] == expected
+
+
 def test_skipped_check_does_not_enter_check_phase(tmp_path, monkeypatch):
     flag = tmp_path / 'checked'
     flag.touch()

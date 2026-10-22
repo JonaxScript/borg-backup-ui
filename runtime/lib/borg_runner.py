@@ -681,13 +681,17 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
 
     operation identifies create, prune, compact or check. Create retains final
     stats and optional file activity; maintenance retains INFO messages except
-    check, which retains only diagnostics.
+    check, which retains only diagnostics. Empty INFO messages and INFO from
+    borg.output.progress (including cache activity) are suppressed; warnings
+    and errors from that logger are retained.
     Plain-text startup/argument errors are retained. Malformed JSON is ignored
     with a diagnostic, without leaking an unparsed progress payload.
     """
     try:
         event = json.loads(line)
     except (ValueError, TypeError):
+        if not line.strip():
+            return
         if line.lstrip().startswith("{"):
             logger.warning("Borg %s returned an unreadable status message", operation)
         else:
@@ -704,8 +708,14 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
             logger.info("%s %s", status, path)
     elif kind == "log_message":
         level = str(event.get("levelname", "")).upper()
+        message = event.get("message", "")
+        if level == "INFO" and (
+            (isinstance(message, str) and not message.strip())
+            or event.get("name") == "borg.output.progress"
+        ):
+            return
         if level in {"WARNING", "ERROR", "CRITICAL"} or (operation in {"create", "prune", "compact"} and level == "INFO"):
-            logger.log(getattr(logging, level), "%s", event.get("message", ""))
+            logger.log(getattr(logging, level), "%s", message)
 
 
 def _run_borg(cmd: List[str], process_controller=None) -> int:
