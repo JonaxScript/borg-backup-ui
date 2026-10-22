@@ -88,7 +88,8 @@ class JobControl:
         """Persist phase/cancellation policy and return the state.
 
         Starts transient timing for each Borg command. Other phases and finished
-        runs clear progress while preserving the command outcome ledger.
+        runs clear progress while preserving command and configured job steps.
+        In-memory detail counters reset at each phase boundary.
         Writes may raise OSError.
         """
         previous = read_control_state(self.run_id, self.run_dir.parent)
@@ -111,6 +112,8 @@ class JobControl:
             "finished": bool(finished),
             "exit_code": exit_code,
         }
+        data["job_steps"] = previous.get("job_steps", [])
+        self._borg_details = {}
         data["borg_steps"] = previous.get("borg_steps", {
             name: {"status": "pending"} for name in ("create", "prune", "compact", "check")
         })
@@ -121,6 +124,23 @@ class JobControl:
         self._last_borg_progress_write = float("-inf")
         _atomic_json(self.state_file, data)
         return data
+
+    def update_job_steps(self, steps: list) -> None:
+        """Persist ordered configured workflow steps; phase updates preserve them."""
+        state = read_control_state(self.run_id, self.run_dir.parent)
+        state["job_steps"] = copy.deepcopy(steps)
+        _atomic_json(self.state_file, state)
+
+    def update_borg_details(self, details: dict) -> None:
+        """Accumulate numeric command results in memory, without per-line disk I/O."""
+        if not hasattr(self, "_borg_details"):
+            self._borg_details = {}
+        self._borg_details.update({key: value for key, value in details.items()
+                                   if type(value) is int and value >= 0})
+
+    def get_borg_details(self) -> dict:
+        """Return the current command's counters, reset on phase transitions."""
+        return dict(getattr(self, "_borg_details", {}))
 
     def update_borg_steps(self, steps: Dict[str, Any]) -> None:
         """Persist the runner's command ledger separately from transient progress.

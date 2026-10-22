@@ -201,6 +201,12 @@ def _tracked_borg_step(name):
                     step["exit_code"] = code
                 return code
             finally:
+                details = getattr(self.process_controller, "get_borg_details", None)
+                if callable(details) and step["status"] != "skipped":
+                    try:
+                        step["details"] = details()
+                    except (OSError, ValueError, TypeError):
+                        pass
                 if step["status"] != "skipped":
                     step["duration_seconds"] = round(max(0, time.monotonic() - started), 3)
                     step["finished_at"] = time.time()
@@ -214,6 +220,8 @@ class BorgRunner:
     """
     Führt Borg-Operationen aus und hält Ergebnisse/Laufzeiten in ``steps``.
     Optionale UI-Fortschrittsmeldungen werden getrennt von Logs verarbeitet.
+    ``workflow`` kann konfigurierte Job-Schritte mit den gemessenen Borg-
+    Ergebnissen und numerischen Details synchronisieren; keine Ablaufsteuerung.
 
     Typischer Workflow in einem Backup-Skript:
         runner = BorgRunner(BorgConfig.from_config(cfg))
@@ -222,14 +230,19 @@ class BorgRunner:
         check_exit = runner.check()
     """
 
-    def __init__(self, config: Optional[BorgConfig] = None, process_controller=None, phase_callback=None) -> None:
+    def __init__(self, config: Optional[BorgConfig] = None, process_controller=None, phase_callback=None, workflow=None) -> None:
         self.config = config or BorgConfig()
         self.process_controller = process_controller
         self.phase_callback = phase_callback
+        self.workflow = workflow
         self.steps = {name: {"status": "pending"} for name in ("create", "prune", "compact", "check")}
 
     def _publish_steps(self) -> None:
         """Publish the small command ledger when supported; never fail a backup on UI I/O."""
+        if self.workflow is not None:
+            for name, step in self.steps.items():
+                if step.get("status") != "pending":
+                    self.workflow.update(name, **step)
         callback = getattr(self.process_controller, "update_borg_steps", None)
         if callable(callback):
             try:
@@ -683,7 +696,9 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
     stats and optional file activity; maintenance retains INFO messages except
     check, which retains only diagnostics. Empty INFO messages and INFO from
     borg.output.progress (including cache activity) are suppressed; warnings
-    and errors from that logger are retained.
+    and errors from that logger are retained. An optional controller receives
+    numeric create/prune details in memory, including final create statistics;
+    archive names, paths and raw messages are never copied to those details.
     Plain-text startup/argument errors are retained. Malformed JSON is ignored
     with a diagnostic, without leaking an unparsed progress payload.
     """
@@ -700,6 +715,35 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
     if not isinstance(event, dict):
         return
     kind = event.get("type", "")
+    detail_callback = getattr(process_controller, "update_borg_details", None)
+    if callable(detail_callback):
+        details = {}
+        if kind == "archive_progress" and operation == "create" and not event.get("finished"):
+            details = {key: event[key] for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size")
+                       if type(event.get(key)) is int and event[key] >= 0}
+        elif kind == "log_message" and operation == "create":
+            message = str(event.get("message", ""))
+            files = re.search(r"Number of files:\s+(\d+)", message)
+            if files:
+                details["nfiles"] = int(files.group(1))
+            sizes = re.search(r"This archive:\s+([\d.]+\s+\S+)\s+([\d.]+\s+\S+)\s+([\d.]+\s+\S+)", message)
+            if sizes:
+                details.update(zip(("original_size", "compressed_size", "deduplicated_size"),
+                                   (convert_to_bytes(value) for value in sizes.groups())))
+        elif kind == "log_message" and operation == "prune":
+            counts = re.fullmatch(r"Keeping (\d+) archives and (\d+) checkpoints, pruning (\d+) archives and (\d+) checkpoints\.", str(event.get("message", "")))
+            if counts:
+                details = dict(zip(("kept_archives", "kept_checkpoints", "prune_candidates", "prune_checkpoint_candidates"), map(int, counts.groups())))
+            pruned = re.match(r"Pruning archive \((\d+)/(\d+)\):", str(event.get("message", "")))
+            if pruned:
+                details["pruned_archives"] = int(pruned.group(1))
+            elif counts and int(counts.group(3)) == 0:
+                details["pruned_archives"] = 0
+        if details:
+            try:
+                detail_callback(details)
+            except (OSError, ValueError, TypeError):
+                pass
     if kind in ("progress_percent", "progress_message", "archive_progress"):
         _publish_borg_progress(process_controller, event)
     elif kind == "file_status" and operation == "create":

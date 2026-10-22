@@ -773,7 +773,35 @@
       "interrupted": "Unterbrochen",
       "not_due": "Nicht fällig",
       "keep_all": "Alle behalten",
-      "not_run": "Nicht ausgeführt"
+      "not_run": "Nicht ausgeführt",
+      "post_condition": "Bedingung nicht erfüllt",
+      "unavailable": "Dienst nicht verfügbar",
+      "after_cancel": "Nicht ausgeführt (Abbruch)"
+    },
+    "workflow": {
+      "steps": "Job-Ablauf",
+      "details": "Details zum Lauf",
+      "step": "Schritt",
+      "result": "Ergebnis / Informationen",
+      "showDetails": "Details anzeigen",
+      "hideDetails": "Details ausblenden",
+      "lastSuccess": "Letztes erfolgreiches Backup: {date}",
+      "noSuccess": "Letztes erfolgreiches Backup: noch kein Ergebnis vorhanden",
+      "targets": "Betroffene Dienste: {count}",
+      "targetsDone": "{done} von {total} Diensten abgeschlossen",
+      "forced": "Davon erzwungen gestoppt: {count}",
+      "kept": "{count} Archive behalten",
+      "pruned": "{count} Archive gelöscht",
+      "exitCode": "Exit-Code: {code}",
+      "timeout": "Zeitlimit überschritten",
+      "names": {
+        "pre_script": "Pre-Skript",
+        "post_script": "Post-Skript",
+        "stop_docker": "Docker stoppen",
+        "start_docker": "Docker starten",
+        "stop_vms": "VMs stoppen",
+        "start_vms": "VMs starten"
+      }
     }
   },
   "schedule": {

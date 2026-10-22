@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from lib.notifications import MailConfig
 
 from .vm_manager import VmShutdownError
+from .job_workflow import tracked_runtime_step
 
 logger = logging.getLogger(__name__)
 
@@ -296,6 +297,7 @@ class BackupJob:
         self.phase_callback = phase_callback
         self.completion_callback = completion_callback
         self.hook_results: dict = {}
+        self.workflow = None
         # Shared runner ledger; saved with the final report after service recovery.
         self.borg_steps: dict = {name: {"status": "pending"} for name in ("create", "prune", "compact", "check")}
         self.backup_exit_code: int | None = None
@@ -407,6 +409,9 @@ class BackupJob:
             if self.completion_callback is not None:
                 self._run_cleanup_step("job completion hooks", lambda: self.completion_callback(self), cleanup_errors)
 
+            if self.workflow is not None:
+                self.workflow.finalize("after_cancel" if self._cancelled else "not_run")
+
             if self._skip_finish:
                 self._run_cleanup_step(
                     "skipped status persistence",
@@ -506,6 +511,15 @@ class BackupJob:
         non-cancellation failures retain the script exit separately from job exit 2.
         """
         self.hook_results[phase] = outcome
+        if self.workflow is not None:
+            details = {"exit_code": outcome.get("exit_code"), "hook_status": outcome["status"]}
+            try:
+                from security_utils import mask_secrets
+                details["script_name"] = mask_secrets(str(outcome.get("name", "")))
+            except ImportError:
+                pass
+            self.workflow.update(phase + "_script", details=details, exit_code=outcome.get("exit_code"),
+                                 status={"success": "success", "cancelled": "cancelled"}.get(outcome["status"], "error"))
         if outcome["status"] == "success":
             return
         if outcome["status"] == "cancelled":
@@ -534,6 +548,7 @@ class BackupJob:
         if self.phase_callback is not None:
             self.phase_callback(phase)
 
+    @tracked_runtime_step("stop_docker")
     def stop_docker(
         self,
         selected_names: Optional[List[str]] = None,
@@ -560,6 +575,12 @@ class BackupJob:
                     str(self.config.log_file),
                 )
             self._record_docker_recovery_state()
+            if self.workflow is not None:
+                result = self._docker_stop_result
+                self.workflow.update("stop_docker", details={"target_count": result.count_before,
+                                     **({"completed_count": result.count_before} if result.success else {})},
+                                     **({"status": "skipped", "reason": "unavailable"} if not result.available else
+                                        {"status": "error"} if not result.success else {}))
 
     def recover_runtime(self) -> None:
         """Restart this job's stopped workloads before repository maintenance.
@@ -603,6 +624,7 @@ class BackupJob:
                 "Runtime recovery failed. Check the backup log and runtime recovery status."
             ) from None
 
+    @tracked_runtime_step("start_docker")
     def start_docker(self) -> None:
         """Attempt Docker restart once; record the result and raise on failure."""
         if (
@@ -612,6 +634,11 @@ class BackupJob:
         ):
             self._docker_restarted = True
             start_result = self.docker_manager.start_all(self._docker_stop_result)
+            if self.workflow is not None:
+                self.workflow.update("start_docker", details={"target_count": start_result.count_before,
+                                     "completed_count": max(0, start_result.count_before - len(start_result.failed_ids))},
+                                     **({"status": "skipped", "reason": "unavailable"}
+                                        if not self._docker_stop_result.available else {}))
             self._mark_runtime_restarted(
                 self._docker_recovery_id,
                 success=bool(start_result.success),
@@ -626,6 +653,7 @@ class BackupJob:
                     f"{len(start_result.failed_ids)} Docker container(s) could not be restarted"
                 )
 
+    @tracked_runtime_step("stop_vms")
     def shutdown_vms(self, selected_names: Optional[List[str]] = None) -> None:
         """Persist initially active targets before shutdown and retain partial progress.
 
@@ -637,11 +665,19 @@ class BackupJob:
             self._vm_shutdown_result = result
 
         if self.vm_manager is not None:
-            if selected_names is None:
-                self._vm_shutdown_result = self.vm_manager.shutdown_all(before_shutdown=before_shutdown)
-            else:
-                self._vm_shutdown_result = self.vm_manager.shutdown_selected(selected_names, before_shutdown=before_shutdown)
+            try:
+                if selected_names is None:
+                    self._vm_shutdown_result = self.vm_manager.shutdown_all(before_shutdown=before_shutdown)
+                else:
+                    self._vm_shutdown_result = self.vm_manager.shutdown_selected(selected_names, before_shutdown=before_shutdown)
+            finally:
+                result = self._vm_shutdown_result
+                if self.workflow is not None and result is not None:
+                    self.workflow.update("stop_vms", details={"target_count": len(result.target_vms),
+                                         "completed_count": len(result.stopped_vms), "forced_count": len(result.forced_vms)},
+                                         **({"status": "warning"} if result.forced_vms else {}))
 
+    @tracked_runtime_step("start_vms")
     def start_vms(self) -> None:
         """Attempt VM restart once; record the result and raise on failure."""
         if (
@@ -651,6 +687,9 @@ class BackupJob:
         ):
             self._vms_restarted = True
             start_result = self.vm_manager.start_all(self._vm_shutdown_result)
+            if self.workflow is not None:
+                self.workflow.update("start_vms", details={"target_count": start_result.count_before,
+                                     "completed_count": start_result.count_after})
             if start_result.success:
                 message = f"All {start_result.count_after} VM(s) restarted successfully."
             else:
@@ -1175,6 +1214,7 @@ class BackupJob:
             status="skipped",
             hook_results=self.hook_results,
             borg_steps=self.borg_steps,
+            job_steps=self.workflow.steps if self.workflow is not None else [],
             error_message=f"Skipped: {reason}",
             skip_reason_code=reason_code,
             skip_reason_text=reason,
@@ -1319,6 +1359,7 @@ class BackupJob:
             missing_source_paths=self._missing_source_paths,
             hook_results=self.hook_results,
             borg_steps=self.borg_steps,
+            job_steps=self.workflow.steps if self.workflow is not None else [],
             backup_exit_code=self.backup_exit_code,
             error_message=error_msg,
             log_file=str(self.config.retained_log_file or self.config.log_file),

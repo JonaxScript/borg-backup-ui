@@ -102,7 +102,7 @@ assert.match(timeline, /is-skipped/);
 assert.match(timeline, /jobs.borgStep.keep_all/);
 assert.doesNotMatch(timeline, /<progress/,'The stepper is visible immediately; detailed progress waits 60 seconds');
 timeline = context.renderBorgRun({...runtime,run_borg_steps:steps},160);
-assert.match(timeline, /<progress/);
+assert.doesNotMatch(timeline, /<progress/, 'Progress is in the operating-status cell, not duplicated in the timeline');
 const saved = {...steps,check:{status:'error',duration_seconds:193}};
 const completed = {running:false,last_borg_steps:saved,last_timestamp:'2026-10-22 14:32:00',last_duration_seconds:768};
 timeline = context.renderBorgRun(completed,500);
@@ -111,7 +111,7 @@ assert.match(timeline,/3:13/);
 assert.match(timeline,/jobs.borgTotalDuration 12:48/);
 assert.doesNotMatch(timeline,/<progress|aria-current/);
 assert.equal(context.renderBorgRun({running:false,last_status:'success'},500),'','Old successful reports must not invent step successes');
-assert.equal(context.renderBorgRun({...completed,running:true,run_borg_steps:{}},500),'','New runs never show old completed steps');
+assert.doesNotMatch(context.renderBorgRun({...completed,running:true,run_borg_steps:{}},500),/borg-step is-/,'New runs never show old completed steps');
 assert.match(context.renderBorgRun({running:false,last_borg_steps:steps},500),/is-interrupted/);
 for(const phase of ['borg_prune','borg_compact']) {
   const maintenance={running:true,phase,borg_progress:{phase,started_at:100,updated_at:110,percent:40}};
@@ -122,7 +122,7 @@ for(const phase of ['borg_prune','borg_compact']) {
 // The regular timer must preserve completed results even with no live state.
 state.jobs=[{key:'demo',...completed}];
 context.updateBorgProgressDisplays({});
-assert.match(element('job-borg-progress-demo').innerHTML,/is-error/);
+assert.match(element('job-workflow-demo').innerHTML,/is-error/);
 assert.doesNotMatch(element('job-borg-progress-demo').innerHTML,/<progress/);
 console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and maintenance gate passed.');
 
@@ -145,7 +145,46 @@ console.log('Four-step timeline: durations, saved results, skip/warning/error st
   context.hideJobsMessage=()=>{};
   context.showJobsError=message=>{throw Error(message);};
   await context.refreshJobs();
-  assert.match(element('job-borg-progress-demo').innerHTML,/is-error/);
-  assert.match(element('job-borg-progress-demo').innerHTML,/12:48/);
+  assert.match(element('job-workflow-demo').innerHTML,/is-error/);
+  assert.match(element('job-workflow-demo').innerHTML,/12:48/);
   console.log('Cron completion refresh and persisted timeline after full page reload passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Configured non-Borg steps keep their order, remain named when collapsed and use SVG states.
+const workflow = [
+  {id:'pre_script',status:'warning',duration_seconds:2,details:{script_name:'<img src=x onerror=bad>',exit_code:1}},
+  {id:'stop_docker',status:'success',duration_seconds:18,details:{target_count:3,completed_count:3}},
+  {id:'create',status:'success',duration_seconds:738,details:{nfiles:58738,original_size:1024}},
+  {id:'start_docker',status:'success',duration_seconds:8},
+  {id:'compact',status:'success',duration_seconds:6},
+  {id:'check',status:'running',started_at:100},
+  {id:'post_script',status:'pending'},
+];
+const workflowJob={key:'workflow',running:true,run_job_steps:workflow,run_phase:'borg_check',
+  borg_progress:{phase:'borg_check',started_at:100,updated_at:160,percent:63},
+  last_successful_backup:{timestamp:'2026-10-21 10:16:00',duration_seconds:892}};
+state.jobs=[workflowJob];
+let configured=context.renderBorgRun(workflowJob,200);
+assert.equal((configured.match(/class="borg-step is-/g)||[]).length,7);
+assert.doesNotMatch(configured,/borg prune|<table|<progress/);
+assert.match(configured,/jobs.workflow.names.stop_docker/);
+assert.match(configured,/<svg/);
+assert.match(configured,/aria-current="step"/);
+assert.match(configured,/jobs.workflow.lastSuccess/);
+assert.match(configured,/aria-expanded="false"/);
+const click={target:{closest:()=>({dataset:{jobsAction:'toggle-workflow',jobKey:'workflow'}})}};
+context.onJobsGridClick(click);
+assert.match(element('job-workflow-workflow').innerHTML,/<table/);
+assert.match(element('job-workflow-workflow').innerHTML,/&lt;img/);
+assert.doesNotMatch(element('job-workflow-workflow').innerHTML,/<img/);
+context.updateBorgProgressDisplays({workflow:{running:true,job_steps:workflow,phase:'borg_check',borg_progress:workflowJob.borg_progress}});
+assert.match(element('job-workflow-workflow').innerHTML,/aria-expanded="true"/);
+assert.match(element('job-borg-progress-workflow').innerHTML,/value="63"/);
+context.onJobsGridClick(click);
+assert.doesNotMatch(element('job-workflow-workflow').innerHTML,/<table/);
+assert.match(element('job-workflow-workflow').innerHTML,/jobs.workflow.lastSuccess/);
+const failedLater={...workflowJob,running:false,last_status:'error',last_timestamp:'2026-10-22 10:20:00',last_job_steps:workflow};
+assert.match(context.renderBorgRun(failedLater,200),/jobs.borgCompletedAt/);
+assert.match(context.renderBorgRun(failedLater,200),/jobs.workflow.lastSuccess/);
+assert.match(context.renderBorgRun(failedLater,200),/is-interrupted/);
+console.log('Configured workflow: named steps, SVG states, disclosure persistence, escaped details and last success passed.');

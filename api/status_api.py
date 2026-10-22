@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[str, Any]:
     """
     Lädt alle aktuellen Backup-Status und gibt Dashboard-Daten zurück.
-    Optionale Borg-Einzelschritte, Run-ID und Logpfad bleiben für Jobkarten erhalten.
+    Optionale Job-/Borg-Schritte, letzter Erfolg, Run-ID und Logpfad bleiben für Jobkarten erhalten.
 
     Gibt zurück:
         {
@@ -29,6 +29,7 @@ def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[st
         format_bytes,
         format_duration,
         time_ago,
+        latest_successful_backup,
     )
 
     status_dir = Path(config["STATUS_DIR"])
@@ -43,6 +44,9 @@ def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[st
     job_ids = active_job_ids(config)
     all_statuses = [status for status in store.load() if status.key in job_ids]
     latest = store.get_latest_per_key(all_statuses)
+    histories = {}
+    for report in all_statuses:
+        histories.setdefault(report.key, []).append(report)
 
     _auto_write_weekly_snapshot(snapshot_file, latest, force_write=force_snapshot_write)
     last_week_sizes = _load_last_week_sizes(snapshot_file)
@@ -79,6 +83,8 @@ def get_status_data(config: dict, force_snapshot_write: bool = False) -> Dict[st
                 "run_id": st.run_id,
                 "log_file": st.log_file,
                 "borg_steps": st.borg_steps,
+                "job_steps": st.job_steps,
+                "last_successful_backup": latest_successful_backup(histories.get(key, [])),
                 "group_id": getattr(st, "group_id", ""),
                 "group_name": getattr(st, "group_name", ""),
                 "group_run_id": getattr(st, "group_run_id", ""),
