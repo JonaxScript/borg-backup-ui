@@ -166,6 +166,7 @@ async function refreshSettings() {
     settingsState.homepageWidgetToken = '';
     settingsState.prometheusToken = '';
     settingsState.data = data;
+    settingsState.notificationTemplateDrafts = {};
     settingsState.systemHealth = health;
     if (appriseProfilesRes?.ok) {
       const apprisePayload = await appriseProfilesRes.json();
@@ -4928,146 +4929,276 @@ function renderSettingsUnraidNotifications(s) {
 }
 
 /**
- * Render editable custom texts for backup notification events.
- * @param {object} config `notification_templates` from the settings payload.
- * @returns {string} Card HTML; fields are disabled when saved texts are unreadable.
+ * Render a shared reference and five retained editors; only one event is visible.
+ * @param {object} config Notification settings from the API.
+ * @returns {string} Card HTML. Unreadable stores disable every mutation control.
  */
 function renderSettingsNotificationTemplates(config) {
   const events = Array.isArray(config.events) ? config.events : [];
   const labels = Object.fromEntries(notificationEventOptions());
   const readable = config.readable !== false;
-  const rows = events.map((event) => _renderNotificationTemplateRow(event, labels[event] || event, config, readable)).join('');
+  const active = events.includes(settingsState.notificationTemplateEvent) ? settingsState.notificationTemplateEvent : events[0];
+  const rows = events.map((event) => _renderNotificationTemplateRow(event, labels[event] || event, config, readable, event === active)).join('');
+  const choices = events.map((event) => `<button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-select" data-notification-event="${escAttr(event)}" aria-pressed="${event === active}" aria-controls="notification-template-${escAttr(event)}">${escHtml(settingsT(`notificationTemplates.events.${event}`))}</button>`).join('');
   return settingsCard(settingsT('notificationTemplates.title'),
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 8h8M8 12h5"/></svg>`,
-    `<div class="settings-body notification-templates" data-notification-templates="${readable ? 'ready' : 'unreadable'}">
+    `<div class="settings-body notification-templates" data-notification-templates="${readable ? 'ready' : 'unreadable'}" data-notification-active="${escAttr(active || '')}">
       <div class="status-message info">${escHtml(settingsT('notificationTemplates.hint'))}</div>
       ${readable ? '' : `<div class="status-message error-state">${escHtml(settingsT('notificationTemplates.unreadable'))}</div>`}
-      ${_renderNotificationTemplatePlaceholders(config.placeholders)}
+      ${_renderNotificationTemplatePlaceholders(config, active, readable)}
+      <div><div class="form-label">${escHtml(settingsT('notificationTemplates.event'))}</div><div class="notification-template-events" role="group" aria-label="${escAttr(settingsT('notificationTemplates.event'))}">${choices}</div></div>
       ${rows}
     </div>`);
 }
 
-function _renderNotificationTemplatePlaceholders(placeholders) {
-  const items = (Array.isArray(placeholders) ? placeholders : []).map((name) => `
-    <div><dt><code>{${escHtml(name)}}</code></dt><dd>${escHtml(settingsT(`notificationTemplates.placeholders.${name}`))}</dd></div>`).join('');
-  return `<details class="notification-template-placeholders">
-    <summary>${escHtml(settingsT('notificationTemplates.placeholdersTitle'))}</summary>
-    <dl>${items}</dl>
-  </details>`;
+/** Return localized example templates containing tokens, never sample backup data. */
+function _notificationTemplateExample(event) {
+  const labels = Object.fromEntries(notificationEventOptions());
+  const fields = ['job', 'target', 'repository', 'status', 'duration', 'time'];
+  if (['backup_success', 'backup_warning'].includes(event)) fields.push('archive');
+  if (event !== 'backup_success') fields.push('error');
+  return {
+    title: `${labels[event] || event}: {job}`,
+    message: fields.map((key) => `${settingsT(`notificationTemplates.exampleLabels.${key}`)}: {${key}}`).join('\n'),
+  };
 }
 
-function _renderNotificationTemplateRow(event, label, config, readable) {
-  const saved = config.templates?.[event] || {};
-  const example = config.examples?.[event] || {};
-  const limits = config.limits || {};
-  const title = String(saved.title || '');
-  const message = String(saved.message || '');
-  const custom = !!(title.trim() || message.trim());
-  const preview = _notificationTemplatePreview(example, title, message);
-  const id = `notification-template-${event}`;
-  const disabled = readable ? '' : 'disabled';
-  return `<details class="notification-template" data-notification-template-event="${escAttr(event)}" ${custom ? 'open' : ''}>
-    <summary>
-      <span>${escHtml(label)}</span>
-      <span class="badge notification-template-state ${custom ? 'is-custom' : ''}" data-notification-template-state>${escHtml(settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default'))}</span>
-    </summary>
-    <div class="notification-template-fields">
-      <div class="form-group">
-        <label class="form-label" for="${id}-title">${escHtml(settingsT('notificationTemplates.titleLabel'))}</label>
-        <input class="form-input" type="text" id="${id}-title" maxlength="${Number(limits.title) || 200}"
-          data-notification-template-field="title" value="${escAttr(title)}" placeholder="${escAttr(example.title)}"
-          oninput="onNotificationTemplateInput(this)" ${disabled}>
+/**
+ * Return editable texts without changing saved settings. Unconfigured events start
+ * with a localized example; saved texts and even explicitly cleared drafts win.
+ */
+function _notificationTemplateEditorValues(event, config, readable) {
+  if (!readable) return { title: '', message: '' };
+  const draft = settingsState.notificationTemplateDrafts?.[event];
+  if (draft) return draft;
+  const saved = config.templates?.[event];
+  if (saved && (saved.title?.trim() || saved.message?.trim())) return saved;
+  return _notificationTemplateExample(event);
+}
+
+/** Classify the visible texts as an example, original fallback or custom template. */
+function _notificationTemplateState(event, title, message) {
+  const example = _notificationTemplateExample(event);
+  if (title === example.title && message === example.message) return 'example';
+  const original = (!title.trim() || title.trim() === '{default_title}') &&
+    (!message.trim() || message.trim() === '{default_message}');
+  return original ? 'default' : 'custom';
+}
+
+/** Render one shared reference; event-dependent sample values come from the API. */
+function _renderNotificationTemplatePlaceholders(config, active, readable) {
+  return `<details class="notification-template-placeholders" open>
+    <summary><strong>${escHtml(settingsT('notificationTemplates.placeholdersTitle'))}</strong><span>${escHtml(settingsT('notificationTemplates.shared'))}</span></summary>
+    <div class="notification-template-reference">
+      <div class="notification-template-reference-tools"><span>${escHtml(settingsT('notificationTemplates.insertHint'))}</span>
+        <label for="notification-template-destination">${escHtml(settingsT('notificationTemplates.insertInto'))}
+          <select class="form-select" id="notification-template-destination" data-notification-destination ${readable ? '' : 'disabled'}><option value="message">${escHtml(settingsT('notificationTemplates.messageLabel'))}</option><option value="title">${escHtml(settingsT('notificationTemplates.titleLabel'))}</option></select>
+        </label>
       </div>
-      <div class="form-group">
-        <label class="form-label" for="${id}-message">${escHtml(settingsT('notificationTemplates.messageLabel'))}</label>
-        <textarea class="form-input mono" id="${id}-message" rows="6" maxlength="${Number(limits.message) || 2000}"
-          data-notification-template-field="message" placeholder="${escAttr(example.message)}"
-          oninput="onNotificationTemplateInput(this)" ${disabled}>${escHtml(message)}</textarea>
-      </div>
-      <div class="notification-template-preview" aria-live="polite">
-        <small>${escHtml(settingsT('notificationTemplates.preview'))}</small>
-        <strong data-notification-template-preview="title">${escHtml(preview.title)}</strong>
-        <pre data-notification-template-preview="message">${escHtml(preview.message)}</pre>
-      </div>
-      <div>
-        <button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-reset" ${disabled}>${escHtml(settingsT('notificationTemplates.reset'))}</button>
-      </div>
+      <table class="settings-table notification-template-table"><thead><tr><th>${escHtml(settingsT('notificationTemplates.meaning'))}</th><th>${escHtml(settingsT('notificationTemplates.placeholder'))}</th><th>${escHtml(settingsT('notificationTemplates.exampleValue'))}</th></tr></thead>
+        <tbody data-notification-reference>${_notificationTemplateReferenceRows(config, active, readable)}</tbody>
+      </table>
+      <button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-more" aria-expanded="${!!settingsState.notificationTemplateShowAll}">${escHtml(settingsT(settingsState.notificationTemplateShowAll ? 'notificationTemplates.showLess' : 'notificationTemplates.showAll', { count: config.placeholders?.length || 0 }))}</button>
+      <div class="form-help">${escHtml(settingsT('notificationTemplates.valuesHint'))}</div>
+      <div class="form-help" data-notification-reference-feedback role="status"></div>
     </div>
   </details>`;
 }
 
-/**
- * Replace known `{name}` placeholders in one pass, like the backend renderer.
- * @param {string} text Custom text.
- * @param {object} values Placeholder values; unknown placeholders stay unchanged.
- * @returns {string} Rendered text.
- */
+/** Return escaped reference rows, prioritizing job, target and repository. */
+function _notificationTemplateReferenceRows(config, event, readable) {
+  const available = Array.isArray(config.placeholders) ? config.placeholders : [];
+  const ordered = [...new Set(['job', 'target', 'repository', ...available])].filter((key) => available.includes(key));
+  const values = config.examples?.[event]?.values || {};
+  return (settingsState.notificationTemplateShowAll ? ordered : ordered.slice(0, 3)).map((key) => `<tr>
+    <td>${escHtml(settingsT(`notificationTemplates.placeholders.${key}`))}</td>
+    <td><button type="button" class="btn btn-secondary btn-sm notification-template-token" data-settings-action="notification-template-insert" data-notification-token="${escAttr(key)}" ${readable ? '' : 'disabled'}><code>{${escHtml(key)}}</code></button></td>
+    <td class="notification-template-value">${escHtml(String(values[key] ?? '') || settingsT('notificationTemplates.emptyValue'))}</td>
+  </tr>`).join('');
+}
+
+/** Render paired, equally sized title/message fields and preview boxes for an event. */
+function _renderNotificationTemplateRow(event, label, config, readable, active) {
+  const saved = _notificationTemplateEditorValues(event, config, readable);
+  const example = config.examples?.[event] || {};
+  const title = String(saved.title || ''), message = String(saved.message || '');
+  const state = _notificationTemplateState(event, title, message);
+  const id = `notification-template-${event}`;
+  const disabled = readable ? '' : 'disabled';
+  const limits = config.limits || {};
+  return `<section class="notification-template" id="${id}" data-notification-template-event="${escAttr(event)}" ${active ? '' : 'hidden'} aria-label="${escAttr(label)}">
+    <div class="notification-template-heading"><strong>${escHtml(label)}</strong><span class="badge notification-template-state ${state === 'custom' ? 'is-custom' : ''}" data-notification-template-state>${escHtml(settingsT(`notificationTemplates.${state}`))}</span></div>
+    <div class="notification-template-fields">
+      <div class="notification-template-column notification-template-source">
+        <div class="notification-template-column-heading"><strong>${escHtml(settingsT('notificationTemplates.yourTemplate'))}</strong><button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-example" ${disabled}>${escHtml(settingsT('notificationTemplates.useExample'))}</button></div>
+        <label class="form-label" for="${id}-title">${escHtml(settingsT('notificationTemplates.titleLabel'))}</label>
+        <input class="form-input mono" type="text" id="${id}-title" maxlength="${Number(limits.title) || 200}" data-notification-template-field="title" value="${escAttr(title)}" placeholder="{default_title}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>
+        <label class="form-label" for="${id}-message">${escHtml(settingsT('notificationTemplates.messageLabel'))}</label>
+        <textarea class="form-input mono" id="${id}-message" rows="9" maxlength="${Number(limits.message) || 2000}" spellcheck="false" data-notification-template-field="message" placeholder="{default_message}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>${escHtml(message)}</textarea>
+      </div>
+      <div class="notification-template-column notification-template-preview" aria-live="polite">
+        <div class="notification-template-column-heading"><strong>${escHtml(settingsT('notificationTemplates.delivered'))}</strong><small>${escHtml(settingsT('notificationTemplates.preview'))}</small></div>
+        <div class="form-label">${escHtml(settingsT('notificationTemplates.previewTitle'))}</div>
+        <div class="notification-template-output" data-notification-template-preview="title">${_notificationTemplatePreviewHtml(example, title, 'title')}</div>
+        <div class="form-label notification-template-preview-hint">${escHtml(settingsT('notificationTemplates.highlightHint'))}</div>
+        <pre class="notification-template-output" data-notification-template-preview="message">${_notificationTemplatePreviewHtml(example, message, 'message')}</pre>
+      </div>
+    </div>
+    <div class="notification-template-footer"><button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-reset" ${disabled}>${escHtml(settingsT('notificationTemplates.reset'))}</button><span class="form-help">${escHtml(settingsT('notificationTemplates.emptyHint'))}</span></div>
+  </section>`;
+}
+
+/** Replace known tokens once, retaining unknown tokens and literal inserted braces. */
 function _renderNotificationTemplateText(text, values) {
   return String(text || '').replace(/\{([a-z_]+)\}/g, (match, name) => (
     Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
   ));
 }
 
-/**
- * Render the title and message a sample backup would send.
- * @param {object} example Server example with `title`, `message` and `values`.
- * @param {string} title Custom title; empty keeps the default.
- * @param {string} message Custom message; empty keeps the default.
- * @returns {{title: string, message: string}} Preview text.
- */
+/** Return preview text with the runtime's single-line title and empty-field fallback. */
 function _notificationTemplatePreview(example, title, message) {
   const values = example?.values && typeof example.values === 'object' ? example.values : {};
   const renderedTitle = _renderNotificationTemplateText(String(title || '').trim(), values)
-    .split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(' ');
+    .split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/).map((part) => part.trim()).filter(Boolean).join(' ');
   const renderedMessage = _renderNotificationTemplateText(String(message || '').trim(), values).trim();
-  return {
-    title: renderedTitle || String(example?.title || ''),
-    message: renderedMessage || String(example?.message || ''),
-  };
+  return { title: renderedTitle || String(example?.title || ''), message: renderedMessage || String(example?.message || '') };
 }
 
-function _refreshNotificationTemplateRow(row) {
-  const event = row.dataset.notificationTemplateEvent || '';
-  const title = row.querySelector('[data-notification-template-field="title"]')?.value || '';
-  const message = row.querySelector('[data-notification-template-field="message"]')?.value || '';
-  const example = settingsState.data?.notification_templates?.examples?.[event] || {};
-  const preview = _notificationTemplatePreview(example, title, message);
-  const previewTitle = row.querySelector('[data-notification-template-preview="title"]');
-  const previewMessage = row.querySelector('[data-notification-template-preview="message"]');
-  if (previewTitle) previewTitle.textContent = preview.title;
-  if (previewMessage) previewMessage.textContent = preview.message;
-  const custom = !!(title.trim() || message.trim());
-  const badge = row.querySelector('[data-notification-template-state]');
-  if (badge) {
-    badge.classList.toggle('is-custom', custom);
-    badge.textContent = settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default');
+/**
+ * Return escaped preview HTML, highlighting only substituted values.
+ * Normalize titles exactly like delivery, trim messages and retain default fallback.
+ * @param {object} example Backend defaults and placeholder values.
+ * @param {string} text User template; neither it nor inserted values are trusted HTML.
+ * @param {'title'|'message'} field Determines newline normalization and fallback.
+ * @returns {string} Safe HTML containing only escaped text and mark elements.
+ */
+function _notificationTemplatePreviewHtml(example, text, field) {
+  const values = example?.values || {};
+  const source = String(text || '').trim(), parts = [];
+  let offset = 0;
+  for (const match of source.matchAll(/\{([a-z_]+)\}/g)) {
+    parts.push({ text: source.slice(offset, match.index), mark: false });
+    const known = Object.prototype.hasOwnProperty.call(values, match[1]);
+    parts.push({ text: known ? String(values[match[1]]) : match[0], mark: known });
+    offset = match.index + match[0].length;
   }
+  parts.push({ text: source.slice(offset), mark: false });
+  const raw = parts.map((part) => part.text).join('');
+  if (!raw.trim()) return escHtml(String(example?.[field] || ''));
+  let position = 0;
+  const spans = parts.map((part) => { const start = position; position += part.text.length; return { ...part, start, end: position }; });
+  const renderRange = (start, end) => spans.map((part) => {
+    const text = part.text.slice(Math.max(0, start - part.start), Math.max(0, Math.min(part.text.length, end - part.start)));
+    return text ? (part.mark ? `<mark>${escHtml(text)}</mark>` : escHtml(text)) : '';
+  }).join('');
+  if (field !== 'title') return renderRange(raw.length - raw.trimStart().length, raw.trimEnd().length);
+  let lineStart = 0;
+  const rendered = raw.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/).map((line) => {
+    const start = raw.indexOf(line, lineStart);
+    lineStart = start + line.length;
+    if (raw.slice(lineStart, lineStart + 2) === '\r\n') lineStart += 2;
+    else if (lineStart < raw.length) lineStart++;
+    return line.trim() ? renderRange(start + line.length - line.trimStart().length, start + line.trimEnd().length) : '';
+  }).filter(Boolean).join(' ');
+  return rendered || escHtml(String(example?.[field] || ''));
 }
 
-/** Update preview and state of one custom notification text after an edit. */
+/** Update the event preview and badge without replacing its editable fields. */
+function _refreshNotificationTemplateRow(row) {
+  const event = row.dataset.notificationTemplateEvent;
+  const title = row.querySelector('[data-notification-template-field="title"]').value;
+  const message = row.querySelector('[data-notification-template-field="message"]').value;
+  const example = settingsState.data?.notification_templates?.examples?.[event] || {};
+  for (const [field, text] of Object.entries({title, message})) {
+    row.querySelector(`[data-notification-template-preview="${field}"]`).innerHTML = _notificationTemplatePreviewHtml(example, text, field);
+  }
+  const state = _notificationTemplateState(event, title, message);
+  const badge = row.querySelector('[data-notification-template-state]');
+  badge.classList.toggle('is-custom', state === 'custom');
+  badge.textContent = settingsT(`notificationTemplates.${state}`);
+}
+
+/** Retain edits through event/language redraws; mark settings dirty only on edits. */
 function onNotificationTemplateInput(field) {
-  const row = field?.closest?.('[data-notification-template-event]');
-  if (row) _refreshNotificationTemplateRow(row);
-  markSettingsDirty();
-}
-
-/** Clear one custom notification text so the default text is used after saving. */
-function resetNotificationTemplate(button) {
-  const row = button?.closest?.('[data-notification-template-event]');
+  if (field.disabled) return;
+  const row = field.closest('[data-notification-template-event]');
   if (!row) return;
-  row.querySelectorAll('[data-notification-template-field]').forEach((field) => { field.value = ''; });
+  settingsState.notificationTemplateDrafts ||= {};
+  settingsState.notificationTemplateDrafts[row.dataset.notificationTemplateEvent] = {
+    title: row.querySelector('[data-notification-template-field="title"]').value,
+    message: row.querySelector('[data-notification-template-field="message"]').value,
+  };
   _refreshNotificationTemplateRow(row);
   markSettingsDirty();
 }
 
+/** Point shared insertion at the last focused field without altering any texts. */
+function onNotificationTemplateFocus(field) {
+  const root = field.closest('[data-notification-templates]');
+  const destination = root?.querySelector('[data-notification-destination]');
+  if (destination) destination.value = field.dataset.notificationTemplateField;
+}
+
+/** Clear only the selected event; empty fields restore its runtime defaults. */
+function resetNotificationTemplate(button) {
+  if (button.disabled) return;
+  const row = button.closest('[data-notification-template-event]');
+  if (!row) return;
+  row.querySelectorAll('[data-notification-template-field]').forEach((field) => { field.value = ''; });
+  onNotificationTemplateInput(row.querySelector('[data-notification-template-field="title"]'));
+}
+
+/** Handle shared reference/event/example controls while preserving every event's draft. */
+function handleNotificationTemplateAction(button, action) {
+  const root = button.closest('[data-notification-templates]');
+  if (!root || button.disabled) return;
+  const config = settingsState.data?.notification_templates || {};
+  const readable = root.dataset.notificationTemplates === 'ready';
+  if (action === 'notification-template-select') {
+    const event = button.dataset.notificationEvent;
+    if (!(config.events || []).includes(event)) return;
+    root.dataset.notificationActive = event;
+    settingsState.notificationTemplateEvent = event;
+    root.querySelectorAll('[data-notification-template-event]').forEach((row) => { row.hidden = row.dataset.notificationTemplateEvent !== event; });
+    root.querySelectorAll('[data-notification-event]').forEach((choice) => choice.setAttribute('aria-pressed', String(choice.dataset.notificationEvent === event)));
+  } else if (action === 'notification-template-more') {
+    settingsState.notificationTemplateShowAll = !settingsState.notificationTemplateShowAll;
+    button.setAttribute('aria-expanded', String(settingsState.notificationTemplateShowAll));
+    button.textContent = settingsT(settingsState.notificationTemplateShowAll ? 'notificationTemplates.showLess' : 'notificationTemplates.showAll', {count: config.placeholders?.length || 0});
+  } else if (readable) {
+    const row = Array.from(root.querySelectorAll('[data-notification-template-event]')).find((item) => item.dataset.notificationTemplateEvent === root.dataset.notificationActive);
+    if (!row) return;
+    if (action === 'notification-template-example') {
+      const example = _notificationTemplateExample(row.dataset.notificationTemplateEvent);
+      row.querySelectorAll('[data-notification-template-field]').forEach((field) => { field.value = example[field.dataset.notificationTemplateField]; });
+      onNotificationTemplateInput(row.querySelector('[data-notification-template-field="title"]'));
+    } else if (action === 'notification-template-insert') {
+      const token = button.dataset.notificationToken;
+      if (!(config.placeholders || []).includes(token)) return;
+      const destination = root.querySelector('[data-notification-destination]').value === 'title' ? 'title' : 'message';
+      const field = row.querySelector(`[data-notification-template-field="${destination}"]`);
+      const value = `{${token}}`;
+      const feedback = root.querySelector('[data-notification-reference-feedback]');
+      if (field.value.length - (field.selectionEnd - field.selectionStart) + value.length > field.maxLength) {
+        feedback.textContent = settingsT('notificationTemplates.limitReached', {max: field.maxLength});
+        return;
+      }
+      field.setRangeText(value, field.selectionStart, field.selectionEnd, 'end');
+      field.focus();
+      onNotificationTemplateInput(field);
+      feedback.textContent = settingsT('notificationTemplates.inserted', {token: value});
+    }
+  }
+  if (['notification-template-select', 'notification-template-more'].includes(action)) {
+    root.querySelector('[data-notification-reference]').innerHTML = _notificationTemplateReferenceRows(config, root.dataset.notificationActive, readable);
+    root.querySelector('[data-notification-reference-feedback]').textContent = '';
+  }
+}
+
 /**
- * Collect custom notification texts below a settings panel.
- * @param {Element|null} panel Active settings panel.
- * @returns {object|null} Texts by event, or null when the card is missing or
- *   the saved texts were unreadable and must not be overwritten.
+ * Collect visible and hidden drafts, or null for unreadable stores. Persist an
+ * explicitly empty field as its original-default token so reloading never
+ * replaces that choice with a localized starter example.
  */
 function collectNotificationTemplates(panel) {
   const root = panel?.querySelector?.('[data-notification-templates="ready"]');
@@ -5075,8 +5206,8 @@ function collectNotificationTemplates(panel) {
   const templates = {};
   root.querySelectorAll('[data-notification-template-event]').forEach((row) => {
     templates[row.dataset.notificationTemplateEvent] = {
-      title: row.querySelector('[data-notification-template-field="title"]')?.value || '',
-      message: row.querySelector('[data-notification-template-field="message"]')?.value || '',
+      title: row.querySelector('[data-notification-template-field="title"]')?.value.trim() || '{default_title}',
+      message: row.querySelector('[data-notification-template-field="message"]')?.value.trim() || '{default_message}',
     };
   });
   return templates;
@@ -6271,6 +6402,7 @@ async function onSettingsContentClick(event) {
   if (action === 'delete-config-backup') return deleteSettingsConfigBackup(el.dataset.backupName || '');
   if (action === 'send-test-email') return sendTestEmail();
   if (action === 'notification-template-reset') return resetNotificationTemplate(el);
+  if (action.startsWith('notification-template-')) return handleNotificationTemplateAction(el, action);
   if (action === 'apprise-profile-select') {
     if (settingsState.appriseDraftProfile) return;
     settingsState.appriseSelectedProfileId = el.dataset.appriseProfileId || '';
@@ -7441,6 +7573,7 @@ async function reloadSettingsDataAfterSave(profileType = '') {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     settingsState.data = data;
+    settingsState.notificationTemplateDrafts = {};
     settingsState.dirty = false;
     if (profileType) {
       const rows = Array.isArray(data?.[`${profileType === 'storagebox' ? 'storage' : profileType}_profiles`])
@@ -7461,6 +7594,7 @@ window.onAppriseProviderFilterChange = onAppriseProviderFilterChange;
 window.onAppriseProviderSelect = onAppriseProviderSelect;
 window.onRepositoryRefreshEnabledToggle = onRepositoryRefreshEnabledToggle;
 window.onNotificationTemplateInput = onNotificationTemplateInput;
+window.onNotificationTemplateFocus = onNotificationTemplateFocus;
 
 /** Fetch administrator script definitions; display errors without replacing saved scripts. */
 async function loadSettingsScripts(selected = '') {
