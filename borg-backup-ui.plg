@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.22.1457">
+<!ENTITY version   "2026.10.23.1054">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,17 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.23.1054###
+### Bug Fixes
+
+- **Matching notification previews:** Editable example templates and their previews now match for all five events, including job names in titles. Supplied example labels follow the interface language; saved custom texts and placeholder values remain unchanged. Save applies the displayed templates to notification delivery. (#584)
+- **Unraid and Discord notification layout:** Show the complete notification template with line breaks in Unraid, including its archived view, and when forwarding to Discord. Keep severity values such as normal in the priority field instead of appending them to the message. (#584)
+
+### Improvements
+
+- **Custom notification texts:** Replace the title and message of backup notifications for Unraid, email and Apprise under Settings > Notifications. Placeholders such as {job}, {status} and {error} insert backup details, a preview shows the result, and empty fields keep the default text. Thanks to [JonaxScript](https://github.com/JonaxScript) for contributing this feature. (#582)
+- **Notification text editor:** Use one shared placeholder reference with event-specific example values, insert placeholders at the cursor, and compare equally sized template and preview fields. All five backup events offer example templates containing placeholders; switching events preserves unsaved edits. (#584)
+
 ###2026.10.22.1457###
 ### Bug Fixes
 
@@ -41,21 +52,6 @@
 ### Improvements
 
 - View and edit shared job Pre/Post scripts and Post conditions directly from job groups. Changes are saved to the original job for individual and group starts; running jobs keep their script snapshot. Concurrent assignment edits are detected before saving. (#573)
-
-###2026.10.17.1802###
-### Bug Fixes
-
-- The job wizard now shows schedule fields and the next-run preview only when scheduling is enabled. Disabled schedules clearly indicate that the job runs manually, and toggling preserves entered values. (#568)
-
-### Improvements
-
-- Run existing backup jobs sequentially in job groups with their own schedules, ordered steps, error policies and integrated logs. Individual jobs retain their settings, scripts and schedules. (#570)
-- Show group membership on individual jobs and retain group context in history and reports. Export and import complete job groups with their jobs. (#570)
-- Keep group execution statuses aligned, identify related dashboard jobs with linked group names and step numbers, and preserve the log viewport size when switching between live and saved logs. (#570)
-- Keep automatic log following enabled when opening the current live log, and show the final available job log even when short jobs finish between refreshes. (#570)
-- Select several group jobs together using search, location filters and clear job identities instead of a compact dropdown. (#570)
-- Keep dashboard group badges and start times on one line, and use application dialogs for group deletion and discarding unsaved edits. Unchanged group settings close without a confirmation. (#570)
-- Arrange equally sized group actions consistently as edit, delete and start, with matching labels. (#570)
 
 ]]>
 </CHANGES>
@@ -82,7 +78,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="33d40a9719598487c40a4e762361eb7f"
+EXPECTED_MD5="153271267dcff40a826076651ed488ba"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
