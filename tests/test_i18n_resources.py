@@ -212,11 +212,25 @@ def test_user_manuals_cover_core_workflows_and_reference_existing_assets():
 
 
 def test_user_manuals_cover_current_stable_safety_and_runtime_guidance():
+    """Preserve safety guidance and honest review baselines across promotions (#583)."""
     manual_de = (ROOT / "docs" / "user-manual" / "de" / "user-manual.md").read_text(encoding="utf-8")
     manual_en = (ROOT / "docs" / "user-manual" / "en" / "user-manual.md").read_text(encoding="utf-8")
 
+    stable_version = re.search(
+        r'<!ENTITY version\s+"([^"]+)"', (ROOT / "borg-backup-ui.plg").read_text()
+    )[1]
+    baselines = []
+    for manual in (manual_de, manual_en):
+        baseline = re.search(
+            r'(?:Verhaltensbasis: Stable|Behavior baseline: stable) `(\d{4}\.\d{2}\.\d{2}\.\d{4})`',
+            manual,
+        )
+        assert baseline, "Manual must declare its documentation review baseline"
+        baselines.append(baseline[1])
+        assert baseline[1] <= stable_version, "Review baseline cannot be newer than stable"
+    assert baselines[0] == baselines[1], "Both languages must document the same baseline"
+
     required_shared = (
-        re.search(r'<!ENTITY version\s+"([^"]+)"', (ROOT / "borg-backup-ui.plg").read_text())[1],
         "Unraid 6.12.5",
         "Python 3 for Unraid",
         "backup.start.priority=1",
