@@ -19,6 +19,7 @@ function dashboardLocationLabel(location) {
 
 let dashboardSystemHealth = null;
 let dashboardSelectedLocation = 'all';
+const dashboardExpandedJobs = new Set();
 const DASHBOARD_LOCATION_ORDER = ['local', 'usb', 'smb', 'storagebox'];
 
 async function fetchStatus() {
@@ -78,7 +79,8 @@ async function refreshStatus() {
       jobMap[k] = job;
     }
 
-    const knownKeys = new Set((statusData.backups || []).map(b => String(b.key || '').toLowerCase()));
+    statusData.backups ||= [];
+    const knownKeys = new Set(statusData.backups.map(b => String(b.key || '').toLowerCase()));
     for (const job of (jobsData.jobs || [])) {
       if (!job.is_utility && !knownKeys.has(String(job.key || '').toLowerCase())) {
         statusData.backups.push({
@@ -148,7 +150,8 @@ function updateRefreshLabel() {
 }
 
 function renderDashboard(data, systemHealth) {
-  renderSummaryBar(data.summary);
+  renderSummaryBar(data.backups || []);
+  renderDashboardAttention(data.backups || []);
   renderRestoreVerificationSummary(data.backups || []);
   renderDashboardSystemWarning(systemHealth);
   renderBackupGrid(data.backups);
@@ -175,65 +178,200 @@ function renderDashboardSystemWarning(data) {
   el.textContent = dashboardT('dashboard.systemWarning');
 }
 
-function renderSummaryBar(summary) {
-  const el = document.getElementById('summary-bar');
-  if (!el) return;
-
-  el.innerHTML = [
-    statTile('total',   summary.total,   dashboardT('dashboard.total'), iconGrid()),
-    statTile('success', summary.success, dashboardT('dashboard.successful'), iconCheck()),
-    statTile('skipped', summary.skipped || 0, dashboardT('dashboard.skipped'), iconSkip()),
-    statTile('warning', summary.warning, dashboardT('dashboard.warnings'), iconWarn()),
-    statTile('error',   summary.error,   dashboardT('dashboard.errors'), iconX()),
-  ].join('');
+/**
+ * Count each latest outcome once; overdue remains an independent time status.
+ * @param {object[]} backups Current status rows, including jobs without a run.
+ * @returns {{counts: object, total: number, overdue: number}} Outcome and time counts.
+ */
+function dashboardBackupSummary(backups) {
+  const counts = { success: 0, warning: 0, error: 0, skipped: 0, cancelled: 0, unknown: 0 };
+  for (const backup of backups) {
+    const status = backup.never_run ? 'unknown' : String(backup.status || '').toLowerCase();
+    counts[Object.hasOwn(counts, status) ? status : 'unknown'] += 1;
+  }
+  return { counts, total: backups.length, overdue: backups.filter((backup) => backup.backup_overdue).length };
 }
 
+/**
+ * Build a labeled ring and legend from numeric counts, using the current theme.
+ * @param {object[]} rows Counts, translated labels and fixed semantic color classes.
+ * @param {number} value Verified/successful count shown inside the ring.
+ * @param {number} total Scope denominator; zero produces an empty neutral ring.
+ * @param {string} centerLabel Translated numerator label.
+ * @returns {string} Escaped summary markup, including a textual legend.
+ */
+function dashboardSummaryContent(rows, value, total, centerLabel) {
+  let offset = 0;
+  const segments = rows.filter((row) => row.count > 0).map((row) => {
+    const start = offset;
+    offset += total ? row.count / total * 100 : 0;
+    return `var(--dashboard-ring-${row.cls}) ${start}% ${offset}%`;
+  });
+  const fill = segments.length ? `conic-gradient(${segments.join(',')})` : 'var(--ui-color-border)';
+  const description = rows.map((row) => `${row.count} ${row.label}`).join(' · ');
+  return `<div class="dashboard-summary-body">
+    <div class="dashboard-summary-ring" style="--dashboard-ring-fill:${fill}" role="img" aria-label="${escHtml(description)}">
+      <div class="dashboard-summary-ring__center"><span><strong>${value}</strong><small>/${total}</small></span><span class="dashboard-summary-ring__label">${escHtml(centerLabel)}</span></div>
+    </div>
+    <dl class="dashboard-summary-legend">${rows.map((row) => `<div class="dashboard-summary-stat ${row.cls}${row.count === 0 ? ' is-zero' : ''}"><dt><span aria-hidden="true"></span>${escHtml(row.label)}</dt><dd>${row.count}</dd></div>`).join('')}</dl>
+  </div>`;
+}
+
+/**
+ * Render backup outcomes from job rows rather than the API's overdue-adjusted counters.
+ * @param {object[]} backups Current status rows; overdue links open their job details.
+ */
+function renderSummaryBar(backups) {
+  const el = document.getElementById('summary-bar');
+  if (!el) return;
+  const summary = dashboardBackupSummary(backups);
+  const rows = [
+    { cls: 'success', count: summary.counts.success, label: dashboardT('dashboard.successful') },
+    { cls: 'warning', count: summary.counts.warning, label: dashboardT('dashboard.withWarnings') },
+    { cls: 'error', count: summary.counts.error, label: dashboardT('dashboard.errors') },
+    { cls: 'neutral', count: summary.counts.skipped, label: dashboardT('dashboard.skipped') },
+    ...(summary.counts.cancelled ? [{ cls: 'warning', count: summary.counts.cancelled, label: dashboardT('jobs.statusCancelled') }] : []),
+    ...(summary.counts.unknown ? [{ cls: 'unknown', count: summary.counts.unknown, label: dashboardT('dashboard.unknownOrNever') }] : []),
+  ];
+  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
+    + dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
+    + `<div class="dashboard-summary-footer${summary.overdue ? ' has-overdue' : ''}">${summary.overdue
+      ? `<button type="button" class="dashboard-summary-overdue" data-dashboard-overdue>${iconWarn()}<span>${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</span></button>`
+      : `<span>${escHtml(dashboardT('dashboard.noOverdueBackups'))}</span>`}</div>`;
+  el.querySelector('[data-dashboard-overdue]')?.addEventListener('click', () => {
+    const first = backups.find((backup) => backup.backup_overdue);
+    if (first) openDashboardJobDetails(first.key);
+  });
+}
+
+/**
+ * Render verification scope explicitly; missing metadata stays unknown, never verified.
+ * @param {object[]} backups Current rows; unplanned and unknown states stay outside the ring.
+ */
 function renderRestoreVerificationSummary(backups) {
   const el = document.getElementById('restore-summary-bar');
   if (!el) return;
-  if (!Array.isArray(backups) || backups.length === 0) {
-    el.innerHTML = '';
-    return;
+  const counts = { verified: 0, stale: 0, failed: 0, never: 0, not_required: 0, unknown: 0 };
+  for (const backup of backups) {
+    const status = String(backup.restore_verification_status || '').toLowerCase();
+    counts[Object.hasOwn(counts, status) ? status : 'unknown'] += 1;
   }
-
-  const scoped = backups.filter((b) => String(b.restore_verification_status || '').toLowerCase() !== 'not_required');
-  const notRequired = backups.length - scoped.length;
-  const verified = scoped.filter((b) => b.restore_verification_status === 'verified').length;
-  const stale = scoped.filter((b) => b.restore_verification_status === 'stale').length;
-  const failed = scoped.filter((b) => b.restore_verification_status === 'failed').length;
-  const never = scoped.filter((b) => b.restore_verification_status === 'never').length;
-
-  el.innerHTML = [
-    statTile('success', `${verified}/${scoped.length}`, dashboardT('dashboard.restoreVerified'), iconCheck()),
-    statTile('warning', stale, dashboardT('dashboard.restoreOverdue'), iconWarn()),
-    statTile('error', failed, dashboardT('dashboard.restoreFailed'), iconX()),
-    statTile('unknown', never, dashboardT('dashboard.restoreOpen'), iconGrid()),
-    statTile('total', notRequired, dashboardT('dashboard.restoreNotScheduled'), iconSkip()),
-  ].join('');
+  const total = backups.length - counts.not_required - counts.unknown;
+  const rows = [
+    { cls: 'success', count: counts.verified, label: dashboardT('dashboard.restoreVerified') },
+    { cls: 'warning', count: counts.stale, label: dashboardT('dashboard.restoreOverdue') },
+    { cls: 'error', count: counts.failed, label: dashboardT('dashboard.restoreFailed') },
+    { cls: 'unknown', count: counts.never, label: dashboardT('dashboard.restoreOpen') },
+  ];
+  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.restoreScope', { count: total, total: backups.length }))}</p>`
+    + dashboardSummaryContent(rows, counts.verified, total, dashboardT('dashboard.restoreVerified'))
+    + `<div class="dashboard-summary-footer">${escHtml(dashboardT('dashboard.restoreUnplannedCount', { count: counts.not_required }))}${counts.unknown ? ` · ${escHtml(dashboardT('dashboard.restoreUnknownCount', { count: counts.unknown }))}` : ''}</div>`;
 }
 
-function statTile(cls, value, label, icon) {
-  return `
-    <div class="stat-tile ${cls}">
-      <div class="stat-icon">${icon}</div>
-      <div>
-        <div class="stat-value">${value}</div>
-        <div class="stat-label">${label}</div>
-      </div>
-    </div>`;
+/**
+ * Return actionable outcomes and overdue states separately, without fabricating check plans.
+ * @param {object[]} backups Current rows with existing run and reminder metadata.
+ * @returns {object[]} Descriptions and affected rows, ordered with failures first.
+ */
+function dashboardAttentionItems(backups) {
+  const items = [];
+  for (const backup of backups) {
+    const run = dashboardRunStatus(backup);
+    const message = dashboardRunMessage(backup);
+    if (!backup.never_run && ['error', 'warning', 'skipped', 'cancelled'].includes(backup.status)) {
+      items.push({ backup, cls: run.cls === 'error' ? 'error' : 'warning', label: run.label, message: message.text });
+    }
+    if (backup.backup_overdue) {
+      items.push({ backup, cls: 'warning', label: dashboardT('dashboard.backupOverdue'), message: dashboardT('dashboard.backupOverdueDetails', {
+        date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run),
+      }) });
+    }
+    if (['failed', 'stale'].includes(backup.restore_verification_status)) {
+      const failed = backup.restore_verification_status === 'failed';
+      items.push({ backup, cls: failed ? 'error' : 'warning', label: dashboardT(failed ? 'dashboard.restoreFailed' : 'dashboard.restoreOverdue'),
+        message: dashboardT(failed ? 'dashboard.restoreFailureAttention' : 'dashboard.restoreOverdueAttention') });
+    }
+  }
+  return items.sort((a, b) => (a.cls === 'error' ? 0 : 1) - (b.cls === 'error' ? 0 : 1));
 }
 
+/**
+ * Render escaped issue descriptions and local links to the affected expandable row.
+ * @param {object[]} backups Current status rows; an empty result hides the section.
+ */
+function renderDashboardAttention(backups) {
+  const el = document.getElementById('dashboard-attention');
+  if (!el) return;
+  const items = dashboardAttentionItems(backups);
+  el.hidden = items.length === 0;
+  el.innerHTML = items.length ? `<header class="dashboard-attention-header"><h2>${escHtml(dashboardT('dashboard.attention'))}</h2><span>${escHtml(dashboardT('dashboard.attentionCount', { count: items.length }))}</span></header>
+    <ul>${items.map((item, index) => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button type="button" class="btn btn-secondary dashboard-attention-action" data-dashboard-attention="${index}">${escHtml(dashboardT('dashboard.viewDetails'))}</button></li>`).join('')}</ul>` : '';
+  el.querySelectorAll('[data-dashboard-attention]').forEach((button) => button.addEventListener('click', () => {
+    const item = items[Number(button.dataset.dashboardAttention)];
+    if (item) openDashboardJobDetails(item.backup.key);
+  }));
+}
+
+/**
+ * Generate a stable HTML-safe row ID for arbitrary job keys.
+ * @param {string} key Job identity, independent of display name or location filter.
+ * @returns {string} Code-point-encoded DOM ID.
+ */
+function dashboardDetailsId(key) {
+  return 'dashboard-details-' + Array.from(String(key || '')).map((char) => char.codePointAt(0).toString(16)).join('-');
+}
+
+/**
+ * Open an affected job in All locations, preserving other expansions and moving focus locally.
+ * @param {string} key Job to reveal from the current cached dashboard data.
+ */
+function openDashboardJobDetails(key) {
+  if (!key) return;
+  dashboardSelectedLocation = 'all';
+  dashboardExpandedJobs.add(String(key));
+  renderBackupGrid(window.BBUI.core.state.data?.backups || []);
+  const row = document.getElementById(dashboardDetailsId(key));
+  const toggle = document.getElementById(dashboardDetailsId(key) + '-toggle');
+  toggle?.focus({ preventScroll: true });
+  row?.scrollIntoView({ block: 'center', behavior: 'auto' });
+}
+
+/**
+ * Toggle an existing details row without rebuilding the table or losing keyboard focus.
+ * @param {HTMLButtonElement} button Inventory disclosure with the stable job key.
+ */
+function toggleDashboardJobDetails(button) {
+  const key = button.dataset.dashboardDetails;
+  const expanded = !dashboardExpandedJobs.has(key);
+  if (expanded) dashboardExpandedJobs.add(key); else dashboardExpandedJobs.delete(key);
+  const row = document.getElementById(dashboardDetailsId(key));
+  if (row) row.hidden = !expanded;
+  button.setAttribute('aria-expanded', String(expanded));
+  button.setAttribute('aria-label', dashboardT(expanded ? 'dashboard.hideJobDetails' : 'dashboard.showJobDetails', { job: button.dataset.dashboardJobName }));
+}
+
+/**
+ * Rebuild the grouped inventory, retaining disclosures and focus for existing jobs.
+ * @param {object[]} backups Current status rows; removed jobs lose their expansion state.
+ */
 function renderBackupGrid(backups) {
   const el = document.getElementById('backup-grid');
   if (!el) return;
 
   if (!backups || backups.length === 0) {
+    dashboardExpandedJobs.clear();
+    dashboardSelectedLocation = 'all';
     renderDashboardLocationSidebar([]);
     updateDashboardSelection([]);
     el.innerHTML = `<div class="ui-empty">${escHtml(dashboardT('dashboard.emptyStatus'))}<br>${escHtml(dashboardT('dashboard.emptyQuestion'))}</div>`;
     return;
   }
 
+  const currentKeys = new Set(backups.map((backup) => String(backup.key)));
+  for (const key of dashboardExpandedJobs) if (!currentKeys.has(key)) dashboardExpandedJobs.delete(key);
+  if (dashboardSelectedLocation !== 'all' && !backups.some((backup) => dashboardLocationKey(backup) === dashboardSelectedLocation)) dashboardSelectedLocation = 'all';
+  const focusedKey = document.activeElement?.dataset?.dashboardDetails;
+  const focusedLocation = document.activeElement?.dataset?.dashboardLocation;
   const visible = backups
     .filter((backup) => dashboardSelectedLocation === 'all' || dashboardLocationKey(backup) === dashboardSelectedLocation)
     .sort((a, b) => {
@@ -256,12 +394,15 @@ function renderBackupGrid(backups) {
       <thead><tr>
         <th>${dashboardT('dashboard.backupColumn')}</th>
         <th>${dashboardT('dashboard.runStatusColumn')}</th>
+        <th>${dashboardT('dashboard.nextRunTime')}</th>
         <th>${dashboardT('dashboard.restoreColumn')}</th>
-        <th>${dashboardT('dashboard.storageColumn')}</th>
-        <th>${dashboardT('dashboard.growthCheckColumn')}</th>
+        <th>${dashboardT('dashboard.repository')}</th>
       </tr></thead>
       <tbody>${renderDashboardLocationGroups(visible)}</tbody>
     </table>`;
+  el.querySelectorAll('[data-dashboard-details]').forEach((button) => button.addEventListener('click', () => toggleDashboardJobDetails(button)));
+  if (focusedKey) document.getElementById(dashboardDetailsId(focusedKey) + '-toggle')?.focus({ preventScroll: true });
+  if (focusedLocation) document.querySelector(`[data-dashboard-location="${focusedLocation}"]`)?.focus({ preventScroll: true });
 }
 
 function renderDashboardLocationGroups(backups) {
@@ -302,7 +443,7 @@ function dashboardBackupCount(count) {
 function renderDashboardLocationSidebar(backups) {
   const el = document.getElementById('dashboard-location-list');
   if (!el) return;
-  const entries = ['all', ...DASHBOARD_LOCATION_ORDER];
+  const entries = ['all', ...DASHBOARD_LOCATION_ORDER.filter((location) => backups.some((backup) => dashboardLocationKey(backup) === location))];
   el.innerHTML = entries.map((location) => {
     const count = location === 'all'
       ? backups.length
@@ -319,6 +460,7 @@ function renderDashboardLocationSidebar(backups) {
     button.addEventListener('click', () => {
       dashboardSelectedLocation = button.dataset.dashboardLocation || 'all';
       renderBackupGrid(backups);
+      document.querySelector(`[data-dashboard-location="${dashboardSelectedLocation}"]`)?.focus({ preventScroll: true });
     });
   });
 }
@@ -336,10 +478,9 @@ function updateDashboardSelection(visible) {
 
 function dashboardRunStatus(backup) {
   if (backup.never_run) return { cls: 'unknown', label: dashboardT('dashboard.neverExecuted') };
-  if (backup.backup_overdue) return { cls: 'warning', label: dashboardT('dashboard.backupOverdue') };
   const status = String(backup.status || 'unknown').toLowerCase();
   return {
-    cls: status === 'cancelled' ? 'warning' : status,
+    cls: status === 'cancelled' ? 'warning' : (['success', 'skipped', 'warning', 'error'].includes(status) ? status : 'unknown'),
     label: {
       success: dashboardT('dashboard.successful'),
       skipped: dashboardT('dashboard.skipped'),
@@ -352,21 +493,13 @@ function dashboardRunStatus(backup) {
 
 function dashboardRunMessage(backup) {
   if (backup.never_run) return { cls: '', text: dashboardT('dashboard.neverExecutedHint') };
-  if (backup.backup_overdue) {
-    return {
-      cls: 'warning',
-      text: dashboardT('dashboard.backupOverdueDetails', {
-        date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run || ''),
-      }),
-    };
-  }
-  if (backup.status === 'error') {
-    return { cls: 'error', text: backup.error_message || backup.message || dashboardT('dashboard.backupFailedDetails') };
+  if (['error', 'warning', 'cancelled'].includes(backup.status)) {
+    return { cls: backup.status === 'error' ? 'error' : 'warning', text: backup.error_message || backup.message || dashboardT(backup.status === 'error' ? 'dashboard.backupFailedDetails' : 'dashboard.backupWarningDetails') };
   }
   if (backup.status === 'skipped') {
     const key = `dashboard.skipReasons.${backup.skip_reason_code || 'skipped'}`;
     const translated = dashboardT(key);
-    return { cls: 'warning', text: translated === key ? dashboardT('dashboard.skipDefault') : translated };
+    return { cls: 'warning', text: translated === key ? (backup.skip_reason_text || backup.error_message || dashboardT('dashboard.skipDefault')) : translated };
   }
   return { cls: '', text: '' };
 }
@@ -452,7 +585,13 @@ function dashboardNextRun(jobKey, enabled) {
     : (sched.cron || dashboardT('dashboard.unknown'));
 }
 
-function renderDashboardRestoreVerificationBadge(backup) {
+/**
+ * Render verification with full dates, or a compact inventory badge when requested.
+ * @param {object} backup Existing verification status and date fields.
+ * @param {boolean} compact Limit visible inventory facts to the validity date.
+ * @returns {string} Badge/facts markup, or an empty string for unknown states.
+ */
+function renderDashboardRestoreVerificationBadge(backup, compact = false) {
   const status = String(backup.restore_verification_status || '').toLowerCase();
   if (!status) return '';
   const map = {
@@ -473,16 +612,18 @@ function renderDashboardRestoreVerificationBadge(backup) {
       : null,
   ].filter(Boolean);
   const title = details.map(([label, value]) => `${label}: ${value}`).join(' · ');
+  if (compact) return `<span class="restore-v-badge ${m.cls}" title="${escHtml(title || m.text)}">${escHtml(m.text)}</span>${backup.restore_verification_valid_until ? `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.validUntilLabel'))}: ${escHtml(backup.restore_verification_valid_until)}</span>` : ''}`;
   return `<span class="restore-v-badge ${m.cls}" title="${escHtml(title || m.text)}">${m.text}</span>${details.length ? `<span class="dashboard-restore-facts">${details.map(([label, value]) => `<span class="dashboard-fact-row"><b>${escHtml(label)}:</b><span>${escHtml(value)}</span></span>`).join('')}</span>` : ''}`;
 }
 
+/**
+ * Render an inventory row with the existing icons/archive identity and a keyed disclosure.
+ * @param {object} backup Status row merged with configured job metadata.
+ * @returns {string} Inventory row followed by its accessible expandable details row.
+ */
 function renderDashboardInventoryRow(backup) {
   const run = dashboardRunStatus(backup);
   const message = dashboardRunMessage(backup);
-  const growthClass = backup.growth_bytes == null ? 'neutral' : backup.growth_bytes > 0 ? 'positive' : 'negative';
-  let checkStatus = backup.repository_check_status;
-  if (checkStatus === 'ok' && isStaleDate(backup.repository_check_date)) checkStatus = 'overdue';
-  const checkLabel = checkStatus ? repoCheckLabel({ ...backup, repository_check_status: checkStatus }) : dashboardT('dashboard.checkUnknown');
   const type = backup.name || backup.display_name || 'Backup';
   const iconKey = typeof resolveJobIcon === 'function' ? resolveJobIcon(backup) : (backup.icon || 'archive');
   const iconColorKey = typeof resolveJobIconColor === 'function' ? resolveJobIconColor(backup) : '';
@@ -505,21 +646,17 @@ function renderDashboardInventoryRow(backup) {
       return [label, value, 'group-next-run', dashboardT('jobGroups.groupStart', { schedule: g.name }) + ' · ' + value];
     }),
   ];
-  const runFacts = runFactRows.length ? `<span class="dashboard-run-facts">
-      ${runFactRows.map(([label, value, cls, detail]) => {
-        const rowClass = cls ? ` ${cls}` : '';
-        return `<span class="dashboard-fact-row${rowClass}"${detail ? ` title="${escHtml(detail)}"` : ''}><b>${escHtml(label.replace(/:\s*$/, ''))}:</b><span>${escHtml(value)}</span></span>`;
-      }).join('')}
-    </span>` : '';
-  const hasSizes = Number(backup.original_size || 0) > 0;
-  const sizeFacts = hasSizes ? [
-    [dashboardT('dashboard.deduplicated'), backup.deduplicated_size_formatted || '—', true],
-    [dashboardT('dashboard.source'), backup.original_size_formatted || '—'],
-    [dashboardT('dashboard.compressed'), backup.compressed_size_formatted || '—'],
-    [dashboardT('dashboard.repository'), backup.repository_size_formatted || '—'],
-  ] : [];
-  const growth = backup.growth_formatted || '—';
-
+  const facts = (rows) => rows.map(([label, value, cls, detail]) => {
+    const rowClass = cls ? ` ${cls}` : '';
+    return `<span class="dashboard-fact-row${rowClass}"${detail ? ` title="${escHtml(detail)}"` : ''}><b>${escHtml(label.replace(/:\s*$/, ''))}:</b><span>${escHtml(value)}</span></span>`;
+  }).join('');
+  const scheduleRows = runFactRows.filter((row) => row[2] === 'next-run' || row[2] === 'group-next-run');
+  const runRows = runFactRows.filter((row) => !scheduleRows.includes(row));
+  const runFacts = runRows.length ? `<span class="dashboard-run-facts">${facts(runRows)}</span>` : '';
+  const overdue = backup.backup_overdue ? `<span class="badge warning">${escHtml(dashboardT('dashboard.backupOverdue'))}</span><span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.backupOverdueDetails', { date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run) }))}</span>` : '';
+  const id = dashboardDetailsId(backup.key);
+  const expanded = dashboardExpandedJobs.has(String(backup.key));
+  const size = Number(backup.repository_size || 0) > 0 || Number(backup.original_size || 0) > 0 ? backup.repository_size_formatted || '—' : '—';
   return `<tr class="dashboard-inventory-row ${run.cls}">
     <td><div class="dashboard-backup-identity">
       <span class="type-icon${iconColorClass}">${typeIcon(iconKey)}</span>
@@ -529,10 +666,53 @@ function renderDashboardInventoryRow(backup) {
       ${backup.enabled === false ? `<span class="badge warning"><span class="badge-dot"></span>${dashboardT('dashboard.disabled')}</span>` : ''}
       <span class="badge ${run.cls}"><span class="badge-dot"></span>${escHtml(run.label)}</span>
     </div>${runFacts}${message.text ? `<div class="dashboard-table-message ${message.cls}">${escHtml(message.text)}</div>` : ''}</td>
-    <td>${renderDashboardRestoreVerificationBadge(backup) || `<span class="dashboard-cell-detail">${dashboardT('dashboard.unknown')}</span>`}</td>
-    <td>${sizeFacts.length ? `<span class="dashboard-storage-facts">${sizeFacts.map(([label, value, primary]) => `<span class="dashboard-fact-row ${primary ? 'primary' : ''}"><b>${escHtml(label)}:</b><span>${escHtml(value)}</span></span>`).join('')}</span>` : `<span class="dashboard-cell-detail">${dashboardT('dashboard.noSizeData')}</span>`}</td>
-    <td><strong class="dashboard-cell-primary dashboard-growth ${growthClass}">${escHtml(growth)}</strong>${renderDashboardRepositoryCheck(checkStatus, checkLabel, backup.repository_next_check)}</td>
-  </tr>`;
+    <td>${overdue}${scheduleRows.length ? `<span class="dashboard-run-facts">${facts(scheduleRows)}</span>` : '<span class="dashboard-cell-detail">—</span>'}</td>
+    <td>${renderDashboardRestoreVerificationBadge(backup, true) || `<span class="dashboard-cell-detail">${dashboardT('dashboard.unknown')}</span>`}</td>
+    <td><strong class="dashboard-cell-primary">${escHtml(size)}</strong><button type="button" id="${id}-toggle" class="dashboard-details-toggle" data-dashboard-details="${escHtml(backup.key)}" data-dashboard-job-name="${escHtml(type)}" aria-controls="${id}" aria-expanded="${expanded}" aria-label="${escHtml(dashboardT(expanded ? 'dashboard.hideJobDetails' : 'dashboard.showJobDetails', { job: type }))}"><span class="dashboard-details-chevron" aria-hidden="true">›</span>${escHtml(dashboardT('dashboard.details'))}</button></td>
+  </tr><tr id="${id}" class="dashboard-details-row"${expanded ? '' : ' hidden'}><td colspan="5">${renderDashboardJobDetails(backup)}</td></tr>`;
+}
+
+/**
+ * Describe the measured check step independently from the stored repository-check record.
+ * @param {object} backup Status row with optional Borg workflow metadata.
+ * @returns {string} Localized status/reason and available duration, or unknown.
+ */
+function dashboardBorgCheckResult(backup) {
+  const step = backup.borg_steps?.check;
+  const labels = {
+    success: 'dashboard.successful', warning: 'dashboard.withWarnings', error: 'dashboard.errors',
+    running: 'jobs.running', skipped: 'dashboard.skipped', cancelled: 'jobs.statusCancelled', pending: 'dashboard.notExecuted',
+  };
+  const label = dashboardT(labels[step?.status] || 'dashboard.unknown');
+  const reason = ['not_due', 'keep_all', 'not_run', 'after_cancel', 'post_condition', 'unavailable'].includes(step?.reason)
+    ? ` · ${dashboardT(`jobs.borgStep.${step.reason}`)}` : '';
+  return `${label}${reason}${step?.duration_seconds == null ? '' : ` · ${dashboardRunDuration(step.duration_seconds)}`}`;
+}
+
+/**
+ * Render all stored storage/check/restore facts without introducing a new check policy.
+ * @param {object} backup Existing storage, workflow and verification status fields.
+ * @returns {string} Escaped details markup; absent measurements remain unknown.
+ */
+function renderDashboardJobDetails(backup) {
+  const growthClass = backup.growth_bytes == null ? 'neutral' : backup.growth_bytes > 0 ? 'positive' : 'negative';
+  let checkStatus = backup.repository_check_status;
+  if (checkStatus === 'ok' && isStaleDate(backup.repository_check_date)) checkStatus = 'overdue';
+  const checkLabel = checkStatus ? repoCheckLabel({ ...backup, repository_check_status: checkStatus }) : dashboardT('dashboard.checkUnknown');
+  const hasSizes = ['original_size', 'compressed_size', 'deduplicated_size', 'repository_size'].some((key) => Number(backup[key] || 0) > 0);
+  const sizeFacts = hasSizes ? [
+    [dashboardT('dashboard.deduplicated'), backup.deduplicated_size_formatted || '—', true],
+    [dashboardT('dashboard.source'), backup.original_size_formatted || '—'],
+    [dashboardT('dashboard.compressed'), backup.compressed_size_formatted || '—'],
+    [dashboardT('dashboard.repository'), backup.repository_size_formatted || '—'],
+  ] : [];
+  const sizeValues = sizeFacts.map(([label, value, primary]) => `<div class="dashboard-fact-row${primary ? ' primary' : ''}"><b>${escHtml(label)}:</b><span>${escHtml(value)}</span></div>`).join('');
+  const archive = backup.archive_name || backup.archive_prefix || '—';
+  return `<div class="dashboard-job-details">
+    <section><h3>${escHtml(dashboardT('dashboard.storageColumn'))}</h3><div class="dashboard-storage-facts">${sizeValues || `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.noSizeData'))}</span>`}<div class="dashboard-fact-row"><b>${escHtml(dashboardT('dashboard.weeklyGrowth'))}:</b><span class="dashboard-growth ${growthClass}">${escHtml(backup.growth_formatted || '—')}</span></div></div></section>
+    <section><h3>${escHtml(dashboardT('dashboard.checkRestoreDetails'))}</h3><div class="dashboard-check-result"><b>${escHtml(dashboardT('dashboard.checkInLastRun'))}:</b><span>${escHtml(dashboardBorgCheckResult(backup))}</span></div>${renderDashboardRepositoryCheck(checkStatus, checkLabel, backup.repository_next_check)}${backup.repository_check_date ? `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.lastStoredCheck'))}: ${escHtml(dashboardAbsoluteTimestamp(backup.repository_check_date))}</span>` : ''}${renderDashboardRestoreVerificationBadge(backup) || `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.unknown'))}</span>`}</section>
+    <div class="dashboard-details-archive"><span>${escHtml(dashboardT('dashboard.archiveLabel'))}:</span> <code>${escHtml(archive)}</code>${backup.timestamp ? `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.lastRunTime'))}: ${escHtml(dashboardAbsoluteTimestamp(backup.timestamp))}</span>` : ''}${backup.last_successful_backup?.timestamp ? `<span class="dashboard-cell-detail">${escHtml(dashboardT('dashboard.lastSuccessfulBackup'))}: ${escHtml(dashboardAbsoluteTimestamp(backup.last_successful_backup.timestamp))}</span>` : ''}</div>
+  </div>`;
 }
 
 function renderDashboardRepositoryCheck(status, label, nextCheck) {

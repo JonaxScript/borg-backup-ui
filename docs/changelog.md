@@ -1,5 +1,10 @@
 # Changelog
 
+## Pending - Dashboard summaries and expandable job details (#589)
+
+- Count latest backup outcomes independently from overdue state and summarize restore evidence against jobs with a test plan. Keep unplanned and unknown restore states explicit.
+- Add actionable error, warning, skip and overdue entries linked to expandable job rows. Retain location grouping, existing icons, archive names, group schedules and all storage/check/restore facts without changing API data or scheduling policies. Preserve disclosures and keyboard focus across refreshes.
+
 ## Pending - Shared notification template editor (#584)
 
 - Render the complete notification description in the Unraid sidebar using escaped HTML and explicit breaks, avoiding multiline INI truncation. Supply original newline-encoded text to Bash notification agents through a process-local startup adapter, restore inherited startup settings, and omit the long-message argument to prevent Discord duplicates. Keep severity under `-i` and preserve email/Apprise text. Native INI/API/Markdown/sanitizer rendering and official Discord delivery are checked offline.

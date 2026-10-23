@@ -178,21 +178,22 @@ The Dashboard answers the most important operational questions:
 
 The page consists of:
 
-- **Backup runs:** Total runs, successful runs, skipped runs, warnings, and errors.
-- **Restore evidence:** Number of verified, overdue, failed, open, and not scheduled restore tests.
-- **Location sidebar:** Filters the table by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`.
+- **Backup runs:** The first ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
+- **Restore evidence:** The second ring shows verified evidence relative to jobs with a restore test plan. Overdue, failed and pending evidence appears alongside it. Jobs without a plan or with unknown restore status are listed separately.
+- **Needs attention:** Shows error messages, warnings, skipped-run reasons and overdue backups or restore evidence. **View** opens details for the affected job.
+- **Location sidebar:** Filters the table by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`. Locations without jobs are hidden. **All locations** keeps jobs grouped by location and retains the existing location icons.
 - **Selection card:** Shows the currently selected location and number of backups.
-- **Job table:** Shows job, location, run status including the next scheduled run, restore status, storage data, and growth/check information.
+- **Job table:** Shows each job with its icon and latest archive name, run status, next scheduled run, restore status and repository size. **Details** expands the remaining information. Expanded details survive refreshes and location or language changes.
 - **Refresh:** Reloads dashboard data.
 
 ### 2.3 Important Columns
 
-- **Backup:** Job name, key, and icon.
-- **Location:** Job storage target.
-- **Run status:** Last run, duration, result, and next scheduled run.
-- **Restore:** Last restore test and validity, if scheduled.
-- **Storage data:** Deduplicated size, source, compressed size, and repository size.
-- **Growth / Check:** Size change and last repository check.
+- **Backup:** Job name, configured icon and color, and latest archive name. The full archive name is also available in the details.
+- **Run status:** Latest result, relative time and duration, plus available error or warning text.
+- **Next run:** Next scheduled run, including group schedules; overdue backups are marked separately.
+- **Restore:** Current evidence status and validity, when available.
+- **Repository:** Last recorded repository size and the **Details** control.
+- **Expanded details:** Deduplicated size, source, compressed size, repository size, growth, the Borg check in the latest run and the stored repository check, plus restore dates and archive name. No additional check plan is created; the display uses existing run data. Missing information remains unknown.
 
 ### 2.4 Typical Actions
 
@@ -200,7 +201,8 @@ The page consists of:
 2. Check the summaries at the top.
 3. Select a location on the left if you only want to see local, USB, SMB, or Storagebox jobs.
 4. Read the run status and restore status for each job.
-5. Click **Refresh** if you expect new data immediately after a run.
+5. Open **Details** for storage values, Borg checks, restore dates and the full archive name.
+6. Click **Refresh** if you expect new data immediately after a run.
 
 ### 2.5 Notes and Best Practices
 

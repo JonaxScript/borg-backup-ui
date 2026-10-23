@@ -49,14 +49,17 @@ The main menu follows the operating workflow: **Dashboard**, **Jobs**, **Reposit
 
 ## 3. Dashboard
 
-The dashboard shows whether backups and restore evidence are currently healthy. The cards at the top summarize backup runs and restore tests. The location sidebar filters the job table by Local, USB, SMB, or Storagebox.
+Two rings summarize the latest backup outcomes and restore evidence. Overdue backups appear separately below the first ring without changing the latest run outcome. The restore ring covers jobs with a test plan; jobs without a plan or with unknown status are listed separately below it.
+
+**Needs attention** shows error messages, warnings, skipped runs and overdue backups or restore evidence. **View** opens the affected job. The location sidebar retains its icons and filters by Local, USB, SMB or Storagebox. Empty locations are hidden; **All locations** keeps jobs grouped by location.
 
 ### Important Columns
 
-- **Run status:** Result, time, duration of the latest backup run, and the next scheduled run.
-- **Restore:** Latest restore test and its validity.
-- **Storage data:** Source size, compressed and deduplicated data, and repository size.
-- **Growth / Check:** Size change and the latest known repository check.
+- **Backup:** Job icon with its configured color, job name and latest archive name.
+- **Run status:** Latest result, relative time and duration, plus available error text.
+- **Next run:** Next scheduled run, including group schedules, with a separate overdue indicator.
+- **Restore:** Evidence status and validity.
+- **Repository:** Repository size and **Details** to expand. Details contain source, compressed and deduplicated sizes, growth, the Borg check in the latest run, the stored repository check, restore dates and the full archive name. There is no additional check plan. Expanded details survive refreshes and location or language changes.
 
 > [!NOTE] The dashboard displays the latest stored status data. Open **History**, **Reports**, or **Repositories** for technical details.
 

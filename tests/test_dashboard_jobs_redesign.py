@@ -144,49 +144,21 @@ def test_dashboard_jobs_layout_is_tablet_and_mobile_responsive() -> None:
     assert "var(--ui-state-neutral-bg)" in css
 
 
-def test_dashboard_summary_uses_subtle_status_surfaces() -> None:
+def test_dashboard_circular_summaries_and_disclosures_use_theme_and_accessible_controls() -> None:
     css = _read("ui/dashboard-jobs.css")
     script = _read("ui/js/pages/dashboard.js")
-    german = _read("ui/i18n/de.json")
-    english = _read("ui/i18n/en.json")
+    html = _read("ui/index.html")
 
-    assert "statTile('total'" in script
-    assert "statTile('success'" in script
-    assert "statTile('skipped'" in script
-    assert "statTile('warning'" in script
-    assert "statTile('error'" in script
-    assert "statTile('unknown'" in script
-    assert ".dashboard-summary-grid .stat-tile.total" in css
-    assert ".dashboard-summary-grid .stat-tile.success" in css
-    assert ".dashboard-summary-grid .stat-tile.skipped" in css
-    assert ".dashboard-summary-grid .stat-tile.warning" in css
-    assert ".dashboard-summary-grid .stat-tile.error" in css
-    assert "background: var(--ui-state-success-bg)" in css
-    assert "background: var(--ui-state-neutral-bg)" in css
-    assert "background: var(--ui-state-info-bg)" in css
-    assert "background: var(--ui-state-warning-bg)" in css
-    assert "background: var(--ui-state-error-bg)" in css
-    assert "border-radius: var(--ui-radius-sm)" in css
-    assert "min-height: 5.125rem" in css
-    assert "--dashboard-summary-fg: var(--ui-state-success-fg)" in css
-    assert "--dashboard-summary-fg: var(--ui-state-warning-fg)" in css
-    assert "--dashboard-summary-fg: var(--ui-state-error-fg)" in css
-    assert "color: var(--dashboard-summary-fg)" in css
-    assert "justify-content: center" in css
-    assert "text-align: center" in css
-    assert ".dashboard-summary-title" in css
-    assert "font-size: var(--ui-font-size-md)" in css
-    assert "font-weight: var(--ui-font-weight-bold)" in css
-    assert '"restoreVerified": "Verifiziert"' in german
-    assert '"restoreOverdue": "Überfällig"' in german
-    assert '"restoreFailed": "Fehlgeschlagen"' in german
-    assert '"restoreOpen": "Offen"' in german
-    assert '"restoreNotScheduled": "Nicht geplant"' in german
-    assert '"restoreVerified": "Verified"' in english
-    assert '"restoreOverdue": "Overdue"' in english
-    assert '"restoreFailed": "Failed"' in english
-    assert '"restoreOpen": "Pending"' in english
-    assert '"restoreNotScheduled": "Not scheduled"' in english
+    assert html.count('class="dashboard-summary-section"') == 2
+    assert 'id="dashboard-attention"' in html
+    for state in ("success", "warning", "error", "neutral"):
+        assert f"--dashboard-ring-{state}: var(--ui-state-{state}-fg)" in css
+    assert 'role="img" aria-label=' in script
+    assert 'aria-controls="${id}" aria-expanded=' in script
+    assert '.dashboard-details-row[hidden]' in css
+    assert ':focus-visible' in css
+    assert '@media (prefers-reduced-motion: reduce)' in css
+
 
 
 def test_dashboard_jobs_locale_contract_matches() -> None:
@@ -261,13 +233,13 @@ def test_dashboard_labels_relative_time_and_duration_separately() -> None:
     assert '"nextRunTime": "Next run"' in english
     assert '"notScheduled": "Not scheduled"' in english
     assert '"scheduleDisabled": "Schedule disabled"' in english
-    assert "nächste geplante Lauf" in help_de
-    assert "next scheduled run" in help_en
+    assert "Nächster Lauf" in help_de
+    assert "next scheduled run" in help_en.lower()
     assert "Wann läuft ein geplanter Job das nächste Mal?" in manual_de
     assert "When will a scheduled job run next?" in manual_en
 
 
-def test_dashboard_shows_backup_overdue_before_last_run_success() -> None:
+def test_dashboard_displays_overdue_alongside_last_run_outcome() -> None:
     script = _read("ui/js/pages/dashboard.js")
 
     assert "backup.backup_overdue" in script
@@ -285,10 +257,16 @@ def test_dashboard_keeps_run_restore_and_storage_facts_aligned() -> None:
     assert "dashboard.deduplicated" in script
     assert "dashboard-fact-row" in script
     assert "grid-template-columns: 6.5rem minmax(0, 1fr)" in css
-    assert ".dashboard-inventory-table th:nth-child(2) { width: 18%; }" in css
-    assert ".dashboard-inventory-table th:nth-child(3) { width: 21%; }" in css
+    assert ".dashboard-inventory-table th:nth-child(2) { width: 23%; }" in css
+    assert ".dashboard-inventory-table th:nth-child(3) { width: 19%; }" in css
     assert ".dashboard-inventory-table th:nth-child(4) { width: 18%; }" in css
-    assert ".dashboard-inventory-table th:nth-child(5) { width: 19%; }" in css
+    assert ".dashboard-inventory-table th:nth-child(5) { width: 14%; }" in css
     assert ".dashboard-location-group-row td" in css
     assert ".dashboard-location-group__identity" in css
     assert "white-space: nowrap" in css
+
+
+def test_dashboard_summary_and_detail_behaviors() -> None:
+    import subprocess
+
+    subprocess.run(["node", "--test", "tests/dashboard_ui.cjs"], cwd=ROOT, check=True)
