@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Custom backup notification texts (#582)
+
+- Add a Notification texts card under Settings > Notifications that replaces title and message of backup success, warning, failure, skip and overdue notifications for Unraid, email and Apprise, with placeholders and a preview based on backend sample values.
+- Apply custom texts once in send_event() before channel routing. Empty fields and empty results keep the default text, unknown placeholders stay unchanged, and store or render errors never block delivery.
+- Validate texts before any settings write. Store them in config/notification-templates.json with owner-only atomic writes only when they change, and include the store in support bundles.
+
 ## Pending - Stable live workflow updates (#579)
 
 - Reconcile job-card DOM nodes in place to preserve running animations, progress elements and focused controls.

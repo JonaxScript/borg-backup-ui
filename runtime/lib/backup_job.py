@@ -1015,7 +1015,11 @@ class BackupJob:
             return
         self._final_sent = True
 
-        from lib.notifications import build_backup_notification_message
+        from lib.notifications import (
+            BACKUP_NOTIFICATION_TITLES,
+            build_backup_notification_context,
+            build_backup_notification_message,
+        )
 
         exit_code = self._borg_exit
         duration = max(0, int(time.time() - self._start_time))
@@ -1027,40 +1031,27 @@ class BackupJob:
             logger.info("Backup was cancelled by the user after safe runtime recovery")
         elif exit_code == 0:
             logger.info("Borg backup completed successfully (exit 0)")
+            details = self._backup_notification_details("Successful", duration)
             self._send_notification_event(
                 "backup_success",
-                "Borg Backup UI: Backup successful",
-                build_backup_notification_message(
-                    job_name=self.config.job_name,
-                    status="Successful",
-                    timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    duration_seconds=duration,
-                    repository=self.config.borg_repo or os.environ.get("BORG_REPO", ""),
-                    backup_location=self.config.backup_location,
-                    archive_name=self._borg_stats.archive_name if self._borg_stats else "",
-                ),
+                BACKUP_NOTIFICATION_TITLES["backup_success"],
+                build_backup_notification_message(**details),
                 "info",
                 duration,
                 exit_code,
+                build_backup_notification_context(**details, exit_code=exit_code),
             )
         elif exit_code == 1:
             logger.info("Borg backup completed with warnings (exit 1)")
+            details = self._backup_notification_details("Warning", duration, "Borg exited with warning status 1.")
             self._send_notification_event(
                 "backup_warning",
-                "Borg Backup UI: Backup completed with warnings",
-                build_backup_notification_message(
-                    job_name=self.config.job_name,
-                    status="Warning",
-                    timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    duration_seconds=duration,
-                    repository=self.config.borg_repo or os.environ.get("BORG_REPO", ""),
-                    backup_location=self.config.backup_location,
-                    archive_name=self._borg_stats.archive_name if self._borg_stats else "",
-                    error_message="Borg exited with warning status 1.",
-                ),
+                BACKUP_NOTIFICATION_TITLES["backup_warning"],
+                build_backup_notification_message(**details),
                 "warning",
                 duration,
                 exit_code,
+                build_backup_notification_context(**details, exit_code=exit_code),
             )
         else:
             failed_hooks = {
@@ -1079,22 +1070,15 @@ class BackupJob:
                 logger.info("Backup aborted during USB preflight (exit %d); Borg backup was not started", exit_code)
             else:
                 logger.info("Borg backup failed (exit %d)", exit_code)
+            details = self._backup_notification_details("Error", duration, self._final_msg or f"Borg exit {exit_code}")
             self._send_notification_event(
                 "backup_failed",
-                "Borg Backup UI: Backup failed",
-                build_backup_notification_message(
-                    job_name=self.config.job_name,
-                    status="Error",
-                    timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    duration_seconds=duration,
-                    repository=self.config.borg_repo or os.environ.get("BORG_REPO", ""),
-                    backup_location=self.config.backup_location,
-                    archive_name=self._borg_stats.archive_name if self._borg_stats else "",
-                    error_message=self._final_msg or f"Borg exit {exit_code}",
-                ),
+                BACKUP_NOTIFICATION_TITLES["backup_failed"],
+                build_backup_notification_message(**details),
                 "alert",
                 duration,
                 exit_code,
+                build_backup_notification_context(**details, exit_code=exit_code),
             )
 
         status_file = self._save_status(duration)
@@ -1252,26 +1236,38 @@ class BackupJob:
         if self._skip_status_written:
             return
         self._save_skip_status()
-        from lib.notifications import build_backup_notification_message
+        from lib.notifications import (
+            BACKUP_NOTIFICATION_TITLES,
+            build_backup_notification_context,
+            build_backup_notification_message,
+        )
 
         duration = max(0, int(time.time() - self._start_time))
         reason = self._skip_reason or "Backup was skipped"
+        details = self._backup_notification_details("Skipped", duration, reason)
+        details["archive_name"] = ""  # Skipped runs never create an archive.
         self._send_notification_event(
             "backup_skipped",
-            "Borg Backup UI: Backup skipped",
-            build_backup_notification_message(
-                job_name=self.config.job_name,
-                status="Skipped",
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                duration_seconds=duration,
-                repository=self.config.borg_repo or os.environ.get("BORG_REPO", ""),
-                backup_location=self.config.backup_location,
-                error_message=reason,
-            ),
+            BACKUP_NOTIFICATION_TITLES["backup_skipped"],
+            build_backup_notification_message(**details),
             "warning",
             duration,
             0,
+            build_backup_notification_context(**details, exit_code=0),
         )
+
+    def _backup_notification_details(self, status: str, duration: int, error_message: str = "") -> dict:
+        """Return backup facts shared by the default and the custom notification text."""
+        return {
+            "job_name": self.config.job_name,
+            "status": status,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "duration_seconds": duration,
+            "repository": self.config.borg_repo or os.environ.get("BORG_REPO", ""),
+            "backup_location": self.config.backup_location,
+            "archive_name": self._borg_stats.archive_name if self._borg_stats else "",
+            "error_message": error_message,
+        }
 
     def _send_notification_event(
         self,
@@ -1281,7 +1277,9 @@ class BackupJob:
         severity: str,
         duration: int,
         exit_code: int,
+        template_context: Optional[Dict[str, str]] = None,
     ) -> None:
+        """Send a backup event best-effort; ``template_context`` enables custom texts."""
         try:
             from lib.notification_events import NotificationEvent, send_event
 
@@ -1302,6 +1300,7 @@ class BackupJob:
                     date_tag=self.config.date_tag,
                     exit_code=exit_code,
                     source="backup_job",
+                    template_context=dict(template_context or {}),
                 ),
                 mail_config=self.mail_config,
             )

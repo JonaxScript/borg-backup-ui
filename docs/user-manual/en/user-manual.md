@@ -1024,6 +1024,8 @@ Configurable events can include:
 
 Reminder settings apply across channels. The reminder interval prevents the same overdue condition from being reported repeatedly. The backup overdue tolerance defines when a scheduled backup run is considered overdue after its expected start time.
 
+**Custom notification texts:** Under **Notification texts**, replace the title and message of the backup events successful, warning, failed, skipped and overdue. The texts apply to Unraid, email and Apprise. Empty fields keep the default text; **Use default text** restores it. Placeholders such as `{job}`, `{status}`, `{time}`, `{duration}`, `{target}`, `{archive}`, `{error}` and `{hostname}` are filled in when the notification is sent, and `{default_message}` inserts the complete default message. The card lists all placeholders and previews each text with sample values. Unknown placeholders remain unchanged, and a text that renders empty falls back to the default text. Inserted values such as status and error messages are always English. Emails from backup runs still include the log excerpt, and restore-test notifications keep their default texts. The texts are stored in `config/notification-templates.json` in the plugin data directory and are included in support bundles.
+
 > **Note:** Test messages verify only the delivery channel. They do not replace a real backup or restore test.
 
 ### Prometheus and Grafana
@@ -1430,7 +1432,8 @@ Have credentials for the chosen channel; do not expose them in logs or screensho
 
 1. Open **Settings > Notifications**.
 2. Configure Unraid, email/SMTP or an Apprise profile.
-3. Select events, reminder interval and backup tolerance. Save.
+3. Select events, reminder interval and backup tolerance. Optionally adjust
+   titles and messages under **Notification texts**. Save.
 4. Send a test message and confirm arrival at its destination.
 5. Check **Settings > Advanced > Notification Reminder**, then verify the result
    and delivery for the next real run.

@@ -53,6 +53,15 @@ _IMPORTANCE_MAP: dict[str, str] = {
     "alert": "alert",
 }
 
+# Default titles of backup notification events; custom texts may replace them.
+BACKUP_NOTIFICATION_TITLES: dict[str, str] = {
+    "backup_success": "Borg Backup UI: Backup successful",
+    "backup_warning": "Borg Backup UI: Backup completed with warnings",
+    "backup_failed": "Borg Backup UI: Backup failed",
+    "backup_skipped": "Borg Backup UI: Backup skipped",
+    "backup_overdue": "Borg Backup UI: Backup overdue",
+}
+
 # ---------------------------------------------------------------------------
 # Dataclass für Mail-Konfiguration
 # ---------------------------------------------------------------------------
@@ -344,6 +353,38 @@ def build_backup_notification_message(
         lines.append(f"Error: {error_message}")
         lines.append("Action: Review the backup log and storage connection.")
     return "\n".join(lines)
+
+
+def build_backup_notification_context(
+    *,
+    job_name: str,
+    status: str,
+    timestamp: str,
+    duration_seconds: int,
+    repository: str,
+    backup_location: str = "",
+    archive_name: str = "",
+    error_message: str = "",
+    exit_code: Optional[int] = None,
+) -> Dict[str, str]:
+    """Return placeholder values for custom backup notification texts.
+
+    Takes the arguments of build_backup_notification_message() plus the job
+    exit code and formats them like the default message, so custom texts show
+    the same facts. Values that do not apply to an event are empty strings.
+    """
+    return {
+        "job": str(job_name or ""),
+        "status": str(status or ""),
+        "time": _format_notification_timestamp(timestamp),
+        "duration": _format_duration_short(duration_seconds),
+        "target": _format_backup_target(repository, backup_location),
+        "location": _location_display_name(backup_location),
+        "repository": str(repository or ""),
+        "archive": archive_name if archive_name and archive_name != "unknown" else "",
+        "error": str(error_message or ""),
+        "exit_code": "" if exit_code is None else str(exit_code),
+    }
 
 
 def build_restore_test_notification_message(

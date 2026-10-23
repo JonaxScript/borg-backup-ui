@@ -233,7 +233,7 @@ Ein echter Restore in ein separates Ziel mit Inhalts- und Anwendungstest bleibt 
 
 ### Allgemein
 
-Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz und Homepage-Widget. SMTP und Benachrichtigungskanäle liegen unter **Benachrichtigungen**, der Wochenbericht unter **Backup**, Versionsinformationen unter **About**.
+Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz und Homepage-Widget. SMTP, Benachrichtigungskanäle und eigene Benachrichtigungstexte liegen unter **Benachrichtigungen**, der Wochenbericht unter **Backup**, Versionsinformationen unter **About**.
 
 ### Benutzer
 

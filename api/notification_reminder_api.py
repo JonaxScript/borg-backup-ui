@@ -203,7 +203,11 @@ def _send_backup_overdue_reminders(effective: dict, mail_config) -> dict[str, An
     from jobs_api import list_jobs
     from schedule_api import get_schedules
     from status_api import get_status_data
-    from lib.notifications import build_backup_notification_message
+    from lib.notifications import (
+        BACKUP_NOTIFICATION_TITLES,
+        build_backup_notification_context,
+        build_backup_notification_message,
+    )
     from lib.notification_events import (
         NotificationEvent,
         clear_reminder_prefix,
@@ -271,17 +275,18 @@ def _send_backup_overdue_reminders(effective: dict, mail_config) -> dict[str, An
 
         display_name = str(job.get("display_name") or job.get("name") or job_key)
         due_marker = str(item.get("expected_run_marker") or "")
-        message = build_backup_notification_message(
-            job_name=display_name,
-            status="Overdue",
-            timestamp=now.strftime("%Y-%m-%d %H:%M:%S"),
-            duration_seconds=0,
-            repository=str(job.get("repo_path") or ""),
-            error_message=f"Scheduled backup missed the expected run at {due_marker}.",
-        )
+        details = {
+            "job_name": display_name,
+            "status": "Overdue",
+            "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "duration_seconds": 0,
+            "repository": str(job.get("repo_path") or ""),
+            "error_message": f"Scheduled backup missed the expected run at {due_marker}.",
+        }
+        message = build_backup_notification_message(**details)
         event = NotificationEvent(
             event_type="backup_overdue",
-            title="Borg Backup UI: Backup overdue",
+            title=BACKUP_NOTIFICATION_TITLES["backup_overdue"],
             message=message,
             severity="warning",
             job_name=f"Borg Backup ({display_name})",
@@ -290,6 +295,10 @@ def _send_backup_overdue_reminders(effective: dict, mail_config) -> dict[str, An
             repository=str(job.get("repo_path") or ""),
             source="scheduled_reminder",
             extra={"cron": str(item.get("cron") or ""), "expected_run": due_marker, "last_timestamp": str(item.get("latest_status_at_raw") or "")},
+            template_context=build_backup_notification_context(
+                **details,
+                backup_location=str(job.get("location") or ""),
+            ),
         )
         results = send_event(effective, event, mail_config=mail_config)
         if any(results.values()):
