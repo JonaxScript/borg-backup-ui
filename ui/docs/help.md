@@ -233,7 +233,7 @@ Ein echter Restore in ein separates Ziel mit Inhalts- und Anwendungstest bleibt 
 
 ### Allgemein
 
-Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz und Homepage-Widget. SMTP, Benachrichtigungskanäle und eigene Benachrichtigungstexte liegen unter **Benachrichtigungen**, der Wochenbericht unter **Backup**, Versionsinformationen unter **About**.
+Verwaltet Datenpfade, Theme, Log-Aufbewahrung, Borg-Cache, Parity-Schutz und Homepage-Widget. SMTP, Benachrichtigungskanäle und eigene Benachrichtigungstexte liegen unter **Benachrichtigungen**, der Wochenbericht unter **Backup**, Versionsinformationen unter **About**. Die Benachrichtigungstexte bieten eine zentrale Platzhalterübersicht, eine Ereignisauswahl und gleich große Vorlage-/Vorschaufelder. Noch nicht konfigurierte Ereignisse zeigen bearbeitbare Beispiele in der Oberflächensprache. Titel und Nachricht der Vorschau entsprechen diesen Vorlagen; **Speichern** übernimmt sie für den Versand. Eigene Texte, Platzhalternamen und eingesetzte Werte werden nicht übersetzt. Unraid zeigt die vollständige Nachricht mit Zeilenumbrüchen; die Weiterleitung an Unraid-Agenten wie Discord erhält dieselben Textzeilen.
 
 ### Benutzer
 

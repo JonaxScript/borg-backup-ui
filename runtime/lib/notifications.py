@@ -16,6 +16,8 @@ Nur Python Standard-Library: smtplib, email, subprocess, logging, pathlib
 from __future__ import annotations
 
 import logging
+import os
+from html import escape
 import smtplib
 import ssl
 import subprocess
@@ -43,13 +45,6 @@ _LEVEL_MAP: dict[str, str] = {
     "err": "alert",
     "error": "alert",
     "fehler": "alert",
-    "alert": "alert",
-}
-
-# Unraid -m flag Werte (unterschiedlich von -i icon)
-_IMPORTANCE_MAP: dict[str, str] = {
-    "normal": "normal",
-    "warning": "warning",
     "alert": "alert",
 }
 
@@ -134,6 +129,21 @@ class MailConfig:
 # Öffentliche API
 # ---------------------------------------------------------------------------
 
+def _unraid_text_fields(description: str) -> tuple[str, str]:
+    """Return the full Unraid display description and plain agent description.
+
+    Unraid's sidebar only renders description, not its long-message field. A
+    single physical line of HTML keeps the INI record intact; br elements retain
+    message line breaks. Escape text twice because Unraid's API decodes HTML
+    entities before parsing the record and rendering Markdown. Leave quotes to
+    the notifier's INI encoder so that API decoding cannot introduce unescaped
+    quotes into a record. The agent text uses Unraid's literal newline encoding.
+    """
+    text = description.replace("\r\n", "\n").replace("\r", "\n").strip()
+    display_text = escape(escape(text, quote=False), quote=False).replace("\n", "<br>")
+    return f"<div>{display_text}</div>", text.replace("\n", r"\n")
+
+
 def notify(
     level: str,
     subject: str,
@@ -149,31 +159,43 @@ def notify(
     Args:
         level:       Severity – "info"/"ok"/"warn"/"warning"/"err"/"error"/"alert"
         subject:     Kurze Überschrift der Benachrichtigung
-        description: Ausführlicher Text
+        description: Vollstaendiger Plaintext fuer Unraid-Anzeige und Agenten
         job_name:    Anzeigename der Quelle (entspricht $JOB_NAME, Unraid -e Flag)
-        icon:        Optionaler Icon-Override; wird sonst aus level abgeleitet
+        icon:        Optionaler -i-Override; wird sonst aus level abgeleitet
 
     Returns:
-        True wenn Notify erfolgreich, False bei Fehler (best-effort)
+        True wenn Notify erfolgreich, False bei Fehler (best-effort).
+
+    Die vollstaendige Beschreibung wird fuer das Unraid-Panel als sicheres HTML
+    uebergeben. Ein nur fuer diesen Notify-Prozess gesetztes BASH_ENV stellt
+    fuer Bash-Agenten den urspruenglichen Text mit kodierten Zeilenumbruechen
+    bereit. Globale Einstellungen und Agentenskripte werden nicht geaendert.
     """
     normalised = _LEVEL_MAP.get(level.lower(), "normal")
-    importance = _IMPORTANCE_MAP.get(normalised, "normal")
     effective_icon = icon if icon else normalised
 
     if not Path(_NOTIFY_BIN).exists():
         logger.warning("Unraid notify binary not found: %s", _NOTIFY_BIN)
         return False
 
+    display_description, agent_description = _unraid_text_fields(description)
+    agent_startup = Path(__file__).resolve().parents[1] / "scripts" / "unraid-notification-agent-env.sh"
+    if not agent_startup.is_file():
+        logger.warning("Unraid notification agent adapter not found: %s", agent_startup)
+        return False
+    agent_env = os.environ.copy()
+    agent_env["BBUI_UNRAID_PREVIOUS_BASH_ENV"] = agent_env.get("BASH_ENV", "")
+    agent_env["BBUI_UNRAID_AGENT_DESCRIPTION"] = agent_description
+    agent_env["BASH_ENV"] = str(agent_startup)
     cmd = [
         _NOTIFY_BIN,
         "-e", job_name,
         "-s", subject,
-        "-d", description,
+        "-d", display_description,
         "-i", effective_icon,
-        "-m", importance,
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=agent_env)
         if result.returncode != 0:
             logger.warning(
                 "notify exit %d: %s", result.returncode, result.stderr.strip()
