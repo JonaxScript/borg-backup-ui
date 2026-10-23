@@ -2,7 +2,7 @@
 
 ## Pending - Shared notification template editor (#584)
 
-- Correct Unraid notify arguments: send the first line as the short description, remaining details with literal newline separators in the long message, and severity only via `-i`. Avoid multiline INI truncation and spurious severity text in Discord agent forwarding; preserve existing email/Apprise message text.
+- Render the complete notification description in the Unraid sidebar using escaped HTML and explicit breaks, avoiding multiline INI truncation. Supply original newline-encoded text to Bash notification agents through a process-local startup adapter, restore inherited startup settings, and omit the long-message argument to prevent Discord duplicates. Keep severity under `-i` and preserve email/Apprise text. Native INI/API/Markdown/sanitizer rendering and official Discord delivery are checked offline.
 
 - Start unconfigured events with editable localized examples and render the exact title/message inputs in the preview. Save applies the displayed templates; existing texts, token names and values remain untranslated. Explicit original-default selections survive save/reload.
 

@@ -233,7 +233,7 @@ test remain necessary.
 
 ### General
 
-Manages data paths, theme, log retention, Borg cache, parity protection and the Homepage widget. SMTP, notification channels and custom notification texts are under **Notifications**, the weekly report under **Backup**, and version information under **About**. Notification texts provide a shared placeholder reference, an event selector and equally sized template/preview fields. Unconfigured events show editable examples in the interface language. Preview titles and messages match those templates; **Save** applies them to delivery. Custom texts, placeholder names and inserted values are not translated.
+Manages data paths, theme, log retention, Borg cache, parity protection and the Homepage widget. SMTP, notification channels and custom notification texts are under **Notifications**, the weekly report under **Backup**, and version information under **About**. Notification texts provide a shared placeholder reference, an event selector and equally sized template/preview fields. Unconfigured events show editable examples in the interface language. Preview titles and messages match those templates; **Save** applies them to delivery. Custom texts, placeholder names and inserted values are not translated. Unraid shows the complete message with line breaks; forwarding to Unraid agents such as Discord preserves the same text lines.
 
 ### Users
 
