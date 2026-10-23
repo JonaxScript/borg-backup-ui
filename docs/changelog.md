@@ -2,6 +2,8 @@
 
 ## Pending - Shared notification template editor (#584)
 
+- Correct Unraid notify arguments: send the first line as the short description, remaining details with literal newline separators in the long message, and severity only via `-i`. Avoid multiline INI truncation and spurious severity text in Discord agent forwarding; preserve existing email/Apprise message text.
+
 - Start unconfigured events with editable localized examples and render the exact title/message inputs in the preview. Save applies the displayed templates; existing texts, token names and values remain untranslated. Explicit original-default selections survive save/reload.
 
 - Centralize placeholder meanings, event-specific sample values and cursor insertion above the event selector. Retain all event drafts when switching or redrawing the editor.

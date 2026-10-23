@@ -46,13 +46,6 @@ _LEVEL_MAP: dict[str, str] = {
     "alert": "alert",
 }
 
-# Unraid -m flag Werte (unterschiedlich von -i icon)
-_IMPORTANCE_MAP: dict[str, str] = {
-    "normal": "normal",
-    "warning": "warning",
-    "alert": "alert",
-}
-
 # Default titles of backup notification events; custom texts may replace them.
 BACKUP_NOTIFICATION_TITLES: dict[str, str] = {
     "backup_success": "Borg Backup UI: Backup successful",
@@ -134,6 +127,19 @@ class MailConfig:
 # Öffentliche API
 # ---------------------------------------------------------------------------
 
+def _unraid_text_fields(description: str) -> tuple[str, str]:
+    """Split plain notification text into Unraid's short and long descriptions.
+
+    The first line becomes ``-d``. Remaining lines become ``-m`` with literal
+    ``\\n`` separators, which Unraid converts to archive line breaks and its
+    agents decode for delivery. This avoids raw multiline INI values without
+    adding HTML to agent messages. Existing blank lines in the details remain.
+    """
+    text = description.replace("\r\n", "\n").replace("\r", "\n").strip()
+    summary, separator, details = text.partition("\n")
+    return summary, details.replace("\n", r"\n") if separator else ""
+
+
 def notify(
     level: str,
     subject: str,
@@ -149,29 +155,34 @@ def notify(
     Args:
         level:       Severity – "info"/"ok"/"warn"/"warning"/"err"/"error"/"alert"
         subject:     Kurze Überschrift der Benachrichtigung
-        description: Ausführlicher Text
+        description: Plaintext; erste Zeile wird Kurzbeschreibung, Rest Nachricht
         job_name:    Anzeigename der Quelle (entspricht $JOB_NAME, Unraid -e Flag)
-        icon:        Optionaler Icon-Override; wird sonst aus level abgeleitet
+        icon:        Optionaler -i-Override; wird sonst aus level abgeleitet
 
     Returns:
-        True wenn Notify erfolgreich, False bei Fehler (best-effort)
+        True wenn Notify erfolgreich, False bei Fehler (best-effort).
+
+    Mehrzeilige Texte werden nur fuer Unraid in die Kurzbeschreibung (-d) und
+    Details (-m) aufgeteilt. Zeilenumbrueche der Details werden als literales
+    ``\\n`` kodiert, damit Archiv und Benachrichtigungsagenten sie verarbeiten.
     """
     normalised = _LEVEL_MAP.get(level.lower(), "normal")
-    importance = _IMPORTANCE_MAP.get(normalised, "normal")
     effective_icon = icon if icon else normalised
 
     if not Path(_NOTIFY_BIN).exists():
         logger.warning("Unraid notify binary not found: %s", _NOTIFY_BIN)
         return False
 
+    summary, message = _unraid_text_fields(description)
     cmd = [
         _NOTIFY_BIN,
         "-e", job_name,
         "-s", subject,
-        "-d", description,
+        "-d", summary,
         "-i", effective_icon,
-        "-m", importance,
     ]
+    if message:
+        cmd.extend(["-m", message])
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if result.returncode != 0:
