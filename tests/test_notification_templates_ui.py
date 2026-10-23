@@ -18,5 +18,5 @@ def test_notification_templates_are_saved_with_the_notifications_tab():
     assert "...(notificationTemplates ? { notification_templates: notificationTemplates } : {})" in script
     assert "if (action === 'notification-template-reset') return resetNotificationTemplate(el);" in script
     assert "window.onNotificationTemplateInput = onNotificationTemplateInput;" in script
-    for selector in (".notification-template ", ".notification-template-preview", ".notification-template-placeholders"):
+    for selector in (".notification-template-fields", ".notification-template-preview", ".notification-template-placeholders"):
         assert selector in css

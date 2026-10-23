@@ -233,7 +233,7 @@ test remain necessary.
 
 ### General
 
-Manages data paths, theme, log retention, Borg cache, parity protection and the Homepage widget. SMTP, notification channels and custom notification texts are under **Notifications**, the weekly report under **Backup**, and version information under **About**.
+Manages data paths, theme, log retention, Borg cache, parity protection and the Homepage widget. SMTP, notification channels and custom notification texts are under **Notifications**, the weekly report under **Backup**, and version information under **About**. Notification texts provide a shared placeholder reference, an event selector and equally sized template/preview fields. **Use example** uses placeholders; concrete values appear in the preview.
 
 ### Users
 
