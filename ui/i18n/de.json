@@ -2838,15 +2838,15 @@
     },
     "notificationTemplates": {
       "title": "Benachrichtigungstexte",
-      "hint": "Ersetzt Titel und Nachricht der Backup-Benachrichtigungen für Unraid, E-Mail und Apprise. Leere Felder behalten den Standardtext. E-Mails aus Backup-Läufen enthalten weiterhin den Log-Auszug.",
+      "hint": "Titel und Nachricht gelten für Unraid, E-Mail und Apprise. Für Ereignisse ohne eigene Texte werden bearbeitbare Beispielvorlagen in der Oberflächensprache angezeigt und erst mit Speichern übernommen. Eigene Texte und Platzhalterwerte werden nicht übersetzt. Leere Felder verwenden den englischen Originalstandard. E-Mails aus Backup-Läufen enthalten weiterhin den Log-Auszug.",
       "unreadable": "Die gespeicherten Benachrichtigungstexte konnten nicht gelesen werden. Es werden die Standardtexte verwendet; beim Speichern bleibt die Datei unverändert. Bitte notification-templates.json im Konfigurationsordner prüfen.",
       "placeholdersTitle": "Platzhalter & Beispiele",
       "custom": "Angepasst",
-      "default": "Standard",
+      "default": "Originalstandard",
       "titleLabel": "Titel",
       "messageLabel": "Nachricht",
       "preview": "Live-Vorschau",
-      "reset": "Standardtext verwenden",
+      "reset": "Originalstandard verwenden",
       "placeholders": {
         "job": "Jobname",
         "status": "Ergebnis, z. B. Successful oder Error",
@@ -2878,7 +2878,7 @@
       "delivered": "So kommt es an",
       "previewTitle": "Titel mit Beispielwerten",
       "highlightHint": "Hervorgehobene Werte ersetzen die Platzhalter.",
-      "emptyHint": "Leere Felder verwenden den Standardtext.",
+      "emptyHint": "Die Vorschau zeigt diese Vorlage mit Beispielwerten. Für den Versand bitte speichern.",
       "limitReached": "Der Platzhalter überschreitet die Grenze von {max} Zeichen.",
       "inserted": "{token} eingefügt.",
       "events": {
@@ -2897,7 +2897,8 @@
         "time": "Zeitpunkt",
         "archive": "Archiv",
         "error": "Grund"
-      }
+      },
+      "example": "Beispielvorlage"
     },
     "apprise": {
       "needsAttention": "Prüfung erforderlich",

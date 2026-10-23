@@ -2838,15 +2838,15 @@
     },
     "notificationTemplates": {
       "title": "Notification texts",
-      "hint": "Replace the default title and message of backup notifications for Unraid, email and Apprise. Empty fields keep the default text. Emails from backup runs still include the log excerpt.",
+      "hint": "Titles and messages apply to Unraid, email and Apprise. Events without custom texts show editable example templates in the interface language; they are only applied when you save. Custom texts and placeholder values are not translated. Empty fields use the original English default. Emails from backup runs still include the log excerpt.",
       "unreadable": "The saved notification texts could not be read. Default texts are used, and saving does not change the file. Check notification-templates.json in the configuration folder.",
       "placeholdersTitle": "Placeholders & examples",
       "custom": "Custom",
-      "default": "Default",
+      "default": "Original default",
       "titleLabel": "Title",
       "messageLabel": "Message",
       "preview": "Live preview",
-      "reset": "Use default text",
+      "reset": "Use original default",
       "placeholders": {
         "job": "Job name",
         "status": "Result, e.g. Successful or Error",
@@ -2878,7 +2878,7 @@
       "delivered": "Delivered message",
       "previewTitle": "Title with example values",
       "highlightHint": "Highlighted values replace the placeholders.",
-      "emptyHint": "Empty fields use the default text.",
+      "emptyHint": "The preview renders this template with sample values. Save to use it for delivery.",
       "limitReached": "The placeholder would exceed the limit of {max} characters.",
       "inserted": "Inserted {token}.",
       "events": {
@@ -2897,7 +2897,8 @@
         "time": "Time",
         "archive": "Archive",
         "error": "Reason"
-      }
+      },
+      "example": "Example template"
     },
     "apprise": {
       "needsAttention": "Needs attention",

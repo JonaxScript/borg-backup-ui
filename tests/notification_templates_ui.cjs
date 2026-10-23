@@ -78,7 +78,8 @@ for (const language of ['de', 'en']) {
     assert.ok(html.includes('data-notification-event="backup_success" aria-pressed="true"'));
     assert.ok(html.includes('value="&lt;b&gt;{job}&lt;/b&gt; failed"'));
     assert.ok(html.includes('&lt;b&gt;<mark>Appdata</mark>&lt;/b&gt; failed'));
-    assert.ok(html.includes('placeholder="Job: {job}\n'));
+    assert.ok(html.includes('placeholder="{default_message}"'));
+    assert.ok(html.includes('>Job: {job}\n'));
     assert.ok(!html.includes('placeholder="Job: Appdata'));
     assert.ok(html.includes('maxlength="200"') && html.includes('maxlength="2000"'));
     assert.ok(!html.includes(' disabled'));
@@ -132,7 +133,7 @@ test('editing, resetting and collecting texts keep the notifications tab consist
   });
   assert.equal(
     JSON.stringify(context.collectNotificationTemplates(panel('ready'))),
-    JSON.stringify({backup_success: {title: 'A', message: ''}, backup_failed: {title: '', message: 'B'}}),
+    JSON.stringify({backup_success: {title: 'A', message: '{default_message}'}, backup_failed: {title: '{default_title}', message: 'B'}}),
   );
   assert.equal(context.collectNotificationTemplates(panel('unreadable')), null);
   assert.equal(context.collectNotificationTemplates(null), null);
@@ -227,4 +228,46 @@ test('event selection retains hidden inputs; insertion respects selection and ma
   root.dataset.notificationTemplates = 'unreadable';
   context.handleNotificationTemplateAction(button, 'notification-template-example');
   assert.equal(field.value, '{job}', 'unreadable stores remain protected');
+});
+
+for (const language of ['de', 'en']) {
+  test(`initial templates and previews share the actual title and message (${language})`, () => {
+    const {context, state} = loadSettings(language);
+    const events = ['backup_success', 'backup_warning', 'backup_failed', 'backup_skipped', 'backup_overdue'];
+    const values = {job: 'Appdata', target: 'USB / borg-appdata', repository: '/mnt/backup',
+      status: 'Warning', error: 'Repository could not be opened', duration: '12 min 34 sec',
+      time: '2026-07-01 03:12', archive: 'appdata-archive'};
+    const source = {...config, events, templates: {}};
+    const before = JSON.stringify(source);
+    for (const event of events) {
+      const texts = context._notificationTemplateEditorValues(event, source, true);
+      assert.ok(texts.title.endsWith(': {job}'));
+      const preview = context._notificationTemplatePreview({values}, texts.title, texts.message);
+      assert.equal(preview.title, texts.title.replace('{job}', 'Appdata'));
+      assert.equal(preview.message, texts.message.replace(/\{([a-z_]+)\}/g, (_, key) => values[key]));
+      assert.ok(preview.message.includes(language === 'de' ? 'Ergebnis: Warning' : 'Result: Warning'));
+      if (event !== 'backup_success') assert.ok(preview.message.includes('Repository could not be opened'));
+      assert.equal(context._notificationTemplateState(event, texts.title, texts.message), 'example');
+    }
+    assert.equal(JSON.stringify(source), before, 'opening the editor must not change stored settings');
+    assert.ok(!state.dirty, 'showing starter examples must not dirty unrelated settings tabs');
+  });
+}
+
+test('saved texts, partial defaults and cleared drafts are never translated or replaced', () => {
+  for (const language of ['de', 'en']) {
+    const {context, state} = loadSettings(language);
+    const saved = {title: 'Mein Backup: {job}', message: 'Custom error: {error}'};
+    const source = {...config, templates: {backup_success: saved, backup_failed: {title: 'Custom', message: ''}}};
+    assert.equal(JSON.stringify(context._notificationTemplateEditorValues('backup_success', source, true)), JSON.stringify(saved));
+    assert.equal(context._notificationTemplateEditorValues('backup_failed', source, true).message, '');
+    state.notificationTemplateDrafts = {backup_success: {title: '', message: ''}};
+    assert.equal(context._notificationTemplateEditorValues('backup_success', source, true).title, '');
+    assert.equal(context._notificationTemplateEditorValues('backup_success', source, false).title, '');
+    const fallback = {title: '{default_title}', message: '{default_message}'};
+    state.notificationTemplateDrafts = {};
+    source.templates.backup_success = fallback;
+    assert.equal(JSON.stringify(context._notificationTemplateEditorValues('backup_success', source, true)), JSON.stringify(fallback));
+    assert.equal(context._notificationTemplateState('backup_success', fallback.title, fallback.message), 'default');
+  }
 });

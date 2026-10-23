@@ -4963,6 +4963,28 @@ function _notificationTemplateExample(event) {
   };
 }
 
+/**
+ * Return editable texts without changing saved settings. Unconfigured events start
+ * with a localized example; saved texts and even explicitly cleared drafts win.
+ */
+function _notificationTemplateEditorValues(event, config, readable) {
+  if (!readable) return { title: '', message: '' };
+  const draft = settingsState.notificationTemplateDrafts?.[event];
+  if (draft) return draft;
+  const saved = config.templates?.[event];
+  if (saved && (saved.title?.trim() || saved.message?.trim())) return saved;
+  return _notificationTemplateExample(event);
+}
+
+/** Classify the visible texts as an example, original fallback or custom template. */
+function _notificationTemplateState(event, title, message) {
+  const example = _notificationTemplateExample(event);
+  if (title === example.title && message === example.message) return 'example';
+  const original = (!title.trim() || title.trim() === '{default_title}') &&
+    (!message.trim() || message.trim() === '{default_message}');
+  return original ? 'default' : 'custom';
+}
+
 /** Render one shared reference; event-dependent sample values come from the API. */
 function _renderNotificationTemplatePlaceholders(config, active, readable) {
   return `<details class="notification-template-placeholders" open>
@@ -4997,23 +5019,22 @@ function _notificationTemplateReferenceRows(config, event, readable) {
 
 /** Render paired, equally sized title/message fields and preview boxes for an event. */
 function _renderNotificationTemplateRow(event, label, config, readable, active) {
-  const saved = (readable && settingsState.notificationTemplateDrafts?.[event]) || config.templates?.[event] || {};
+  const saved = _notificationTemplateEditorValues(event, config, readable);
   const example = config.examples?.[event] || {};
-  const template = _notificationTemplateExample(event);
   const title = String(saved.title || ''), message = String(saved.message || '');
-  const custom = !!(title.trim() || message.trim());
+  const state = _notificationTemplateState(event, title, message);
   const id = `notification-template-${event}`;
   const disabled = readable ? '' : 'disabled';
   const limits = config.limits || {};
   return `<section class="notification-template" id="${id}" data-notification-template-event="${escAttr(event)}" ${active ? '' : 'hidden'} aria-label="${escAttr(label)}">
-    <div class="notification-template-heading"><strong>${escHtml(label)}</strong><span class="badge notification-template-state ${custom ? 'is-custom' : ''}" data-notification-template-state>${escHtml(settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default'))}</span></div>
+    <div class="notification-template-heading"><strong>${escHtml(label)}</strong><span class="badge notification-template-state ${state === 'custom' ? 'is-custom' : ''}" data-notification-template-state>${escHtml(settingsT(`notificationTemplates.${state}`))}</span></div>
     <div class="notification-template-fields">
       <div class="notification-template-column notification-template-source">
         <div class="notification-template-column-heading"><strong>${escHtml(settingsT('notificationTemplates.yourTemplate'))}</strong><button type="button" class="btn btn-secondary btn-sm" data-settings-action="notification-template-example" ${disabled}>${escHtml(settingsT('notificationTemplates.useExample'))}</button></div>
         <label class="form-label" for="${id}-title">${escHtml(settingsT('notificationTemplates.titleLabel'))}</label>
-        <input class="form-input mono" type="text" id="${id}-title" maxlength="${Number(limits.title) || 200}" data-notification-template-field="title" value="${escAttr(title)}" placeholder="${escAttr(template.title)}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>
+        <input class="form-input mono" type="text" id="${id}-title" maxlength="${Number(limits.title) || 200}" data-notification-template-field="title" value="${escAttr(title)}" placeholder="{default_title}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>
         <label class="form-label" for="${id}-message">${escHtml(settingsT('notificationTemplates.messageLabel'))}</label>
-        <textarea class="form-input mono" id="${id}-message" rows="9" maxlength="${Number(limits.message) || 2000}" spellcheck="false" data-notification-template-field="message" placeholder="${escAttr(template.message)}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>${escHtml(message)}</textarea>
+        <textarea class="form-input mono" id="${id}-message" rows="9" maxlength="${Number(limits.message) || 2000}" spellcheck="false" data-notification-template-field="message" placeholder="{default_message}" oninput="onNotificationTemplateInput(this)" onfocus="onNotificationTemplateFocus(this)" ${disabled}>${escHtml(message)}</textarea>
       </div>
       <div class="notification-template-column notification-template-preview" aria-live="polite">
         <div class="notification-template-column-heading"><strong>${escHtml(settingsT('notificationTemplates.delivered'))}</strong><small>${escHtml(settingsT('notificationTemplates.preview'))}</small></div>
@@ -5091,10 +5112,10 @@ function _refreshNotificationTemplateRow(row) {
   for (const [field, text] of Object.entries({title, message})) {
     row.querySelector(`[data-notification-template-preview="${field}"]`).innerHTML = _notificationTemplatePreviewHtml(example, text, field);
   }
-  const custom = !!(title.trim() || message.trim());
+  const state = _notificationTemplateState(event, title, message);
   const badge = row.querySelector('[data-notification-template-state]');
-  badge.classList.toggle('is-custom', custom);
-  badge.textContent = settingsT(custom ? 'notificationTemplates.custom' : 'notificationTemplates.default');
+  badge.classList.toggle('is-custom', state === 'custom');
+  badge.textContent = settingsT(`notificationTemplates.${state}`);
 }
 
 /** Retain edits through event/language redraws; mark settings dirty only on edits. */
@@ -5174,15 +5195,19 @@ function handleNotificationTemplateAction(button, action) {
   }
 }
 
-/** Return all event drafts (including hidden rows), or null for unreadable stores. */
+/**
+ * Collect visible and hidden drafts, or null for unreadable stores. Persist an
+ * explicitly empty field as its original-default token so reloading never
+ * replaces that choice with a localized starter example.
+ */
 function collectNotificationTemplates(panel) {
   const root = panel?.querySelector?.('[data-notification-templates="ready"]');
   if (!root) return null;
   const templates = {};
   root.querySelectorAll('[data-notification-template-event]').forEach((row) => {
     templates[row.dataset.notificationTemplateEvent] = {
-      title: row.querySelector('[data-notification-template-field="title"]')?.value || '',
-      message: row.querySelector('[data-notification-template-field="message"]')?.value || '',
+      title: row.querySelector('[data-notification-template-field="title"]')?.value.trim() || '{default_title}',
+      message: row.querySelector('[data-notification-template-field="message"]')?.value.trim() || '{default_message}',
     };
   });
   return templates;

@@ -2,6 +2,8 @@
 
 ## Pending - Shared notification template editor (#584)
 
+- Start unconfigured events with editable localized examples and render the exact title/message inputs in the preview. Save applies the displayed templates; existing texts, token names and values remain untranslated. Explicit original-default selections survive save/reload.
+
 - Centralize placeholder meanings, event-specific sample values and cursor insertion above the event selector. Retain all event drafts when switching or redrawing the editor.
 - Align title/message editors with their previews and highlight escaped substituted values. Localized example titles/messages use tokens for all five events; empty fields still use existing runtime defaults.
 
