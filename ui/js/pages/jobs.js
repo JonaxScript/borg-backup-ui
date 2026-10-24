@@ -341,10 +341,10 @@ function borgProgressDuration(seconds) {
     : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** Return this run's ordered steps; older reports retain only their known Borg ledger. */
+/** Return known run steps including managed database exports; older reports retain their Borg ledger. */
 function jobWorkflowSteps(job) {
   const configured = job.running ? job.run_job_steps : job.last_job_steps;
-  const allowed = ['pre_script', 'stop_docker', 'stop_vms', 'create', 'start_docker', 'start_vms', 'prune', 'compact', 'check', 'post_script'];
+  const allowed = ['pre_script', 'database_backup', 'stop_docker', 'stop_vms', 'create', 'start_docker', 'start_vms', 'prune', 'compact', 'check', 'post_script'];
   if (Array.isArray(configured) && configured.length) {
     return configured.filter(step => step && allowed.includes(step.id));
   }
@@ -480,7 +480,7 @@ function renderJobOperation(job, now = Date.now() / 1000) {
   const view = active && jobStepView(active, job, now);
   const progress = renderBorgProgress(job, now);
   let html = view ? `<div class="job-active-step"><strong>${escHtml(view.label)}</strong>${progress ? '' : `<small>${escHtml(jobsT('jobs.borgElapsed', {time:view.duration}))}</small>`}</div>` : '';
-  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
+  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'database_backup', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
     html += `<div class="job-active-step"><strong>${escHtml(jobsT(`jobGroups.phases.${job.run_phase}`))}</strong></div>`;
   }
   html += progress;

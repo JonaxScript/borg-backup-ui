@@ -45,6 +45,8 @@ Manual test-channel acceptance on Unraid:
   the original is unchanged. Switching categories retains unsaved own edits.
   Check the script dropdown, Description/Source code tabs (including keyboard navigation),
   neutral gray card headings matching Prometheus and all six specific descriptions.
+  Intro/selection cards and detail tabs must match the Own scripts content surface
+  in both themes.
   In Sources & destination, test many folders/profiles, wrapped long names, selection
   counts, retained unavailable profiles and reachable footer actions. Check
   light/dark themes, German/English, mobile layout and the container dropdown.
@@ -64,6 +66,9 @@ Manual test-channel acceptance on Unraid:
 - Run a mixed file/database job and a database-only job. Verify current dumps and
   manifest in Borg, missing/excluded artifacts cause failure, warnings retain
   local dumps, and no previous/partial dump appears in the current archive.
+- While a database export runs, check the active Database backups step and elapsed
+  time before Docker shutdown. Verify persisted success/failure/cancellation and
+  file details, and visibility of assigned Pre/Post scripts.
 - Restore into separate database containers and verify data, views, routines,
   triggers/events and PostgreSQL extensions/roles. Reprovision omitted passwords
   and MariaDB global grants; do not claim a common snapshot with application files.

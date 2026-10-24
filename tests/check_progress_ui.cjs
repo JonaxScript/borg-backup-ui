@@ -241,3 +241,36 @@ for (const id of ['stop_docker', 'stop_vms', 'start_docker', 'start_vms']) {
 const metricLines = context.renderBorgProgress({...creating,borg_progress:{...creating.borg_progress,deduplicated_size:1024}},200);
 assert.equal((metricLines.match(/class="borg-progress-metric"/g)||[]).length,3);
 assert.doesNotMatch(metricLines,/createFiles[^<]* · /);
+
+// Managed database exports must be visible before Docker/Borg work starts (#591).
+const dbWorkflow = [
+  {id:'pre_script',status:'success',duration_seconds:2,details:{script_name:'Prepare backup'}},
+  {id:'database_backup',status:'running',started_at:170},
+  {id:'stop_docker',status:'pending'},
+  {id:'create',status:'pending'},
+  {id:'post_script',status:'pending'},
+];
+const dbJob={key:'database',running:true,run_phase:'database_backup',run_job_steps:dbWorkflow};
+const dbTimeline=context.renderBorgRun(dbJob,200);
+assert.equal((dbTimeline.match(/class="borg-step is-/g)||[]).length,5);
+assert.ok(dbTimeline.indexOf('data-step="pre_script"')<dbTimeline.indexOf('data-step="database_backup"'));
+assert.ok(dbTimeline.indexOf('data-step="database_backup"')<dbTimeline.indexOf('data-step="stop_docker"'));
+assert.match(dbTimeline,/is-running" data-step="database_backup" aria-current="step"/);
+assert.match(context.renderJobOperation(dbJob,200),/jobs.workflow.names.database_backup.*0:30/);
+assert.doesNotMatch(context.renderJobOperation(dbJob,200),/<progress/);
+assert.match(context.renderJobOperation({...dbJob,run_job_steps:[]},200),/jobGroups.phases.database_backup/);
+assert.doesNotMatch(context.renderBorgRun({...dbJob,run_job_steps:[{id:'unknown',status:'running'}]},200),/data-step="unknown"/);
+for (const status of ['success','error','cancelled','skipped']) {
+  const lastSteps=dbWorkflow.map(step=>step.id==='database_backup'?{...step,status,duration_seconds:30}:step);
+  assert.match(context.renderBorgRun({...dbJob,running:false,last_job_steps:lastSteps},200),new RegExp(`is-${status}.*data-step="database_backup"`));
+}
+state.jobs=[dbJob];
+context.onJobsGridClick({target:{closest:()=>({dataset:{jobsAction:'toggle-workflow',jobKey:'database'}})}});
+const dbCompleted={id:'database_backup',status:'success',duration_seconds:30,details:{results:[{archived:true,files:[{database:'<img src=x>',bytes:1024,duration_seconds:12}]}]}};
+const persisted=context.renderBorgRun({...dbJob,running:false,last_job_steps:[dbCompleted]},200);
+assert.match(persisted,/&lt;img src=x>.*1.0 KiB.*0:12.*jobs.databaseArchived/);
+assert.doesNotMatch(persisted,/<img/);
+for (const id of ['pre_script','post_script']) {
+  assert.match(context.renderJobOperation({...dbJob,run_job_steps:[{id,status:'running',started_at:190}]},200),new RegExp(`jobs.workflow.names.${id}.*0:10`));
+}
+console.log('Database and hook steps: immediate active phase, ordered timeline, final outcomes and escaped saved details passed.');

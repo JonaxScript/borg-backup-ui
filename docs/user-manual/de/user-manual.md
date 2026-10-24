@@ -362,7 +362,7 @@ Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** er
 
 Der Gesamtstatus steht direkt unter **Betriebszustand**.
 
-Der Ablaufstreifen nutzt die gesamte Kartenbreite. Er zeigt die im Lauf konfigurierten Schritte in Ausführungsreihenfolge: gegebenenfalls Pre-Skript, Docker/VMs stoppen, `borg create`, Docker/VMs starten, `borg prune`, `borg compact`, `borg check` und Post-Skript. Bei „Alle Archive behalten“ fehlt `prune`. Eine eingeplante, noch nicht fällige Prüfung bleibt dagegen mit „Nicht fällig“ sichtbar. Namen und gemessene Laufzeiten sind immer sichtbar; auf schmalen Bildschirmen bricht die Folge in mehrere Zeilen um.
+Der Ablaufstreifen nutzt die gesamte Kartenbreite. Er zeigt die im Lauf konfigurierten Schritte in Ausführungsreihenfolge: gegebenenfalls Pre-Skript, Datenbank-Sicherungen, Docker/VMs stoppen, `borg create`, Docker/VMs starten, `borg prune`, `borg compact`, `borg check` und Post-Skript. Bei „Alle Archive behalten“ fehlt `prune`. Eine eingeplante, noch nicht fällige Prüfung bleibt dagegen mit „Nicht fällig“ sichtbar. Namen und gemessene Laufzeiten sind immer sichtbar; auf schmalen Bildschirmen bricht die Folge in mehrere Zeilen um.
 
 Haken im Kreis, Kreuz im Kreis, Warndreieck, Stopp-Symbol, Minus, leerer Kreis und animierter Ring unterscheiden Erfolg, Fehler, Warnung, Abbruch, übersprungene, ausstehende und laufende Schritte auch ohne Farberkennung. Bei reduzierter Bewegung bleibt der Ring statisch. Bei Fortschrittsaktualisierungen läuft die Animation ohne Neustart weiter. Nicht ausgeführte Schritte erhalten keine erfundene Laufzeit und keinen Erfolgshaken. Dienstwiederherstellung nach Fehlern oder Abbrüchen wird ebenfalls erfasst.
 
@@ -2065,6 +2065,11 @@ fehlenden Mount, unzugängliche Pfade/Symlinks, falsche Rechte des privaten Ordn
 ein ungeeignetes Dateisystem und fehlenden freien Speicher.
 
 ### 19.2 Ablauf und Prüfung
+
+Die Jobkarte zeigt **Datenbank-Sicherungen** als eigenen Schritt vor den
+Docker-/VM-Stopps. Während des Exports sind der aktive Schritt und seine
+verstrichene Laufzeit sichtbar. Ergebnis und Laufzeit bleiben anschließend in
+den Laufdetails erhalten. Zugeordnete Pre-/Post-Skripte erscheinen separat.
 
 1. Verbindung speichern, Datenbanken laden, gewünschte Namen anhaken und speichern.
    **Verbindung prüfen** wiederholt die Abfrage ohne Änderung der Auswahl. Dies

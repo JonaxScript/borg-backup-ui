@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Include database_backup in the job workflow and active-phase fallback so exports appear before Docker shutdown, with live duration and persisted outcomes. Match template/managed selector cards and detail tabs to the Own scripts content surface. Cover active/final database states, hook visibility and browser theme consistency.
+
 - Use a compact script dropdown and full-width Description/Source code tabs. Preserve own drafts and ignore stale source responses. Split wizard folder/database profile selection into counted tabs with bounded scrollable lists and wrapped paths/profile details.
 
 - Match script card headings to neutral Settings/Prometheus styling and remove MariaDB/PostgreSQL hook templates from the allowlisted UI catalog. Keep both managed database helpers and existing user copies unchanged.

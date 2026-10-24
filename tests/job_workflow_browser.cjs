@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 (async () => {
-  const browser = await chromium.launch({headless:true});
+  const browser = await chromium.launch({headless:true,...(process.env.BBUI_CHROMIUM?{executablePath:process.env.BBUI_CHROMIUM}:{})});
   try {
     const page = await browser.newPage({viewport:{width:1440,height:1000}});
     await page.setContent('<div id="jobs-grid"></div>');
@@ -117,6 +117,27 @@ const {chromium} = require('playwright');
       patchJobMarkup(root,'<div id="b"><span data-step="create">B2</span></div><div id="c">C</div>');
       if(root.firstChild!==kept || root.textContent!=='B2C' || root.children.length!==2) throw Error('Keyed reconciliation failed');
     });
+    // The managed export is active before any Docker/Borg work, even under 60 seconds.
+    await page.evaluate(() => {
+      const now=Date.now()/1000;
+      jobsState.jobs=[{key:'database',location:'local',running:true,run_phase:'database_backup',run_job_steps:[
+        {id:'pre_script',status:'success',duration_seconds:2},
+        {id:'database_backup',status:'running',started_at:now-30},
+        {id:'stop_docker',status:'pending'}, {id:'create',status:'pending'}, {id:'post_script',status:'pending'}]}];
+      renderJobsGrid(jobsState.jobs);
+    });
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"].is-running').count(),1);
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"]').getAttribute('aria-current'),'step');
+    assert.ok((await page.locator('#job-borg-progress-database').textContent()).includes('jobs.workflow.names.database_backup'));
+    assert.equal(await page.locator('progress').count(),0);
+    await page.locator('[data-jobs-action="toggle-workflow"]').click();
+    assert.equal(await page.locator('tr[data-step="database_backup"].is-running').count(),1);
+    await page.evaluate(() => {
+      const job=jobsState.jobs[0];job.running=false;job.last_job_steps=job.run_job_steps.map(step=>({...step,status:'success',duration_seconds:30}));
+      renderJobsGrid(jobsState.jobs);
+    });
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"].is-success').count(),1);
+    assert.equal(await page.locator('tr[data-step="database_backup"].is-success').count(),1);
     console.log('Browser workflow: continuous animation/node identity, live counters, disclosure/focus, atomic completion, stale polls and keyed reconciliation passed.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -51,9 +51,10 @@ async function showScriptLibrary(kind) {
     settingsState.scriptCatalog = entries;
     const rows = entries.filter(row => row.kind === kind);
     rows.sort((a,b) => scriptLibraryDetail(a, 'title').localeCompare(scriptLibraryDetail(b, 'title')));
-    panel.innerHTML = `<p class="script-library-intro">${escHtml(scriptLibraryT(`${kind}Help`))}</p>
+    panel.innerHTML = `<div class="script-library-selection">${settingsCard(escHtml(scriptLibraryT(kind)), settingsMenuIcon(kind === 'template' ? 'advanced' : 'backup'), `<div class="settings-body">
+      <p class="script-library-intro">${escHtml(scriptLibraryT(`${kind}Help`))}</p>
       <div class="script-library-picker"><label for="script-library-select">${escHtml(scriptLibraryT(kind === 'template' ? 'selectTemplate' : 'selectManaged'))}</label>
-      <select id="script-library-select" class="form-select" ${rows.length ? '' : 'disabled'}>${rows.map(row => `<option value="${escHtml(row.id)}">${escHtml(scriptLibraryDetail(row, 'title'))}</option>`).join('') || `<option>${escHtml(scriptLibraryT('empty'))}</option>`}</select></div>
+      <select id="script-library-select" class="form-select" ${rows.length ? '' : 'disabled'}>${rows.map(row => `<option value="${escHtml(row.id)}">${escHtml(scriptLibraryDetail(row, 'title'))}</option>`).join('') || `<option>${escHtml(scriptLibraryT('empty'))}</option>`}</select></div></div>`)}</div>
       <div id="script-library-source" class="script-library-source"></div>`;
     const select = document.getElementById('script-library-select');
     select.addEventListener('change', () => loadScriptLibrarySource(select.value));

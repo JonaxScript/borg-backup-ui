@@ -354,7 +354,7 @@ Each job has its own bordered card with spacing. **All locations** shows separat
 
 The overall result appears directly below **Operating status**.
 
-The workflow spans the full job-card width and shows the configured run steps in execution order: optional Pre script, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Names and measured durations are always visible; narrow screens wrap the sequence across rows.
+The workflow spans the full job-card width and shows the configured run steps in execution order: optional Pre script, database backups, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Names and measured durations are always visible; narrow screens wrap the sequence across rows.
 
 A circled check, circled cross, warning triangle, stop symbol, minus, empty circle and rotating ring distinguish success, failure, warning, cancellation, skipped, pending and running steps without relying on color alone. Reduced-motion preferences disable ring animation. Progress updates preserve the running animation without restarting it. Unexecuted steps never receive invented durations or success symbols. Recovery after errors or cancellation is tracked too.
 
@@ -2024,6 +2024,11 @@ Storage errors distinguish an absent mount, inaccessible/symlink path, incorrect
 private-directory permissions, unsupported filesystem and insufficient free space.
 
 ### 19.2 Run and verify
+
+The job card shows **Database backups** as a separate step before Docker/VM
+shutdown. During export, the active step and elapsed time remain visible. Its
+outcome and duration remain in the run details afterwards. Assigned Pre/Post
+scripts appear as separate steps.
 
 1. Save the connection and load databases. Select the required names and save.
    **Check connection** repeats discovery without changing the selection; it does

@@ -1269,11 +1269,12 @@
 .script-library-nav button, .script-library-detail-tabs button { border:0; border-bottom:2px solid transparent; border-radius:0; padding:var(--ui-space-3) 0; background:transparent; color:var(--ui-color-text-muted); cursor:pointer; font:inherit; }
 .script-library-nav button[aria-pressed=true], .script-library-detail-tabs button[aria-selected=true] { color:var(--ui-color-text); border-bottom-color:var(--ui-color-accent); }
 .script-library-nav button:focus-visible, .script-library-detail-tabs button:focus-visible { outline:2px solid var(--ui-color-accent); outline-offset:2px; }
-.script-library-intro { margin:0 0 var(--ui-space-5); color:var(--ui-color-text-muted); max-width:85ch; }
-.script-library-picker { display:flex; gap:var(--ui-space-3); align-items:center; flex-wrap:wrap; margin-bottom:var(--ui-space-5); }
-.script-library-picker .form-select { width:24rem; max-width:100%; min-width:0; }
+.script-library-selection { margin-bottom:var(--ui-space-5); }
+.script-library-intro { margin:0; color:var(--ui-color-text); }
+.script-library-picker { display:grid; gap:var(--ui-space-2); min-width:0; }
+.script-library-picker .form-select { width:100%; max-width:100%; min-width:0; }
 .script-library-source { min-width:0; }
-.script-library-detail-tabs { padding:0 var(--ui-space-4); background:var(--ui-color-surface-subtle); }
+.script-library-detail-tabs { padding:0 var(--ui-space-4); background:var(--ui-color-surface); }
 .script-library-actions { border-top:1px solid var(--ui-color-border); padding-top:var(--ui-space-4); }
 .script-library-source-meta { display:flex; flex-wrap:wrap; gap:var(--ui-space-2); justify-content:space-between; color:var(--text-muted); font-size:12px; margin:var(--ui-space-3) 0; }
 .script-library-source-meta code { overflow-wrap:anywhere; }
