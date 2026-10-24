@@ -197,7 +197,13 @@ async function loadDatabaseRuns() {
   const node = document.getElementById('db-runs'); if (!node) return;
   try {
     const data = await databaseRequest('/runs', undefined);
-    node.innerHTML = data.runs.map((r,i) => `<div class="form-group"><strong>${escHtml(dbT(r.status))}</strong> · ${escHtml(settingsFmtBytes(r.bytes))}<br><code>${escHtml(r.directory)}</code><br>${escHtml(r.archived ? dbT('archived') : dbT('notArchived'))} <button class="btn btn-secondary" data-cleanup="${i}">${escHtml(dbT('cleanup'))}</button></div>`).join('') || `<p>${escHtml(dbT('noRuns'))}</p>`;
+    node.innerHTML = data.runs.map((r,i) => {
+      const date = new Date(r.started_at || NaN);
+      const timestamp = Number.isNaN(date.getTime()) ? (r.started_at || '') : date.toLocaleString(settingsLocale(), {dateStyle:'medium', timeStyle:'long'});
+      return `<article class="database-run"><header><strong>${escHtml(r.profile_name || r.profile_id)}</strong><time datetime="${escHtml(r.started_at || '')}">${escHtml(timestamp)}</time></header>
+        <div class="database-run-meta"><span class="badge">${escHtml(dbT(r.status))}</span><span>${escHtml(r.compression === 'gzip' ? dbT('compressedSize', {size:settingsFmtBytes(r.bytes)}) : settingsFmtBytes(r.bytes))}</span>${r.compression === 'gzip' ? `<span>${escHtml(dbT('originalSize', {size:settingsFmtBytes(r.uncompressed_bytes)}))}</span>` : ''}</div>
+        <code>${escHtml(r.directory)}</code><span>${escHtml(r.archived ? dbT('archived') : dbT('notArchived'))}</span><button class="btn btn-secondary" data-cleanup="${i}">${escHtml(dbT('cleanup'))}</button></article>`;
+    }).join('') || `<p>${escHtml(dbT('noRuns'))}</p>`;
     for (const error of data.errors || []) { const p = document.createElement('p'); p.textContent = `${error.profile_id}: ${apiErrorMessage({code:error.error_code})}`; node.append(p); }
     node.querySelectorAll('[data-cleanup]').forEach(button => button.addEventListener('click', () => {
       const r=data.runs[Number(button.dataset.cleanup)]; startDatabaseAction(r.profile_id, 'cleanup', r.directory);

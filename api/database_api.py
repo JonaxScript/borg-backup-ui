@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from database_profiles import DatabaseError, data_root, snapshot_profiles, list_profiles
-from database_backup import export_profiles, reconcile_operations, open_staging, _descriptor_path, _private_path, cleanup_run, utc_now, discover_databases, close_results
+from database_backup import export_profiles, reconcile_operations, open_staging, _descriptor_path, _private_path, cleanup_run, is_run_directory_name, utc_now, discover_databases, close_results
 from inventory_store import atomic_write_json
 
 _active = {}
@@ -105,14 +105,18 @@ def start_operation(config, payload):
 
 
 def retained_runs(config):
-    """List managed runs without following links or opening an absent staging mount."""
+    """List current/legacy runs with profile snapshots, dates and byte counts.
+
+    Never follow links or open an absent mount. Original sizes come from completed
+    manifest entries; bytes includes all regular run files, including the manifest.
+    """
     rows, errors = [], []
     for profile in list_profiles(config)['profiles']:
         try:
             with open_staging(profile, require_space=False) as fd:
                 root = _descriptor_path(fd)
                 for directory in sorted(root.glob('bbui-*'))[-500:]:
-                    if directory.is_symlink() or not directory.is_dir():
+                    if not is_run_directory_name(directory.name) or directory.is_symlink() or not directory.is_dir():
                         continue
                     _private_path(directory)
                     path = directory / 'manifest.json'
@@ -121,7 +125,10 @@ def retained_runs(config):
                     row = json.loads(path.read_text())
                     if row.get('profile_id') != profile['id']:
                         continue
-                    rows.append({'profile_id': profile['id'], 'directory': str(Path(profile['staging_dir']) / directory.name), 'status': row.get('status'),
+                    rows.append({'profile_id': profile['id'], 'profile_name': row.get('profile_name') or profile['name'],
+                                 'compression': row.get('compression', 'none'),
+                                 'uncompressed_bytes': sum(f.get('uncompressed_bytes', f.get('bytes', 0)) for f in row.get('files', [])),
+                                 'directory': str(Path(profile['staging_dir']) / directory.name), 'status': row.get('status'),
                                  'started_at': row.get('started_at'), 'archived': row.get('archived', False),
                                  'bytes': sum(p.stat().st_size for p in directory.iterdir() if p.is_file() and not p.is_symlink())})
         except DatabaseError as exc:

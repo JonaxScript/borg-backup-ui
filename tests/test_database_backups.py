@@ -86,7 +86,7 @@ def test_export_uses_only_current_completed_files_and_retains_previous(config, p
     second=backup.export_profiles(config,[profile],'job','two')
     assert first[0]['directory'] != second[0]['directory']
     paths=backup.artifact_paths(second)
-    assert {p.name for p in paths} == {'app.sql','manifest.json'}
+    assert {p.name for p in paths} == {'app.sql.gz','manifest.json'}
     assert all(p.parent.samefile(second[0]['directory']) for p in paths)
     assert all(p.is_file() and p.stat().st_mode & 0o777 == 0o600 for p in paths)
     assert first[0]['restore_tested'] is False
@@ -100,9 +100,9 @@ def test_failed_export_does_not_publish_or_reuse_old_dump(config, profile, monke
         backup.export_profiles(config,[profile],'job','two')
     runs=list(Path(profile['staging_dir']).iterdir())
     failed=next(p for p in runs if str(p)!=first[0]['directory'])
-    assert (failed/'app.sql.partial').is_file() and not (failed/'app.sql').exists()
+    assert (failed/'app.sql.gz.partial').is_file() and not (failed/'app.sql.gz').exists()
     assert json.loads((failed/'manifest.json').read_text())['status']=='failed'
-    assert (Path(first[0]['directory'])/'app.sql').is_file()
+    assert (Path(first[0]['directory'])/'app.sql.gz').is_file()
 
 
 def test_empty_export_fails(config, profile, monkeypatch):
@@ -126,7 +126,7 @@ def test_archive_verification_reads_actual_content_and_rejects_missing(config, p
     monkeypatch.setattr(backup.subprocess,'Popen',lambda *a,**k:original([sys.executable,'-c','pass'],**k))
     with pytest.raises(profiles.DatabaseError,match='archive_verification'):
         backup.verify_archive('repo','archive',results)
-    assert (Path(results[0]['directory'])/'app.sql').is_file()
+    assert (Path(results[0]['directory'])/'app.sql.gz').is_file()
 
 
 def test_cleanup_is_owned_and_explicit(config, profile, monkeypatch, tmp_path):
@@ -138,11 +138,11 @@ def test_cleanup_is_owned_and_explicit(config, profile, monkeypatch, tmp_path):
         backup.cleanup_run(directory,profile)
     unexpected.unlink()
     outside=tmp_path/'valuable'; outside.write_text('keep')
-    (directory/'app.sql').unlink(); (directory/'app.sql').symlink_to(outside)
+    (directory/'app.sql.gz').unlink(); (directory/'app.sql.gz').symlink_to(outside)
     with pytest.raises(profiles.DatabaseError,match='cleanup_blocked'):
         backup.cleanup_run(directory,profile)
     assert outside.read_text()=='keep'
-    (directory/'app.sql').unlink(); (directory/'app.sql').write_text('dump')
+    (directory/'app.sql.gz').unlink(); (directory/'app.sql.gz').write_text('dump')
     backup.cleanup_run(directory,profile)
     assert not directory.exists() and outside.exists()
 
@@ -360,7 +360,7 @@ def test_managed_secret_travels_only_over_stdin(config, profile, monkeypatch, tm
         def poll(self):return 0
     def popen(cmd,**kwargs):
         captured['command']=cmd
-        p=Process();p.stdin.write.side_effect=lambda data:captured.update(stdin=data)
+        p=Process();read_fd, write_fd = backup.os.pipe();backup.os.close(write_fd);p.stdout = backup.os.fdopen(read_fd, 'rb');p.stdin.write.side_effect=lambda data:captured.update(stdin=data)
         return p
     monkeypatch.setattr(backup.subprocess,'Popen',popen)
     monkeypatch.setattr(backup,'_control',lambda *a:'done')

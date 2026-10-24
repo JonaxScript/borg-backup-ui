@@ -29,6 +29,7 @@
 #        other nonzero statuses are shell/native-client failures.
 # --no-password forbids interactive prompts. PGPASSFILE points to $2; psql ignores
 # user startup files. No password is supplied as an argument or printed by this helper.
+# The host gzip-compresses the stdout stream; this helper emits native raw bytes.
 # No server mutations or local dump files. The host owns staging, verification and
 # retention; the supervisor owns credential removal and process-group cancellation.
 

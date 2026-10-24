@@ -43,7 +43,13 @@ Manual test-channel acceptance on Unraid:
   helpers appear there. No export runs at install.
 - Open all six Templates, create an own draft, edit/save/assign the copy and verify
   the original is unchanged. Switching categories retains unsaved own edits.
-  Check light/dark themes, German/English, mobile layout and the container dropdown.
+  Check accented description/source cards, all eight specific descriptions,
+  light/dark themes, German/English, mobile layout and the container dropdown.
+- Check new run names include profile and server-local timestamp/offset. Verify
+  gzip files restore correctly, both sizes display correctly and existing
+  uncompressed UUID runs remain listable/removable. Test disk-full/timeout/abort
+  without publishing incomplete exports. Optional large-stream regression:
+  `BBUI_COMPRESSION_TEST_MIB=5500 pytest -q tests/test_database_compression.py -k bounded_chunks`.
 - Enter database users/passwords in Settings, load database lists, select scope
   and save. No manual container files/mounts are needed. Test Secrets export/import
   and credential rotation during a run. Check unavailable/wrong staging mounts.

@@ -2080,8 +2080,14 @@ Externe Docker-Eingriffe sind dadurch nicht gesperrt und können den Export abbr
 MariaDB sichert transaktional einschließlich Routinen, Events, Triggern und
 SQL zur Datenbankanlage. Nicht-InnoDB-Basistabellen werden abgewiesen. Während
 des Exports keine Schemaänderungen durchführen. Serverkonten/globale Grants
-sind nicht enthalten. PostgreSQL nutzt das unkomprimierte Custom-Format; Borg
-komprimiert nach Jobeinstellung. Optionale Rollen/Tablespaces werden getrennt
+sind nicht enthalten. PostgreSQL liefert ein Custom-Format. Das Plugin komprimiert
+alle neuen lokalen Exporte bereits während des Datenstroms mit gzip (Stufe 6):
+MariaDB als `.sql.gz`, PostgreSQL als `.dump.gz`, globale Objekte als
+`globals.sql.gz`. Es entsteht keine zweite vollständige unkomprimierte Dump-Datei.
+Der Speicherbedarf des Datenstroms ist begrenzt; Komprimierung benötigt zusätzliche
+CPU-Zeit. Die erreichte Größe hängt vom Inhalt ab. Borgs Komprimierung bleibt
+unabhängig nach Jobeinstellung aktiv; bereits komprimierte Daten können die
+Deduplizierung zwischen Läufen verringern. Optionale Rollen/Tablespaces werden getrennt
 und ohne Passwort-Hashes exportiert. Mehrere Datenbanken und globale Objekte
 bilden keine atomare Momentaufnahme des gesamten Clusters.
 
@@ -2092,7 +2098,14 @@ erst nach dem Dump reicht dafür nicht. Wiederanlauf im Post-Skript mit passende
 Fehler-/Abbruchbedingung vorsehen.
 
 Das Manifest enthält Werkzeugversionen, Containeridentität, Umfang, Größen und
-SHA-256-Hashes. Im Archiv liegen die Dateien unter `bbui-<run-id>/`, im Manifest als
+SHA-256-Hashes der komprimierten Dateien sowie deren unkomprimierte Bytezahl.
+Neue Sicherungsordner tragen Profilname, Startzeit in Server-Ortszeit mit
+Zeitzonenoffset und eine eindeutige Kennung, z. B.
+`bbui-mariadb-apps-2026-10-24_11-35-10+0200-<kennung>/`. Der Profilname wird
+für den Dateinamen vereinfacht; das Manifest bewahrt den ursprünglichen Namen
+und die Profil-ID. Die Übersicht zeigt Profil, Zeitpunkt und beide Größen.
+Vorhandene unkomprimierte Dumps und UUID-Ordner bleiben unverändert lesbar und
+bereinigbar. Im Archiv gilt derselbe Ordnername, im Manifest als
 `archive_directory` vermerkt. Ältere Testarchive verwenden den absoluten Staging-Pfad
 ohne führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
 zurück und vergleicht ihre Bytes. Fehlende, ausgeschlossene oder abweichende
@@ -2130,6 +2143,11 @@ und Zugangsdaten-Dateien einrichten und Verbindungen erneut prüfen.
 Manifest und Dumps des gewünschten Laufs über Browse & Restore in ein separates
 Verzeichnis extrahieren und Hashes prüfen. Einen frischen isolierten Container mit
 passenden Client-/Serverversionen verwenden. Nicht auf Produktionsdaten testen.
+
+Neue `.gz`-Dateien zuerst prüfen (`gzip -t database.sql.gz`) und in der isolierten
+Wiederherstellungsumgebung entpacken (`gzip -dk database.sql.gz`; entsprechend für
+`.dump.gz` und `globals.sql.gz`). Für diese zusätzliche Arbeitskopie genug Platz
+vorsehen. Vorhandene unkomprimierte Dumps benötigen diesen Schritt nicht.
 
 MariaDB: benötigte Konten/Grants separat einrichten und den SQL-Dump mit
 `mariadb --defaults-file=/geschuetzt/restore.cnf < database.sql` importieren.

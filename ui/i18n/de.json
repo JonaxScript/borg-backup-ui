@@ -3402,7 +3402,70 @@
         "lines": "{count} Zeilen",
         "mariadb": "Exportiert ausgewählte MariaDB-Datenbanken über die integrierte Datenbanksicherung.",
         "postgresql": "Exportiert PostgreSQL-Datenbanken und optional globale Objekte über die integrierte Datenbanksicherung.",
-        "templatePurpose": "Eigenständige Pre-/Post-Vorlage. Zweck, Voraussetzungen, Konfiguration und Verhalten sind im Quelltext beschrieben."
+        "templatePurpose": "Eigenständige Pre-/Post-Vorlage. Zweck, Voraussetzungen, Konfiguration und Verhalten sind im Quelltext beschrieben.",
+        "details": {
+          "mariadb": {
+            "title": "MariaDB-Datenbanksicherung",
+            "purpose": "Exportiert die im Datenbankprofil ausgewählten Datenbanken inklusive Tabellen, Daten, Views, Routinen, Triggern und Events.",
+            "prerequisites": "Laufender Docker-Container mit mariadb und mariadb-dump, passende Datenbankrechte und ausschließlich InnoDB-Basistabellen. Schemaänderungen während des Exports vermeiden.",
+            "configuration": "Unter Einstellungen > Datenbank-Sicherungen Container, Zugangsdaten, Datenbanken und privaten Dump-Speicher festlegen. Dieser Helfer wird nicht als Pre-/Post-Skript zugeordnet.",
+            "behavior": "Borg Backup UI steuert Prüfung, Export, gzip-Komprimierung und Aufbewahrung. Fehler verhindern die Archivierung unvollständiger Dumps. Globale Benutzer und Rechte werden nicht exportiert; Änderungen am Helfer können durch Updates ersetzt werden."
+          },
+          "postgresql": {
+            "title": "PostgreSQL-Datenbanksicherung",
+            "purpose": "Exportiert ausgewählte Datenbanken im pg_restore-Custom-Format und auf Wunsch zusätzlich globale Rollen und Tablespaces.",
+            "prerequisites": "Laufender Docker-Container mit psql, pg_dump und pg_restore; für globale Objekte zusätzlich pg_dumpall. Der Datenbankbenutzer benötigt die erforderlichen Leserechte.",
+            "configuration": "Container, Zugangsdaten, Datenbanken und optionale globale Objekte im Datenbankprofil auswählen. Dump-Speicher, Timeout und Aufbewahrung ebenfalls dort einstellen.",
+            "behavior": "Das Plugin komprimiert die Ausgaben mit gzip und prüft vor der Archivierung den erfolgreichen Export. Rollen-Passworthashes werden ausgelassen. Datenbanken und globale Objekte bilden keinen gemeinsamen Snapshot. Updates können den Helfer ersetzen."
+          },
+          "source": {
+            "title": "Quellverzeichnis prüfen",
+            "purpose": "Prüft vor dem Backup, ob der erwartete Datenträger gemountet ist und das Quellverzeichnis anhand einer Kennungsdatei zum richtigen Datenträger gehört.",
+            "prerequisites": "Der Mount muss bereits vorhanden sein. Eine reguläre, lesbare Kennungsdatei mit höchstens 256 Byte im Quellverzeichnis wird benötigt; symbolische Links auf die Kennungsdatei sind unzulässig.",
+            "configuration": "MOUNT_PATH, SOURCE_PATH, MARKER_NAME und EXPECTED_ID anpassen. Danach CONFIGURED auf yes setzen, speichern und als Pre-Skript zuordnen. Startwert für Timeout: 30 Sekunden.",
+            "behavior": "Fehlender Mount, ein Quellpfad außerhalb des Mounts oder eine abweichende Kennung stoppt das Backup. Das Skript mountet nichts und verändert keine Quelldateien."
+          },
+          "space": {
+            "title": "Freien Speicher prüfen",
+            "purpose": "Prüft vor dem Backup einen Mindestwert für freien Platz auf einem bereits gemounteten lokalen Dump- oder Staging-Dateisystem.",
+            "prerequisites": "Vorhandener Mount sowie mountpoint, df und awk auf dem Host. Die Prüfung reserviert keinen Speicher und berechnet nicht die voraussichtliche Backupgröße.",
+            "configuration": "MOUNT_PATH und MIN_FREE_GIB festlegen, CONFIGURED auf yes setzen und die eigene Kopie als Pre-Skript zuordnen. Startwert für Timeout: 30 Sekunden.",
+            "behavior": "Zu wenig Platz, ein fehlender Mount oder nicht lesbare Platzangaben stoppen das Backup. Remote-Quotas und die spätere Dateisystembelegung werden nicht geprüft."
+          },
+          "wake": {
+            "title": "Server per Wake-on-LAN starten",
+            "purpose": "Sendet bei nicht erreichbarem TCP-Port ein Wake-on-LAN-Paket und wartet anschließend auf die Erreichbarkeit des Zielports.",
+            "prerequisites": "Python 3 auf dem Host, Wake-on-LAN am Zielgerät und ein Netzwerk, das den IPv4-Broadcast zulässt. Ein erreichbarer Port bestätigt weder Anmeldung noch Verfügbarkeit einer Freigabe.",
+            "configuration": "MAC_ADDRESS, BROADCAST_IP, SERVER_IP, SERVER_PORT und WAIT_SECONDS setzen; CONFIGURED auf yes setzen und als Pre zuordnen. Timeout größer als WAIT_SECONDS wählen, Startwert: 150 Sekunden.",
+            "behavior": "Ist der Port bereits erreichbar, wird kein Wake-Paket gesendet. Zeitüberschreitung oder Netzwerkfehler stoppen das Backup. Das Skript fährt den Server nach dem Job nicht herunter."
+          },
+          "mariaTemplate": {
+            "title": "MariaDB-Dump als Pre-Skript",
+            "purpose": "Eigenständige Vorlage zum Export einer einzelnen MariaDB-Datenbank als SQL-Datei vor einem Backup. Für die integrierte Sicherung mehrerer Datenbanken stattdessen ein Datenbankprofil verwenden.",
+            "prerequisites": "Docker und mariadb-dump im laufenden Container; geschützte Client-Konfigurationsdatei im Container. Ein vorhandenes privates 0700-Ausgabeverzeichnis unter einem vertrauenswürdigen Mount ist erforderlich.",
+            "configuration": "MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE und CLIENT_CONFIG anpassen, dann CONFIGURED=yes setzen. Als Pre zuordnen und OUTPUT_DIR als Backupquelle aufnehmen. Startwert für Timeout: 1800 Sekunden.",
+            "behavior": "Nur ein erfolgreicher, nicht leerer Dump wird veröffentlicht. Fehler stoppen das Backup; ältere Dumps bleiben erhalten und werden nicht automatisch bereinigt. Diese Vorlage liefert unkomprimiertes SQL und nutzt nicht die Secrets-Verwaltung des Datenbankprofils."
+          },
+          "pgTemplate": {
+            "title": "PostgreSQL-Dump als Pre-Skript",
+            "purpose": "Eigenständige Vorlage zum Export einer einzelnen PostgreSQL-Datenbank im Custom-Format. Rollen und Tablespaces sind nicht Bestandteil dieses Dumps.",
+            "prerequisites": "Docker, pg_dump im laufenden Container und eine geschützte pgpass-Datei im Container. Vorhandenes privates 0700-Ausgabeverzeichnis unter einem vertrauenswürdigen Mount.",
+            "configuration": "MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE, DB_USER und PGPASS_FILE einstellen; CONFIGURED=yes setzen. Als Pre zuordnen und OUTPUT_DIR als Backupquelle aufnehmen. Startwert für Timeout: 1800 Sekunden.",
+            "behavior": "Fehler oder leere Ausgabe stoppen das Backup. Erfolgreiche Dumps bleiben bis zur separaten Bereinigung erhalten. Die Vorlage verwendet die native pg_dump-Komprimierung; integrierte Profile bieten zusätzlich verwaltete Secrets, globale Objekte und Aufbewahrung."
+          },
+          "webhook": {
+            "title": "Job-Ergebnis an Webhook senden",
+            "purpose": "Sendet Job-ID und Ergebnis vor dem Post-Skript als JSON an einen eigenen HTTPS-Empfänger. Dies ist kein Adapter für einen bestimmten Benachrichtigungsdienst.",
+            "prerequisites": "curl und Python 3 sowie eine private curl-Konfiguration mit genau einer HTTPS-URL und optionalen Authentifizierungsheadern. Datei muss dem ausführenden Benutzer gehören und Modus 0600 haben.",
+            "configuration": "CURL_CONFIG auf die geschützte Datei setzen, CONFIGURED=yes setzen und als Post mit „Auch bei Fehler, Überspringen oder Abbruch“ zuordnen. Startwert für Timeout: 30 Sekunden.",
+            "behavior": "Nur eine HTTP-2xx-Antwort zählt als Erfolg; keine automatischen Wiederholungen. Zustellfehler lassen Post und damit den Job fehlschlagen. Gemeldet wird das Ergebnis vor Post, nicht der endgültige Jobstatus."
+          }
+        },
+        "prerequisites": "Voraussetzungen",
+        "configuration": "Einrichtung",
+        "behavior": "Ablauf und Fehlerverhalten",
+        "description": "Beschreibung",
+        "codeTitle": "Skript"
       }
     },
     "databases": {
@@ -3618,6 +3681,8 @@
     "legacyCredentials": "Dieses bestehende Profil verwendet noch seine Container-Datei. Ein Passwort eingeben, um zu den Secrets von Borg Backup UI zu wechseln.",
     "chooseContainer": "Container auswählen …",
     "containerHint": "Wähle den Container aus, in dem die Datenbank läuft.",
-    "containersEmpty": "Keine Container geladen. Docker-Verfügbarkeit prüfen; eine gespeicherte Auswahl bleibt erhalten."
+    "containersEmpty": "Keine Container geladen. Docker-Verfügbarkeit prüfen; eine gespeicherte Auswahl bleibt erhalten.",
+    "compressedSize": "Komprimiert: {size}",
+    "originalSize": "Unkomprimiert: {size}"
   }
 }

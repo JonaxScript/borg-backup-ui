@@ -1288,3 +1288,28 @@
 .script-source-code code { background:transparent; padding:0; color:inherit; }
 .script-source-lines { padding:12px 8px; overflow:hidden; text-align:right; color:var(--text-muted); background:var(--bg-card); border-right:1px solid var(--border); user-select:none; }
 @media (max-width:700px) { .script-library-layout { grid-template-columns:minmax(0,1fr); } .script-library-file-list { max-height:12rem; } .script-source-code { height:24rem; } }
+
+/* Give script descriptions the same accented cards as the other Settings pages. */
+.script-library-intro { padding:var(--ui-space-4); border:1px solid var(--ui-state-info-border); border-left:4px solid var(--ui-color-accent); border-radius:var(--ui-radius-md); background:var(--ui-state-info-bg); }
+.script-library-intro h3 { color:var(--ui-state-info-fg); }
+.script-library-intro p { color:var(--ui-color-text); }
+.script-library-source .settings-section { overflow:hidden; border:1px solid var(--ui-color-border); border-radius:var(--ui-radius-md); background:var(--ui-color-surface); margin-bottom:var(--ui-space-5); }
+.script-library-source .settings-section-header { display:flex; gap:var(--ui-space-3); align-items:center; padding:var(--ui-space-3) var(--ui-space-4); background:var(--ui-state-info-bg); border-bottom:1px solid var(--ui-state-info-border); color:var(--ui-state-info-fg); }
+.script-library-source .settings-section-header > svg { width:1.2rem; height:1.2rem; flex-shrink:0; color:var(--ui-color-accent); }
+.script-library-description, .script-library-code-body { padding:var(--ui-space-4); }
+.script-library-purpose { color:var(--ui-color-text); font-size:var(--ui-font-size-md); line-height:1.65; }
+.script-library-details { display:grid; gap:var(--ui-space-4); margin:var(--ui-space-4) 0; }
+.script-library-details > div { padding-left:var(--ui-space-3); border-left:3px solid var(--ui-state-info-border); }
+.script-library-details dt { font-weight:600; color:var(--ui-color-accent); margin-bottom:var(--ui-space-1); }
+.script-library-details dd { margin:0; line-height:1.65; color:var(--ui-color-text); }
+.script-library-ownership { background:var(--ui-state-info-bg); color:var(--ui-state-info-fg); border:1px solid var(--ui-state-info-border); }
+.script-library-browser[data-library-kind=template] .script-library-ownership { background:var(--ui-state-success-bg); color:var(--ui-state-success-fg); border-color:var(--ui-state-success-border); }
+.script-library-file-list { background:var(--ui-color-surface); }
+.script-library-file { background:var(--ui-color-surface); padding:var(--ui-space-4) var(--ui-space-3); }
+.script-library-file[aria-pressed=true] { background:var(--ui-state-info-bg); color:var(--ui-state-info-fg); }
+.database-run { display:grid; gap:var(--ui-space-2); padding:var(--ui-space-4); margin-top:var(--ui-space-3); background:var(--ui-color-surface); border:1px solid var(--ui-color-border); border-left:3px solid var(--ui-color-accent); border-radius:var(--ui-radius-sm); }
+.database-run header, .database-run-meta { display:flex; gap:var(--ui-space-3); align-items:center; flex-wrap:wrap; }
+.database-run code { overflow-wrap:anywhere; }
+.database-run .btn { justify-self:start; }
+
+.script-library-description > .badge, .script-library-description > .btn { justify-self:start; }

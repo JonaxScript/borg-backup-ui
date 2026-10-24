@@ -5,6 +5,7 @@ Docker, Borg and repository-local TMPDIR/pytest --basetemp. No ports are publish
 Only uniquely named test containers and generated fixture data are touched.
 """
 import json
+import gzip
 import os
 import subprocess
 import time
@@ -97,8 +98,9 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     backup.verify_archive(str(repo),'fixture',results)
     assert results[0]['archived'] and not results[0]['restore_tested']
     target=launch('restore')
-    dump=next(p for p in paths if p.suffix in ('.sql','.dump'))
+    dump=next(p for p in paths if p.name in ('fixture.sql.gz','fixture.dump.gz'))
     content=command(['borg','extract','--stdout',str(repo)+'::fixture',results[0]['archive_directory'] + '/' + dump.name])
+    content=gzip.decompress(content)
     if engine=='mariadb':
         sql(target,content.decode())
         assert b'backed-up' in sql(target,'SELECT value FROM item_view;','fixture')
@@ -106,8 +108,9 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
         assert b'inactive' in sql(target,'SHOW EVENTS FROM fixture;')
         assert b'items_trigger' in sql(target,'SHOW TRIGGERS FROM fixture;')
     else:
-        globals_path=Path(results[0]['directory'])/'globals.sql'
+        globals_path=Path(results[0]['directory'])/'globals.sql.gz'
         globals_sql=command(['borg','extract','--stdout',str(repo)+'::fixture',results[0]['archive_directory'] + '/' + globals_path.name])
+        globals_sql=gzip.decompress(globals_sql)
         assert b'PASSWORD' not in globals_sql and password.encode() not in globals_sql
         # The bootstrap role already exists in a fresh official image; skip only its CREATE.
         sql(target,globals_sql.decode().replace('CREATE ROLE postgres;',''))
@@ -134,7 +137,7 @@ def test_real_owned_group_cancellation(database_container,tmp_path,monkeypatch):
     profile=dict(id='db-aaaaaaaaaaaa',engine=engine,container=container,execution_user='',credential_file='/unused',port=1,database_user='',timeout_seconds=30)
     cfg={'BACKUP_SCRIPTS_DIR':str(tmp_path/'config')}
     start=time.monotonic()
-    with (tmp_path/'output').open('wb') as handle:
+    with gzip.open(tmp_path/'output.gz', 'wb') as handle:
         with pytest.raises(DatabaseError,match='cancelled'):
             backup._operation(cfg,profile,backup.container_identity(profile),'dump','fixture',handle,lambda:time.monotonic()-start>.8)
     records=[json.loads(p.read_text()) for p in (tmp_path/'config/database-operations').glob('*.json')]

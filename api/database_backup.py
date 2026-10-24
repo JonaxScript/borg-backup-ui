@@ -6,6 +6,7 @@ Persistent operation journals prevent stale job locks from allowing an unsafe re
 from __future__ import annotations
 
 import copy
+import gzip
 import hashlib
 import json
 import os
@@ -16,6 +17,7 @@ import subprocess
 import time
 import tempfile
 import uuid
+import unicodedata
 from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import contextmanager
@@ -168,7 +170,11 @@ def reconcile_operations(config):
 
 
 def _operation(config, profile, cid, action, database, output, cancelled):
-    """Stream a managed client to output; journal before launch and verify exit/abort."""
+    """Stream bounded chunks to a binary sink, including a gzip writer.
+
+    Journal before launch; monitor timeout/cancellation while draining Docker stdout.
+    Sink/pipe failures terminate the owned exporter group and never mark completion.
+    """
     token = uuid.uuid4().hex
     journal = data_root(config) / 'database-operations' / (token + '.json')
     record = {'token': token, 'container_id': cid, 'execution_user': profile['execution_user'],
@@ -195,18 +201,25 @@ def _operation(config, profile, cid, action, database, output, cancelled):
     reason = None
     started = time.monotonic()
     try:
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=output, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         proc.stdin.write(script.encode())
         proc.stdin.close()
         limit = min(60, profile['timeout_seconds']) if action in ('probe', 'discover') else profile['timeout_seconds']
-        while proc.poll() is None:
-            if cancelled():
-                reason = 'cancelled'
-                break
-            if time.monotonic() - started > limit:
-                reason = 'timeout'
-                break
-            time.sleep(0.1)
+        with selectors.DefaultSelector() as selector:
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            while selector.get_map() or proc.poll() is None:
+                if cancelled():
+                    reason = 'cancelled'
+                    break
+                if time.monotonic() - started > limit:
+                    reason = 'timeout'
+                    break
+                for key, _ in selector.select(timeout=.1):
+                    block = os.read(key.fd, 1024 * 1024)
+                    if block:
+                        output.write(block)
+                    else:
+                        selector.unregister(key.fileobj)
         if reason:
             if not _terminate(record):
                 raise DatabaseError('unresolved_export')
@@ -235,6 +248,8 @@ def _operation(config, profile, cid, action, database, output, cancelled):
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
+        if proc and proc.stdout:
+            proc.stdout.close()
         record['finished_at'] = utc_now()
         atomic_write_json(journal, record)
         if record['status'] != 'unresolved':
@@ -427,9 +442,30 @@ def _probe(config, profile, cid, database, cancelled, directory):
         path.unlink(missing_ok=True)
 
 
+def run_directory_name(profile_name, started_at):
+    """Return a path-safe profile slug, server-local timestamp/offset and unique suffix.
+
+    The bounded ASCII slug is descriptive only; profile_id remains authoritative.
+    started_at must be an ISO timestamp with timezone information.
+    """
+    ascii_name = unicodedata.normalize('NFKD', profile_name).encode('ascii', 'ignore').decode()
+    slug = re.sub(r'[^a-z0-9]+', '-', ascii_name.lower()).strip('-')[:60].rstrip('-') or 'profile'
+    stamp = datetime.fromisoformat(started_at).astimezone().strftime('%Y-%m-%d_%H-%M-%S%z')
+    return f'bbui-{slug}-{stamp}-{uuid.uuid4().hex}'
+
+
+def is_run_directory_name(name):
+    """Accept current named runs and existing UUID-only directories for retained data."""
+    return bool(re.fullmatch(r'bbui-(?:[a-z0-9][a-z0-9-]{0,59}-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}[+-][0-9]{4}-)?[a-f0-9]{32}', name))
+
+
 def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, progress=None, check_only=False, results=None):
     """Export into held private directories; retain completed files on failure.
 
+    New runs use profile/time directory names and stream raw client bytes through
+    gzip level 6 without an uncompressed staging copy. Publish .gz files only after
+    successful client exit, nonempty input, gzip close and fsync. Manifests record
+    original byte counts and compressed sizes/hashes; failed partial files remain.
     Returns JSON-serializable DumpResult manifests. Call close_results after the
     final archive/cleanup operation; pass results to retain partial manifests and
     explicitly close handles even when this function raises.
@@ -438,19 +474,21 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
     for profile in profiles:
         if cancelled():
             raise DatabaseError('cancelled')
-        name = 'bbui-' + uuid.uuid4().hex
+        started_at = utc_now()
+        name = run_directory_name(profile['name'], started_at)
         with open_staging(profile) as fd:
             os.mkdir(name, mode=0o700, dir_fd=fd)
             manifest = DumpResult(fd)
         directory = _descriptor_path(manifest._root_fd) / name
         manifest.update({'format_version': 1, 'helper_version': 1, 'job_id': job_id, 'run_id': run_id,
-                    'profile_id': profile['id'], 'engine': profile['engine'], 'started_at': utc_now(),
+                    'profile_id': profile['id'], 'profile_name': profile['name'], 'engine': profile['engine'], 'started_at': started_at,
+                    'compression': 'gzip',
                     'status': 'running', 'archived': False, 'restore_tested': False, 'files': [],
                     'retention': profile['retention'], 'directory': str(Path(profile['staging_dir']) / name),
                     'archive_directory': name,
                     'scope': {'databases': profile['databases'], 'globals': profile['include_globals'],
                               'credentials': False, 'application_files_consistent': False},
-                    'restore': 'Use matching mariadb client or pg_restore/psql in a separate container. '
+                    'restore': 'Decompress .gz files first, then use matching mariadb client or pg_restore/psql in a separate container. '
                                'Reprovision credentials, roles/grants and required extensions. See database backup guide.'})
         results.append(manifest)
         try:
@@ -470,23 +508,25 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                 if profile['include_globals'] and database == profile['databases'][0]:
                     actions.append('globals')
                 for action in actions:
-                    name = ('globals.sql' if action == 'globals' else database + ('.sql' if profile['engine'] == 'mariadb' else '.dump'))
+                    name = ('globals.sql' if action == 'globals' else database + ('.sql' if profile['engine'] == 'mariadb' else '.dump')) + '.gz'
                     partial = directory / (name + '.partial')
                     with partial.open('xb') as handle:
                         os.fchmod(handle.fileno(), 0o600)
-                        _operation(config, profile, cid, action, database, handle, cancelled)
+                        with gzip.GzipFile(filename='', mode='wb', fileobj=handle, compresslevel=6, mtime=0) as compressed:
+                            _operation(config, profile, cid, action, database, compressed, cancelled)
+                            uncompressed_bytes = compressed.tell()
                         handle.flush()
                         os.fsync(handle.fileno())
-                    if not partial.stat().st_size:
+                    if not uncompressed_bytes:
                         raise DatabaseError('empty_dump')
                     if profile['engine'] == 'postgresql' and action == 'dump':
-                        with partial.open('rb') as handle:
+                        with gzip.open(partial, 'rb') as handle:
                             if handle.read(5) != b'PGDMP':
                                 raise DatabaseError('invalid_dump')
                     final = directory / name
                     partial.rename(final)
                     manifest['files'].append({'name': name, 'database': database, 'kind': action, **versions,
-                                              'bytes': final.stat().st_size, 'sha256': _hash(final, cancelled),
+                                              'bytes': final.stat().st_size, 'uncompressed_bytes': uncompressed_bytes, 'compression': 'gzip', 'sha256': _hash(final, cancelled),
                                               'duration_seconds': round(time.monotonic() - started, 3), 'status': 'dump_completed'})
                     atomic_write_json(directory / 'manifest.json', manifest)
                     if progress:
@@ -594,7 +634,7 @@ def cleanup_run(directory, profile, *, verified=False, interrupted=False):
         _cleanup_run(directory.path, profile, verified=verified, interrupted=interrupted)
         return
     logical = Path(directory)
-    if logical.parent != Path(profile['staging_dir']) or not re.fullmatch(r'bbui-[a-f0-9]{32}', logical.name):
+    if logical.parent != Path(profile['staging_dir']) or not is_run_directory_name(logical.name):
         raise DatabaseError('storage_path')
     with open_staging(profile, require_space=False) as fd:
         _cleanup_run(_descriptor_path(fd) / logical.name, profile, verified=verified, interrupted=interrupted)
@@ -616,9 +656,12 @@ def _cleanup_run(path, profile, *, verified, interrupted):
         raise DatabaseError('cleanup_blocked')
     for database in databases:
         name = database + ('.sql' if manifest['engine'] == 'mariadb' else '.dump')
+        if manifest.get('compression') == 'gzip':
+            name += '.gz'
         allowed.update((name, name + '.partial'))
     if manifest.get('scope', {}).get('globals'):
-        allowed.update(('globals.sql', 'globals.sql.partial'))
+        name = 'globals.sql.gz' if manifest.get('compression') == 'gzip' else 'globals.sql'
+        allowed.update((name, name + '.partial'))
     children = list(path.iterdir())
     if any(p.name not in allowed or p.is_symlink() or not p.is_file() or p.stat().st_uid != os.geteuid() for p in children):
         raise DatabaseError('cleanup_blocked')

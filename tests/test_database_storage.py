@@ -114,7 +114,8 @@ def test_path_replacement_during_export_cannot_redirect_io(config, profile, pool
     results = backup.export_profiles(config, [profile], 'job', 'run')
     try:
         run = Path(results[0]['directory']).name
-        assert (original/run/'app.sql').read_text().startswith('CREATE TABLE')
+        import gzip
+        assert gzip.decompress((original/run/'app.sql.gz').read_bytes()).startswith(b'CREATE TABLE')
         assert list(root.iterdir()) == []
         backup.write_manifest(results[0])
         assert copy.deepcopy(results) == json.loads(json.dumps(results))
@@ -163,7 +164,7 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         borg('init', '--encryption=none', repo)
         borg('create', repo+'::test', *backup.borg_artifact_paths(results))
         paths = borg('list', '--short', repo+'::test').splitlines()
-        assert sorted(paths) == sorted(results[0]['archive_directory']+'/'+name for name in ['app.sql','manifest.json'])
+        assert sorted(paths) == sorted(results[0]['archive_directory']+'/'+name for name in ['app.sql.gz','manifest.json'])
         backup.verify_archive(repo, 'test', results)
         backup.write_manifest(results[0])
         backup.cleanup_run(results[0], profile, verified=True)
@@ -189,4 +190,4 @@ def test_export_failure_retains_manifest_and_releases_handle(config, profile, po
     finally:
         backup.close_results(results)
     with pytest.raises(OSError): os.fstat(fd)
-    assert (Path(results[0]['directory'])/'app.sql.partial').is_file()
+    assert (Path(results[0]['directory'])/'app.sql.gz.partial').is_file()

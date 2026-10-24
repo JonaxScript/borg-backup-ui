@@ -3402,7 +3402,70 @@
         "lines": "{count} lines",
         "mariadb": "Exports selected MariaDB databases through integrated database backups.",
         "postgresql": "Exports PostgreSQL databases and optional global objects through integrated database backups.",
-        "templatePurpose": "Standalone Pre/Post template. Source comments describe purpose, prerequisites, configuration and behavior."
+        "templatePurpose": "Standalone Pre/Post template. Source comments describe purpose, prerequisites, configuration and behavior.",
+        "details": {
+          "mariadb": {
+            "title": "MariaDB database backup",
+            "purpose": "Exports databases selected in the database profile, including tables, data, views, routines, triggers and events.",
+            "prerequisites": "A running Docker container with mariadb and mariadb-dump, suitable database permissions and InnoDB base tables only. Avoid schema changes during export.",
+            "configuration": "Configure container, credentials, database selection and private dump storage in Settings > Database backups. Do not assign this helper as a Pre/Post script.",
+            "behavior": "Borg Backup UI controls checks, export, gzip compression and retention. Failures prevent incomplete dumps from being archived. Global users and grants are not exported; updates may replace edits to this helper."
+          },
+          "postgresql": {
+            "title": "PostgreSQL database backup",
+            "purpose": "Exports selected databases in pg_restore custom format and optionally global roles and tablespaces.",
+            "prerequisites": "A running Docker container with psql, pg_dump and pg_restore; globals additionally require pg_dumpall. The database account needs the necessary read permissions.",
+            "configuration": "Select container, credentials, databases and optional global objects in the database profile. Configure dump storage, timeout and retention there as well.",
+            "behavior": "The plugin gzip-compresses output and requires successful export before archiving. Role password hashes are omitted. Databases and global objects do not share a common snapshot. Updates may replace this helper."
+          },
+          "source": {
+            "title": "Check source directory",
+            "purpose": "Before backup, checks that the expected filesystem is mounted and an identity marker identifies the intended source directory.",
+            "prerequisites": "The mount must already exist. A regular readable marker file of at most 256 bytes is required in the source directory; a symlink marker is rejected.",
+            "configuration": "Set MOUNT_PATH, SOURCE_PATH, MARKER_NAME and EXPECTED_ID. Then set CONFIGURED to yes, save and assign as Pre. Suggested timeout: 30 seconds.",
+            "behavior": "A missing mount, source outside the mount or mismatched identity blocks backup. The script does not mount storage or change source files."
+          },
+          "space": {
+            "title": "Check free space",
+            "purpose": "Checks a minimum free-space threshold on an already mounted local dump or staging filesystem before backup.",
+            "prerequisites": "An existing mount and host tools mountpoint, df and awk. This check neither reserves space nor estimates backup size.",
+            "configuration": "Set MOUNT_PATH and MIN_FREE_GIB, set CONFIGURED to yes and assign your copy as Pre. Suggested timeout: 30 seconds.",
+            "behavior": "Insufficient space, a missing mount or unreadable capacity blocks backup. Remote quotas and later filesystem usage are not checked."
+          },
+          "wake": {
+            "title": "Wake a server with Wake-on-LAN",
+            "purpose": "Sends a Wake-on-LAN packet when the target TCP port is unavailable, then waits for that port to become reachable.",
+            "prerequisites": "Python 3 on the host, Wake-on-LAN enabled on the target and a network that permits IPv4 broadcast. Port readiness does not verify authentication or share availability.",
+            "configuration": "Set MAC_ADDRESS, BROADCAST_IP, SERVER_IP, SERVER_PORT and WAIT_SECONDS; set CONFIGURED to yes and assign as Pre. Choose a timeout above WAIT_SECONDS; suggested value: 150 seconds.",
+            "behavior": "An already reachable port skips the wake packet. Timeout or network failure blocks backup. This script does not shut down the server after the job."
+          },
+          "mariaTemplate": {
+            "title": "MariaDB dump as a Pre script",
+            "purpose": "Standalone template exporting one MariaDB database to SQL before backup. Use a database profile instead for integrated backups of multiple databases.",
+            "prerequisites": "Docker and mariadb-dump in the running container; a protected client configuration file inside it. An existing private 0700 output directory below a trusted mount is required.",
+            "configuration": "Set MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE and CLIENT_CONFIG, then CONFIGURED=yes. Assign as Pre and add OUTPUT_DIR as a backup source. Suggested timeout: 1800 seconds.",
+            "behavior": "Only a successful nonempty dump is published. Failure blocks backup; older dumps remain without automatic retention. This template produces uncompressed SQL and does not use database-profile Secrets management."
+          },
+          "pgTemplate": {
+            "title": "PostgreSQL dump as a Pre script",
+            "purpose": "Standalone template exporting one PostgreSQL database in custom format. Cluster roles and tablespaces are not included.",
+            "prerequisites": "Docker, pg_dump in the running container and a protected pgpass file inside it. An existing private 0700 output directory below a trusted mount.",
+            "configuration": "Set MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE, DB_USER and PGPASS_FILE, then CONFIGURED=yes. Assign as Pre and add OUTPUT_DIR as a backup source. Suggested timeout: 1800 seconds.",
+            "behavior": "Failure or empty output blocks backup. Successful dumps remain until separately removed. The template uses native pg_dump compression; integrated profiles also offer managed Secrets, global objects and retention."
+          },
+          "webhook": {
+            "title": "Send job result to a webhook",
+            "purpose": "Posts job ID and the pre-Post result as JSON to your own HTTPS receiver. This is not a provider-specific notification adapter.",
+            "prerequisites": "curl and Python 3 plus a private curl configuration with exactly one HTTPS URL and optional authentication headers. The file must belong to the executing user with mode 0600.",
+            "configuration": "Set CURL_CONFIG to the protected file, set CONFIGURED=yes and assign as Post with “Also on failure, skip or cancellation”. Suggested timeout: 30 seconds.",
+            "behavior": "Only HTTP 2xx counts as success; no automatic retries. Delivery failure fails Post and the overall job. The result describes the state before Post, not the final job status."
+          }
+        },
+        "prerequisites": "Prerequisites",
+        "configuration": "Configuration",
+        "behavior": "Behavior and failures",
+        "description": "Description",
+        "codeTitle": "Script"
       }
     },
     "databases": {
@@ -3618,6 +3681,8 @@
     "legacyCredentials": "This existing profile still uses its container file. Enter a password to switch to Borg Backup UI Secrets.",
     "chooseContainer": "Select a container …",
     "containerHint": "Select the container running the database.",
-    "containersEmpty": "No containers loaded. Check Docker availability; an existing selection is preserved."
+    "containersEmpty": "No containers loaded. Check Docker availability; an existing selection is preserved.",
+    "compressedSize": "Compressed: {size}",
+    "originalSize": "Uncompressed: {size}"
   }
 }

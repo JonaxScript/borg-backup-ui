@@ -28,6 +28,7 @@
 # stderr: native diagnostics, suppressed by the host supervisor, never a UI log.
 # Exits: 0 success, 20 unsupported action/name, 21 unsafe credential file,
 #        22 non-InnoDB table, otherwise shell/native-client failure.
+# The host gzip-compresses the stdout stream; this helper emits native raw bytes.
 # No server mutations or local dump files. Credentials are read, never removed
 # here: the supervisor owns their lifecycle and cancellation/process cleanup.
 

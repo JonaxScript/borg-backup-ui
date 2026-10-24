@@ -16,7 +16,7 @@ const {chromium} = require('playwright');
         if (url.pathname==='/api/settings/databases') {
           if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:'b'.repeat(32)};profiles=[row];body={profile:row};}
           else body={profiles};
-        } else if(url.pathname.endsWith('/runs')) body={runs:[],errors:[]};
+        } else if(url.pathname.endsWith('/runs')) body={runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
         else if(url.pathname.endsWith('/action')) {actions++;action=req.postDataJSON().action;body={id:'a'.repeat(32),status:'running'};}
         else if(url.pathname.endsWith('/status')) body={status:'completed',profile_id:'db-aaaaaaaaaaaa',action,results:[],...(action==='discover'?{databases:['app','photos','new_unselected']}:{})};
         else if(url.pathname.endsWith('/runtime-inventory')) body={docker_containers:['mariadb-test','postgres-test']};
@@ -32,7 +32,7 @@ const {chromium} = require('playwright');
         }}}};
         window.escHtml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
         window.settingsState={};window._updateUnsavedChangesUi=()=>{};
-        window.settingsFmtBytes=v=>`${v} B`;window.apiErrorMessage=d=>d.code||'error';
+        window.settingsLocale=()=> 'de-DE';window.settingsFmtBytes=v=>`${v} B`;window.apiErrorMessage=d=>d.code||'error';
         window.wizardState={jobIdRequest:1};window._wizardShowError=()=>{};
       },JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`,'utf8')));
       const settings=fs.readFileSync('ui/js/pages/settings.js','utf8');
@@ -61,6 +61,9 @@ const {chromium} = require('playwright');
       await page.locator('[data-db-action=dump]').click();
       await page.waitForFunction(()=>document.getElementById('db-result').textContent.includes('Borg')===false && document.getElementById('db-cancel').disabled);
       assert.equal(actions,2);
+      assert.ok((await page.locator('#db-runs').textContent()).includes('MariaDB Apps'));
+      assert.ok((await page.locator('#db-runs').textContent()).includes('5700000000'));
+      assert.equal(await page.locator('#db-runs time').getAttribute('datetime'),'2026-10-24T09:35:10Z');
       await page.locator('#db-name').fill('unsaved');
       await page.locator('[data-db-action=dump]').click();assert.equal(actions,2);
       await page.evaluate(()=>wizardLoadDatabases(1));

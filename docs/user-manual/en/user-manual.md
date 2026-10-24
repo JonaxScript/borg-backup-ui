@@ -2040,7 +2040,11 @@ external Docker administrator can still stop a container; that fails the export.
 MariaDB exports use a transaction and include routines, events, triggers and SQL
 for database creation. Non-InnoDB base tables are rejected; avoid concurrent
 schema changes. Server accounts/global grants are excluded. PostgreSQL exports
-use uncompressed custom format; Borg applies job compression. Optional global
+use custom format. All new local exports are gzip-compressed while streaming
+(level 6): `.sql.gz` for MariaDB, `.dump.gz` for PostgreSQL, and `globals.sql.gz`.
+No second full uncompressed dump is written. Streaming uses bounded memory;
+compression takes CPU time and its ratio depends on content. Borg still applies
+job compression; precompressed data can reduce deduplication between runs. Optional global
 roles/tablespaces are exported separately, without password hashes. Databases
 and globals do not share a cluster-wide atomic snapshot.
 
@@ -2051,8 +2055,14 @@ only after the dump does not establish a common recovery point. Arrange recovery
 in Post with the appropriate error/cancellation policy.
 
 Completed artifacts include a manifest with tool versions, container identity,
-selected scope, sizes and SHA-256 hashes. Paths inside Borg use the
-`bbui-<run-id>/` directory recorded as `archive_directory` in the manifest.
+selected scope, compressed/uncompressed sizes and SHA-256 hashes of compressed
+files. New run folders contain a safe profile-name slug, server-local start time
+with timezone offset and a unique suffix, for example
+`bbui-mariadb-apps-2026-10-24_11-35-10+0200-<id>/`. The manifest preserves the
+original profile name and ID. The overview displays profile, date and both sizes.
+Existing uncompressed dumps and UUID-only directories remain readable and
+removable without changes. Paths inside Borg use the same folder name, recorded
+as `archive_directory` in the manifest.
 Older test archives use the original staging path without its leading slash. The job reads each required artifact back
 from the new archive and checks its bytes. Excluded/missing/corrupt output fails
 verification; completed local files remain. The manifest inside the archive
@@ -2089,6 +2099,11 @@ and run connection checks after restoring configuration.
 Extract the chosen run's manifest and dumps through Browse & Restore into a
 separate directory. Verify the manifest hashes. Use a fresh, isolated container
 and matching client/server versions. Never test by overwriting production.
+
+Check new `.gz` files first (`gzip -t database.sql.gz`), then decompress in the
+isolated restore environment (`gzip -dk database.sql.gz`; likewise for `.dump.gz`
+and `globals.sql.gz`). Allow space for this working copy. Existing uncompressed
+dumps do not need this step.
 
 MariaDB: provision required database accounts/grants, then import the SQL with
 `mariadb --defaults-file=/protected/restore.cnf < database.sql`. It contains

@@ -16,7 +16,7 @@ const {chromium}=require('playwright');
   let saved=[],writes=0;
   await page.route('http://bbui.test/**',async route=>{
    const request=route.request(),url=new URL(request.url());let body={};
-   if(url.pathname==='/'){await route.fulfill({contentType:'text/html',body:'<main id="page-settings" style="max-width:1200px;margin:24px auto"><div id="settings-scripts-panel"></div></main>'});return;}
+   if(url.pathname==='/'){await route.fulfill({contentType:'text/html',body:'<main id="page-settings" style="max-width:1200px;margin:24px auto"><div class="settings-tab-panel" id="settings-scripts-panel"></div></main>'});return;}
    if(url.pathname.endsWith('/catalog'))body={entries:sources.map(({content,...row})=>row)};
    else if(url.pathname.endsWith('/source'))body={script:sources.find(row=>row.id===url.searchParams.get('id'))};
    else if(url.pathname==='/api/settings/scripts'){
@@ -63,6 +63,10 @@ const {chromium}=require('playwright');
   await page.locator('[data-script-kind=template]').click();
   await page.locator('[data-source-id="template:source"]').click();
   await page.waitForSelector('#script-template-use');
+  assert.equal(await page.locator('.script-library-source .settings-section').count(),2);
+  assert.ok((await page.locator('.script-library-details').textContent()).includes('MOUNT_PATH'));
+  assert.equal(await page.locator('.script-library-details dt').count(),3);
+  assert.notEqual(await page.locator('.script-library-source .settings-section-header').first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
   if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/script-templates-${language}.png`,fullPage:true});
   await page.evaluate(()=>window.approveDiscard=false);
   await page.locator('#script-template-use').click();assert.equal(writes,0);

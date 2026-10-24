@@ -2,6 +2,14 @@
 /** Administrator source browser: templates create drafts; managed files have no write action. */
 function scriptLibraryT(key, params = {}) { return settingsT(`scripts.library.${key}`, params); }
 
+/** Resolve documented shipped sources by filename; never treat server text as HTML. */
+function scriptLibraryDetail(script, field) {
+  const key = {'database-dump-mariadb.sh':'mariadb', 'database-dump-postgresql.sh':'postgresql',
+    'pre-check-source.sh':'source', 'pre-check-free-space.sh':'space', 'pre-wake-server.sh':'wake',
+    'pre-dump-mariadb.sh':'mariaTemplate', 'pre-dump-postgresql.sh':'pgTemplate', 'post-json-webhook.sh':'webhook'}[script.name];
+  return key ? scriptLibraryT(`details.${key}.${field}`) : (field === 'title' ? script.name : '');
+}
+
 /** Render ownership navigation and a separate, initially empty source browser. */
 function renderScriptLibraryChrome() {
   return `<nav class="script-library-nav" aria-label="${escHtml(scriptLibraryT('navigation'))}">${['own','template','managed'].map(kind => `<button type="button" class="btn ${kind === 'own' ? 'btn-primary' : 'btn-secondary'}" data-script-kind="${kind}" aria-pressed="${kind === 'own'}">${escHtml(scriptLibraryT(kind))}</button>`).join('')}</nav>
@@ -36,6 +44,7 @@ async function showScriptLibrary(kind) {
     button.classList.toggle('btn-primary', selected); button.classList.toggle('btn-secondary', !selected);
   });
   if (kind === 'own') return;
+  panel.dataset.libraryKind = kind;
   panel.innerHTML = `<p role="status">${escHtml(settingsT('scripts.loading'))}</p>`;
   try {
     const entries = settingsState.scriptCatalog || (await scriptLibraryRequest('catalog')).entries;
@@ -53,7 +62,7 @@ async function showScriptLibrary(kind) {
       const search = document.getElementById('script-library-filter').value.toLowerCase();
       const filtered = rows.filter(row => `${row.name} ${row.path}`.toLowerCase().includes(search));
       const list = document.getElementById('script-library-files');
-      list.innerHTML = filtered.map(row => `<button type="button" class="script-library-file" data-source-id="${escHtml(row.id)}"><strong>${escHtml(row.name)}</strong><small>${escHtml(row.path)}</small></button>`).join('') || `<p class="form-help">${escHtml(scriptLibraryT('empty'))}</p>`;
+      list.innerHTML = filtered.map(row => `<button type="button" class="script-library-file" data-source-id="${escHtml(row.id)}"><strong>${escHtml(scriptLibraryDetail(row, 'title'))}</strong><small>${escHtml(row.name)}</small></button>`).join('') || `<p class="form-help">${escHtml(scriptLibraryT('empty'))}</p>`;
       list.querySelectorAll('[data-source-id]').forEach(button => button.addEventListener('click', () => loadScriptLibrarySource(button.dataset.sourceId)));
     };
     document.getElementById('script-library-filter').addEventListener('input', renderFiles);
@@ -71,11 +80,15 @@ async function loadScriptLibrarySource(id) {
   try {
     const {script} = await scriptLibraryRequest(`source?id=${encodeURIComponent(id)}`);
     if (!panel.isConnected || request !== settingsState.scriptLibraryRequest) return;
-    const purpose = {'database-dump-mariadb.sh':'mariadb', 'database-dump-postgresql.sh':'postgresql'}[script.name];
-    panel.innerHTML = `<div class="script-library-source-heading"><div><h4>${escHtml(script.name)}</h4><p class="form-help">${escHtml(purpose ? scriptLibraryT(purpose) : scriptLibraryT('templatePurpose'))}</p></div><span class="badge">${escHtml(scriptLibraryT(script.kind === 'template' ? 'copyEditable' : 'pluginOwned'))}</span></div>
-      <div class="script-library-source-meta"><code>${escHtml(script.path)}</code><span>Bash / Shell · ${escHtml(scriptLibraryT('lines', {count:script.content.split('\n').length}))}</span></div>
-      ${script.kind === 'template' ? `<button type="button" class="btn btn-primary" id="script-template-use">${escHtml(scriptLibraryT('use'))}</button>` : ''}
-      <div class="script-source-code"><div class="script-source-lines" aria-hidden="true"></div><pre tabindex="0" aria-label="${escHtml(scriptLibraryT('source'))}"><code></code></pre></div>`;
+    panel.innerHTML = settingsCard(escHtml(scriptLibraryDetail(script, 'title')), settingsMenuIcon(script.kind === 'template' ? 'advanced' : 'backup'), `
+      <div class="settings-body script-library-description">
+        <span class="script-library-ownership badge">${escHtml(scriptLibraryT(script.kind === 'template' ? 'copyEditable' : 'pluginOwned'))}</span>
+        <p class="script-library-purpose">${escHtml(scriptLibraryDetail(script, 'purpose'))}</p>
+        <dl class="script-library-details">${['prerequisites','configuration','behavior'].map(field => `<div><dt>${escHtml(scriptLibraryT(field))}</dt><dd>${escHtml(scriptLibraryDetail(script, field))}</dd></div>`).join('')}</dl>
+        ${script.kind === 'template' ? `<button type="button" class="btn btn-primary" id="script-template-use">${escHtml(scriptLibraryT('use'))}</button>` : ''}
+      </div>`) + settingsCard(escHtml(scriptLibraryT('codeTitle')), settingsMenuIcon('advanced'), `
+      <div class="settings-body script-library-code-body"><div class="script-library-source-meta"><code>${escHtml(script.path)}</code><span>Bash / Shell · ${escHtml(scriptLibraryT('lines', {count:script.content.split('\n').length}))}</span></div>
+      <div class="script-source-code"><div class="script-source-lines" aria-hidden="true"></div><pre tabindex="0" aria-label="${escHtml(scriptLibraryT('source'))}"><code></code></pre></div></div>`);
     // Select the source code explicitly: metadata also contains a code element.
     const source = panel.querySelector('pre code');
     const grammar = window.Prism?.languages?.[script.language];
@@ -87,7 +100,7 @@ async function loadScriptLibrarySource(id) {
     panel.querySelector('#script-template-use')?.addEventListener('click', async () => {
       if (settingsState.scriptDirty && !await _openSettingsDialog({title:settingsT('forms.unsavedTitle'), message:settingsT('forms.leaveUnsavedMessage'), confirmText:settingsT('forms.leave'), confirmClass:'btn-danger'})) return;
       if (!panel.isConnected || request !== settingsState.scriptLibraryRequest) return;
-      renderSettingsScriptEditor('', {name:uniqueSettingsScriptName(script.name.replace(/\.sh$/, '')), description:'', content:script.content, timeout_seconds:script.timeout_seconds});
+      renderSettingsScriptEditor('', {name:uniqueSettingsScriptName(script.name.replace(/\.sh$/, '')), description:scriptLibraryDetail(script, 'purpose'), content:script.content, timeout_seconds:script.timeout_seconds});
       showMsg('settings-script-result', 'success', scriptLibraryT('draft'));
       document.getElementById('settings-script-name').focus();
     });
