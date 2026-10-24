@@ -324,6 +324,9 @@
     document.getElementById('wiz-source-path-input')?.addEventListener('input', wizardSourcePathInputChanged);
     document.getElementById('wiz-source-path-input')?.addEventListener('keydown', wizardSourcePathKeydown);
     document.getElementById('wiz-source-path-list')?.addEventListener('click', wizardSourcePathsClick);
+    document.getElementById('wiz-source-tabs')?.addEventListener('click', wizardSourceTabEvent);
+    document.getElementById('wiz-source-tabs')?.addEventListener('keydown', wizardSourceTabEvent);
+    document.getElementById('wiz-databases')?.addEventListener('change', wizardUpdateDatabaseCount);
     document.getElementById('wiz-source-path-suggest')?.addEventListener('click', wizardSourcePathsClick);
     document.getElementById('wiz-exclude-path-input')?.addEventListener('input', wizardExcludePathInputChanged);
     document.getElementById('wiz-exclude-path-input')?.addEventListener('keydown', wizardExcludePathKeydown);

@@ -127,24 +127,24 @@ def test_wizard_source_paths_are_explained_for_normal_users() -> None:
     assert 'data-i18n="wizard.exclusionsSection"' in html
     assert 'data-i18n="wizard.exclusionsSectionHint"' in html
     assert ".wizard-exclusions-layout" in css
-    assert '"sourcesSection": "Zu sichernde Ordner"' in german
-    assert '"sourcesSectionHint": "Festlegen, welche Verzeichnisse gesichert werden sollen."' in german
+    assert '"sourcesSection": "Backup-Quellen"' in german
+    assert '"sourcesSectionHint": "Ordner, Datenbankprofile oder beides auswählen."' in german
     assert '"sourcePaths": "Auswahl"' in german
     assert '"exclusionsSection": "Ausschlüsse"' in german
     assert '"exclusionsSectionHint": "Festlegen, welche Unterverzeichnisse oder Dateien nicht gesichert werden sollen."' in german
     assert '"excludePaths": "Nicht sichern"' in german
     assert '"noSourcePaths": "Noch keine zu sichernden Ordner hinzugefügt."' in german
     assert '"validationSource": "Bitte mindestens einen Ordner oder eine Datei auswählen, die gesichert werden soll."' in german
-    assert '"sourcesSection": "Folders to back up"' in english
+    assert '"sourcesSection": "Backup sources"' in english
     assert '"sourcePaths": "Selection"' in english
     assert '"exclusionsSection": "Exclusions"' in english
     assert "Quellen sind die Ordner oder Dateien" in help_de
     assert "Lesbarkeit der ausgewählten Ordner oder Dateien" in help_de
     assert "Sources are the folders or files" in help_en
     assert "readability of the selected folders or files" in help_en
-    assert "**Zu sichernde Ordner**" in manual_de
+    assert "**Backup-Quellen**" in manual_de
     assert "Technisch werden sie als Quellpfade des Jobs gespeichert." in manual_de
-    assert "**Folders to back up**" in manual_en
+    assert "**Backup sources**" in manual_en
     assert "Technically, they are stored as the job's source paths." in manual_en
 
 

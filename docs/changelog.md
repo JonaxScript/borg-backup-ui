@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Use a compact script dropdown and full-width Description/Source code tabs. Preserve own drafts and ignore stale source responses. Split wizard folder/database profile selection into counted tabs with bounded scrollable lists and wrapped paths/profile details.
+
 - Match script card headings to neutral Settings/Prometheus styling and remove MariaDB/PostgreSQL hook templates from the allowlisted UI catalog. Keep both managed database helpers and existing user copies unchanged.
 
 - Add accented script description/source cards and specific bilingual prerequisites, configuration and failure behavior for all eight catalog entries. Name new dump directories after profile and server-local timestamp/offset. Stream native exports through bounded host-side gzip, record compressed/original sizes, and retain listing/cleanup compatibility with uncompressed UUID runs. Document decompression before restore.

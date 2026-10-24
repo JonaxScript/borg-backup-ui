@@ -307,7 +307,7 @@ Der **Job-Name** ist ein Anzeigename. Die **Job-ID** ist eine davon unabhängige
 
 ![Quellen und vorhandenes Ziel-Repository](../assets/de/current/wizard-sources.png)
 
-Die kompakte Ansicht zeigt links **Zu sichernde Ordner** und rechts das **Backup-Ziel**. Links legen Sie fest, welche Ordner oder Dateien in das Backup aufgenommen werden. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
+Die kompakte Ansicht zeigt links **Backup-Quellen** und rechts das **Backup-Ziel**. Links wählen Sie in getrennten Reitern Ordner und Datenbankprofile aus. Beide Reiter zeigen die Anzahl ausgewählter Einträge; lange Listen scrollen innerhalb des Bereichs. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
 
 Typische Ordner, die gesichert werden:
 
@@ -2036,6 +2036,14 @@ Unter **Einstellungen > Skripte** sind drei Bereiche getrennt:
   Die Ausführung und Konfiguration erfolgen über Datenbankprofile. Interne
   Python-Bausteine, Startdienst, Restore-Test und Benachrichtigungsadapter sind
   kein Bestandteil dieser Ansicht.
+
+Vorlagen und verwaltete Skripte werden über eine Dropdown-Liste ausgewählt.
+Die Reiter **Beschreibung** und **Quelltext** teilen sich die volle Breite;
+die Auswahl und der aktive Reiter bleiben beim Wechsel erhalten.
+Im Job-Assistenten trennt **Quellen & Ziel** Ordner und Datenbankprofile in
+eigene Reiter mit Auswahlzähler. Lange Listen scrollen innerhalb des Bereichs;
+die Zähler nennen die ausgewählten Ordner bzw. Profile. Der Reiterwechsel
+ändert weder die Auswahl noch das Backup-Ziel.
 
 Das Feld **Docker-Container** bietet eine Auswahlliste der erkannten Container.
 

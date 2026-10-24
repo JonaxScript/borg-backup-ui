@@ -43,7 +43,10 @@ Manual test-channel acceptance on Unraid:
   helpers appear there. No export runs at install.
 - Open all four Templates, create an own draft, edit/save/assign the copy and verify
   the original is unchanged. Switching categories retains unsaved own edits.
-  Check neutral gray description/source card headings matching Prometheus, all six specific descriptions,
+  Check the script dropdown, Description/Source code tabs (including keyboard navigation),
+  neutral gray card headings matching Prometheus and all six specific descriptions.
+  In Sources & destination, test many folders/profiles, wrapped long names, selection
+  counts, retained unavailable profiles and reachable footer actions. Check
   light/dark themes, German/English, mobile layout and the container dropdown.
 - Check new run names include profile and server-local timestamp/offset. Verify
   gzip files restore correctly, both sizes display correctly and existing

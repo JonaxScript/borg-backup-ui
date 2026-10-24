@@ -967,8 +967,8 @@
     "noVms": "Keine VMs gefunden.",
     "sourcePaths": "Auswahl",
     "sourcePathsHint": "(ab /mnt: ↑/↓ auswählen, → Verzeichnis öffnen, Enter übernehmen)",
-    "sourcesSection": "Zu sichernde Ordner",
-    "sourcesSectionHint": "Festlegen, welche Verzeichnisse gesichert werden sollen.",
+    "sourcesSection": "Backup-Quellen",
+    "sourcesSectionHint": "Ordner, Datenbankprofile oder beides auswählen.",
     "exclusionsSection": "Ausschlüsse",
     "exclusionsSectionHint": "Festlegen, welche Unterverzeichnisse oder Dateien nicht gesichert werden sollen.",
     "targetSection": "Backup-Ziel",
@@ -1256,7 +1256,9 @@
     "postAlways": "Auch bei Fehler, Überspringen oder Abbruch",
     "scriptsManage": "Skripte unter Einstellungen → Skripte anlegen und bearbeiten.",
     "scriptsLoadError": "Skripte konnten nicht geladen werden. Wizard erneut öffnen.",
-    "scriptMissing": "Skript fehlt – neu auswählen"
+    "scriptMissing": "Skript fehlt – neu auswählen",
+    "sourceFolders": "Ordner",
+    "sourceDatabases": "Datenbankprofile"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -3391,8 +3393,6 @@
         "managed": "Von Borg Backup UI verwaltet",
         "templateHelp": "Vorlage ansehen und als eigenes Skript übernehmen. Deine Kopie lässt sich bearbeiten und bleibt bei Plugin-Updates erhalten. Erst nach Speichern und Zuweisen läuft sie in einem Job.",
         "managedHelp": "Diese Dateien gehören zu den Plugin-Funktionen und werden von Borg Backup UI gepflegt. Hier siehst du ihren Quelltext schreibgeschützt. Plugin-Updates können diese Dateien ersetzen.",
-        "search": "Datei suchen",
-        "choose": "Wähle links eine Datei, um Zweck und Quelltext anzusehen.",
         "empty": "Keine passenden Dateien.",
         "copyEditable": "Als eigene Kopie bearbeitbar",
         "pluginOwned": "Borg Backup UI · Schreibgeschützt",
@@ -3451,7 +3451,11 @@
         "configuration": "Einrichtung",
         "behavior": "Ablauf und Fehlerverhalten",
         "description": "Beschreibung",
-        "codeTitle": "Skript"
+        "codeTitle": "Quelltext",
+        "selectTemplate": "Vorlage",
+        "selectManaged": "Verwaltetes Skript",
+        "detailNavigation": "Skriptdetails",
+        "descriptionTitle": "Beschreibung"
       }
     },
     "databases": {

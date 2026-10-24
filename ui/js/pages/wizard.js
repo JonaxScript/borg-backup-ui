@@ -609,6 +609,7 @@ function openWizard(existingJobKey = '') {
   document.getElementById('wiz-source-path-input').value = '';
   wizardCancelSourceSuggestRequest();
   wizardState.sourcePaths = [];
+  wizardShowSourceTab('folders');
   wizardState.sourceSuggest = [];
   wizardState.sourceSuggestIndex = -1;
   wizardRenderSourcePaths();
@@ -1006,6 +1007,8 @@ function wizardRenderSourcePaths() {
   const list = document.getElementById('wiz-source-path-list');
   if (!list) return;
   const items = wizardState.sourcePaths || [];
+  const count = document.getElementById('wiz-source-folder-count');
+  if (count) count.textContent = String(items.length);
   if (!items.length) {
     list.innerHTML = `<div class="form-hint">${wizardT('wizard.noSourcePaths')}</div>`;
     return;
@@ -1016,6 +1019,34 @@ function wizardRenderSourcePaths() {
       <button type="button" class="wizard-path-chip-del" data-wiz-src-del="${idx}" title="${wizardT('wizard.removeSource')}" aria-label="${wizardT('wizard.removeSource')}">×</button>
     </div>
   `).join('');
+}
+
+/** Switch source panels without changing selected paths/profiles or the target configuration. */
+function wizardShowSourceTab(view) {
+  if (!['folders','databases'].includes(view)) return;
+  document.querySelectorAll('[data-source-tab]').forEach(button => {
+    const selected = button.dataset.sourceTab === view;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    document.getElementById(button.getAttribute('aria-controls'))?.classList.toggle('hidden', !selected);
+  });
+  if (view !== 'folders') wizardHideSourceSuggest();
+}
+
+/** Handle native tab clicks and arrow/Home/End navigation within the source tab list. */
+function wizardSourceTabEvent(event) {
+  const button = event.target.closest('[data-source-tab]');
+  if (!button) return;
+  const tabs = [...document.querySelectorAll('[data-source-tab]')];
+  let target = button;
+  if (event.type === 'keydown') {
+    const index = tabs.indexOf(button);
+    const next = {ArrowRight:(index + 1) % tabs.length, ArrowLeft:(index + tabs.length - 1) % tabs.length, Home:0, End:tabs.length - 1}[event.key];
+    if (next === undefined) return;
+    event.preventDefault(); target = tabs[next];
+  }
+  wizardShowSourceTab(target.dataset.sourceTab);
+  target.focus();
 }
 
 function wizardRenderExcludePaths() {

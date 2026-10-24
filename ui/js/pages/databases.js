@@ -221,9 +221,17 @@ async function wizardLoadDatabases(request) {
     wizardApplyDatabases([]);
   } catch (_) { if (request === wizardState.jobIdRequest) { wizardState.databasesLoaded = false; _wizardShowError(2, dbT('loadError')); } }
 }
+/** Render all available and missing selected profiles without changing the requested selection. */
 function wizardApplyDatabases(selected) {
   const node = document.getElementById('wiz-databases'); if (!node) return;
   const rows = [...(wizardState.databaseProfiles || [])];
   for (const id of selected) if (!rows.some(p => p.id === id)) rows.push({id,name:dbT('missing'),databases:[]});
-  node.innerHTML = rows.map(p => `<label class="form-label"><input type="checkbox" value="${escHtml(p.id)}" ${selected.includes(p.id) ? 'checked' : ''}> ${escHtml(p.name)} · ${escHtml(p.engine || '')}: ${escHtml(p.databases.join(', '))}${p.enabled ? '' : ' ('+escHtml(dbT('missing'))+')'}${p.include_globals ? ' · '+escHtml(dbT('globals')) : ''}</label>`).join('') || `<p>${escHtml(dbT('noProfiles'))}</p>`;
+  node.innerHTML = rows.map(p => `<label class="wizard-database-choice"><input type="checkbox" value="${escHtml(p.id)}" ${selected.includes(p.id) ? 'checked' : ''}><span><strong>${escHtml(p.name)}${p.enabled ? '' : ' ('+escHtml(dbT('missing'))+')'}</strong><small>${escHtml(p.engine || '')}${p.databases.length ? ' · '+escHtml(p.databases.join(', ')) : ''}${p.include_globals ? ' · '+escHtml(dbT('globals')) : ''}</small></span></label>`).join('') || `<p>${escHtml(dbT('noProfiles'))}</p>`;
+  wizardUpdateDatabaseCount();
+}
+
+/** Update the selected-profile count, including unavailable profiles retained for explicit correction. */
+function wizardUpdateDatabaseCount() {
+  const count = document.getElementById('wiz-source-database-count');
+  if (count) count.textContent = String(document.querySelectorAll('#wiz-databases input:checked').length);
 }

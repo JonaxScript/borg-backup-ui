@@ -299,7 +299,7 @@ The **Job name** is a display name. The **Job ID** is an independent, immutable 
 
 ![Sources and target repository](../assets/en/current/wizard-sources.png)
 
-The compact view shows **Folders to back up** on the left and the **Backup target** on the right. The left side defines which folders or files are included in the backup. Exclusions are configured in the next step. The right side selects storage type, the exact storage target, an existing repository, and job compression. The repository list only shows repositories belonging to the selected storage target. Repository paths are no longer entered freely in a job.
+The compact view shows **Backup sources** on the left and the **Backup target** on the right. The left side provides separate folder and database profile tabs with selected-item counts and scrollable lists. Exclusions are configured in the next step. The right side selects storage type, the exact storage target, an existing repository, and job compression. The repository list only shows repositories belonging to the selected storage target. Repository paths are no longer entered freely in a job.
 
 Typical folders to back up:
 
@@ -1998,6 +1998,13 @@ managed Secrets. Existing external files are preserved and are not exported.
   syntax highlighting, documentation and an update notice. Database profiles
   control their configuration and execution. Internal Python modules, startup
   service, restore test and notification adapter are outside this view.
+
+Select templates and managed scripts from a dropdown. **Description** and
+**Source code** tabs share the full available width and retain the chosen view.
+In the job wizard, **Sources & destination** separates folders and database
+profiles into tabs with selected-item counts. Long lists scroll within their
+panel; counts refer to selected folders or profiles. Switching tabs preserves
+both selections and the backup destination.
 
 The **Docker container** field offers a dropdown of discovered containers.
 

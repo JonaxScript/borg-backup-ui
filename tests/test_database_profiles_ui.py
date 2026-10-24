@@ -13,3 +13,5 @@ def test_database_profiles_browser():
     if available.returncode:
         pytest.skip('Playwright and Chromium are required for the database settings browser test')
     subprocess.run(['node','tests/database_profiles_ui.cjs'], cwd=Path(__file__).resolve().parents[1], check=True)
+
+    subprocess.run(['node','tests/wizard_sources_ui.cjs'], cwd=Path(__file__).resolve().parents[1], check=True)

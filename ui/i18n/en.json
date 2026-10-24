@@ -967,8 +967,8 @@
     "noVms": "No VMs found.",
     "sourcePaths": "Selection",
     "sourcePathsHint": "(from /mnt: ↑/↓ select, → open directory, Enter to add)",
-    "sourcesSection": "Folders to back up",
-    "sourcesSectionHint": "Choose which directories are backed up.",
+    "sourcesSection": "Backup sources",
+    "sourcesSectionHint": "Select folders, database profiles or both.",
     "exclusionsSection": "Exclusions",
     "exclusionsSectionHint": "Choose which child directories or files are not backed up.",
     "targetSection": "Backup target",
@@ -1256,7 +1256,9 @@
     "postAlways": "Also on failure, skip or cancellation",
     "scriptsManage": "Create and edit scripts under Settings → Scripts.",
     "scriptsLoadError": "Scripts could not be loaded. Reopen the wizard.",
-    "scriptMissing": "Missing script – select again"
+    "scriptMissing": "Missing script – select again",
+    "sourceFolders": "Folders",
+    "sourceDatabases": "Database profiles"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -3391,8 +3393,6 @@
         "managed": "Managed by Borg Backup UI",
         "templateHelp": "Inspect a template and create your own script from it. Your copy is editable and survives plugin updates. It runs in a job only after saving and assignment.",
         "managedHelp": "These files implement plugin features and are maintained by Borg Backup UI. Their source is available here read-only. Plugin updates may replace these files.",
-        "search": "Find a file",
-        "choose": "Select a file on the left to inspect its purpose and source.",
         "empty": "No matching files.",
         "copyEditable": "Editable as your own copy",
         "pluginOwned": "Borg Backup UI · Read-only",
@@ -3451,7 +3451,11 @@
         "configuration": "Configuration",
         "behavior": "Behavior and failures",
         "description": "Description",
-        "codeTitle": "Script"
+        "codeTitle": "Source code",
+        "selectTemplate": "Template",
+        "selectManaged": "Managed script",
+        "detailNavigation": "Script details",
+        "descriptionTitle": "Description"
       }
     },
     "databases": {

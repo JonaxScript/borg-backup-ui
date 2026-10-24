@@ -1601,11 +1601,15 @@
         <div class="wizard-step2-layout">
           <section class="wizard-step2-panel" aria-labelledby="wizard-step2-sources-title">
             <header class="wizard-step2-panel-header">
-              <strong id="wizard-step2-sources-title" data-i18n="wizard.sourcesSection">Zu sichernde Ordner</strong>
-              <span data-i18n="wizard.sourcesSectionHint">Festlegen, welche Verzeichnisse gesichert werden sollen.</span>
+              <strong id="wizard-step2-sources-title" data-i18n="wizard.sourcesSection">Backup-Quellen</strong>
+              <span data-i18n="wizard.sourcesSectionHint">Ordner, Datenbankprofile oder beides auswählen.</span>
             </header>
-            <div class="form-group wizard-source-fields">
-              <label class="form-label form-label-required"><span class="form-required-marker" aria-hidden="true">*</span><span data-i18n="wizard.sourcePaths">Auswahl</span> <span class="form-hint" data-i18n="wizard.sourcePathsHint">(ab /mnt: ↑/↓ auswählen, → Verzeichnis öffnen, Enter übernehmen)</span></label>
+            <div id="wiz-source-tabs" class="wizard-source-tabs" role="tablist" aria-label="Backup sources" data-i18n-aria-label="wizard.sourcesSection">
+              <button type="button" id="wiz-source-tab-folders" role="tab" aria-controls="wiz-source-panel-folders" aria-selected="true" data-source-tab="folders"><span data-i18n="wizard.sourceFolders">Ordner</span> <span id="wiz-source-folder-count">0</span></button>
+              <button type="button" id="wiz-source-tab-databases" role="tab" aria-controls="wiz-source-panel-databases" aria-selected="false" tabindex="-1" data-source-tab="databases"><span data-i18n="wizard.sourceDatabases">Datenbankprofile</span> <span id="wiz-source-database-count">0</span></button>
+            </div>
+            <div id="wiz-source-panel-folders" role="tabpanel" aria-labelledby="wiz-source-tab-folders" class="form-group wizard-source-fields">
+              <label class="form-label" for="wiz-source-path-input"><span data-i18n="wizard.sourcePaths">Auswahl</span> <span class="form-hint" data-i18n="wizard.sourcePathsHint">(ab /mnt: ↑/↓ auswählen, → Verzeichnis öffnen, Enter übernehmen)</span></label>
               <div class="wizard-path-control">
                 <input class="form-input mono" type="text" id="wiz-source-path-input" placeholder="/mnt/user/...">
                 <div id="wiz-source-path-suggest" class="wizard-path-suggest hidden"></div>
@@ -1613,7 +1617,8 @@
               <div id="wiz-source-path-list" class="wizard-path-list wizard-step2-path-list"></div>
               <textarea class="form-input path-list-input hidden" id="wiz-source-paths" rows="4"
                 placeholder="/mnt/user/data/&#10;/mnt/user/documents/"></textarea>
-              <h3 data-i18n="database.title">Datenbank-Sicherungen</h3>
+            </div>
+            <div id="wiz-source-panel-databases" role="tabpanel" aria-labelledby="wiz-source-tab-databases" class="wizard-source-fields hidden">
               <p class="form-help" data-i18n="database.wizardHint"></p>
               <div id="wiz-databases"></div>
             </div>
