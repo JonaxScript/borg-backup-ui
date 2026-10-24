@@ -878,7 +878,8 @@ def _secrets_dir() -> Path:
 def _valid_secret_backup_name(name: str) -> bool:
     value = str(name or "")
     import re
-    if re.fullmatch(r'\.database-[a-f0-9]{32}\.json', value):
+    from database_profiles import NAMED_CREDENTIAL
+    if re.fullmatch(r'(?:\.database-[a-f0-9]{32}|' + NAMED_CREDENTIAL + r')\.json', value):
         return True
     if value.startswith((".borg-passphrase-", ".smb-", ".ntfy-")) and "/" not in value:
         return True
@@ -1229,6 +1230,7 @@ def export_secrets_backup(password: str) -> dict:
         raise ValueError("Password must contain at least 8 characters")
     files = []
     candidates = list(_secrets_dir().glob(".*"))
+    candidates.extend(_secrets_dir().glob("database-*.json"))
     candidates.extend(sorted((_secrets_dir() / "borg-keys").glob("*")))
     for p in sorted(candidates):
         if not p.is_file():

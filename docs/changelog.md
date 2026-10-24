@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Remove UUID suffixes from new dump directories and database-job archive names; fail on collisions without overwriting existing data. Retain legacy directory recognition and archive selection. Use readable versioned secret filenames with profile/connection metadata; show the current file in Settings and include both formats in encrypted Secrets transfer. Add resumable startup migration database_secret_names_v1 with profile snapshots and secret-free audit events, preserving original secrets for old configuration exports.
+
 - Remove the six-step workflow wrap limit and responsive row breaks. Keep a continuous, keyboard-focusable horizontal timeline with readable minimum step widths and local overflow on narrow cards.
 
 - Include database_backup in the job workflow and active-phase fallback so exports appear before Docker shutdown, with live duration and persisted outcomes. Match template/managed selector cards and detail tabs to the Own scripts content surface. Cover active/final database states, hook visibility and browser theme consistency.

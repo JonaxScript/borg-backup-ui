@@ -1973,12 +1973,31 @@ Server/client major versions must match (major.minor for MariaDB). Validated
 images for this implementation are `mariadb:11.4` and `postgres:16`; other images
 must meet these prerequisites and require their own restore test.
 
-Credentials are saved as private `secrets/.database-<id>.json` files below the
-plugin data root. Password fields are write-only: leave an existing password
-blank to keep it. Each password change creates a new credential reference, so
-running jobs keep their original snapshot. Previous credential versions remain
-for active snapshots and recovery. Include them in the explicit encrypted
-**Secrets backup**; ordinary configuration exports contain references only.
+Credentials are saved privately under `secrets/`, for example as
+`database-mariadb-backup-v001.json`. The filename contains a safe profile-name
+slug and version number. Alongside the password, the file records profile ID/name,
+database engine, container, database user and creation time. The profile shows
+its current filename; passwords are never populated in the UI. Leave the password
+blank to retain it.
+
+Changing the password, profile name, container, engine or database user creates a
+new immutable file. Identical slugs share a version sequence without replacing
+existing files. Previous versions remain for active snapshots and recovery.
+Include them in the separate encrypted **Secrets backup**; ordinary configuration
+exports contain references only.
+
+Startup migration `database_secret_names_v1` copies currently referenced UUID
+secrets into the readable format and updates profile references. Original
+`.database-<id>.json` files remain available for historical configuration exports
+and run snapshots. Unassociated old secrets are not guessed or renamed. The
+migration snapshots the original profiles under `config/migration-backups/`, logs
+actions without passwords and is visible under **System health & migration**.
+Failures block normal operation through the central migration runner until a
+successful restart.
+
+Manual dump imports require credentials for the destination server; the original
+backup password is not mandatory. Secrets do not replace database account/grant
+backups.
 
 No container file or bind mount needs to be configured for new profiles. The
 plugin transfers credentials over Docker stdin into an owned temporary file in
@@ -2069,11 +2088,15 @@ in Post with the appropriate error/cancellation policy.
 Completed artifacts include a manifest with tool versions, container identity,
 selected scope, compressed/uncompressed sizes and SHA-256 hashes of compressed
 files. New run folders contain a safe profile-name slug, server-local start time
-with timezone offset and a unique suffix, for example
-`bbui-mariadb-apps-2026-10-24_11-35-10+0200-<id>/`. The manifest preserves the
+with timezone offset and no UUID, for example
+`bbui-mariadb-apps-2026-10-24_11-35-10+0200/`. The manifest preserves the
 original profile name and ID. The overview displays profile, date and both sizes.
 Existing uncompressed dumps and UUID-only directories remain readable and
-removable without changes. Paths inside Borg use the same folder name, recorded
+removable without changes, including profile/time/UUID directories. An existing
+dump directory for the same profile slug and timestamp causes an error without
+overwriting data. New database-job archives use `<prefix>-YYYY-MM-DD_HH-MM-SS`
+without a random suffix; Borg rejects an existing archive name. Existing archives
+with UUID suffixes remain selectable and restorable. Paths inside Borg use the same folder name, recorded
 as `archive_directory` in the manifest.
 Older test archives use the original staging path without its leading slash. The job reads each required artifact back
 from the new archive and checks its bytes. Excluded/missing/corrupt output fails

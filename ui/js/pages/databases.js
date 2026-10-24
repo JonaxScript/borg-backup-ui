@@ -52,6 +52,7 @@ function renderDatabaseSettings() {
       <div class="form-group">${input('database_user','text','required autocomplete="username"')}</div>
       <div class="form-group"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id ? 'passwordKeep' : 'passwordEnter'))}"></div>
       <p class="form-help">${escHtml(dbT('credentials'))}</p>
+      ${row.auth_mode === 'managed' && row.credential_id ? `<p class="form-help database-secret-file">${escHtml(dbT('secretFile'))}: <code>${escHtml('secrets/' + (/^[a-f0-9]{32}$/.test(row.credential_id) ? '.database-' : '') + row.credential_id + '.json')}</code></p>` : ''}
       ${row.auth_mode === 'container' ? `<p class="status-message info">${escHtml(dbT('legacyCredentials'))} <code>${escHtml(row.credential_file)}</code></p>` : ''}
       <details class="database-advanced"><summary>${escHtml(dbT('advancedConnection'))}</summary>
         <div class="form-group">${input('port','number','required min="1" max="65535"')}</div>

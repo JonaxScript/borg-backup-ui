@@ -50,11 +50,19 @@ Manual test-channel acceptance on Unraid:
   In Sources & destination, test many folders/profiles, wrapped long names, selection
   counts, retained unavailable profiles and reachable footer actions. Check
   light/dark themes, German/English, mobile layout and the container dropdown.
-- Check new run names include profile and server-local timestamp/offset. Verify
+- Check new run names contain profile and server-local timestamp/offset without a
+  UUID; database-job archives use the original prefix/date/time format. Existing
+  UUID-only and profile/time/UUID directories remain listable/removable. Duplicate
+  names must fail without modifying prior dumps/archives. Verify
   gzip files restore correctly, both sizes display correctly and existing
   uncompressed UUID runs remain listable/removable. Test disk-full/timeout/abort
   without publishing incomplete exports. Optional large-stream regression:
   `BBUI_COMPRESSION_TEST_MIB=5500 pytest -q tests/test_database_compression.py -k bounded_chunks`.
+- Upgrade UUID credentials: confirm migration database_secret_names_v1, profile
+  snapshots/audit entries without passwords, readable versioned files with profile,
+  container and user metadata, and retained old secrets. Recheck after interruption.
+  Verify encrypted Secrets export/import and old configuration reference recovery;
+  rotate credentials and rename profiles while preserving old snapshots.
 - Enter database users/passwords in Settings, load database lists, select scope
   and save. No manual container files/mounts are needed. Test Secrets export/import
   and credential rotation during a run. Check unavailable/wrong staging mounts.

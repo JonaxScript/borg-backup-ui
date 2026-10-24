@@ -162,10 +162,15 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         def borg(*args):
             return subprocess.check_output(['borg', *args], stderr=subprocess.PIPE, text=True, timeout=60)
         borg('init', '--encryption=none', repo)
-        borg('create', repo+'::test', *backup.borg_artifact_paths(results))
-        paths = borg('list', '--short', repo+'::test').splitlines()
+        archive = 'appdata-backup-2026-10-24_12-40-29'
+        borg('create', repo+'::'+archive, *backup.borg_artifact_paths(results))
+        before = borg('list', '--json', repo)
+        with pytest.raises(subprocess.CalledProcessError):
+            borg('create', repo+'::'+archive, *backup.borg_artifact_paths(results))
+        assert borg('list', '--json', repo) == before
+        paths = borg('list', '--short', repo+'::'+archive).splitlines()
         assert sorted(paths) == sorted(results[0]['archive_directory']+'/'+name for name in ['app.sql.gz','manifest.json'])
-        backup.verify_archive(repo, 'test', results)
+        backup.verify_archive(repo, archive, results)
         backup.write_manifest(results[0])
         backup.cleanup_run(results[0], profile, verified=True)
         assert not list(root.iterdir())

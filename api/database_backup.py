@@ -17,12 +17,11 @@ import subprocess
 import time
 import tempfile
 import uuid
-import unicodedata
 from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-from database_profiles import DatabaseError, data_root, read_password
+from database_profiles import DatabaseError, data_root, read_password, profile_slug
 from inventory_store import atomic_write_json
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'runtime' / 'scripts'
@@ -443,20 +442,15 @@ def _probe(config, profile, cid, database, cancelled, directory):
 
 
 def run_directory_name(profile_name, started_at):
-    """Return a path-safe profile slug, server-local timestamp/offset and unique suffix.
-
-    The bounded ASCII slug is descriptive only; profile_id remains authoritative.
-    started_at must be an ISO timestamp with timezone information.
-    """
-    ascii_name = unicodedata.normalize('NFKD', profile_name).encode('ascii', 'ignore').decode()
-    slug = re.sub(r'[^a-z0-9]+', '-', ascii_name.lower()).strip('-')[:60].rstrip('-') or 'profile'
+    """Return a safe profile slug and server-local timestamp/offset, without a UUID."""
     stamp = datetime.fromisoformat(started_at).astimezone().strftime('%Y-%m-%d_%H-%M-%S%z')
-    return f'bbui-{slug}-{stamp}-{uuid.uuid4().hex}'
+    return f'bbui-{profile_slug(profile_name)}-{stamp}'
 
 
 def is_run_directory_name(name):
-    """Accept current named runs and existing UUID-only directories for retained data."""
-    return bool(re.fullmatch(r'bbui-(?:[a-z0-9][a-z0-9-]{0,59}-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}[+-][0-9]{4}-)?[a-f0-9]{32}', name))
+    """Accept readable names and retained UUID-only or profile/time/UUID runs."""
+    stamp = r'[a-z0-9][a-z0-9-]{0,59}-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}[+-][0-9]{4}'
+    return bool(re.fullmatch(r'bbui-(?:' + stamp + r'(?:-[a-f0-9]{32})?|[a-f0-9]{32})', name))
 
 
 def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, progress=None, check_only=False, results=None):
@@ -477,7 +471,10 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
         started_at = utc_now()
         name = run_directory_name(profile['name'], started_at)
         with open_staging(profile) as fd:
-            os.mkdir(name, mode=0o700, dir_fd=fd)
+            try:
+                os.mkdir(name, mode=0o700, dir_fd=fd)
+            except FileExistsError:
+                raise DatabaseError('dump_exists') from None
             manifest = DumpResult(fd)
         directory = _descriptor_path(manifest._root_fd) / name
         manifest.update({'format_version': 1, 'helper_version': 1, 'job_id': job_id, 'run_id': run_id,

@@ -33,18 +33,20 @@ def test_compressed_export_metadata_and_original_bytes(config, profile, monkeypa
 
 
 @pytest.mark.parametrize('name', ['Photos & Apps', '../../escape', 'Übung 2026', '日本語', 'a'*100])
-def test_run_names_are_bounded_safe_and_unique(name):
+def test_run_names_are_bounded_safe_and_readable(name):
     stamp = '2026-10-24T10:15:30+02:00'
     first = backup.run_directory_name(name, stamp)
     assert backup.is_run_directory_name(first) and '/' not in first and '..' not in first
-    assert len(first) <= 124
-    assert first != backup.run_directory_name(name, stamp)
+    assert len(first) <= 91
+    assert first == backup.run_directory_name(name, stamp)
+    assert __import__("re").search(r"_[0-9]{2}-[0-9]{2}-[0-9]{2}[+-][0-9]{4}$", first)
     assert '2026-10-24_' in first
 
 
-def test_legacy_dump_listing_and_cleanup(config, profile, monkeypatch):
+@pytest.mark.parametrize("name", ["bbui-"+"a"*32, "bbui-db-2026-10-24_12-36-26+0200-"+"b"*32, "bbui-db-2026-10-24_12-36-26+0200"])
+def test_legacy_dump_listing_and_cleanup(config, profile, monkeypatch, name):
     fake_export(monkeypatch, profile)
-    directory = Path(profile['staging_dir']) / ('bbui-'+'a'*32)
+    directory = Path(profile['staging_dir']) / name
     directory.mkdir(mode=0o700)
     (directory/'app.sql').write_text('legacy dump')
     (directory/'manifest.json').write_text(json.dumps({'profile_id':profile['id'], 'engine':'mariadb',
@@ -110,3 +112,17 @@ def test_stream_failure_terminates_export_and_retains_failure(config, profile, t
     records=[json.loads(p.read_text()) for p in (Path(config['BACKUP_SCRIPTS_DIR'])/'database-operations').glob('*.json')]
     assert records and all(r['status']=='failed' for r in records)
     assert 'private disk error' not in json.dumps(records)
+
+
+def test_duplicate_dump_timestamp_preserves_existing_run(config, profile, monkeypatch):
+    fake_export(monkeypatch, profile)
+    monkeypatch.setattr(backup, 'utc_now', lambda: '2026-10-24T10:15:30+00:00')
+    first = backup.export_profiles(config, [profile], 'job', 'first')
+    directory = backup.result_directory(first[0])
+    before = {p.name:p.read_bytes() for p in directory.iterdir()}
+    try:
+        with pytest.raises(profiles.DatabaseError, match='dump_exists'):
+            backup.export_profiles(config, [profile], 'job', 'second')
+        assert {p.name:p.read_bytes() for p in directory.iterdir()} == before
+    finally:
+        backup.close_results(first)

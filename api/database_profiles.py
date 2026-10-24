@@ -6,8 +6,10 @@ import json
 import os
 import re
 import uuid
+import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
-from inventory_store import inventory_lock, read_inventory, atomic_write_inventory, atomic_write_bytes
+from inventory_store import inventory_lock, read_inventory, atomic_write_inventory
 
 
 class DatabaseError(ValueError):
@@ -30,11 +32,71 @@ def store_path(config):
     return data_root(config) / 'config' / 'database-profiles.json'
 
 
+LEGACY_CREDENTIAL = r'[a-f0-9]{32}'
+NAMED_CREDENTIAL = r'database-[a-z0-9][a-z0-9-]{0,59}-v[0-9]{3,9}'
+
+
+def profile_slug(name):
+    """Return a bounded descriptive ASCII slug; profile IDs remain authoritative."""
+    ascii_name = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode()
+    return re.sub(r'[^a-z0-9]+', '-', ascii_name.lower()).strip('-')[:60].rstrip('-') or 'profile'
+
+
 def secret_path(config, credential_id):
-    """Resolve an immutable managed credential reference inside the plugin Secrets directory."""
-    if not isinstance(credential_id, str) or not re.fullmatch(r'[a-f0-9]{32}', credential_id):
+    """Resolve a readable versioned reference or a retained legacy UUID secret."""
+    if not isinstance(credential_id, str):
         raise DatabaseError('credentials')
-    return data_root(config) / 'secrets' / ('.database-' + credential_id + '.json')
+    if re.fullmatch(LEGACY_CREDENTIAL, credential_id):
+        name = '.database-' + credential_id
+    elif re.fullmatch(NAMED_CREDENTIAL, credential_id):
+        name = credential_id
+    else:
+        raise DatabaseError('credentials')
+    return data_root(config) / 'secrets' / (name + '.json')
+
+
+def next_credential_id(config, profile, reserved=()):
+    """Choose an unused readable version under the caller's inventory lock.
+
+    Existing names, including dangling symlinks and other profiles with the same
+    slug, are never reused. Reserved references cover a multi-profile migration.
+    """
+    stem = 'database-' + profile_slug(profile['name']) + '-v'
+    for version in range(1, 1000000000):
+        candidate = f'{stem}{version:03d}'
+        if candidate not in reserved and not os.path.lexists(secret_path(config, candidate)):
+            return candidate
+    raise DatabaseError('credentials')
+
+
+def credential_payload(profile, password, created_at=None):
+    """Describe a secret's profile/connection snapshot without changing its password."""
+    return {'schema_version': 1, 'profile_id': profile['id'], 'profile_name': profile['name'],
+            'engine': profile['engine'], 'container': profile['container'],
+            'database_user': profile['database_user'], 'credential_id': profile['credential_id'],
+            'created_at': created_at or datetime.now(timezone.utc).isoformat(), 'password': password}
+
+
+def create_secret(config, reference, payload):
+    """Write a new private secret exclusively; never replace a file or symlink.
+
+    Callers publish its reference only after this function succeeds. An interrupted
+    write can leave an unreferenced file, whose version is never reused. This works
+    on flash filesystems that do not support hard links.
+    """
+    target = secret_path(config, reference)
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.write('\n')
+        handle.flush()
+        os.fsync(handle.fileno())
+    directory_fd = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def read_password(config, profile):
@@ -44,11 +106,16 @@ def read_password(config, profile):
         info = path.stat()
         if path.is_symlink() or info.st_uid != os.geteuid() or info.st_mode & 0o077:
             raise DatabaseError('credentials')
-        value = json.loads(path.read_text())['password']
+        payload = json.loads(path.read_text())
+        if re.fullmatch(NAMED_CREDENTIAL, profile.get('credential_id', '')) and (
+                payload.get('profile_id') != profile.get('id') or
+                payload.get('credential_id') != profile.get('credential_id')):
+            raise DatabaseError('credentials')
+        value = payload['password']
         if not isinstance(value, str) or len(value) > 4096 or any(c in value for c in '\x00\r\n'):
             raise DatabaseError('credentials')
         return value
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         raise DatabaseError('credentials') from None
 
 
@@ -74,7 +141,7 @@ def validate_profile(raw):
     if row['auth_mode'] == 'managed':
         row['credential_id'] = raw.get('credential_id', '')
         if row['credential_id']:
-            _text(row['credential_id'], r'[a-f0-9]{32}')
+            _text(row['credential_id'], f'(?:{LEGACY_CREDENTIAL}|{NAMED_CREDENTIAL})')
     for key, default in [('enabled', True), ('include_globals', False)]:
         row[key] = raw.get(key, default)
         if not isinstance(row[key], bool):
@@ -154,7 +221,8 @@ def snapshot_profiles(config, identifiers, *, allow_disabled=False, require_data
 def save_profile(config, raw):
     """Save a profile and optionally a new immutable secret; blank/omitted updates retain credentials.
 
-    Secrets never enter the inventory. Old secret versions remain available to
+    Passwords never enter the inventory. Profile/connection changes create a new
+    descriptive secret snapshot. Old secret versions remain available to
     running snapshots and the explicit encrypted Secrets backup.
     """
     if not isinstance(raw, dict):
@@ -173,9 +241,12 @@ def save_profile(config, raw):
                 raise DatabaseError('credentials')
             if not row['credential_id'] and password is None:
                 raise DatabaseError('credentials')
-            if password or not row['credential_id']:
-                row['credential_id'] = uuid.uuid4().hex
-                atomic_write_bytes(secret_path(config, row['credential_id']), json.dumps({'password': password}).encode(), mode=0o600)
+            identity_changed = any(old.get(key) != row.get(key) for key in ('name', 'engine', 'container', 'database_user'))
+            if password or not row['credential_id'] or identity_changed:
+                if not password and row['credential_id']:
+                    password = read_password(config, old)
+                row['credential_id'] = next_credential_id(config, row, {p.get('credential_id') for p in rows})
+                create_secret(config, row['credential_id'], credential_payload(row, password))
         rows = [r for r in rows if r['id'] != row['id']] + [row]
         atomic_write_inventory(store_path(config), {'schema_version': 1, 'profiles': rows})
     return {'profile': row}

@@ -134,6 +134,7 @@ _MIGRATION_UUID_BACKUP_NAME_RE = re.compile(
     r"^(?P<migration_id>[A-Za-z0-9_]+)-(?P<run_id>[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})$"
 )
 _SNAPSHOT_JOURNALS = {
+    "database_secret_names_v1": "database-secret-names-migration.json",
     "job_ids_v1": "job-id-migration.json",
     "job_settings_v1": "job-settings-migration.json",
 }

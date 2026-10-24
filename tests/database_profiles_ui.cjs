@@ -9,12 +9,13 @@ const {chromium} = require('playwright');
       const page = await browser.newPage({viewport:{width:1200,height:1000}});
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
       let profiles=[], actions=0, action='';
+      const credential=language==='de'?'b'.repeat(32):'database-'+'a'.repeat(60)+'-v001';
       await page.route('http://bbui.test/**', async route => {
         const req=route.request(),url=new URL(req.url());
         let body={};
         if (url.pathname==='/') {await route.fulfill({contentType:'text/html',body:'<main id="page-settings" style="max-width:850px;margin:20px auto"><div class="settings-tab-panel" data-settings-panel="databases"><div id="settings-databases-panel"></div></div><div id="wiz-databases"></div><div id="managed-preview"></div></main>'});return;}
         if (url.pathname==='/api/settings/databases') {
-          if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:'b'.repeat(32)};profiles=[row];body={profile:row};}
+          if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:credential};profiles=[row];body={profile:row};}
           else body={profiles};
         } else if(url.pathname.endsWith('/runs')) body={runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
         else if(url.pathname.endsWith('/action')) {actions++;action=req.postDataJSON().action;body={id:'a'.repeat(32),status:'running'};}
@@ -56,6 +57,7 @@ const {chromium} = require('playwright');
       await page.locator('#db-databases input[value=photos]').check();
       await page.locator('.database-footer button[type=submit]').click();
       await page.waitForFunction(()=>document.getElementById('db-select').value==='db-aaaaaaaaaaaa' && !settingsState.databaseDirty);
+      assert.equal(await page.locator('.database-secret-file code').textContent(), 'secrets/'+(language==='de'?'.database-':'')+credential+'.json');
       assert.equal(profiles[0].databases.length,2);assert.equal(profiles[0].retention,'keep');
       assert.equal(await page.locator('#settings-databases-panel img').count(),0);
       await page.locator('[data-db-action=dump]').click();

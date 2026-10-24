@@ -2007,13 +2007,32 @@ Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB dieselbe
 Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4` und
 `postgres:16`. Andere Images benötigen passende Voraussetzungen und eigene Restore-Tests.
 
-Zugangsdaten speichert das Plugin geschützt als `secrets/.database-<id>.json`
-unter seinem Datenverzeichnis. Passwortfelder werden nie zurückbefüllt; leer
-lassen behält ein gespeichertes Passwort. Jede Passwortänderung erzeugt eine
-neue Referenz, damit laufende Jobs ihren ursprünglichen Stand behalten. Ältere
-Versionen bleiben für laufende Snapshots und Wiederherstellung erhalten. Diese
-Dateien über das separate verschlüsselte **Secrets-Backup** sichern; normale
-Konfigurationsexporte enthalten nur Referenzen.
+Zugangsdaten speichert das Plugin geschützt unter `secrets/`, zum Beispiel als
+`database-sicherung-mariadb-v001.json`. Der Dateiname enthält den vereinfachten
+Profilnamen und eine Versionsnummer. Die Datei beschreibt Profil-ID, Profilname,
+Datenbanktyp, Container, Datenbankbenutzer und Erstellungszeitpunkt zusätzlich zum
+Passwort. Im Profil wird der aktuelle Dateiname angezeigt; das Passwort wird nie
+zurückbefüllt. Leer lassen behält das gespeicherte Passwort.
+
+Passwortänderungen sowie Änderungen an Profilname, Container, Datenbanktyp oder
+Datenbankbenutzer erzeugen eine neue unveränderliche Datei. Gleiche vereinfachte
+Profilnamen teilen sich den Versionszähler, ohne vorhandene Dateien zu ersetzen.
+Ältere Versionen bleiben für laufende Snapshots und Wiederherstellung erhalten.
+Diese Dateien über das separate verschlüsselte **Secrets-Backup** sichern;
+normale Konfigurationsexporte enthalten nur Referenzen.
+
+Die Startmigration `database_secret_names_v1` kopiert aktuell referenzierte
+UUID-Secrets in das lesbare Format und aktualisiert die Profilreferenzen.
+Originale `.database-<id>.json` bleiben erhalten, damit ältere Konfigurationsexporte
+und Lauf-Snapshots weiter funktionieren. Nicht mehr zugeordnete alte Dateien werden
+nicht geraten oder umbenannt. Die Migration sichert die bisherigen Profile unter
+`config/migration-backups/`, protokolliert Aktionen ohne Passwörter und ist unter
+**Systemzustand & Migration** nachvollziehbar. Bei Fehlern blockiert der zentrale
+Migrationsmechanismus den Normalbetrieb bis zu einem fehlerfreien Neustart.
+
+Für den manuellen Dump-Import werden Zugangsdaten zum Zielserver benötigt; das
+ursprüngliche Backup-Passwort ist dafür nicht zwingend erforderlich. Secrets ersetzen
+keine Sicherung der Datenbankkonten und Berechtigungen.
 
 Neue Profile benötigen keine manuell angelegte Datei oder Container-Einbindung.
 Das Plugin überträgt Zugangsdaten über Docker-stdin in eine eigene temporäre Datei
@@ -2113,12 +2132,17 @@ Fehler-/Abbruchbedingung vorsehen.
 Das Manifest enthält Werkzeugversionen, Containeridentität, Umfang, Größen und
 SHA-256-Hashes der komprimierten Dateien sowie deren unkomprimierte Bytezahl.
 Neue Sicherungsordner tragen Profilname, Startzeit in Server-Ortszeit mit
-Zeitzonenoffset und eine eindeutige Kennung, z. B.
-`bbui-mariadb-apps-2026-10-24_11-35-10+0200-<kennung>/`. Der Profilname wird
+Zeitzonenoffset, ohne UUID, z. B.
+`bbui-mariadb-apps-2026-10-24_11-35-10+0200/`. Der Profilname wird
 für den Dateinamen vereinfacht; das Manifest bewahrt den ursprünglichen Namen
 und die Profil-ID. Die Übersicht zeigt Profil, Zeitpunkt und beide Größen.
 Vorhandene unkomprimierte Dumps und UUID-Ordner bleiben unverändert lesbar und
-bereinigbar. Im Archiv gilt derselbe Ordnername, im Manifest als
+bereinigbar. Ein bereits vorhandenes Dump-Verzeichnis für denselben Profilnamen
+und Zeitpunkt führt zum Fehler; es wird nichts überschrieben. Neue Borg-Archive
+verwenden auch bei Datenbank-Jobs `<präfix>-JJJJ-MM-TT_HH-MM-SS` ohne Zufallszusatz.
+Borg lehnt einen bereits vorhandenen Archivnamen ab. Bestehende Archive mit
+UUID-Zusatz bleiben unverändert auswählbar und wiederherstellbar.
+Im Archiv gilt derselbe Ordnername, im Manifest als
 `archive_directory` vermerkt. Ältere Testarchive verwenden den absoluten Staging-Pfad
 ohne führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
 zurück und vergleicht ihre Bytes. Fehlende, ausgeschlossene oder abweichende

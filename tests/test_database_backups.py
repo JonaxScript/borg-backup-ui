@@ -83,6 +83,7 @@ def fake_export(monkeypatch, profile, failure=None):
 def test_export_uses_only_current_completed_files_and_retains_previous(config, profile, monkeypatch):
     fake_export(monkeypatch,profile)
     first=backup.export_profiles(config,[profile],'job','one')
+    monkeypatch.setattr(backup,'utc_now',lambda:'2026-10-25T10:00:00+00:00')
     second=backup.export_profiles(config,[profile],'job','two')
     assert first[0]['directory'] != second[0]['directory']
     paths=backup.artifact_paths(second)
@@ -96,6 +97,7 @@ def test_failed_export_does_not_publish_or_reuse_old_dump(config, profile, monke
     fake_export(monkeypatch,profile)
     first=backup.export_profiles(config,[profile],'job','one')
     fake_export(monkeypatch,profile,'export_failed')
+    monkeypatch.setattr(backup,'utc_now',lambda:'2026-10-25T10:00:00+00:00')
     with pytest.raises(profiles.DatabaseError,match='export_failed'):
         backup.export_profiles(config,[profile],'job','two')
     runs=list(Path(profile['staging_dir']).iterdir())
@@ -200,6 +202,7 @@ def test_runner_database_step_precedes_container_stop(run_backup, monkeypatch, t
         if outcome in ('failed','cancelled'):raise profiles.DatabaseError('export_failed' if outcome=='failed' else 'cancelled')
         return [result]
     def verify(*a,**kw):
+        assert __import__('re').fullmatch(r'.+-[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}', a[1])
         state.actions.append('verify')
         if outcome=='archive_failed':raise profiles.DatabaseError('archive_verification')
     monkeypatch.setattr(backup,'export_profiles',export)
@@ -216,12 +219,15 @@ def test_runner_database_step_precedes_container_stop(run_backup, monkeypatch, t
     assert ('cleanup' in state.actions)==(outcome=='cleanup')
 
 
-def test_database_only_configuration_roundtrip(tmp_path, profile):
+@pytest.mark.parametrize("managed", [False, True])
+def test_database_only_configuration_roundtrip(tmp_path, profile, managed):
     from test_settings_transfer_repository_model import _canonical_source
     from settings_transfer_api import export_jobs_bundle, import_jobs_bundle, ConfigurationExportError
     from wizard_api import load_job_for_wizard
     config,_=_canonical_source(tmp_path/'source')
-    created=profiles.save_profile(config,{k:v for k,v in profile.items() if k!='id'})['profile']
+    raw={k:v for k,v in profile.items() if k!='id'}
+    if managed:raw.update(auth_mode='managed',database_user='root',password='private-test-value')
+    created=profiles.save_profile(config,raw)['profile']
     job_path=next((Path(config['BACKUP_SCRIPTS_DIR'])/'config/jobs').glob('*.json'))
     row=json.loads(job_path.read_text());row.update(source_paths=[],database_profile_ids=[created['id']]);atomic_write_json(job_path,row)
     bundle=export_jobs_bundle(config)['bundle']
@@ -233,6 +239,11 @@ def test_database_only_configuration_roundtrip(tmp_path, profile):
     assert json.loads(imported.read_text())['source_paths']==[]
     form=load_job_for_wizard(imported.stem,Path(target['BACKUP_SCRIPTS_DIR'])/'scripts',target)
     assert form['database_profile_ids']==[created['id']] and form['source_paths']==[]
+    if managed:
+        with pytest.raises(profiles.DatabaseError,match='credentials'):profiles.read_password(target,created)
+        from inventory_store import atomic_write_bytes
+        atomic_write_bytes(profiles.secret_path(target,created['credential_id']), profiles.secret_path(config,created['credential_id']).read_bytes())
+        assert profiles.read_password(target,created)=='private-test-value'
     profiles.save_profile(target,{**created,'name':'Keep my edit'})
     with pytest.raises(ConfigurationExportError):import_jobs_bundle(target,bundle,dry_run=False,settings_mode='ignore')
     assert profiles.list_profiles(target)['profiles'][0]['name']=='Keep my edit'
@@ -307,6 +318,11 @@ def test_managed_credentials_are_private_immutable_and_not_in_profile(config, pr
     created=profiles.save_profile(config,raw)['profile']
     assert created['auth_mode']=='managed' and 'password' not in created and 'credential_file' not in created
     first=profiles.secret_path(config,created['credential_id'])
+    assert first.name == 'database-db-v001.json'
+    metadata=json.loads(first.read_text())
+    assert metadata['profile_id']==created['id'] and metadata['profile_name']=='DB'
+    assert metadata['container']=='mariadb' and metadata['database_user']=='root'
+    assert metadata['engine']=='mariadb' and metadata['created_at']
     assert first.stat().st_mode & 0o777==0o600
     assert profiles.read_password(config,created)==raw['password']
     assert raw['password'] not in profiles.store_path(config).read_text()
@@ -340,14 +356,17 @@ def test_managed_secret_encrypted_export_and_restore(config, profile, monkeypatc
     import settings_transfer_api as transfer
     row=profiles.save_profile(config,{**profile,'id':None,'auth_mode':'managed','database_user':'root','password':'only-in-secret'})['profile']
     original=profiles.secret_path(config,row['credential_id'])
+    legacy_file=profiles.secret_path(config,'b'*32)
+    atomic_write_json(legacy_file,{'password':'old-only-in-secret'})
     monkeypatch.setattr(transfer,'_secrets_dir',lambda:original.parent)
     exported=transfer.export_secrets_backup('encrypted-fixture-passphrase')
-    assert exported['count']==1 and 'only-in-secret' not in json.dumps(exported)
+    assert exported['count']==2 and 'only-in-secret' not in json.dumps(exported)
     destination=tmp_path/'restored-secrets';destination.mkdir()
     monkeypatch.setattr(transfer,'_secrets_dir',lambda:destination)
     transfer.import_secrets_backup('encrypted-fixture-passphrase',exported['payload_b64'])
     restored=destination/original.name
     assert restored.read_bytes()==original.read_bytes()
+    assert (destination/legacy_file.name).read_bytes()==legacy_file.read_bytes()
     assert restored.stat().st_mode & 0o777==0o600
 
 

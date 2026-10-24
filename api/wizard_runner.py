@@ -6,7 +6,6 @@ api/wizard_runner.py - Scriptless Runner fuer Wizard-Jobs (Phase 4)
 from __future__ import annotations
 
 import json
-import uuid
 import fcntl
 import logging
 import os
@@ -854,7 +853,7 @@ def main() -> int:
             workflow=workflow,
         )
         job.borg_steps = runner.steps
-        database_archive = archive_prefix + "-" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "-" + uuid.uuid4().hex[:8] if database_results else None
+        database_archive = archive_prefix + "-" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") if database_results else None
         create_options = {"archive_name": database_archive} if database_archive else {}
         create_exit = runner.create(
             job_config.backup_paths,
