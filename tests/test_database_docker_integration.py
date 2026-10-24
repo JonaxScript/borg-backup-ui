@@ -1,6 +1,6 @@
 """Opt-in real Docker/Borg restore and cancellation tests (#591).
 
-Set BBUI_DATABASE_DOCKER_TESTS=1. Requires pre-pulled mariadb:11.4 and postgres:16,
+Set BBUI_DATABASE_DOCKER_TESTS=1. Requires pre-pulled mariadb:11.4, mysql:8.0-debian and postgres:16,
 Docker, Borg and repository-local TMPDIR/pytest --basetemp. No ports are published.
 Only uniquely named test containers and generated fixture data are touched.
 """
@@ -26,21 +26,22 @@ def command(args, **kwargs):
     return subprocess.run(args,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=120,**kwargs).stdout
 
 
-@pytest.fixture(params=['mariadb','postgresql'])
+@pytest.fixture(params=['mariadb','postgresql','mysql'])
 def database_container(request,tmp_path):
     engine=request.param
     names=[]
     def launch(suffix):
         name='bbui591-test-'+uuid.uuid4().hex[:12]+'-'+suffix
         directory=tmp_path/suffix; directory.mkdir()
-        image='mariadb:11.4' if engine=='mariadb' else 'postgres:16'
-        target='/var/lib/mysql' if engine=='mariadb' else '/var/lib/postgresql/data'
-        env=['-e','MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes','-e','MARIADB_ROOT_HOST=%'] if engine=='mariadb' else ['-e','POSTGRES_HOST_AUTH_METHOD=trust']
+        image={'mariadb':'mariadb:11.4','mysql':'mysql:8.0-debian','postgresql':'postgres:16'}[engine]
+        target='/var/lib/mysql' if engine in ('mariadb','mysql') else '/var/lib/postgresql/data'
+        env=['-e','MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes','-e','MARIADB_ROOT_HOST=%'] if engine in ('mariadb','mysql') else ['-e','POSTGRES_HOST_AUTH_METHOD=trust']
+        if engine=='mysql':env=['-e','MYSQL_ALLOW_EMPTY_PASSWORD=yes','-e','MYSQL_ROOT_HOST=%']
         command(['docker','run','-d','--name',name,'--network','none','--mount',f'type=bind,source={directory},target={target}',*env,image])
         names.append(name)
-        deadline=time.monotonic()+180
+        deadline=time.monotonic()+420
         while time.monotonic()<deadline:
-            cmd=['mariadb','--protocol=tcp','-h127.0.0.1','-uroot','-e','SELECT 1'] if engine=='mariadb' else ['psql','-h127.0.0.1','-U','postgres','-c','SELECT 1']
+            cmd=['mysql' if engine=='mysql' else 'mariadb','--protocol=tcp','-h127.0.0.1','-uroot','-e','SELECT 1'] if engine in ('mariadb','mysql') else ['psql','-h127.0.0.1','-U','postgres','-c','SELECT 1']
             try:
                 command(['docker','exec',name,*cmd]);break
             except subprocess.CalledProcessError:time.sleep(.3)
@@ -56,19 +57,19 @@ def database_container(request,tmp_path):
 def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypatch):
     engine,source,launch=database_container
     def sql(name,text,database=None):
-        args=['mariadb','-uroot'] if engine=='mariadb' else ['psql','-U','postgres','-v','ON_ERROR_STOP=1','-tA']
-        if database:args += [database] if engine=='mariadb' else ['-d',database]
+        args=['mysql' if engine=='mysql' else 'mariadb','-uroot'] if engine in ('mariadb','mysql') else ['psql','-U','postgres','-v','ON_ERROR_STOP=1','-tA']
+        if database:args += [database] if engine in ('mariadb','mysql') else ['-d',database]
         return command(['docker','exec','-i',name,*args],input=text.encode())
     sql(source,'CREATE DATABASE fixture;')
     sql(source,"CREATE TABLE items(id integer primary key, value varchar(80)); INSERT INTO items VALUES(1,'backed-up'); CREATE VIEW item_view AS SELECT * FROM items;",'fixture')
-    if engine=='mariadb':
+    if engine in ('mariadb','mysql'):
         sql(source,'CREATE PROCEDURE fixture.answer() SELECT 42; CREATE EVENT fixture.inactive ON SCHEDULE EVERY 1 DAY DISABLE DO SELECT 1; CREATE TRIGGER fixture.items_trigger BEFORE INSERT ON fixture.items FOR EACH ROW SET NEW.value = NEW.value;')
     else:
         sql(source,'CREATE ROLE fixture_owner; ALTER DATABASE fixture OWNER TO fixture_owner;')
         sql(source,'CREATE EXTENSION IF NOT EXISTS hstore;','fixture')
     password='fixture:p\\ass"$word'
     user='fixture_login'
-    if engine=='mariadb':
+    if engine in ('mariadb','mysql'):
         sql(source, "SET sql_mode='NO_BACKSLASH_ESCAPES'; CREATE USER 'fixture_login'@'127.0.0.1' IDENTIFIED BY '"+password+"'; GRANT ALL PRIVILEGES ON *.* TO 'fixture_login'@'127.0.0.1';")
     else:
         sql(source,"CREATE ROLE fixture_login WITH LOGIN SUPERUSER PASSWORD '"+password+"';")
@@ -101,7 +102,7 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     dump=next(p for p in paths if p.name in ('fixture.sql.gz','fixture.dump.gz'))
     content=command(['borg','extract','--stdout',str(repo)+'::fixture',results[0]['archive_directory'] + '/' + dump.name])
     content=gzip.decompress(content)
-    if engine=='mariadb':
+    if engine in ('mariadb','mysql'):
         sql(target,content.decode())
         assert b'backed-up' in sql(target,'SELECT value FROM item_view;','fixture')
         assert b'42' in sql(target,'CALL fixture.answer();')
@@ -121,7 +122,7 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     # Missing artifacts must fail even though Borg itself successfully created the archive.
     command(['borg','create',str(repo)+'::missing',backup.borg_artifact_paths(results)[-1]])
     with pytest.raises(DatabaseError,match='archive_verification'):backup.verify_archive(str(repo),'missing',results)
-    if engine=='mariadb':
+    if engine in ('mariadb','mysql'):
         sql(source,'CREATE TABLE unsupported(id integer) ENGINE=MyISAM;','fixture')
         with pytest.raises(DatabaseError,match='nontransactional'):backup.export_profiles(cfg,[profile],'fixture-job','unsupported')
     print(engine,results[0]['files'][0]['server_version'],'restore verified')

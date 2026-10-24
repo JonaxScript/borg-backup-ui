@@ -5,6 +5,7 @@ function scriptLibraryT(key, params = {}) { return settingsT(`scripts.library.${
 /** Resolve documented shipped sources by filename; never treat server text as HTML. */
 function scriptLibraryDetail(script, field) {
   const key = {'database-dump-mariadb.sh':'mariadb', 'database-dump-postgresql.sh':'postgresql',
+    'database-dump-mysql.sh':'mysql', 'database-dump-mongodb.sh':'mongodb', 'database-dump-redis.sh':'redis', 'database-dump-sqlite.py':'sqlite',
     'pre-check-source.sh':'source', 'pre-check-free-space.sh':'space', 'pre-wake-server.sh':'wake',
     'post-json-webhook.sh':'webhook'}[script.name];
   return key ? scriptLibraryT(`details.${key}.${field}`) : (field === 'title' ? script.name : '');
@@ -96,7 +97,7 @@ async function loadScriptLibrarySource(id) {
         <dl class="script-library-details">${['prerequisites','configuration','behavior'].map(field => `<div><dt>${escHtml(scriptLibraryT(field))}</dt><dd>${escHtml(scriptLibraryDetail(script, field))}</dd></div>`).join('')}</dl>
         ${script.kind === 'template' ? `<div class="script-library-actions"><button type="button" class="btn btn-primary" id="script-template-use">${escHtml(scriptLibraryT('use'))}</button></div>` : ''}
       </div>
-      <div id="script-library-panel-code" role="tabpanel" aria-labelledby="script-library-tab-code" class="settings-body script-library-code-body hidden"><div class="script-library-source-meta"><code>${escHtml(script.path)}</code><span>Bash / Shell · ${escHtml(scriptLibraryT('lines', {count:script.content.split('\n').length}))}</span></div>
+      <div id="script-library-panel-code" role="tabpanel" aria-labelledby="script-library-tab-code" class="settings-body script-library-code-body hidden"><div class="script-library-source-meta"><code>${escHtml(script.path)}</code><span>${script.language === 'python' ? 'Python / SQLite' : 'Bash / Shell'} · ${escHtml(scriptLibraryT('lines', {count:script.content.split('\n').length}))}</span></div>
       <div class="script-source-code"><div class="script-source-lines" aria-hidden="true"></div><pre tabindex="0" aria-label="${escHtml(scriptLibraryT('source'))}"><code></code></pre></div></div>`);
     // Select the source code explicitly: metadata also contains a code element.
     const source = panel.querySelector('pre code');
@@ -105,7 +106,8 @@ async function loadScriptLibrarySource(id) {
     else source.textContent = script.content;
     panel.querySelector('.script-source-lines').textContent = script.content.split('\n').map((_, i) => i + 1).join('\n');
     const pre = panel.querySelector('pre');
-    pre.addEventListener('scroll', () => { panel.querySelector('.script-source-lines').scrollTop = pre.scrollTop; });
+    const lineNumbers = panel.querySelector('.script-source-lines');
+    pre.addEventListener('scroll', () => { if (pre.isConnected) lineNumbers.scrollTop = pre.scrollTop; });
     const tabs = [...panel.querySelectorAll('[data-script-detail]')];
     tabs.forEach((button, index) => {
       button.addEventListener('click', () => showScriptLibraryDetail(button.dataset.scriptDetail));

@@ -59,6 +59,7 @@ def start_operation(config, payload):
     if not ok:
         raise DatabaseError('busy')
     try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         atomic_write_json(path, state)
         with _guard:
             _active[identifier] = event

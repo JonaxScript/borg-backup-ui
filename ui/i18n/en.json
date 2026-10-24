@@ -268,7 +268,10 @@
       "database_invalid_operation": "Invalid database operation.",
       "database_busy": "Docker is already in use by another plugin operation.",
       "database_operation_failed": "Database operation failed.",
-      "database_selection_required": "Select at least one database before using the profile in a job."
+      "database_selection_required": "Select at least one database before using the profile in a job.",
+      "database_sqlite_source": "SQLite source unavailable or unsupported. Check the container path, local directory bind mount, WAL access and database format.",
+      "database_mongodb_replica_required": "MongoDB online backup requires an initialized, non-sharded replica set and permission to inspect its topology (getCmdLineOpts). Standalone instances are not supported.",
+      "database_tools_missing": "Required export tools are missing in this container (including setsid). Use an image providing the documented prerequisites; nothing is installed automatically."
     },
     "messages": {
       "smb_already_mounted": "The SMB share is already mounted.",
@@ -3446,6 +3449,34 @@
             "prerequisites": "curl and Python 3 plus a private curl configuration with exactly one HTTPS URL and optional authentication headers. The file must belong to the executing user with mode 0600.",
             "configuration": "Set CURL_CONFIG to the protected file, set CONFIGURED=yes and assign as Post with “Also on failure, skip or cancellation”. Suggested timeout: 30 seconds.",
             "behavior": "Only HTTP 2xx counts as success; no automatic retries. Delivery failure fails Post and the overall job. The result describes the state before Post, not the final job status."
+          },
+          "mysql": {
+            "title": "MySQL database backup",
+            "purpose": "Exports databases selected in the database profile, including tables, data, views, routines, triggers and events.",
+            "prerequisites": "A running Docker container with mysql and mysqldump, suitable database permissions and InnoDB base tables only. Avoid schema changes during export.",
+            "configuration": "Configure container, credentials, database selection and private dump storage in Settings > Database backups. Do not assign this helper as a Pre/Post script.",
+            "behavior": "Borg Backup UI controls checks, export, gzip compression and retention. Failures prevent incomplete dumps from being archived. Global users and grants are not exported; updates may replace edits to this helper."
+          },
+          "mongodb": {
+            "title": "MongoDB database backup",
+            "purpose": "MongoDB: online backup of a complete replica-set member with oplog. Includes all databases and users/roles with credential hashes. No per-database selection, standalone or sharded deployments. Normal writes may continue; avoid schema, role and FCV changes during the dump.",
+            "prerequisites": "mongosh and mongodump >=100.3 in a running non-sharded replica set. Full backup/oplog access and getCmdLineOpts permission; no downtime required.",
+            "configuration": "Configure container, credentials, database selection and private dump storage in Settings > Database backups. Do not assign this helper as a Pre/Post script.",
+            "behavior": "Borg Backup UI controls cancellation, timeout, gzip compression and archive verification. Errors retain incomplete dumps for inspection. Updates may replace this managed helper."
+          },
+          "redis": {
+            "title": "Redis database backup",
+            "purpose": "Redis: complete standalone-instance RDB snapshot. All logical databases are included. No Redis Cluster support; configuration and ACL credentials are separate.",
+            "prerequisites": "redis-cli in the running standalone container. PING, INFO and replication permissions. Redis Cluster is rejected.",
+            "configuration": "Configure container, credentials, database selection and private dump storage in Settings > Database backups. Do not assign this helper as a Pre/Post script.",
+            "behavior": "Borg Backup UI controls cancellation, timeout, gzip compression and archive verification. Errors retain incomplete dumps for inspection. Updates may replace this managed helper."
+          },
+          "sqlite": {
+            "title": "SQLite database backup",
+            "purpose": "SQLite: native online snapshot including committed WAL data. An uncompressed temporary snapshot needs additional space on dump storage. External application files are separate. For Stash, also include configuration and external blobs, or use Stash’s own complete backup.",
+            "prerequisites": "A running application container with a local directory bind mount. The Python SQLite runtime runs on the host. No network filesystem, named volume or encrypted SQLite source.",
+            "configuration": "Select container, exact database path inside the container and private dump storage in Settings > Database backups. No database password is required.",
+            "behavior": "Borg Backup UI controls cancellation, timeout, gzip compression and archive verification. Errors retain incomplete dumps for inspection. Updates may replace this managed helper."
           }
         },
         "prerequisites": "Prerequisites",
@@ -3461,7 +3492,7 @@
     },
     "databases": {
       "title": "Database backups",
-      "description": "Back up MariaDB and PostgreSQL in Docker."
+      "description": "Native backups for databases in Docker."
     }
   },
   "jobGroups": {
@@ -3657,7 +3688,7 @@
     "loadError": "Could not load database profiles.",
     "missing": "Missing or disabled",
     "wizardHint": "Optional: select saved database profiles. All selected databases must export successfully. A database-only job can have no file sources.",
-    "intro": "Connect your container, load its databases and choose what to back up.",
+    "intro": "Manage native Docker database backups with saved profiles, protected credentials and local dump storage.",
     "connection": "1. Connection and credentials",
     "password": "Database password",
     "passwordKeep": "Leave blank to keep the saved password",
@@ -3678,6 +3709,20 @@
     "containerHint": "Select the container running the database.",
     "containersEmpty": "No containers loaded. Check Docker availability; an existing selection is preserved.",
     "compressedSize": "Compressed: {size}",
-    "originalSize": "Uncompressed: {size}"
+    "originalSize": "Uncompressed: {size}",
+    "authentication": "Authentication",
+    "authenticated": "Credentials from Secrets",
+    "noAuthentication": "Server without authentication",
+    "sqlite_path": "Database path inside container",
+    "sqliteHint": "Select the exact SQLite file inside a directory bind mount backed by a local pool. No extra SQLite tool inside the container is required. Network paths, /mnt/user and named Docker volumes are not supported.",
+    "authentication_database": "Authentication database (MongoDB)",
+    "wholeInstance": "Complete Redis instance (all logical databases)",
+    "selectedFile": "Selected SQLite database file",
+    "mysqlScope": "MySQL: transactional InnoDB tables only; includes routines, triggers and events. Accounts and grants are separate.",
+    "mongodbScope": "MongoDB: online backup of a complete replica-set member with oplog. Includes all databases and users/roles with credential hashes. No per-database selection, standalone or sharded deployments. Normal writes may continue; avoid schema, role and FCV changes during the dump.",
+    "redisScope": "Redis: complete standalone-instance RDB snapshot. All logical databases are included. No Redis Cluster support; configuration and ACL credentials are separate.",
+    "sqliteScope": "SQLite: native online snapshot including committed WAL data. An uncompressed temporary snapshot needs additional space on dump storage. External application files are separate. For Stash, also include configuration and external blobs, or use Stash’s own complete backup.",
+    "housekeeping": "Internal operation and test records are removed 30 days after confirmed completion. Running, unresolved and unidentifiable records are retained. This does not remove dumps or Secrets.",
+    "wholeReplicaSet": "Complete replica-set member (all databases + oplog)"
   }
 }

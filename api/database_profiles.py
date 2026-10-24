@@ -132,11 +132,17 @@ def validate_profile(raw):
     if not isinstance(raw, dict):
         raise DatabaseError('invalid_profile')
     engine = raw.get('engine')
-    if engine not in ('mariadb', 'postgresql'):
+    if engine not in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis', 'sqlite'):
         raise DatabaseError('invalid_profile')
     row = {'engine': engine}
     row['auth_mode'] = raw.get('auth_mode', 'container' if raw.get('credential_file') else 'managed')
-    if row['auth_mode'] not in ('managed', 'container'):
+    if row['auth_mode'] not in ('managed', 'container', 'none'):
+        raise DatabaseError('invalid_profile')
+    if engine == 'sqlite':
+        row['auth_mode'] = 'none'
+    if row['auth_mode'] == 'none' and engine not in ('sqlite', 'redis', 'mongodb'):
+        raise DatabaseError('invalid_profile')
+    if row['auth_mode'] == 'container' and engine in ('redis', 'mongodb'):
         raise DatabaseError('invalid_profile')
     if row['auth_mode'] == 'managed':
         row['credential_id'] = raw.get('credential_id', '')
@@ -159,7 +165,7 @@ def validate_profile(raw):
         raise DatabaseError('invalid_profile')
     if row['auth_mode'] == 'managed' or engine == 'postgresql' or row['database_user']:
         _text(row['database_user'], r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63)
-    if engine == 'mariadb' and row['include_globals']:
+    if engine != 'postgresql' and row['include_globals']:
         raise DatabaseError('invalid_profile')
     for key in (['credential_file'] if row['auth_mode'] == 'container' else []) + ['staging_mount', 'staging_dir']:
         value = _text(raw.get(key))
@@ -174,16 +180,28 @@ def validate_profile(raw):
     databases = raw.get('databases')
     if not isinstance(databases, list) or len(databases) > 64:
         raise DatabaseError('invalid_profile')
-    system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine == 'mariadb' else {'template0', 'template1'}
+    system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine in ('mariadb', 'mysql') else {'admin', 'config', 'local'} if engine == 'mongodb' else {'template0', 'template1'}
     row['databases'] = list(dict.fromkeys(_text(x, r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63) for x in databases))
     if any(x.lower() in system for x in row['databases']):
         raise DatabaseError('system_database')
-    for key, default, minimum, maximum in [('port', 3306 if engine == 'mariadb' else 5432, 1, 65535),
+    for key, default, minimum, maximum in [('port', {'mariadb':3306, 'mysql':3306, 'postgresql':5432, 'mongodb':27017, 'redis':6379, 'sqlite':1}[engine], 1, 65535),
                                          ('timeout_seconds', 1800, 1, 86400), ('min_free_mib', 1024, 1, 104857600)]:
         value = raw.get(key, default)
         if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
             raise DatabaseError('invalid_profile')
         row[key] = value
+    if engine in ('redis', 'mongodb') and any(x != 'all' for x in row['databases']):
+        raise DatabaseError('invalid_profile')
+    if engine == 'sqlite':
+        value = _text(raw.get('sqlite_path'), maximum=4096)
+        path = Path(value)
+        if not path.is_absolute() or '..' in path.parts or str(path) != value:
+            raise DatabaseError('invalid_profile')
+        row['sqlite_path'] = value
+        if any(x != 'database' for x in row['databases']):
+            raise DatabaseError('invalid_profile')
+    if engine == 'mongodb':
+        row['authentication_database'] = _text(raw.get('authentication_database', 'admin'), r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63)
     row['retention'] = raw.get('retention', 'keep')
     if row['retention'] not in ('keep', 'after_archive'):
         raise DatabaseError('invalid_profile')

@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Online database engines and metadata housekeeping (#593)
+
+- Add MySQL transactional exports, complete standalone Redis RDB snapshots, and full MongoDB replica-set dumps with oplog. Reject nontransactional MySQL tables, MongoDB standalone/sharded deployments and Redis Cluster. No offline fallback, writer-pause workflow or automatic container reconfiguration.
+- Add SQLite Online Backup API snapshots of explicit files on local Docker directory binds, including WAL data, integrity checks, cancellation and temporary-file cleanup. Explain separate Stash configuration/blob scope and manual restoration.
+- Expose six managed database helpers with engine-specific bilingual descriptions; include offline Python syntax highlighting for the SQLite helper. Preserve existing profiles, Secrets, archives and four editable templates.
+- Prune confirmed completed operation/test metadata after 30 days under docker-control, hourly after startup. Retain running/unresolved, malformed, unsafe and unidentifiable records. Only journal-linked discovery leftovers qualify; dumps and Secrets are unaffected. No state-store migration.
+
 ## Pending - Integrated Docker database backups (#591)
 
 - Replace native database confirmations with shared Settings dialogs for profile deletion, draft discard and local cleanup. Include the exact cleanup path and explain the cross-profile local dump list.

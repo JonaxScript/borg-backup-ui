@@ -4487,6 +4487,28 @@ def _start_repository_info_refresh_loop(config: dict) -> threading.Thread | None
         return None
 
 
+def _start_database_housekeeping_loop(config: dict) -> threading.Thread | None:
+    """Prune completed database metadata hourly after startup; never log contents."""
+    def _run():
+        time.sleep(60)
+        while True:
+            try:
+                from database_housekeeping import prune_completed
+                result = prune_completed(config)
+                if result['removed'] or result['discovery_removed']:
+                    _log(f"Database housekeeping: removed={result['removed']} discovery={result['discovery_removed']}")
+            except Exception:
+                _log("WARNING: Database housekeeping could not complete; retained unprocessed records.")
+            time.sleep(3600)
+    try:
+        thread = threading.Thread(target=_run, name="database-housekeeping", daemon=True)
+        thread.start()
+        return thread
+    except Exception:
+        _log("WARNING: Database housekeeping could not start.")
+        return None
+
+
 def _start_apprise_runtime_warmup(config: dict) -> threading.Thread | None:
     """Warm the bundled Apprise runtime so the first profile API call is not cold."""
 
@@ -4661,6 +4683,7 @@ def _start_normal_runtime_services(config: dict) -> None:
     _start_notification_reminder_loop(config)
     _start_notification_delivery_loop(config)
     _start_repository_info_refresh_loop(config)
+    _start_database_housekeeping_loop(config)
     _start_apprise_runtime_warmup(config)
 
 

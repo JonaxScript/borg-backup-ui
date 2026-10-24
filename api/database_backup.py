@@ -33,7 +33,7 @@ umask 077
 state=/dev/shm/bbui-db-$1; shift
 mkdir -m 700 "$state"
 trap 'rm -f "$state/credentials"' EXIT
-command -v setsid >/dev/null || { echo 20 > "$state/done"; exit 20; }
+command -v setsid >/dev/null || { echo 24 > "$state/done"; exit 24; }
 exec 3<&0
 setsid sh -s -- "$state" "$@" <&3 &
 child=$!
@@ -57,7 +57,10 @@ state=/dev/shm/bbui-db-$1; action=$2
 [ -d "$state" ] && [ ! -L "$state" ] || { echo unknown; exit; }
 [ "$(stat -c %u "$state")" = "$(id -u)" ] && [ "$(stat -c %a "$state")" = 700 ] || exit 1
 if [ ! -f "$state/pid" ]; then
-  if [ -f "$state/done" ]; then echo done; else echo unknown; fi
+  if [ -f "$state/done" ]; then
+    if [ "$action" = ack ]; then rm -f "$state/done" "$state/credentials"; rmdir "$state"; fi
+    echo done
+  else echo unknown; fi
   exit
 fi
 read -r pid < "$state/pid"
@@ -174,17 +177,25 @@ def _operation(config, profile, cid, action, database, output, cancelled):
     Journal before launch; monitor timeout/cancellation while draining Docker stdout.
     Sink/pipe failures terminate the owned exporter group and never mark completion.
     """
+    if profile['engine'] == 'sqlite':
+        return _sqlite_operation(profile, cid, action, output, cancelled)
     token = uuid.uuid4().hex
     journal = data_root(config) / 'database-operations' / (token + '.json')
     record = {'token': token, 'container_id': cid, 'execution_user': profile['execution_user'],
               'profile_id': profile['id'], 'status': 'running', 'started_at': utc_now()}
+    if action == 'discover':
+        record['discovery_directory'] = Path(output.name).parent.name
     credentials = ''
     credential_file = profile.get('credential_file', '')
-    if profile.get('auth_mode') == 'managed':
-        password = read_password(config, profile)
-        if profile['engine'] == 'mariadb':
+    if profile.get('auth_mode') in ('managed', 'none'):
+        password = read_password(config, profile) if profile['auth_mode'] == 'managed' else ''
+        if profile['engine'] in ('mariadb', 'mysql'):
             escaped = password.replace('\\', '\\\\').replace('"', '\\"').replace('\t', '\\t')
             content = '[client]\nuser=' + profile['database_user'] + '\npassword="' + escaped + '"\n'
+        elif profile['engine'] == 'mongodb':
+            content = json.dumps({'password': password}) + '\n'
+        elif profile['engine'] == 'redis':
+            content = password + '\n'
         else:
             escaped = password.replace('\\', '\\\\').replace(':', '\\:')
             content = f"127.0.0.1:{profile['port']}:*:{profile['database_user']}:{escaped}\n"
@@ -193,9 +204,12 @@ def _operation(config, profile, cid, action, database, output, cancelled):
         credentials = f'cat > "$state/credentials" <<\'{delimiter}\'\n{content}{delimiter}\n'
         credential_file = '/dev/shm/bbui-db-' + token + '/credentials'
     script = LEADER + credentials + (SCRIPTS / ('database-dump-' + profile['engine'] + '.sh')).read_text()
+    journal.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     atomic_write_json(journal, record)
     cmd = _docker(profile, cid) + ['sh', '-c', SUPERVISOR, 'bbui', token, action,
-                                credential_file, str(profile['port']), profile['database_user'], database]
+                                credential_file, str(profile['port']), '' if profile.get('auth_mode') == 'none' else profile['database_user'], database]
+    if profile['engine'] == 'mongodb':
+        cmd += [profile['authentication_database']]
     proc = None
     reason = None
     started = time.monotonic()
@@ -227,7 +241,7 @@ def _operation(config, profile, cid, action, database, output, cancelled):
             if not _terminate(record):
                 raise DatabaseError('unresolved_export')
         if proc.returncode:
-            raise DatabaseError({21: 'credentials', 22: 'nontransactional'}.get(proc.returncode, 'export_failed'))
+            raise DatabaseError({21: 'credentials', 22: 'nontransactional', 23: 'mongodb_replica_required', 24: 'tools_missing'}.get(proc.returncode, 'export_failed'))
         if container_identity(profile) != cid:
             raise DatabaseError('container_changed')
         record['status'] = 'completed'
@@ -253,6 +267,74 @@ def _operation(config, profile, cid, action, database, output, cancelled):
         atomic_write_json(journal, record)
         if record['status'] != 'unresolved':
             _control(record, 'ack')
+
+
+def _sqlite_operation(profile, cid, action, output, cancelled):
+    """Back up an explicit SQLite path from local Docker bind storage in this process.
+
+    No background exporter survives cancellation or process exit. Named volumes,
+    network/FUSE paths, links, missing files and paths outside directory binds are
+    rejected. The container path is mapped using the captured immutable Docker ID.
+    """
+    import importlib.util
+    try:
+        import sqlite3
+    except ImportError:
+        raise DatabaseError('tools_missing') from None
+    from contextlib import ExitStack
+    started = time.monotonic()
+    def check():
+        if cancelled():
+            raise DatabaseError('cancelled')
+        if time.monotonic() - started > profile['timeout_seconds']:
+            raise DatabaseError('timeout')
+    try:
+        mounts = json.loads(_run(['docker', 'inspect', '--format', '{{json .Mounts}}', cid], stdout=subprocess.PIPE, text=True).stdout)
+        source = Path(profile['sqlite_path'])
+        matches = [m for m in mounts if source == Path(m['Destination']) or Path(m['Destination']) in source.parents]
+        if not matches:
+            raise DatabaseError('sqlite_source')
+        mount = max(matches, key=lambda m: len(Path(m['Destination']).parts))
+        if mount['Type'] != 'bind' or source == Path(mount['Destination']):
+            raise DatabaseError('sqlite_source')
+        host = Path(mount['Source']) / source.relative_to(mount['Destination'])
+        # Anchor every parent and validate the final source; WAL must remain next
+        # to the opened database, so use the held parent path, not a file FD URI.
+        with ExitStack() as stack:
+            fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+            stack.callback(os.close, fd)
+            for part in host.parent.parts[1:]:
+                fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                stack.callback(os.close, fd)
+            try:
+                _local_filesystem(fd)
+            except DatabaseError:
+                raise DatabaseError('sqlite_source') from None
+            anchored = _descriptor_path(fd) / host.name
+            for suffix in ('', '-wal', '-shm', '-journal'):
+                p = Path(str(anchored) + suffix)
+                if p.is_symlink():
+                    raise DatabaseError('sqlite_source')
+            source_fd = os.open(host.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+            stack.callback(os.close, source_fd)
+            info = os.fstat(source_fd)
+            if not stat.S_ISREG(info.st_mode) or os.read(source_fd, 16) != b'SQLite format 3\x00':
+                raise DatabaseError('sqlite_source')
+            filename = output.fileobj.name if isinstance(output, gzip.GzipFile) else output.name
+            directory = Path(filename).parent
+            spec = importlib.util.spec_from_file_location('bbui_sqlite_helper', SCRIPTS / 'database-dump-sqlite.py')
+            helper = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(helper)
+            helper.run(anchored, action, output, check, directory if action == 'dump' else None)
+            if not os.path.samestat(info, anchored.stat()):
+                raise DatabaseError('sqlite_source')
+        if container_identity(profile) != cid:
+            raise DatabaseError('container_changed')
+    except DatabaseError:
+        raise
+    except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
+        check()
+        raise DatabaseError('sqlite_source') from None
 
 
 def _private_path(path):
@@ -431,9 +513,12 @@ def _probe(config, profile, cid, database, cancelled, directory):
         if not server or not client:
             raise DatabaseError('version_mismatch')
         sv, cv = server[0], client[1]
-        # V1 deliberately requires the same server/client major (major.minor for MariaDB).
-        width = 2 if profile['engine'] == 'mariadb' else 1
-        if sv.split('.')[:width] != cv.split('.')[:width]:
+        if profile['engine'] == 'mongodb' and tuple(map(int, cv.split('.')[:2])) < (100, 3):
+            raise DatabaseError('tools_missing')
+        # SQL/Redis major versions match (major.minor for MySQL/MariaDB).
+        # MongoDB Database Tools use independent 100.x version numbers.
+        width = 2 if profile['engine'] in ('mariadb', 'mysql') else 1
+        if profile['engine'] != 'mongodb' and sv.split('.')[:width] != cv.split('.')[:width]:
             raise DatabaseError('version_mismatch')
         return {'server_version': sv, 'client_version': cv,
                 'extensions': [line for line in lines[2:] if re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', line)]}
@@ -484,9 +569,10 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                     'retention': profile['retention'], 'directory': str(Path(profile['staging_dir']) / name),
                     'archive_directory': name,
                     'scope': {'databases': profile['databases'], 'globals': profile['include_globals'],
-                              'credentials': False, 'application_files_consistent': False},
-                    'restore': 'Decompress .gz files first, then use matching mariadb client or pg_restore/psql in a separate container. '
-                               'Reprovision credentials, roles/grants and required extensions. See database backup guide.'})
+                              'credentials': profile['engine'] == 'mongodb', 'application_files_consistent': False,
+                              **({'oplog': True, 'users_roles_included': True} if profile['engine'] == 'mongodb' else {}),
+                              **({'container_database_path': profile['sqlite_path']} if profile['engine'] == 'sqlite' else {})},
+                    'restore': restore_hint(profile['engine'])})
         results.append(manifest)
         try:
             atomic_write_json(directory / 'manifest.json', manifest)
@@ -505,7 +591,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                 if profile['include_globals'] and database == profile['databases'][0]:
                     actions.append('globals')
                 for action in actions:
-                    name = ('globals.sql' if action == 'globals' else database + ('.sql' if profile['engine'] == 'mariadb' else '.dump')) + '.gz'
+                    name = ('globals.sql' if action == 'globals' else database + dump_suffix(profile['engine'])) + '.gz'
                     partial = directory / (name + '.partial')
                     with partial.open('xb') as handle:
                         os.fchmod(handle.fileno(), 0o600)
@@ -516,9 +602,10 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                         os.fsync(handle.fileno())
                     if not uncompressed_bytes:
                         raise DatabaseError('empty_dump')
-                    if profile['engine'] == 'postgresql' and action == 'dump':
+                    if profile['engine'] in ('postgresql', 'redis', 'sqlite') and action == 'dump':
+                        magic = {'postgresql': b'PGDMP', 'redis': b'REDIS', 'sqlite': b'SQLite format 3\x00'}[profile['engine']]
                         with gzip.open(partial, 'rb') as handle:
-                            if handle.read(5) != b'PGDMP':
+                            if handle.read(len(magic)) != magic:
                                 raise DatabaseError('invalid_dump')
                     final = directory / name
                     partial.rename(final)
@@ -558,7 +645,7 @@ def discover_databases(config, profile, cancelled=lambda: False):
     """
     parent = data_root(config) / 'database-discovery'
     parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=parent) as temporary:
+    with tempfile.TemporaryDirectory(prefix="discovery-", dir=parent) as temporary:
         path = Path(temporary) / 'names'
         with path.open('xb') as output:
             os.fchmod(output.fileno(), 0o600)
@@ -566,15 +653,38 @@ def discover_databases(config, profile, cancelled=lambda: False):
         if path.stat().st_size > 1024 * 1024:
             raise DatabaseError('export_failed')
         names = path.read_text().splitlines()
-    excluded = {'mysql', 'information_schema', 'performance_schema', 'sys'} if profile['engine'] == 'mariadb' else {'template0', 'template1'}
+    excluded = {'mysql', 'information_schema', 'performance_schema', 'sys'} if profile['engine'] in ('mariadb', 'mysql') else {'admin', 'config', 'local'} if profile['engine'] == 'mongodb' else {'template0', 'template1'}
     return sorted(set(name for name in names if name.lower() not in excluded and re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', name)))
+
+
+def restore_hint(engine):
+    """Return artifact-specific recovery requirements stored alongside every dump."""
+    instructions = {
+        'mariadb': 'Import SQL with a compatible mariadb client; reprovision users/grants.',
+        'mysql': 'Import SQL with a compatible mysql client; reprovision users/grants.',
+        'postgresql': 'Use pg_restore for custom dumps and psql for optional globals; reprovision role passwords and extensions.',
+        'mongodb': 'Use compatible mongorestore --archive=<file> --oplogReplay. Full archive includes users/roles and credential hashes.',
+        'redis': 'Restore the RDB with compatible Redis persistence settings; existing AOF must not override it. Reprovision config/ACLs.',
+        'sqlite': 'Stop the destination application; preserve old database/sidecars separately and restore the snapshot with correct ownership. Follow app WAL/SHM handling; external blobs/config are separate.',
+    }
+    return 'Decompress .gz files first. Restore into an isolated destination. ' + instructions[engine]
+
+
+def dump_suffix(engine):
+    """Return the native artifact suffix; reject unrecognized manifest engines."""
+    try:
+        return {'mariadb': '.sql', 'mysql': '.sql', 'postgresql': '.dump',
+                'mongodb': '.archive', 'redis': '.rdb', 'sqlite': '.sqlite'}[engine]
+    except KeyError:
+        raise DatabaseError('invalid_dump') from None
 
 
 def managed_scripts():
     """Return fixed bundled helper sources for an administrator's read-only view."""
-    return [{'name': 'database-dump-' + engine + '.sh', 'engine': engine,
-             'content': (SCRIPTS / ('database-dump-' + engine + '.sh')).read_text()}
-            for engine in ('mariadb', 'postgresql')]
+    return [{'name': 'database-dump-' + engine + suffix, 'engine': engine,
+             'content': (SCRIPTS / ('database-dump-' + engine + suffix)).read_text()}
+            for engine in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis', 'sqlite')
+            for suffix in ['.py' if engine == 'sqlite' else '.sh']]
 
 
 def verify_archive(repo, archive, results, cancelled=lambda: False):
@@ -648,11 +758,13 @@ def _cleanup_run(path, profile, *, verified, interrupted):
     if verified and manifest.get('status') != 'archived':
         raise DatabaseError('cleanup_blocked')
     allowed = {'manifest.json', '.probe', '.verify'}
+    if manifest.get('engine') == 'sqlite':
+        allowed.update('.sqlite-snapshot' + suffix for suffix in ('', '-journal', '-wal', '-shm'))
     databases = manifest.get('scope', {}).get('databases', [])
     if not isinstance(databases, list) or any(not isinstance(db, str) or not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', db) for db in databases):
         raise DatabaseError('cleanup_blocked')
     for database in databases:
-        name = database + ('.sql' if manifest['engine'] == 'mariadb' else '.dump')
+        name = database + dump_suffix(manifest['engine'])
         if manifest.get('compression') == 'gzip':
             name += '.gz'
         allowed.update((name, name + '.partial'))

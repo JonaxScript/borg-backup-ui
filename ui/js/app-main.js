@@ -59,6 +59,7 @@
     '/ui/js/pages/storage.js',
     '/ui/vendor/prism/prism-core.min.js',
     '/ui/vendor/prism/prism-bash.min.js',
+    '/ui/vendor/prism/prism-python.min.js',
     '/ui/js/components/bash-editor.js',
     '/ui/js/pages/settings.js',
     '/ui/js/pages/databases.js',

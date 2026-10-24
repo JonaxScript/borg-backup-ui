@@ -1948,7 +1948,7 @@ modify production data.
 ### 19.1 Profiles and prerequisites
 
 Under **Settings > Database backups**, create a profile for a running local
-MariaDB or PostgreSQL container. Enter the database user (typically `root` for
+MariaDB or PostgreSQL container (additional online engines are described in section 19.5). Enter the database user (typically `root` for
 MariaDB or `postgres` for PostgreSQL) and password. Use **Save connection and load
 databases**, select databases with the checkboxes, then save the profile. A root
 Docker execution user alone does not bypass database authentication. Discovery
@@ -2013,7 +2013,7 @@ managed Secrets. Existing external files are preserved and are not exported.
   **Create own script** creates an unsaved draft. Adjust its constants, check
   prerequisites, then set `CONFIGURED="yes"`, save and assign it to a job.
   The original template is unchanged; updates do not overwrite your own copy.
-- **Managed by Borg Backup UI**: only the two database helpers, read-only with
+- **Managed by Borg Backup UI**: only the six managed database helpers, read-only with
   syntax highlighting, documentation and an update notice. Database profiles
   control their configuration and execution. Internal Python modules, startup
   service, restore test and notification adapter are outside this view.
@@ -2106,6 +2106,17 @@ archive verification. **Archived and verified is not a database restore test.**
 
 ### 19.3 Local retention and interrupted operations
 
+Internal metadata in `database-operations` and `database-tests` is checked hourly,
+starting one minute after normal service startup. Confirmed terminal records are
+removed once their valid completion timestamp is older than 30 days. Running,
+unresolved, malformed, unsafe or unidentifiable entries remain. The same rule
+cleans journal-linked leftovers in `database-discovery`; normal discovery already
+removes its temporary directory immediately. Older temporary directories without
+an identifying journal remain for manual investigation. Busy Docker operations
+defer the pass. Dumps, Secrets, configuration and Borg archives are untouched.
+This does not migrate internal state to SQLite.
+
+
 **Local backup runs** shows retained database dumps across saved profiles, from
 backup jobs and test dumps. The profile selector above does not filter this list.
 Borg archives and ordinary file backups are not listed here. Removing local files
@@ -2163,3 +2174,58 @@ rows and application behavior. Log a restore as tested only after these checks.
 Logical exports do not provide WAL/binlog retention, physical server backups or
 point-in-time recovery. New tables/databases outside the explicit selection are
 not automatically included.
+
+### 19.5 Additional online backup engines (#593)
+
+Database profiles perform online backups: no container shutdown or paused writers
+are required. A job's separately configured Appdata/Docker stop steps remain
+independent and run after database exports. Unsupported configurations fail the
+check/export; there is no fallback to an offline or raw-file backup.
+
+| Engine | Online method | Supported scope |
+| --- | --- | --- |
+| MySQL | `mysqldump --single-transaction` | Selected InnoDB databases, routines, triggers and events; no accounts/grants. Avoid concurrent schema changes. |
+| MongoDB | `mongodump --archive --oplog` | Complete initialized replica-set member, including users/roles and credential hashes. No individual databases, standalone servers, shard/config-server members or mongos. |
+| Redis | `redis-cli --rdb -` | All logical databases of one standalone instance. No Redis Cluster, server config or ACL credentials. |
+| SQLite | Native SQLite Online Backup API | One explicit database file in a local Docker directory bind mount, including committed WAL data. |
+
+For MySQL, `mysql` and `mysqldump` must be present, with matching major/minor
+versions. The usual container supervisor tools including `setsid` are required.
+Minimal images without these tools are rejected; the plugin does not install
+packages in containers. MongoDB additionally needs `mongosh`, Database Tools
+with `--config` support (100.3 or newer), full backup/oplog permissions and
+`getCmdLineOpts` permission to exclude sharded deployments. Normal MongoDB writes
+continue; avoid schema, role/privilege and feature-compatibility changes during
+export. Oplog rollover or native export errors fail the run. No replica-set setup
+or topology change is performed automatically. Use matching server/FCV and tool
+versions for restore. Redis requires PING, INFO and replication permissions.
+MongoDB and Redis can explicitly use **Server without authentication** when that
+matches the server; the default remains protected credentials in Secrets.
+
+For SQLite, select the application container and enter its **database path inside
+the container**, for example `/root/.stash/stash-go.sqlite` if that is the path
+configured in Stash. The plugin resolves its directory bind mount to a local host
+pool and uses the host SQLite runtime; no SQLite executable is needed inside the
+container. Named volumes, a single-file bind mount, network/FUSE paths (including
+`/mnt/user`), symlinks and encrypted SQLite databases are unsupported. Use the
+actual local pool path for the directory bind. The temporary uncompressed
+snapshot needs additional space on dump storage, is integrity-checked, streamed
+into gzip and removed after completion or a handled failure. This is a database
+snapshot, not a full application backup: Stash configuration, media and external
+blob storage must be included separately. Stash's own full-backup function is
+another option when application-managed blob inclusion is required.
+
+Restore remains explicit and manual into an isolated destination. First extract
+and decompress the selected artifact. Import MySQL SQL with `mysql`; restore
+MongoDB with `mongorestore --archive=<file> --oplogReplay` using compatible versions
+and suitable privileges. The complete MongoDB archive contains sensitive account
+data. For Redis, restore the RDB using the server's persistence procedure; ensure
+an existing AOF does not take precedence over the restored RDB. For SQLite/Stash,
+stop the destination application, retain its old database and sidecars separately,
+restore the snapshot at its configured database path with appropriate ownership,
+and follow the application's procedure for WAL/SHM and external blob files.
+Stopping the destination during restore does not require downtime during backup.
+
+See the native [MongoDB oplog documentation](https://www.mongodb.com/docs/database-tools/mongodump/),
+[SQLite backup API](https://www.sqlite.org/backup.html) and
+[Stash backup/restore guide](https://docs.stashapp.cc/guides/backup-and-restore-database/).

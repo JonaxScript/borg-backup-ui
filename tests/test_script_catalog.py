@@ -13,7 +13,7 @@ from job_scripts import save_script, list_scripts
 def test_catalog_contains_only_database_helpers_and_practical_templates():
     entries = catalog.list_catalog()['entries']
     paths = {row['path'] for row in entries if row['kind'] == 'managed'}
-    assert paths == {'runtime/scripts/database-dump-mariadb.sh','runtime/scripts/database-dump-postgresql.sh'}
+    assert paths == {f'runtime/scripts/database-dump-{engine}.sh' for engine in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis')} | {'runtime/scripts/database-dump-sqlite.py'}
     assert len([row for row in entries if row['kind']=='template']) == 4
     assert all('content' not in row for row in entries)
     for row in entries:

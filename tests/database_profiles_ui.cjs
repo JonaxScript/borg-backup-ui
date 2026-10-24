@@ -114,6 +114,23 @@ const {chromium} = require('playwright');
       await page.locator('#settings-dialog-confirm-btn').click();
       await page.waitForFunction(()=>document.querySelectorAll('#db-select option').length===1);
       assert.equal(deletes,1);
+      for (const engine of ['mysql','mongodb','redis','sqlite']) {
+        await page.locator('#db-engine').selectOption(engine);
+        assert.equal(await page.locator('#db-globals-label').isVisible(),false);
+        assert.equal(await page.locator('#db-sqlite-field').isVisible(),engine==='sqlite');
+        assert.ok((await page.locator('#db-engine-scope').textContent()).length>30);
+        if (engine==='sqlite') {
+          assert.equal(await page.locator('#db-password').isVisible(),false);
+          assert.equal(await page.locator('#db-sqlite_path').getAttribute('required'),'');
+          assert.equal(await page.locator('#db-databases input[value=database]:checked').count(),1);
+        }
+        if (engine==='redis') {
+          assert.equal(await page.locator('#db-port').inputValue(),'6379');
+          assert.equal(await page.locator('#db-databases input[value=all]:checked').count(),1);
+          await page.locator('#db-auth-mode').selectOption('none');
+          assert.equal(await page.locator('#db-password').isVisible(),false);
+        }
+      }
       assert.deepEqual(browserDialogs,[]);
       assert.deepEqual(errors,[]);
       await page.close();
