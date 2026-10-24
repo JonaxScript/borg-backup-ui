@@ -469,7 +469,7 @@ function renderBorgRun(job, now = Date.now() / 1000) {
       return `<tr class="is-${view.state}" data-step="${escHtml(step.id)}"><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
     }).join('')}</tbody>
     </table></div>` : `<div id="job-step-details-${escHtml(job.key)}" hidden></div>`;
-  return `<ol class="borg-stepper" style="--workflow-cols:${Math.min(6, steps.length)}" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
+  return `<ol class="borg-stepper" tabindex="0" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
     ${details}<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div>
     <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button></div>`;
 }

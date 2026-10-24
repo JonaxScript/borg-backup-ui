@@ -68,7 +68,9 @@ Manual test-channel acceptance on Unraid:
   local dumps, and no previous/partial dump appears in the current archive.
 - While a database export runs, check the active Database backups step and elapsed
   time before Docker shutdown. Verify persisted success/failure/cancellation and
-  file details, and visibility of assigned Pre/Post scripts.
+  file details, and visibility of assigned Pre/Post scripts. Check seven steps in
+  one desktop row and a full eleven-step workflow on narrow cards: only the strip
+  scrolls horizontally, keyboard scrolling works, and refresh retains focus/scroll.
 - Restore into separate database containers and verify data, views, routines,
   triggers/events and PostgreSQL extensions/roles. Reprovision omitted passwords
   and MariaDB global grants; do not claim a common snapshot with application files.

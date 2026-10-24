@@ -354,7 +354,7 @@ Each job has its own bordered card with spacing. **All locations** shows separat
 
 The overall result appears directly below **Operating status**.
 
-The workflow spans the full job-card width and shows the configured run steps in execution order: optional Pre script, database backups, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Names and measured durations are always visible; narrow screens wrap the sequence across rows.
+The workflow spans the full job-card width and shows the configured run steps in execution order: optional Pre script, database backups, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Names and measured durations are always visible; all steps stay in one row. When space is limited, scroll the workflow horizontally; keyboard scrolling is available after focusing it with Tab.
 
 A circled check, circled cross, warning triangle, stop symbol, minus, empty circle and rotating ring distinguish success, failure, warning, cancellation, skipped, pending and running steps without relying on color alone. Reduced-motion preferences disable ring animation. Progress updates preserve the running animation without restarting it. Unexecuted steps never receive invented durations or success symbols. Recovery after errors or cancellation is tracked too.
 
