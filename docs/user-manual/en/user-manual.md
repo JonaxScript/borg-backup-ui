@@ -1990,7 +1990,7 @@ managed Secrets. Existing external files are preserved and are not exported.
 **Settings > Scripts** separates three areas:
 
 - **Own scripts**: saved, editable Pre/Post scripts.
-- **Templates**: six practical Bash examples with syntax highlighting and line numbers.
+- **Templates**: four practical Bash examples (source check, free-space check, Wake-on-LAN and webhook) with syntax highlighting and line numbers.
   **Create own script** creates an unsaved draft. Adjust its constants, check
   prerequisites, then set `CONFIGURED="yes"`, save and assign it to a job.
   The original template is unchanged; updates do not overwrite your own copy.

@@ -2,7 +2,10 @@
 
 [English](README.md)
 
-Sechs eigenstaendige Bash-Vorlagen unter **Einstellungen > Skripte > Vorlagen**.
+Vier eigenstaendige Bash-Vorlagen unter **Einstellungen > Skripte > Vorlagen**:
+Quellpruefung, Speicherpruefung, Wake-on-LAN und Webhook. Die beiden Datenbank-
+Beispiele unten bleiben Referenzdateien fuer manuellen Import; im UI-Katalog
+werden stattdessen die verwalteten Datenbankprofile verwendet.
 Die Quellen werden mitgeliefert, aber niemals automatisch aktiviert.
 **Als eigenes Skript uebernehmen** erstellt einen ungespeicherten, bearbeitbaren
 Entwurf. Updates erhalten gespeicherte eigene Kopien. Der manuelle Import

@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Match script card headings to neutral Settings/Prometheus styling and remove MariaDB/PostgreSQL hook templates from the allowlisted UI catalog. Keep both managed database helpers and existing user copies unchanged.
+
 - Add accented script description/source cards and specific bilingual prerequisites, configuration and failure behavior for all eight catalog entries. Name new dump directories after profile and server-local timestamp/offset. Stream native exports through bounded host-side gzip, record compressed/original sizes, and retain listing/cleanup compatibility with uncompressed UUID runs. Document decompression before restore.
 
 - Separate custom scripts, six practical templates and the two managed database helpers in Settings. Add an admin-only allowlisted source catalog, syntax-highlighted read-only viewer, and explicit template-to-draft copying. Internal Python, service, restore and notification scripts are not exposed. Document and structure database helpers; replace container text entry with a native selector.

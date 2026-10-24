@@ -3439,20 +3439,6 @@
             "configuration": "MAC_ADDRESS, BROADCAST_IP, SERVER_IP, SERVER_PORT und WAIT_SECONDS setzen; CONFIGURED auf yes setzen und als Pre zuordnen. Timeout größer als WAIT_SECONDS wählen, Startwert: 150 Sekunden.",
             "behavior": "Ist der Port bereits erreichbar, wird kein Wake-Paket gesendet. Zeitüberschreitung oder Netzwerkfehler stoppen das Backup. Das Skript fährt den Server nach dem Job nicht herunter."
           },
-          "mariaTemplate": {
-            "title": "MariaDB-Dump als Pre-Skript",
-            "purpose": "Eigenständige Vorlage zum Export einer einzelnen MariaDB-Datenbank als SQL-Datei vor einem Backup. Für die integrierte Sicherung mehrerer Datenbanken stattdessen ein Datenbankprofil verwenden.",
-            "prerequisites": "Docker und mariadb-dump im laufenden Container; geschützte Client-Konfigurationsdatei im Container. Ein vorhandenes privates 0700-Ausgabeverzeichnis unter einem vertrauenswürdigen Mount ist erforderlich.",
-            "configuration": "MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE und CLIENT_CONFIG anpassen, dann CONFIGURED=yes setzen. Als Pre zuordnen und OUTPUT_DIR als Backupquelle aufnehmen. Startwert für Timeout: 1800 Sekunden.",
-            "behavior": "Nur ein erfolgreicher, nicht leerer Dump wird veröffentlicht. Fehler stoppen das Backup; ältere Dumps bleiben erhalten und werden nicht automatisch bereinigt. Diese Vorlage liefert unkomprimiertes SQL und nutzt nicht die Secrets-Verwaltung des Datenbankprofils."
-          },
-          "pgTemplate": {
-            "title": "PostgreSQL-Dump als Pre-Skript",
-            "purpose": "Eigenständige Vorlage zum Export einer einzelnen PostgreSQL-Datenbank im Custom-Format. Rollen und Tablespaces sind nicht Bestandteil dieses Dumps.",
-            "prerequisites": "Docker, pg_dump im laufenden Container und eine geschützte pgpass-Datei im Container. Vorhandenes privates 0700-Ausgabeverzeichnis unter einem vertrauenswürdigen Mount.",
-            "configuration": "MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE, DB_USER und PGPASS_FILE einstellen; CONFIGURED=yes setzen. Als Pre zuordnen und OUTPUT_DIR als Backupquelle aufnehmen. Startwert für Timeout: 1800 Sekunden.",
-            "behavior": "Fehler oder leere Ausgabe stoppen das Backup. Erfolgreiche Dumps bleiben bis zur separaten Bereinigung erhalten. Die Vorlage verwendet die native pg_dump-Komprimierung; integrierte Profile bieten zusätzlich verwaltete Secrets, globale Objekte und Aufbewahrung."
-          },
           "webhook": {
             "title": "Job-Ergebnis an Webhook senden",
             "purpose": "Sendet Job-ID und Ergebnis vor dem Post-Skript als JSON an einen eigenen HTTPS-Empfänger. Dies ist kein Adapter für einen bestimmten Benachrichtigungsdienst.",

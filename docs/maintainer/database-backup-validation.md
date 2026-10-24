@@ -41,9 +41,9 @@ Manual test-channel acceptance on Unraid:
   executable with the bilingual ownership warning and appear read-only with syntax
   highlighting under Scripts > Managed by Borg Backup UI. Only the two database
   helpers appear there. No export runs at install.
-- Open all six Templates, create an own draft, edit/save/assign the copy and verify
+- Open all four Templates, create an own draft, edit/save/assign the copy and verify
   the original is unchanged. Switching categories retains unsaved own edits.
-  Check accented description/source cards, all eight specific descriptions,
+  Check neutral gray description/source card headings matching Prometheus, all six specific descriptions,
   light/dark themes, German/English, mobile layout and the container dropdown.
 - Check new run names include profile and server-local timestamp/offset. Verify
   gzip files restore correctly, both sizes display correctly and existing

@@ -2,7 +2,10 @@
 
 [Deutsch](README.de.md)
 
-Six standalone Bash templates under **Settings > Scripts > Templates**. Their
+Four standalone Bash templates are available under **Settings > Scripts > Templates**:
+source checks, free-space checks, Wake-on-LAN and webhooks. The two database
+examples below remain reference files for manual import; they are excluded from
+the UI template catalog in favor of managed database profiles. Their
 sources ship with the plugin; they are never enabled automatically. Use **Create own script** to create an unsaved, editable copy. Updates preserve saved copies.
 Manual **Import (.sh)** remains available.
 Each file contains its own implementation; no shared helper has to be installed.

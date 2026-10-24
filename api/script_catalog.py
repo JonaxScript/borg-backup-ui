@@ -32,7 +32,7 @@ def _regular_source(path):
 
 
 def _entries():
-    """Build an ID-to-file allowlist from the two database helpers and practical template root, excluding user data."""
+    """Build an ID-to-file allowlist from two database helpers and four explicitly selected hook templates, excluding user data."""
     templates = _template_root()
     entries = {}
     for name in ('database-dump-mariadb.sh', 'database-dump-postgresql.sh'):
@@ -40,7 +40,9 @@ def _entries():
         if _regular_source(path):
             relative = 'runtime/scripts/' + name
             entries['managed:' + relative] = (path, 'managed', relative)
-    for path in sorted(templates.glob('*.sh')):
+    # Database exports belong to managed profiles, not the editable hook catalog.
+    for name in ('post-json-webhook.sh', 'pre-check-free-space.sh', 'pre-check-source.sh', 'pre-wake-server.sh'):
+        path = templates / name
         if _regular_source(path):
             relative = 'practical/' + path.name
             entries['template:' + relative] = (path, 'template', relative)

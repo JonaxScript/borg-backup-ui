@@ -3439,20 +3439,6 @@
             "configuration": "Set MAC_ADDRESS, BROADCAST_IP, SERVER_IP, SERVER_PORT and WAIT_SECONDS; set CONFIGURED to yes and assign as Pre. Choose a timeout above WAIT_SECONDS; suggested value: 150 seconds.",
             "behavior": "An already reachable port skips the wake packet. Timeout or network failure blocks backup. This script does not shut down the server after the job."
           },
-          "mariaTemplate": {
-            "title": "MariaDB dump as a Pre script",
-            "purpose": "Standalone template exporting one MariaDB database to SQL before backup. Use a database profile instead for integrated backups of multiple databases.",
-            "prerequisites": "Docker and mariadb-dump in the running container; a protected client configuration file inside it. An existing private 0700 output directory below a trusted mount is required.",
-            "configuration": "Set MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE and CLIENT_CONFIG, then CONFIGURED=yes. Assign as Pre and add OUTPUT_DIR as a backup source. Suggested timeout: 1800 seconds.",
-            "behavior": "Only a successful nonempty dump is published. Failure blocks backup; older dumps remain without automatic retention. This template produces uncompressed SQL and does not use database-profile Secrets management."
-          },
-          "pgTemplate": {
-            "title": "PostgreSQL dump as a Pre script",
-            "purpose": "Standalone template exporting one PostgreSQL database in custom format. Cluster roles and tablespaces are not included.",
-            "prerequisites": "Docker, pg_dump in the running container and a protected pgpass file inside it. An existing private 0700 output directory below a trusted mount.",
-            "configuration": "Set MOUNT_PATH, OUTPUT_DIR, CONTAINER, DATABASE, DB_USER and PGPASS_FILE, then CONFIGURED=yes. Assign as Pre and add OUTPUT_DIR as a backup source. Suggested timeout: 1800 seconds.",
-            "behavior": "Failure or empty output blocks backup. Successful dumps remain until separately removed. The template uses native pg_dump compression; integrated profiles also offer managed Secrets, global objects and retention."
-          },
           "webhook": {
             "title": "Send job result to a webhook",
             "purpose": "Posts job ID and the pre-Post result as JSON to your own HTTPS receiver. This is not a provider-specific notification adapter.",

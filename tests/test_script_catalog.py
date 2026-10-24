@@ -14,14 +14,14 @@ def test_catalog_contains_only_database_helpers_and_practical_templates():
     entries = catalog.list_catalog()['entries']
     paths = {row['path'] for row in entries if row['kind'] == 'managed'}
     assert paths == {'runtime/scripts/database-dump-mariadb.sh','runtime/scripts/database-dump-postgresql.sh'}
-    assert len([row for row in entries if row['kind']=='template']) == 6
+    assert len([row for row in entries if row['kind']=='template']) == 4
     assert all('content' not in row for row in entries)
     for row in entries:
         result = catalog.read_catalog_source(row['id'])['script']
         assert result['content'] and result['kind'] == row['kind']
 
 
-@pytest.mark.parametrize('identifier', ['../../etc/passwd', '/etc/passwd', 'managed:../secrets/password', 'managed:runtime/scripts/../../../../etc/passwd', 'template:../README.md', 'managed:api/wizard_runner.py', 'managed:runtime/scripts/borg_restore_test.py', 'managed:runtime/scripts/unraid-notification-agent-env.sh', ''])
+@pytest.mark.parametrize('identifier', ['../../etc/passwd', '/etc/passwd', 'managed:../secrets/password', 'managed:runtime/scripts/../../../../etc/passwd', 'template:../README.md', 'template:practical/pre-dump-mariadb.sh', 'template:practical/pre-dump-postgresql.sh', 'managed:api/wizard_runner.py', 'managed:runtime/scripts/borg_restore_test.py', 'managed:runtime/scripts/unraid-notification-agent-env.sh', ''])
 def test_source_rejects_non_catalog_ids(identifier):
     with pytest.raises(FileNotFoundError, match='Script source is unavailable'):
         catalog.read_catalog_source(identifier)
@@ -58,8 +58,8 @@ def test_template_copy_is_separate_and_does_not_execute_or_modify_source(tmp_pat
 def test_installed_documentation_layout_is_used(tmp_path, monkeypatch):
     monkeypatch.setattr(catalog, 'APP_ROOT', tmp_path)
     folder=tmp_path/'ui/docs/examples/job-hooks/practical'; folder.mkdir(parents=True)
-    (folder/'sample.sh').write_text('#!/bin/bash\nexit 0')
-    assert catalog.read_catalog_source('template:practical/sample.sh')['script']['content'].endswith('exit 0')
+    (folder/'pre-check-source.sh').write_text('#!/bin/bash\nexit 0')
+    assert catalog.read_catalog_source('template:practical/pre-check-source.sh')['script']['content'].endswith('exit 0')
 
 
 def test_catalog_routes_are_admin_only():

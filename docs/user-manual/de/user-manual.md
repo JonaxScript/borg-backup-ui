@@ -2026,7 +2026,7 @@ werden nicht exportiert.
 Unter **Einstellungen > Skripte** sind drei Bereiche getrennt:
 
 - **Eigene Skripte**: gespeicherte, bearbeitbare Pre-/Post-Skripte.
-- **Vorlagen**: sechs praktische Bash-Beispiele mit Syntaxhervorhebung und Zeilennummern.
+- **Vorlagen**: vier praktische Bash-Beispiele (Quellprüfung, Speicherprüfung, Wake-on-LAN und Webhook) mit Syntaxhervorhebung und Zeilennummern.
   **Als eigenes Skript übernehmen** erzeugt einen ungespeicherten Entwurf.
   Konstanten anpassen, Voraussetzungen prüfen und erst dann `CONFIGURED="yes"`
   setzen, speichern und einem Job zuordnen. Die Originalvorlage bleibt unverändert;

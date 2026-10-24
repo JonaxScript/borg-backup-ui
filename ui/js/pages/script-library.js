@@ -6,7 +6,7 @@ function scriptLibraryT(key, params = {}) { return settingsT(`scripts.library.${
 function scriptLibraryDetail(script, field) {
   const key = {'database-dump-mariadb.sh':'mariadb', 'database-dump-postgresql.sh':'postgresql',
     'pre-check-source.sh':'source', 'pre-check-free-space.sh':'space', 'pre-wake-server.sh':'wake',
-    'pre-dump-mariadb.sh':'mariaTemplate', 'pre-dump-postgresql.sh':'pgTemplate', 'post-json-webhook.sh':'webhook'}[script.name];
+    'post-json-webhook.sh':'webhook'}[script.name];
   return key ? scriptLibraryT(`details.${key}.${field}`) : (field === 'title' ? script.name : '');
 }
 
