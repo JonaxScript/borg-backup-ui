@@ -1991,14 +1991,19 @@ The two bundled helpers are visible under **Settings > Scripts > Bundled scripts
 in a read-only view. They run through database profiles, not custom hook assignments.
 
 Use a directory with mode `0700`, owned by the plugin execution user
-(normally root), on a real mounted local pool/disk. Parent directories must be
-owned by root/the execution user and not group/world writable. Symlinks are
-rejected. Supported filesystem types are Btrfs, XFS, ext-family and ZFS. Use the
+(normally root), on a real mounted local pool/disk. Pool and parent directories may retain their normal Unraid ownership
+and permissions (including `nobody:users`, `0777`). Only the private dump directory
+requires the plugin owner and `0700`; the plugin never changes existing pool
+permissions. All components are opened without following symlinks. Held directory
+handles keep exports, archiving and cleanup on the original directory if another
+user renames or replaces its path. Supported filesystem types are Btrfs, XFS, ext-family and ZFS. Use the
 actual pool path, not `/mnt/user`; boot storage, RAM and network filesystems are
 not supported. Select the actual mount point separately. The free-space reserve
 is a guard, not an estimate of dump size; allocate room for complete exports.
 An explicit dump creates a missing directory directly below the mounted pool
-with mode `0700`; the mount and safe parent directories must already exist.
+with mode `0700`; the mount and any intermediate directories must already exist.
+Storage errors distinguish an absent mount, inaccessible/symlink path, incorrect
+private-directory permissions, unsupported filesystem and insufficient free space.
 
 ### 19.2 Run and verify
 
@@ -2035,8 +2040,9 @@ only after the dump does not establish a common recovery point. Arrange recovery
 in Post with the appropriate error/cancellation policy.
 
 Completed artifacts include a manifest with tool versions, container identity,
-selected scope, sizes and SHA-256 hashes. Paths inside Borg match the absolute
-staging path without its leading slash. The job reads each required artifact back
+selected scope, sizes and SHA-256 hashes. Paths inside Borg use the
+`bbui-<run-id>/` directory recorded as `archive_directory` in the manifest.
+Older test archives use the original staging path without its leading slash. The job reads each required artifact back
 from the new archive and checks its bytes. Excluded/missing/corrupt output fails
 verification; completed local files remain. The manifest inside the archive
 records export-time status; the local result and job workflow record subsequent

@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from database_profiles import DatabaseError, data_root, snapshot_profiles, list_profiles
-from database_backup import export_profiles, reconcile_operations, staging_root, cleanup_run, utc_now, discover_databases
+from database_backup import export_profiles, reconcile_operations, open_staging, _descriptor_path, _private_path, cleanup_run, utc_now, discover_databases, close_results
 from inventory_store import atomic_write_json
 
 _active = {}
@@ -73,27 +73,18 @@ def start_operation(config, payload):
             if action in ('discover', 'check'):
                 state['databases'] = discover_databases(config, profile, event.is_set)
             elif action == 'dump':
-                state['results'] = export_profiles(config, profiles, 'test', identifier, event.is_set,
-                                                    check_only=action == 'check')
+                state['results'] = []
+                export_profiles(config, profiles, 'test', identifier, event.is_set, results=state['results'])
             elif action == 'cleanup':
-                directory = Path(str(payload.get('directory', '')))
-                # A lock plus successful reconciliation proves no managed exporter remains.
-                root = staging_root(profile, require_space=False)
-                if directory.parent != root or not directory.name.startswith('bbui-') or directory.is_symlink():
-                    raise DatabaseError('invalid_storage')
-                if (directory / 'manifest.json').is_symlink():
-                    raise DatabaseError('cleanup_blocked')
-                manifest = json.loads((directory / 'manifest.json').read_text())
-                if manifest.get('status') == 'running':
-                    manifest['status'] = 'interrupted'
-                    atomic_write_json(directory / 'manifest.json', manifest)
-                cleanup_run(directory, profile)
+                # Successful reconciliation under docker-control proves no exporter remains.
+                cleanup_run(Path(str(payload.get('directory', ''))), profile, interrupted=True)
             state['status'] = 'completed'
         except DatabaseError as exc:
             state.update(status='cancelled' if exc.reason == 'cancelled' else 'failed', error_code=exc.api_code)
         except Exception:
             state.update(status='failed', error_code='database_operation_failed')
         finally:
+            close_results(state.get('results', []))
             state['finished_at'] = utc_now()
             try:
                 locks.release()
@@ -118,19 +109,23 @@ def retained_runs(config):
     rows, errors = [], []
     for profile in list_profiles(config)['profiles']:
         try:
-            root = staging_root(profile, require_space=False)
-            for directory in sorted(root.glob('bbui-*'))[-500:]:
-                if directory.is_symlink() or not directory.is_dir():
-                    continue
-                path = directory / 'manifest.json'
-                if path.is_symlink() or not path.is_file():
-                    continue
-                row = json.loads(path.read_text())
-                if row.get('profile_id') != profile['id']:
-                    continue
-                rows.append({'profile_id': profile['id'], 'directory': str(directory), 'status': row.get('status'),
-                             'started_at': row.get('started_at'), 'archived': row.get('archived', False),
-                             'bytes': sum(p.stat().st_size for p in directory.iterdir() if p.is_file() and not p.is_symlink())})
+            with open_staging(profile, require_space=False) as fd:
+                root = _descriptor_path(fd)
+                for directory in sorted(root.glob('bbui-*'))[-500:]:
+                    if directory.is_symlink() or not directory.is_dir():
+                        continue
+                    _private_path(directory)
+                    path = directory / 'manifest.json'
+                    if path.is_symlink() or not path.is_file():
+                        continue
+                    row = json.loads(path.read_text())
+                    if row.get('profile_id') != profile['id']:
+                        continue
+                    rows.append({'profile_id': profile['id'], 'directory': str(Path(profile['staging_dir']) / directory.name), 'status': row.get('status'),
+                                 'started_at': row.get('started_at'), 'archived': row.get('archived', False),
+                                 'bytes': sum(p.stat().st_size for p in directory.iterdir() if p.is_file() and not p.is_symlink())})
+        except DatabaseError as exc:
+            errors.append({'profile_id': profile['id'], 'error_code': exc.api_code})
         except Exception:
             errors.append({'profile_id': profile['id'], 'error_code': 'database_invalid_storage'})
     return {'runs': rows, 'errors': errors}

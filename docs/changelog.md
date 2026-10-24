@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Accept normal Unraid pool ownership/modes without modifying them; require only the dump directory to be private. Anchor exports, Borg input/readback and cleanup to held directory descriptors, reject symlink components and unsupported backing filesystems, and report distinct storage diagnostics. New database archive entries use the manifest's stable `archive_directory` instead of process descriptor paths.
+
 - Simplify setup with managed versioned Secrets, native database discovery and explicit checkbox selection. Match Settings cards and expose shipped helpers read-only under Scripts. Preserve existing credential references; include managed files in encrypted Secrets exports.
 
 - Add credential-reference profiles, bundled managed exporters, asynchronous admin checks/dumps/cleanup, and job wizard integration for MariaDB and PostgreSQL.

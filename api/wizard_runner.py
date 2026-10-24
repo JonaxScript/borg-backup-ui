@@ -811,7 +811,7 @@ def main() -> int:
             result_code = 130
             return result_code
         if meta.get("_database_profiles"):
-            from database_backup import export_profiles, validate_sources, artifact_paths
+            from database_backup import export_profiles, validate_sources, borg_artifact_paths
             validate_sources(meta["_database_profiles"], job_config.backup_paths)
             set_phase("database_backup")
             with workflow.track("database_backup"):
@@ -822,7 +822,7 @@ def main() -> int:
                     results=database_results,
                 )
                 workflow.update("database_backup", details={"results": database_results})
-            job_config.backup_paths.extend(artifact_paths(database_results))
+            job_config.backup_paths.extend(borg_artifact_paths(database_results))
         if docker_mgr is not None:
             set_phase("stopping_docker")
             selected = docker_control["selected"]
@@ -876,15 +876,14 @@ def main() -> int:
 
         job.recover_runtime()
         if database_results:
-            from database_backup import verify_archive, cleanup_run
-            from inventory_store import atomic_write_json
+            from database_backup import verify_archive, cleanup_run, write_manifest
             try:
                 verify_archive(borg_config.repo, database_archive, database_results, control.is_cancel_requested)
                 workflow.update("database_backup", details={"results": database_results})
                 for result, profile in zip(database_results, meta["_database_profiles"]):
-                    atomic_write_json(Path(result['directory']) / 'manifest.json', result)
+                    write_manifest(result)
                     if create_exit == 0 and profile['retention'] == 'after_archive':
-                        cleanup_run(result['directory'], profile, verified=True)
+                        cleanup_run(result, profile, verified=True)
             except Exception:
                 workflow.update("database_backup", status="error")
                 raise
@@ -970,6 +969,8 @@ def main() -> int:
         result_code = 2
         raise
     finally:
+        from database_backup import close_results
+        close_results(database_results)
         try:
             if not cleanup_done:
                 if exclusion_temp is not None:

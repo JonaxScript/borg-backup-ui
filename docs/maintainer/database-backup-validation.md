@@ -10,9 +10,11 @@ BBUI_DATABASE_DOCKER_TESTS=1 pytest -q -s tests/test_database_docker_integration
 pytest -q tests/test_database_backups.py tests/test_database_profiles_ui.py
 ```
 
-The Docker test substitutes only the host staging mount guard because the
+The Docker test substitutes only the host mount detection and filesystem-type probe because the
 repository test filesystem is not an Unraid pool. Production mount, permissions,
-space and overlap rules have isolated tests. Clients and database processes are
+space and overlap rules have isolated tests, including writable pools, symlink
+rejection, directory replacement during export, real Borg readback through held
+directory handles, and cleanup without touching a replacement directory. Clients and database processes are
 real. Test images expose no ports; generated data is disposable. Failed fixture
 startup is not an application export failure. Successful cancellation excludes
 zombies (which cannot run) and checks that no active client child remains.
@@ -40,6 +42,9 @@ Manual test-channel acceptance on Unraid:
 - Enter database users/passwords in Settings, load database lists, select scope
   and save. No manual container files/mounts are needed. Test Secrets export/import
   and credential rotation during a run. Check unavailable/wrong staging mounts.
+- Keep normal pool permissions (`0777 nobody:users`); only the dump directory
+  needs `0700 root:root`. Verify a missing direct child is created only by an
+  explicit dump, and mount/path/mode/filesystem errors are distinguished.
 - Save a profile, check its connection, export a test dump, cancel an active dump
   and reconcile an interrupted operation. Check per-run status/space and cleanup.
 - Run a mixed file/database job and a database-only job. Verify current dumps and

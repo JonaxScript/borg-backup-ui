@@ -51,7 +51,7 @@ def test_profile_rejects_unsafe_or_unsupported_inputs(profile, field, value):
 
 def test_staging_and_source_overlap_fail_closed(monkeypatch, profile):
     monkeypatch.setattr(backup.os.path,'ismount',lambda p:False)
-    with pytest.raises(profiles.DatabaseError, match='invalid_storage'): backup.staging_root(profile)
+    with pytest.raises(profiles.DatabaseError, match='storage_mount'): backup.staging_root(profile)
     with pytest.raises(profiles.DatabaseError, match='source_overlap'): backup.validate_sources([profile],[profile['staging_mount']])
     backup.validate_sources([profile],[str(Path(profile['staging_mount'])/'other')])
 
@@ -59,20 +59,19 @@ def test_staging_and_source_overlap_fail_closed(monkeypatch, profile):
 def test_staging_rejects_unsafe_permissions_and_low_space(monkeypatch, profile):
     root=Path(profile['staging_dir'])
     root.chmod(0o777)
-    with pytest.raises(profiles.DatabaseError,match='invalid_storage'):backup._private_path(root)
+    with pytest.raises(profiles.DatabaseError,match='storage_permissions'):backup._private_path(root)
     root.chmod(0o700)
     monkeypatch.setattr(backup.os.path,'ismount',lambda p:True)
-    monkeypatch.setattr(backup,'_private_path',lambda p:None)
     monkeypatch.setattr(backup,'_run',lambda *a,**kw:Mock(stdout='xfs'))
-    monkeypatch.setattr(backup.shutil,'disk_usage',lambda p:Mock(free=1))
+    monkeypatch.setattr(backup.os,'fstatvfs',lambda fd:Mock(f_bavail=1,f_frsize=1))
     with pytest.raises(profiles.DatabaseError,match='no_space'):backup.staging_root(profile)
     assert backup.staging_root(profile,require_space=False)==root
 
 
 def fake_export(monkeypatch, profile, failure=None):
-    # Repository test directories may have group-writable ancestors; production rejects those.
-    monkeypatch.setattr(backup, '_private_path', lambda p: None)
-    monkeypatch.setattr(backup, 'staging_root', lambda p, **kw: Path(p['staging_dir']))
+    # Substitute host mount/type only; retain real FD, ownership and mode checks.
+    monkeypatch.setattr(backup.os.path, 'ismount', lambda p: True)
+    monkeypatch.setattr(backup, '_run', lambda *a, **kw: Mock(stdout='xfs'))
     monkeypatch.setattr(backup, 'container_identity', lambda p:'a'*64)
     monkeypatch.setattr(backup, '_probe', lambda *a: {'server_version':'11.4.9', 'client_version':'11.4.9','extensions':[]})
     def export(config,p,cid,action,database,output,cancelled):
@@ -88,7 +87,7 @@ def test_export_uses_only_current_completed_files_and_retains_previous(config, p
     assert first[0]['directory'] != second[0]['directory']
     paths=backup.artifact_paths(second)
     assert {p.name for p in paths} == {'app.sql','manifest.json'}
-    assert all(p.parent == Path(second[0]['directory']) for p in paths)
+    assert all(p.parent.samefile(second[0]['directory']) for p in paths)
     assert all(p.is_file() and p.stat().st_mode & 0o777 == 0o600 for p in paths)
     assert first[0]['restore_tested'] is False
 
@@ -119,7 +118,7 @@ def test_archive_verification_reads_actual_content_and_rejects_missing(config, p
     import subprocess
     original = subprocess.Popen
     def popen(cmd, **kw):
-        source=Path('/'+cmd[-1])
+        source=backup.result_directory(results[0])/Path(cmd[-1]).name
         return original([sys.executable, '-c', 'import sys;sys.stdout.buffer.write(open(sys.argv[1],"rb").read())', str(source)], **kw)
     monkeypatch.setattr(backup.subprocess,'Popen',popen)
     backup.verify_archive('repo','archive',results)

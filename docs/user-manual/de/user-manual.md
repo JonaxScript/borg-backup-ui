@@ -2028,15 +2028,21 @@ in einer schreibgeschützten Ansicht. Die Ausführung erfolgt über Datenbankpro
 nicht über zusätzliche Hook-Zuordnungen.
 
 Ein privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
-auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Elternverzeichnisse
-müssen root/dem Ausführungsnutzer gehören und dürfen nicht für Gruppe/Andere
-beschreibbar sein. Symlinks werden abgewiesen. Unterstützt: Btrfs, XFS, ext-Dateisysteme
+auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Pool und Elternverzeichnisse
+behalten ihre normalen Unraid-Eigentümer und Rechte (auch `nobody:users`, `0777`).
+Nur das private Dump-Verzeichnis benötigt den Plugin-Eigentümer und `0700`;
+vorhandene Pool-Rechte ändert das Plugin nicht. Alle Pfadbestandteile werden ohne
+Verfolgung symbolischer Links geöffnet. Gehaltene Verzeichnis-Handles stellen
+sicher, dass Export, Archivierung und Bereinigung beim ursprünglichen Verzeichnis
+bleiben, wenn ein anderer Benutzer dessen Pfad umbenennt oder ersetzt. Unterstützt: Btrfs, XFS, ext-Dateisysteme
 und ZFS. Den echten Poolpfad statt `/mnt/user` verwenden. Bootstick, RAM und
 Netzwerk-Dateisysteme sind nicht unterstützt. Den tatsächlichen Mountpunkt separat
 angeben. Die Freiplatzgrenze schätzt die Dump-Größe nicht; Platz für vollständige
 Exporte vorsehen. Ein fehlendes Verzeichnis direkt unter dem eingebundenen Pool
-legt ein ausdrücklich gestarteter Dump mit Modus `0700` an. Mountpunkt und sichere
-Elternverzeichnisse müssen vorhanden sein.
+legt ein ausdrücklich gestarteter Dump mit Modus `0700` an. Mountpunkt und etwaige
+Zwischenverzeichnisse müssen vorhanden sein. Fehlermeldungen unterscheiden einen
+fehlenden Mount, unzugängliche Pfade/Symlinks, falsche Rechte des privaten Ordners,
+ein ungeeignetes Dateisystem und fehlenden freien Speicher.
 
 ### 19.2 Ablauf und Prüfung
 
@@ -2074,8 +2080,9 @@ erst nach dem Dump reicht dafür nicht. Wiederanlauf im Post-Skript mit passende
 Fehler-/Abbruchbedingung vorsehen.
 
 Das Manifest enthält Werkzeugversionen, Containeridentität, Umfang, Größen und
-SHA-256-Hashes. Im Archiv entspricht der Pfad dem absoluten Staging-Pfad ohne
-führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
+SHA-256-Hashes. Im Archiv liegen die Dateien unter `bbui-<run-id>/`, im Manifest als
+`archive_directory` vermerkt. Ältere Testarchive verwenden den absoluten Staging-Pfad
+ohne führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
 zurück und vergleicht ihre Bytes. Fehlende, ausgeschlossene oder abweichende
 Dateien führen zum Fehler; lokale Exporte bleiben erhalten. Das Manifest im
 Archiv beschreibt den Exportzeitpunkt; das lokale Ergebnis und der Jobablauf

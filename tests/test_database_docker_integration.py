@@ -81,7 +81,10 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     leftovers=command(['docker','exec',source,'sh','-c','find /dev/shm -name credentials -print'])
     assert not leftovers
     # Host filesystem/mount safety is covered separately; all exporter/Borg/database operations are real.
-    monkeypatch.setattr(backup,'staging_root',lambda *a,**k:staging)
+    monkeypatch.setattr(backup.os.path, 'ismount', lambda p: True)
+    original_run = backup._run
+    from unittest.mock import Mock
+    monkeypatch.setattr(backup, '_run', lambda cmd, **kw: Mock(stdout='xfs') if cmd[0]=='stat' else original_run(cmd, **kw))
     cfg={'BACKUP_SCRIPTS_DIR':str(tmp_path/'config')}
     results=backup.export_profiles(cfg,[profile],'fixture-job','fixture-run')
     monkeypatch.setenv('BORG_CACHE_DIR',str(tmp_path/'cache'))
@@ -90,12 +93,12 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     repo=tmp_path/'borg-repository'
     command(['borg','init','--encryption=none',str(repo)])
     paths=backup.artifact_paths(results)
-    command(['borg','create',str(repo)+'::fixture',*[str(p) for p in paths]])
+    command(['borg','create',str(repo)+'::fixture',*backup.borg_artifact_paths(results)])
     backup.verify_archive(str(repo),'fixture',results)
     assert results[0]['archived'] and not results[0]['restore_tested']
     target=launch('restore')
     dump=next(p for p in paths if p.suffix in ('.sql','.dump'))
-    content=command(['borg','extract','--stdout',str(repo)+'::fixture',str(dump).lstrip('/')])
+    content=command(['borg','extract','--stdout',str(repo)+'::fixture',results[0]['archive_directory'] + '/' + dump.name])
     if engine=='mariadb':
         sql(target,content.decode())
         assert b'backed-up' in sql(target,'SELECT value FROM item_view;','fixture')
@@ -104,7 +107,7 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
         assert b'items_trigger' in sql(target,'SHOW TRIGGERS FROM fixture;')
     else:
         globals_path=Path(results[0]['directory'])/'globals.sql'
-        globals_sql=command(['borg','extract','--stdout',str(repo)+'::fixture',str(globals_path).lstrip('/')])
+        globals_sql=command(['borg','extract','--stdout',str(repo)+'::fixture',results[0]['archive_directory'] + '/' + globals_path.name])
         assert b'PASSWORD' not in globals_sql and password.encode() not in globals_sql
         # The bootstrap role already exists in a fresh official image; skip only its CREATE.
         sql(target,globals_sql.decode().replace('CREATE ROLE postgres;',''))
@@ -113,12 +116,13 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
         assert b'fixture_owner' in sql(target,"SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='fixture';")
         assert b'hstore' in sql(target,'SELECT extname FROM pg_extension;','fixture')
     # Missing artifacts must fail even though Borg itself successfully created the archive.
-    command(['borg','create',str(repo)+'::missing',str(paths[-1])])
+    command(['borg','create',str(repo)+'::missing',backup.borg_artifact_paths(results)[-1]])
     with pytest.raises(DatabaseError,match='archive_verification'):backup.verify_archive(str(repo),'missing',results)
     if engine=='mariadb':
         sql(source,'CREATE TABLE unsupported(id integer) ENGINE=MyISAM;','fixture')
         with pytest.raises(DatabaseError,match='nontransactional'):backup.export_profiles(cfg,[profile],'fixture-job','unsupported')
     print(engine,results[0]['files'][0]['server_version'],'restore verified')
+    backup.close_results(results)
 
 
 def test_real_owned_group_cancellation(database_container,tmp_path,monkeypatch):
