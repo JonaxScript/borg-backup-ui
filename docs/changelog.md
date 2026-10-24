@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Separate custom scripts, six practical templates and the two managed database helpers in Settings. Add an admin-only allowlisted source catalog, syntax-highlighted read-only viewer, and explicit template-to-draft copying. Internal Python, service, restore and notification scripts are not exposed. Document and structure database helpers; replace container text entry with a native selector.
+
 - Accept normal Unraid pool ownership/modes without modifying them; require only the dump directory to be private. Anchor exports, Borg input/readback and cleanup to held directory descriptors, reject symlink components and unsupported backing filesystems, and report distinct storage diagnostics. New database archive entries use the manifest's stable `archive_directory` instead of process descriptor paths.
 
 - Simplify setup with managed versioned Secrets, native database discovery and explicit checkbox selection. Match Settings cards and expose shipped helpers read-only under Scripts. Preserve existing credential references; include managed files in encrypted Secrets exports.

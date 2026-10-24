@@ -3383,7 +3383,27 @@
       "disabledJob": "Job deaktiviert",
       "beforeBackup": "Vor allen Backup-Vorbereitungen",
       "assignedHint": "Änderungen gelten ab dem nächsten Lauf dieser Jobs. Zum Löschen zuerst alle Zuordnungen im Job-Wizard entfernen.",
-      "validationHint": "Beim Speichern wird die Bash-Syntax geprüft. Das Skript wird dabei nicht ausgeführt. Fehler während der Ausführung können daher trotzdem auftreten."
+      "validationHint": "Beim Speichern wird die Bash-Syntax geprüft. Das Skript wird dabei nicht ausgeführt. Fehler während der Ausführung können daher trotzdem auftreten.",
+      "library": {
+        "navigation": "Skriptbibliothek",
+        "own": "Eigene Skripte",
+        "template": "Vorlagen",
+        "managed": "Von Borg Backup UI verwaltet",
+        "templateHelp": "Vorlage ansehen und als eigenes Skript übernehmen. Deine Kopie lässt sich bearbeiten und bleibt bei Plugin-Updates erhalten. Erst nach Speichern und Zuweisen läuft sie in einem Job.",
+        "managedHelp": "Diese Dateien gehören zu den Plugin-Funktionen und werden von Borg Backup UI gepflegt. Hier siehst du ihren Quelltext schreibgeschützt. Plugin-Updates können diese Dateien ersetzen.",
+        "search": "Datei suchen",
+        "choose": "Wähle links eine Datei, um Zweck und Quelltext anzusehen.",
+        "empty": "Keine passenden Dateien.",
+        "copyEditable": "Als eigene Kopie bearbeitbar",
+        "pluginOwned": "Borg Backup UI · Schreibgeschützt",
+        "use": "Als eigenes Skript übernehmen",
+        "draft": "Vorlage als Entwurf übernommen. Prüfe die Konfiguration und speichere deine Kopie.",
+        "source": "Quelltext mit Syntaxhervorhebung",
+        "lines": "{count} Zeilen",
+        "mariadb": "Exportiert ausgewählte MariaDB-Datenbanken über die integrierte Datenbanksicherung.",
+        "postgresql": "Exportiert PostgreSQL-Datenbanken und optional globale Objekte über die integrierte Datenbanksicherung.",
+        "templatePurpose": "Eigenständige Pre-/Post-Vorlage. Zweck, Voraussetzungen, Konfiguration und Verhalten sind im Quelltext beschrieben."
+      }
     },
     "databases": {
       "title": "Datenbank-Sicherungen",
@@ -3595,6 +3615,9 @@
     "managedTitle": "Mitgelieferte Skripte",
     "managedExecution": "Diese schreibgeschützten Helfer werden über Datenbankprofile ausgeführt. Sie sind keine eigenen Pre-/Post-Hooks und dürfen nicht zusätzlich zugeordnet werden.",
     "readOnly": "Verwaltet · schreibgeschützt",
-    "legacyCredentials": "Dieses bestehende Profil verwendet noch seine Container-Datei. Ein Passwort eingeben, um zu den Secrets von Borg Backup UI zu wechseln."
+    "legacyCredentials": "Dieses bestehende Profil verwendet noch seine Container-Datei. Ein Passwort eingeben, um zu den Secrets von Borg Backup UI zu wechseln.",
+    "chooseContainer": "Container auswählen …",
+    "containerHint": "Wähle den Container aus, in dem die Datenbank läuft.",
+    "containersEmpty": "Keine Container geladen. Docker-Verfügbarkeit prüfen; eine gespeicherte Auswahl bleibt erhalten."
   }
 }

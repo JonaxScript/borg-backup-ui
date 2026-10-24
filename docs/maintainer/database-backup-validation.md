@@ -7,7 +7,7 @@ on PATH. Keep TMPDIR and pytest's base directory inside this repository.
 
 ```
 BBUI_DATABASE_DOCKER_TESTS=1 pytest -q -s tests/test_database_docker_integration.py --basetemp=.release-tmp/database-docker-tests
-pytest -q tests/test_database_backups.py tests/test_database_profiles_ui.py
+pytest -q tests/test_database_backups.py tests/test_database_profiles_ui.py tests/test_script_catalog.py tests/test_script_library_ui.py
 ```
 
 The Docker test substitutes only the host mount detection and filesystem-type probe because the
@@ -38,7 +38,12 @@ Fresh Unraid installation and upgrade acceptance remain maintainer tests.
 Manual test-channel acceptance on Unraid:
 
 - Fresh install: open both translated settings pages, confirm both helpers ship
-  executable with the bilingual ownership warning and appear read-only under Scripts. No export runs at install.
+  executable with the bilingual ownership warning and appear read-only with syntax
+  highlighting under Scripts > Managed by Borg Backup UI. Only the two database
+  helpers appear there. No export runs at install.
+- Open all six Templates, create an own draft, edit/save/assign the copy and verify
+  the original is unchanged. Switching categories retains unsaved own edits.
+  Check light/dark themes, German/English, mobile layout and the container dropdown.
 - Enter database users/passwords in Settings, load database lists, select scope
   and save. No manual container files/mounts are needed. Test Secrets export/import
   and credential rotation during a run. Check unavailable/wrong staging mounts.

@@ -979,6 +979,8 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/settings/databases/runs": self._get_database_runs,
                 "/api/settings/databases/status": lambda: self._database_status(parsed.query),
                 "/api/settings/scripts": self._get_job_scripts,
+                "/api/settings/scripts/catalog": self._get_script_catalog,
+                "/api/settings/scripts/source": lambda: self._get_script_source(parsed.query),
                 "/api/settings/basic": self._get_settings_basic,
                 "/api/setup-status": self._get_setup_status,
                 "/api/settings/backup-history": self._get_settings_backup_history,
@@ -1213,6 +1215,16 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         from job_scripts import list_scripts_with_assignments
         from database_backup import managed_scripts
         return {**list_scripts_with_assignments(self.config), 'managed_scripts': managed_scripts()}
+
+    def _get_script_catalog(self) -> dict:
+        """List practical hook templates and managed database helpers for administrators."""
+        from script_catalog import list_catalog
+        return list_catalog()
+
+    def _get_script_source(self, query) -> dict:
+        """Read a source by catalog ID; never accept arbitrary filesystem paths."""
+        from script_catalog import read_catalog_source
+        return read_catalog_source((parse_qs(query).get('id') or [''])[0])
 
     def _save_job_script(self) -> dict:
         """Validate Bash syntax and persist an explicitly submitted script."""
@@ -4020,7 +4032,7 @@ btn.addEventListener('click',doRecovery);
             self.send_header("Content-Length", str(len(content)))
             cache_control = (
                 "no-store"
-                if path in {"/api/widget/summary", "/api/settings/scripts", "/api/settings/scripts/import", "/api/settings/scripts/export", "/api/settings/homepage-widget-token", "/api/settings/prometheus", "/api/repositories/key-export", "/api/wizard/new-job-id"}
+                if path in {"/api/widget/summary", "/api/settings/scripts", "/api/settings/scripts/import", "/api/settings/scripts/export", "/api/settings/scripts/catalog", "/api/settings/scripts/source", "/api/settings/homepage-widget-token", "/api/settings/prometheus", "/api/repositories/key-export", "/api/wizard/new-job-id"}
                 else "no-cache"
             )
             self.send_header("Cache-Control", cache_control)

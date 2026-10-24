@@ -3383,7 +3383,27 @@
       "disabledJob": "Job disabled",
       "beforeBackup": "Before all backup preparation",
       "assignedHint": "Changes apply from these jobs' next run. To delete this script, first remove all assignments in the job wizard.",
-      "validationHint": "Saving checks the Bash syntax. The script is not executed during this check. Errors may therefore still occur when the script runs."
+      "validationHint": "Saving checks the Bash syntax. The script is not executed during this check. Errors may therefore still occur when the script runs.",
+      "library": {
+        "navigation": "Script library",
+        "own": "Own scripts",
+        "template": "Templates",
+        "managed": "Managed by Borg Backup UI",
+        "templateHelp": "Inspect a template and create your own script from it. Your copy is editable and survives plugin updates. It runs in a job only after saving and assignment.",
+        "managedHelp": "These files implement plugin features and are maintained by Borg Backup UI. Their source is available here read-only. Plugin updates may replace these files.",
+        "search": "Find a file",
+        "choose": "Select a file on the left to inspect its purpose and source.",
+        "empty": "No matching files.",
+        "copyEditable": "Editable as your own copy",
+        "pluginOwned": "Borg Backup UI · Read-only",
+        "use": "Create own script",
+        "draft": "Template copied into a draft. Review its configuration and save your copy.",
+        "source": "Source with syntax highlighting",
+        "lines": "{count} lines",
+        "mariadb": "Exports selected MariaDB databases through integrated database backups.",
+        "postgresql": "Exports PostgreSQL databases and optional global objects through integrated database backups.",
+        "templatePurpose": "Standalone Pre/Post template. Source comments describe purpose, prerequisites, configuration and behavior."
+      }
     },
     "databases": {
       "title": "Database backups",
@@ -3595,6 +3615,9 @@
     "managedTitle": "Bundled scripts",
     "managedExecution": "These read-only helpers run through Database backup profiles. They are not custom Pre/Post hooks and must not be assigned a second time.",
     "readOnly": "Managed · read-only",
-    "legacyCredentials": "This existing profile still uses its container file. Enter a password to switch to Borg Backup UI Secrets."
+    "legacyCredentials": "This existing profile still uses its container file. Enter a password to switch to Borg Backup UI Secrets.",
+    "chooseContainer": "Select a container …",
+    "containerHint": "Select the container running the database.",
+    "containersEmpty": "No containers loaded. Check Docker availability; an existing selection is preserved."
   }
 }

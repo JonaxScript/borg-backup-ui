@@ -1987,8 +1987,19 @@ completion/cancellation, or during interrupted-operation reconciliation. Existin
 profiles using a container file continue to work; enter a password to switch to
 managed Secrets. Existing external files are preserved and are not exported.
 
-The two bundled helpers are visible under **Settings > Scripts > Bundled scripts**
-in a read-only view. They run through database profiles, not custom hook assignments.
+**Settings > Scripts** separates three areas:
+
+- **Own scripts**: saved, editable Pre/Post scripts.
+- **Templates**: six practical Bash examples with syntax highlighting and line numbers.
+  **Create own script** creates an unsaved draft. Adjust its constants, check
+  prerequisites, then set `CONFIGURED="yes"`, save and assign it to a job.
+  The original template is unchanged; updates do not overwrite your own copy.
+- **Managed by Borg Backup UI**: only the two database helpers, read-only with
+  syntax highlighting, documentation and an update notice. Database profiles
+  control their configuration and execution. Internal Python modules, startup
+  service, restore test and notification adapter are outside this view.
+
+The **Docker container** field offers a dropdown of discovered containers.
 
 Use a directory with mode `0700`, owned by the plugin execution user
 (normally root), on a real mounted local pool/disk. Pool and parent directories may retain their normal Unraid ownership

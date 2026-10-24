@@ -7614,7 +7614,7 @@ async function loadSettingsScripts(selected = '') {
     const data = await response.json();
     if (!response.ok) throw new Error(apiErrorMessage(data, response.status));
     settingsState.jobScripts = data.scripts || [];
-    settingsState.managedScripts = data.managed_scripts || [];
+    settingsState.scriptCatalog = null;
     renderSettingsScriptEditor(selected);
   } catch (error) { panel.textContent = String(error.message); }
 }
@@ -7628,7 +7628,7 @@ function renderSettingsScriptEditor(selected = '', draft = null) {
   const jobCount = new Set(assignments.map(item => item.job_id)).size;
   settingsState.scriptEditor?.destroy();
   settingsState.scriptDirty = !!draft;
-  panel.innerHTML = renderManagedDatabaseScripts(settingsState.managedScripts || []) + settingsCard(settingsT('scripts.title'), settingsMenuIcon('advanced'), `
+  panel.innerHTML = renderScriptLibraryChrome() + '<div id="settings-own-scripts">' + settingsCard(settingsT('scripts.title'), settingsMenuIcon('advanced'), `
     <div class="settings-body job-script-editor">
     <p>${escHtml(settingsT('scripts.help'))}</p>
     <div class="form-group"><label class="form-label" for="settings-script-select">${settingsT('scripts.select')}</label>
@@ -7662,7 +7662,8 @@ function renderSettingsScriptEditor(selected = '', draft = null) {
         ${script.id ? `<button type="button" class="btn btn-danger" id="settings-script-delete" ${assignments.length ? 'disabled aria-describedby="settings-script-usage-title"' : ''}>${settingsT('scripts.delete')}</button>` : ''}
       </div>
       <p id="settings-script-result" class="status-message hidden" role="status"></p>
-    </form></div>`);
+    </form></div>`) + '</div>';
+  initScriptLibrary();
   settingsState.scriptEditor = window.BBUI.components.bashEditor?.create(document.getElementById('settings-script-content'));
   document.getElementById('settings-script-import').addEventListener('click', () => document.getElementById('settings-script-file').click());
   document.getElementById('settings-script-file').addEventListener('change', event => {

@@ -38,6 +38,8 @@ function renderDatabaseSettings() {
     engine:'mariadb', enabled:true, port:3306, timeout_seconds:1800, min_free_mib:1024, retention:'keep', databases:[], auth_mode:'managed', database_user:'root', staging_mount:'/mnt/cache', staging_dir:'/mnt/cache/borg-database-dumps',
   };
   const input = (key, type='text', extra='') => `<label class="form-label" for="db-${key}">${escHtml(dbT(key))}</label><input class="form-input" id="db-${key}" name="${key}" type="${type}" value="${escHtml(key === 'database_user' ? (row[key] || (row.engine === 'postgresql' ? 'postgres' : 'root')) : (row[key] ?? ''))}" ${extra}>`;
+  const containers = [...new Set(databaseState.containers.map(p => typeof p === 'string' ? p : p.name || p.Name || '').filter(Boolean))].sort();
+  if (row.container && !containers.includes(row.container)) containers.unshift(row.container);
   panel.innerHTML = `<div class="database-settings">
     <div class="database-intro"><span class="settings-menu-icon">${settingsMenuIcon('repository')}</span><div><h3>${escHtml(dbT('title'))}</h3><p>${escHtml(dbT('intro'))}</p></div></div>
     <div class="form-group"><label class="form-label" for="db-select">${escHtml(dbT('profile'))}</label>
@@ -46,7 +48,7 @@ function renderDatabaseSettings() {
     ${settingsCard(escHtml(dbT('connection')), settingsMenuIcon('repository'), `<div class="settings-body database-fields">
       <div class="form-group">${input('name','text','required maxlength="100"')}</div>
       <div class="form-group"><label class="form-label" for="db-engine">${escHtml(dbT('engine'))}</label><select class="form-select" id="db-engine" name="engine"><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option></select></div>
-      <div class="form-group">${input('container','text','required list="db-containers"')}<datalist id="db-containers">${databaseState.containers.map(p => `<option value="${escHtml(typeof p === 'string' ? p : p.name || p.Name || '')}"></option>`).join('')}</datalist></div>
+      <div class="form-group"><label class="form-label" for="db-container">${escHtml(dbT('container'))}</label><div><select class="form-select" id="db-container" name="container" required aria-describedby="db-container-hint"><option value="" disabled ${row.container ? '' : 'selected'}>${escHtml(dbT('chooseContainer'))}</option>${containers.map(name => `<option value="${escHtml(name)}" ${name === row.container ? 'selected' : ''}>${escHtml(name)}</option>`).join('')}</select><p class="form-help" id="db-container-hint">${escHtml(dbT(databaseState.containers.length ? 'containerHint' : 'containersEmpty'))}</p></div></div>
       <div class="form-group">${input('database_user','text','required autocomplete="username"')}</div>
       <div class="form-group"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id ? 'passwordKeep' : 'passwordEnter'))}"></div>
       <p class="form-help">${escHtml(dbT('credentials'))}</p>
@@ -61,7 +63,7 @@ function renderDatabaseSettings() {
       <button class="btn btn-primary" type="submit" data-db-discover>${escHtml(dbT('discover'))}</button>
       <div id="db-databases" class="database-selection"></div>
       <div class="database-flags"><label id="db-globals-label"><input type="checkbox" id="db-globals" ${row.include_globals ? 'checked' : ''}> ${escHtml(dbT('globals'))}</label></div>
-      <p class="form-help">${escHtml(dbT('globalsHint'))}</p>
+      <p class="form-help">${escHtml(dbT('globalsHint'))}</p><p class="form-help">${escHtml(dbT('scope'))}</p>
     </div>`)}
     ${settingsCard(escHtml(dbT('storageTitle')), settingsMenuIcon('backup'), `<div class="settings-body database-fields">
       <p class="form-help">${escHtml(dbT('storageHint'))}</p>
@@ -83,7 +85,6 @@ function renderDatabaseSettings() {
       <p id="db-result" class="status-message hidden" role="status" aria-live="polite"></p>
     </div>`)}
     ${settingsCard(escHtml(dbT('runs')), settingsMenuIcon('backup'), `<div class="settings-body"><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div></div>`)}
-    <details class="database-advanced"><summary>${escHtml(dbT('managedTitle'))}</summary><p>${escHtml(dbT('managed'))}</p><p>${escHtml(dbT('scope'))}</p></details>
   </div>`;
   document.getElementById('db-engine').value = row.engine;
   document.getElementById('db-retention').value = row.retention;
@@ -219,9 +220,4 @@ function wizardApplyDatabases(selected) {
   const rows = [...(wizardState.databaseProfiles || [])];
   for (const id of selected) if (!rows.some(p => p.id === id)) rows.push({id,name:dbT('missing'),databases:[]});
   node.innerHTML = rows.map(p => `<label class="form-label"><input type="checkbox" value="${escHtml(p.id)}" ${selected.includes(p.id) ? 'checked' : ''}> ${escHtml(p.name)} · ${escHtml(p.engine || '')}: ${escHtml(p.databases.join(', '))}${p.enabled ? '' : ' ('+escHtml(dbT('missing'))+')'}${p.include_globals ? ' · '+escHtml(dbT('globals')) : ''}</label>`).join('') || `<p>${escHtml(dbT('noProfiles'))}</p>`;
-}
-
-/** Keep shipped assets visible but separate from assignable user hooks; no write action. */
-function renderManagedDatabaseScripts(scripts) {
-  return settingsCard(escHtml(dbT('managedTitle')), settingsMenuIcon('repository'), `<div class="settings-body managed-database-scripts"><p>${escHtml(dbT('managed'))}</p><p class="form-help">${escHtml(dbT('managedExecution'))}</p>${scripts.map(script => `<details><summary><strong>${escHtml(script.name)}</strong> <span class="badge">${escHtml(dbT('readOnly'))}</span></summary><pre tabindex="0"><code>${escHtml(script.content)}</code></pre></details>`).join('')}</div>`);
 }

@@ -2,8 +2,9 @@
 
 [Deutsch](README.de.md)
 
-Six standalone Bash templates for **Settings > Scripts > Import (.sh)**. These
-are opt-in examples in the repository, not installed or enabled by the plugin.
+Six standalone Bash templates under **Settings > Scripts > Templates**. Their
+sources ship with the plugin; they are never enabled automatically. Use **Create own script** to create an unsaved, editable copy. Updates preserve saved copies.
+Manual **Import (.sh)** remains available.
 Each file contains its own implementation; no shared helper has to be installed.
 They are intended for review and host-specific testing, not unattended deployment.
 
@@ -18,14 +19,15 @@ They are intended for review and host-specific testing, not unattended deploymen
 
 ## Import and configuration
 
-1. Read the selected file and this guide. Save the raw `.sh` file as UTF-8, not
+1. Read the selected template and this guide. For manual import, save raw `.sh` as UTF-8, not
    the HTML repository page. Retain the Bash shebang on its first line.
-2. Import the file, then change the constants at the top for your own host.
+2. Use the template as your own script (or import the file), then adjust its constants.
    Do not put passwords/tokens into the editor: scripts can be exported.
 3. Set `CONFIGURED="yes"` only after configuring prerequisites. Unchanged
    examples exit with code 2 without running their payload.
 4. Set a descriptive name and a timeout. Import does not carry timeout/description;
-   the table above is a starting point. Save and assign in wizard step 9.
+   the table above is a starting point. Template copies prefill these timeouts.
+   Save and assign in wizard step 9.
 5. Test with a disposable backup job, inspect the log and archive, and test a
    restore of any database export before enabling scheduling.
 

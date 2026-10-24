@@ -2023,9 +2023,21 @@ Bestehende Profile mit Container-Datei bleiben nutzbar. Ein Passwort eingeben,
 um auf verwaltete Secrets umzustellen. Externe Dateien bleiben unverändert und
 werden nicht exportiert.
 
-Beide Helfer erscheinen unter **Einstellungen > Skripte > Mitgelieferte Skripte**
-in einer schreibgeschützten Ansicht. Die Ausführung erfolgt über Datenbankprofile,
-nicht über zusätzliche Hook-Zuordnungen.
+Unter **Einstellungen > Skripte** sind drei Bereiche getrennt:
+
+- **Eigene Skripte**: gespeicherte, bearbeitbare Pre-/Post-Skripte.
+- **Vorlagen**: sechs praktische Bash-Beispiele mit Syntaxhervorhebung und Zeilennummern.
+  **Als eigenes Skript übernehmen** erzeugt einen ungespeicherten Entwurf.
+  Konstanten anpassen, Voraussetzungen prüfen und erst dann `CONFIGURED="yes"`
+  setzen, speichern und einem Job zuordnen. Die Originalvorlage bleibt unverändert;
+  Updates überschreiben die eigene Kopie nicht.
+- **Von Borg Backup UI verwaltet**: ausschließlich die beiden Datenbankhelfer,
+  schreibgeschützt mit Syntaxhervorhebung, Dokumentation und Update-Hinweis.
+  Die Ausführung und Konfiguration erfolgen über Datenbankprofile. Interne
+  Python-Bausteine, Startdienst, Restore-Test und Benachrichtigungsadapter sind
+  kein Bestandteil dieser Ansicht.
+
+Das Feld **Docker-Container** bietet eine Auswahlliste der erkannten Container.
 
 Ein privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
 auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Pool und Elternverzeichnisse

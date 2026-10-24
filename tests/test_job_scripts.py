@@ -250,7 +250,7 @@ def test_status_roundtrip_retains_hook_outcomes(tmp_path):
 
 
 @pytest.mark.parametrize('method', ['GET', 'POST', 'DELETE'])
-@pytest.mark.parametrize('path', ['/api/settings/scripts', '/api/settings/scripts/import', '/api/settings/scripts/export'])
+@pytest.mark.parametrize('path', ['/api/settings/scripts', '/api/settings/scripts/import', '/api/settings/scripts/export', '/api/settings/scripts/catalog', '/api/settings/scripts/source'])
 def test_scripts_require_admin(method, path):
     handler = BackupUIHandler.__new__(BackupUIHandler)
     assert handler._required_role_for_request(path, method) == 'admin'
@@ -291,6 +291,16 @@ def test_http_script_routes_validate_before_save(tmp_path, monkeypatch):
         assert data['scripts'][0]['assignments'] == []
         assert headers['Cache-Control'] == 'no-store'
         original = job_scripts.store_path(Handler.config).read_bytes()
+        status, catalog, headers = request('GET', suffix='/catalog')
+        assert status == 200 and headers['Cache-Control'] == 'no-store'
+        assert len(catalog['entries']) == 8
+        for entry in catalog['entries']:
+            status, source, headers = request('GET', suffix='/source?id=' + entry['id'])
+            assert status == 200 and headers['Cache-Control'] == 'no-store'
+            assert source['script']['id'] == entry['id'] and source['script']['content']
+        assert request('GET', suffix='/source?id=../../etc/passwd')[0] == 404
+        assert request('GET', suffix='/source?id=managed:api/wizard_runner.py')[0] == 404
+        assert job_scripts.store_path(Handler.config).read_bytes() == original
         status, exported, headers = request('POST', payload, '/export')
         assert status == 200 and headers['Cache-Control'] == 'no-store'
         status, imported, headers = request('POST', {'filename': exported['filename'],
