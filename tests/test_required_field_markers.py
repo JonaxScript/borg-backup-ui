@@ -47,11 +47,19 @@ def test_restore_job_and_repository_wizards_mark_required_fields() -> None:
         "storage.repositoryKeyExport",
         "wizard.jobName",
         "wizard.archivePrefix",
-        "wizard.sourcePaths",
         "wizard.storageTarget",
         "wizard.repositorySelect",
     ):
         _assert_required_i18n_label(html, key)
+
+    # Folder sources are optional for database-only jobs (#591). The wizard
+    # validates the combined folder/profile selection, not each tab separately.
+    source_label = re.search(
+        r'<label[^>]*for="wiz-source-path-input"[^>]*>.*?</label>', html, re.S,
+    )
+    assert source_label
+    assert "form-label-required" not in source_label.group(0)
+    assert "form-required-marker" not in source_label.group(0)
 
     # Direct archive navigation is optional; selected sources are summarized in
     # the target step rather than presented as another editable required field.

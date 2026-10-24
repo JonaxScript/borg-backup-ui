@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 (async () => {
-  const browser = await chromium.launch({headless:true});
+  const browser = await chromium.launch({headless:true,...(process.env.BBUI_CHROMIUM?{executablePath:process.env.BBUI_CHROMIUM}:{})});
   try {
     const page = await browser.newPage({viewport:{width:1440,height:1000}});
     await page.setContent('<div id="jobs-grid"></div>');
@@ -20,7 +20,7 @@ const {chromium} = require('playwright');
       renderJobsLocationSidebar = updateJobsSelection = hideJobsMessage = () => {};
       showJobsError = () => {};
       locationIcon = () => '';
-      renderJobCard = job => `<article id="job-card-${job.key}"><div id="job-borg-progress-${job.key}">${renderJobOperation(job)}</div><div id="job-workflow-${job.key}">${renderBorgRun(job)}</div></article>`;
+      renderJobCard = job => `<article class="jobs-redesign-row" id="job-card-${job.key}"><div id="job-borg-progress-${job.key}">${renderJobOperation(job)}</div><div class="job-workflow" id="job-workflow-${job.key}">${renderBorgRun(job)}</div></article>`;
       const now = Date.now()/1000;
       window.live = {running:true,run_id:'run-one',phase:'borg_create',job_steps:[
         {id:'stop_docker',status:'success',duration_seconds:35,details:{target_count:31,completed_count:31}},
@@ -117,6 +117,67 @@ const {chromium} = require('playwright');
       patchJobMarkup(root,'<div id="b"><span data-step="create">B2</span></div><div id="c">C</div>');
       if(root.firstChild!==kept || root.textContent!=='B2C' || root.children.length!==2) throw Error('Keyed reconciliation failed');
     });
+    // The managed export is active before any Docker/Borg work, even under 60 seconds.
+    await page.evaluate(() => {
+      const now=Date.now()/1000;
+      jobsState.jobs=[{key:'database',location:'local',running:true,run_phase:'database_backup',run_job_steps:[
+        {id:'pre_script',status:'success',duration_seconds:2},
+        {id:'database_backup',status:'running',started_at:now-30},
+        {id:'stop_docker',status:'pending'}, {id:'create',status:'pending'}, {id:'post_script',status:'pending'}]}];
+      renderJobsGrid(jobsState.jobs);
+    });
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"].is-running').count(),1);
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"]').getAttribute('aria-current'),'step');
+    assert.ok((await page.locator('#job-borg-progress-database').textContent()).includes('jobs.workflow.names.database_backup'));
+    assert.equal(await page.locator('progress').count(),0);
+    await page.locator('[data-jobs-action="toggle-workflow"]').click();
+    assert.equal(await page.locator('tr[data-step="database_backup"].is-running').count(),1);
+    await page.evaluate(() => {
+      const job=jobsState.jobs[0];job.running=false;job.last_job_steps=job.run_job_steps.map(step=>({...step,status:'success',duration_seconds:30}));
+      renderJobsGrid(jobsState.jobs);
+    });
+    assert.equal(await page.locator('.borg-step[data-step="database_backup"].is-success').count(),1);
+    assert.equal(await page.locator('tr[data-step="database_backup"].is-success').count(),1);
+    // Seven steps fit a desktop card; longer workflows scroll locally in one row.
+    for (const file of ['ui/style.css','ui/design-system.css']) await page.addStyleTag({content:fs.readFileSync(file,'utf8')});
+    await page.evaluate(labels => {
+      BBUI.components={i18n:{t:(key)=>key.split('.').reduce((value,part)=>value?.[part],labels)||key}};
+      document.documentElement.dataset.theme='light';
+      document.getElementById('jobs-grid').style.maxWidth='1280px';
+      const ids=['database_backup','stop_docker','create','start_docker','prune','compact','check'];
+      jobsState.jobs=[{key:'row',location:'local',running:false,last_job_steps:ids.map(id=>({id,status:'success',duration_seconds:30}))}];
+      renderJobsGrid(jobsState.jobs);
+    },JSON.parse(fs.readFileSync('ui/i18n/de.json','utf8')));
+    const strip=page.locator('.borg-stepper');
+    const geometry=()=>strip.evaluate(node=>({tops:[...node.children].map(child=>child.getBoundingClientRect().top),width:node.clientWidth,scrollWidth:node.scrollWidth}));
+    let sizes=await geometry();
+    assert.equal(new Set(sizes.tops).size,1);
+    assert.equal(sizes.scrollWidth,sizes.width);
+    assert.notEqual(await strip.locator('li').nth(5).evaluate(node=>getComputedStyle(node,'::after').display),'none');
+    if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/workflow-seven.png`});
+    await page.evaluate(()=>{
+      const ids=['pre_script','database_backup','stop_docker','stop_vms','create','start_docker','start_vms','prune','compact','check','post_script'];
+      jobsState.jobs[0].last_job_steps=ids.map(id=>({id,status:'success',duration_seconds:30}));
+      renderJobsGrid(jobsState.jobs);
+    });
+    for(const width of [1280,640,390]) {
+      await page.setViewportSize({width,height:900});
+      sizes=await geometry();
+      assert.equal(new Set(sizes.tops).size,1);
+      assert.ok(sizes.scrollWidth>sizes.width,JSON.stringify({width,...sizes}));
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await strip.evaluate(node=>node.scrollLeft=0);
+      await strip.focus();
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(()=>document.querySelector('.borg-stepper').scrollLeft>0);
+      await strip.evaluate(node=>node.scrollLeft=node.scrollWidth);
+      const position=await strip.evaluate(node=>node.scrollLeft);
+      await page.evaluate(()=>renderJobsGrid(jobsState.jobs));
+      assert.equal(await strip.evaluate(node=>node.scrollLeft),position);
+      assert.equal(await strip.evaluate(node=>node===document.activeElement),true);
+      assert.equal(await strip.locator('li').last().evaluate(node=>node.getBoundingClientRect().right<=node.parentElement.getBoundingClientRect().right+1),true);
+    }
+    if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/workflow-mobile.png`});
     console.log('Browser workflow: continuous animation/node identity, live counters, disclosure/focus, atomic completion, stale polls and keyed reconciliation passed.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

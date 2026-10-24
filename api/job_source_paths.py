@@ -15,8 +15,8 @@ class SourcePathValidationError(ValueError):
     """A job does not contain a valid canonical source-path list."""
 
 
-def normalize_source_paths(value: Any, *, field: str = "Source paths") -> list[str]:
-    """Validate and normalize the canonical JSON-array representation."""
+def normalize_source_paths(value: Any, *, field: str = "Source paths", allow_empty: bool = False) -> list[str]:
+    """Validate canonical JSON paths; allow_empty is only for jobs with database profiles."""
     if not isinstance(value, list):
         raise SourcePathValidationError(f"{field} must be stored as a JSON array")
 
@@ -38,7 +38,7 @@ def normalize_source_paths(value: Any, *, field: str = "Source paths") -> list[s
         seen.add(normalized)
         normalized_paths.append(normalized)
 
-    if not normalized_paths:
+    if not normalized_paths and not allow_empty:
         raise SourcePathValidationError(f"{field} must contain at least one path")
     return normalized_paths
 

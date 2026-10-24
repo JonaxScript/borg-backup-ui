@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from . import borg_security_v1, canonical_backup_conf_v1, job_ids_v1, job_settings_v1
+from . import database_secret_names_v1, borg_security_v1, canonical_backup_conf_v1, job_ids_v1, job_settings_v1
 from .audit import (
     append_event,
     config_dir as audit_config_dir,
@@ -24,6 +24,7 @@ MIGRATIONS = [
     job_ids_v1,
     job_settings_v1,
     borg_security_v1,
+    database_secret_names_v1,
 ]
 
 FINAL_STATES = {"applied", "not_required", "not_applicable", "skipped"}

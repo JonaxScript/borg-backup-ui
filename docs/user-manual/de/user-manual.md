@@ -307,7 +307,7 @@ Der **Job-Name** ist ein Anzeigename. Die **Job-ID** ist eine davon unabhängige
 
 ![Quellen und vorhandenes Ziel-Repository](../assets/de/current/wizard-sources.png)
 
-Die kompakte Ansicht zeigt links **Zu sichernde Ordner** und rechts das **Backup-Ziel**. Links legen Sie fest, welche Ordner oder Dateien in das Backup aufgenommen werden. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
+Die kompakte Ansicht zeigt links **Backup-Quellen** und rechts das **Backup-Ziel**. Links wählen Sie in getrennten Reitern Ordner und Datenbankprofile aus. Beide Reiter zeigen die Anzahl ausgewählter Einträge; lange Listen scrollen innerhalb des Bereichs. Ausschlüsse werden im nächsten Schritt festgelegt. Rechts werden Speichertyp, konkretes Speicherziel, ein vorhandenes Repository und die Job-Kompression gewählt. Die Repository-Liste zeigt ausschließlich Repositorys, die zum ausgewählten Speicherziel gehören. Repository-Pfade werden im Job nicht mehr frei eingegeben.
 
 Typische Ordner, die gesichert werden:
 
@@ -362,7 +362,7 @@ Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** er
 
 Der Gesamtstatus steht direkt unter **Betriebszustand**.
 
-Der Ablaufstreifen nutzt die gesamte Kartenbreite. Er zeigt die im Lauf konfigurierten Schritte in Ausführungsreihenfolge: gegebenenfalls Pre-Skript, Docker/VMs stoppen, `borg create`, Docker/VMs starten, `borg prune`, `borg compact`, `borg check` und Post-Skript. Bei „Alle Archive behalten“ fehlt `prune`. Eine eingeplante, noch nicht fällige Prüfung bleibt dagegen mit „Nicht fällig“ sichtbar. Namen und gemessene Laufzeiten sind immer sichtbar; auf schmalen Bildschirmen bricht die Folge in mehrere Zeilen um.
+Der Ablaufstreifen nutzt die gesamte Kartenbreite. Er zeigt die im Lauf konfigurierten Schritte in Ausführungsreihenfolge: gegebenenfalls Pre-Skript, Datenbank-Sicherungen, Docker/VMs stoppen, `borg create`, Docker/VMs starten, `borg prune`, `borg compact`, `borg check` und Post-Skript. Bei „Alle Archive behalten“ fehlt `prune`. Eine eingeplante, noch nicht fällige Prüfung bleibt dagegen mit „Nicht fällig“ sichtbar. Namen und gemessene Laufzeiten sind immer sichtbar; alle Schritte bleiben in einer Zeile. Reicht der Platz nicht aus, lässt sich der Ablaufstreifen horizontal scrollen, auch per Tastatur nach Auswahl mit Tab.
 
 Haken im Kreis, Kreuz im Kreis, Warndreieck, Stopp-Symbol, Minus, leerer Kreis und animierter Ring unterscheiden Erfolg, Fehler, Warnung, Abbruch, übersprungene, ausstehende und laufende Schritte auch ohne Farberkennung. Bei reduzierter Bewegung bleibt der Ring statisch. Bei Fortschrittsaktualisierungen läuft die Animation ohne Neustart weiter. Nicht ausgeführte Schritte erhalten keine erfundene Laufzeit und keinen Erfolgshaken. Dienstwiederherstellung nach Fehlern oder Abbrüchen wird ebenfalls erfasst.
 
@@ -1975,3 +1975,283 @@ Produktionsdaten und dienen gezielten Tests.
 | Test-Timeout oder widersprüchlicher Bericht | Exit-Code und einzelne Schritte lesen | Grenzen aus 8.3 beachten; Last/Erreichbarkeit und Laufzeit prüfen | Ohne Timeout wiederholen und tatsächlichen Restore prüfen |
 | Kein Reminder | Ereignis, Empfänger, Toleranz, letzten Versand prüfen | Einstellungen speichern; Kanal testen; ohne bisherigen Restore-Bericht kein entsprechender Überfälligkeits-Reminder | Testnachricht und nächstes berechtigtes Ereignis kontrollieren |
 | Migration blockiert / Dienste bleiben aus | Systemzustand, Migration und Runtime-Recovery lesen | Konkrete Ursache beheben; Dienste bewusst prüfen; keine Statusdateien als Reparatur löschen | Fehlerfreier Neustart und geprüfter Dienstzustand |
+
+## 19. Datenbank-Sicherungen in Docker (#591)
+
+### 19.1 Profile und Voraussetzungen
+
+Unter **Einstellungen > Datenbank-Sicherungen** ein Profil für einen laufenden
+lokalen MariaDB-, MySQL- oder PostgreSQL-Container anlegen (Umfang siehe Abschnitt 19.5). Datenbankbenutzer (üblicherweise
+`root` bei MariaDB/MySQL, `postgres` bei PostgreSQL) und Passwort eingeben. **Verbindung
+speichern und Datenbanken laden**, gewünschte Datenbanken anhaken und Profil
+speichern. Der Docker-Ausführungsnutzer root ersetzt keine Datenbankanmeldung.
+Neu gefundene Datenbanken werden niemals automatisch in Jobs aufgenommen. Namen dürfen
+Buchstaben, Ziffern, Unterstriche, Punkte und Bindestriche enthalten; Datenbanknamen
+müssen mit Buchstabe, Ziffer oder Unterstrich beginnen. Systemschemas sind keine
+normalen Sicherungsquellen. Fehlende/deaktivierte Profile blockieren zugeordnete
+Jobs. Solange ein Job ein Profil verwendet, lässt es sich nicht löschen.
+
+Das Plugin liefert `database-dump-mariadb.sh`, `database-dump-mysql.sh` und `database-dump-postgresql.sh`
+mit seiner Runtime aus. **Borg Backup UI pflegt diese Skripte; direkte Änderungen
+können beim nächsten Plugin-Update überschrieben werden.** Der Skriptkopf enthält
+diesen Hinweis auf Deutsch und Englisch. Profile und eigene Skripte bleiben bei
+Updates erhalten. Eigene Anpassungen als separate importierte Pre-Skripte pflegen.
+Solche Kopien erhalten keine automatischen Updates oder automatische Aufnahme der
+Dumps ins Archiv. Nicht denselben Export zugleich als Pre-Skript und Profil ausführen.
+
+Im Container werden `sh`, `env`, `setsid`, `stat`, `id`, `readlink`, übliche Shell-Werkzeuge,
+`/proc`, ein beschreibbares `/dev/shm` und die Datenbankwerkzeuge benötigt.
+MariaDB: `mariadb` und `mariadb-dump`; MySQL: `mysql` und `mysqldump`; PostgreSQL: `psql`, `pg_dump`, `pg_restore`
+und für globale Objekte `pg_dumpall`. Fehlende Werkzeuge werden nicht installiert.
+Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB/MySQL dieselbe
+Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4`, `mysql:8.0-debian` und
+`postgres:16`. Andere Images benötigen passende Voraussetzungen und eigene Restore-Tests.
+
+Zugangsdaten speichert das Plugin geschützt unter `secrets/`, zum Beispiel als
+`database-sicherung-mariadb-v001.json`. Der Dateiname enthält den vereinfachten
+Profilnamen und eine Versionsnummer. Die Datei beschreibt Profil-ID, Profilname,
+Datenbanktyp, Container, Datenbankbenutzer und Erstellungszeitpunkt zusätzlich zum
+Passwort. Im Profil wird der aktuelle Dateiname angezeigt; das Passwort wird nie
+zurückbefüllt. Leer lassen behält das gespeicherte Passwort.
+
+Passwortänderungen sowie Änderungen an Profilname, Container, Datenbanktyp oder
+Datenbankbenutzer erzeugen eine neue unveränderliche Datei. Gleiche vereinfachte
+Profilnamen teilen sich den Versionszähler, ohne vorhandene Dateien zu ersetzen.
+Ältere Versionen bleiben für laufende Snapshots und Wiederherstellung erhalten.
+Diese Dateien über das separate verschlüsselte **Secrets-Backup** sichern;
+normale Konfigurationsexporte enthalten nur Referenzen.
+
+Die Startmigration `database_secret_names_v1` kopiert aktuell referenzierte
+UUID-Secrets in das lesbare Format und aktualisiert die Profilreferenzen.
+Originale `.database-<id>.json` bleiben erhalten, damit ältere Konfigurationsexporte
+und Lauf-Snapshots weiter funktionieren. Nicht mehr zugeordnete alte Dateien werden
+nicht geraten oder umbenannt. Die Migration sichert die bisherigen Profile unter
+`config/migration-backups/`, protokolliert Aktionen ohne Passwörter und ist unter
+**Systemzustand & Migration** nachvollziehbar. Bei Fehlern blockiert der zentrale
+Migrationsmechanismus den Normalbetrieb bis zu einem fehlerfreien Neustart.
+
+Für den manuellen Dump-Import werden Zugangsdaten zum Zielserver benötigt; das
+ursprüngliche Backup-Passwort ist dafür nicht zwingend erforderlich. Secrets ersetzen
+keine Sicherung der Datenbankkonten und Berechtigungen.
+
+Neue Profile benötigen keine manuell angelegte Datei oder Container-Einbindung.
+Das Plugin überträgt Zugangsdaten über Docker-stdin in eine eigene temporäre Datei
+unter `/dev/shm`, niemals über Prozessargumente oder Logs. Nach bestätigtem Ende
+oder Abbruch wird sie entfernt, bei Unterbrechungen im Zuge der Abgleichaktion.
+Bestehende Profile mit Container-Datei bleiben nutzbar. Ein Passwort eingeben,
+um auf verwaltete Secrets umzustellen. Externe Dateien bleiben unverändert und
+werden nicht exportiert.
+
+Unter **Einstellungen > Skripte** sind drei Bereiche getrennt:
+
+- **Eigene Skripte**: gespeicherte, bearbeitbare Pre-/Post-Skripte.
+- **Vorlagen**: vier praktische Bash-Beispiele (Quellprüfung, Speicherprüfung, Wake-on-LAN und Webhook) mit Syntaxhervorhebung und Zeilennummern.
+  **Als eigenes Skript übernehmen** erzeugt einen ungespeicherten Entwurf.
+  Konstanten anpassen, Voraussetzungen prüfen und erst dann `CONFIGURED="yes"`
+  setzen, speichern und einem Job zuordnen. Die Originalvorlage bleibt unverändert;
+  Updates überschreiben die eigene Kopie nicht.
+- **Von Borg Backup UI verwaltet**: ausschließlich die drei verwalteten Datenbankhelfer,
+  schreibgeschützt mit Syntaxhervorhebung, Dokumentation und Update-Hinweis.
+  Die Ausführung und Konfiguration erfolgen über Datenbankprofile. Interne
+  Python-Bausteine, Startdienst, Restore-Test und Benachrichtigungsadapter sind
+  kein Bestandteil dieser Ansicht.
+
+Vorlagen und verwaltete Skripte werden über eine Dropdown-Liste ausgewählt.
+Die Reiter **Beschreibung** und **Quelltext** teilen sich die volle Breite;
+die Auswahl und der aktive Reiter bleiben beim Wechsel erhalten.
+Im Job-Assistenten trennt **Quellen & Ziel** Ordner und Datenbankprofile in
+eigene Reiter mit Auswahlzähler. Lange Listen scrollen innerhalb des Bereichs;
+die Zähler nennen die ausgewählten Ordner bzw. Profile. Der Reiterwechsel
+ändert weder die Auswahl noch das Backup-Ziel.
+
+Das Feld **Docker-Container** bietet eine Auswahlliste der erkannten Container.
+
+Ein privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
+auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Pool und Elternverzeichnisse
+behalten ihre normalen Unraid-Eigentümer und Rechte (auch `nobody:users`, `0777`).
+Nur das private Dump-Verzeichnis benötigt den Plugin-Eigentümer und `0700`;
+vorhandene Pool-Rechte ändert das Plugin nicht. Alle Pfadbestandteile werden ohne
+Verfolgung symbolischer Links geöffnet. Gehaltene Verzeichnis-Handles stellen
+sicher, dass Export, Archivierung und Bereinigung beim ursprünglichen Verzeichnis
+bleiben, wenn ein anderer Benutzer dessen Pfad umbenennt oder ersetzt. Unterstützt: Btrfs, XFS, ext-Dateisysteme
+und ZFS. Den echten Poolpfad statt `/mnt/user` verwenden. Bootstick, RAM und
+Netzwerk-Dateisysteme sind nicht unterstützt. Den tatsächlichen Mountpunkt separat
+angeben. Die Freiplatzgrenze schätzt die Dump-Größe nicht; Platz für vollständige
+Exporte vorsehen. Ein fehlendes Verzeichnis direkt unter dem eingebundenen Pool
+legt ein ausdrücklich gestarteter Dump mit Modus `0700` an. Mountpunkt und etwaige
+Zwischenverzeichnisse müssen vorhanden sein. Fehlermeldungen unterscheiden einen
+fehlenden Mount, unzugängliche Pfade/Symlinks, falsche Rechte des privaten Ordners,
+ein ungeeignetes Dateisystem und fehlenden freien Speicher.
+
+### 19.2 Ablauf und Prüfung
+
+Die Jobkarte zeigt **Datenbank-Sicherungen** als eigenen Schritt vor den
+Docker-/VM-Stopps. Während des Exports sind der aktive Schritt und seine
+verstrichene Laufzeit sichtbar. Ergebnis und Laufzeit bleiben anschließend in
+den Laufdetails erhalten. Zugeordnete Pre-/Post-Skripte erscheinen separat.
+
+1. Verbindung speichern, Datenbanken laden, gewünschte Namen anhaken und speichern.
+   **Verbindung prüfen** wiederholt die Abfrage ohne Änderung der Auswahl. Dies
+   prüft weder Exportrechte noch Dump-Speicher oder Wiederherstellbarkeit. Leere
+   Auswahlen sind als Entwurf speicherbar, aber nicht in Jobs verwendbar.
+2. **Test-Dump erstellen** erzeugt asynchron einen lokalen Export und erlaubt
+   Abbruch. Dieser ist noch kein Borg-Backup. Pfad, Größe und Ergebnis prüfen und
+   vor automatischen Sicherungen eine Wiederherstellung testen.
+3. In Wizard-Schritt 2 Profile auswählen. Ohne Dateiquellen ist ein reiner
+   Datenbank-Job möglich. Jede ausgewählte Datenbank ist erforderlich.
+4. Repository, Zeitplan und Borg-Aufbewahrung wie bisher auswählen. Das
+   Dump-Verzeichnis darf sich nicht mit normalen Quellen überschneiden. Nur die
+   fertigen Exporte des aktuellen Laufs und ihr Manifest werden automatisch hinzugefügt.
+
+Reihenfolge: Sperren, vorhandenes Pre-Skript, Mounts/Voraussetzungen,
+**Datenbank-Sicherung**, bisherige Docker-/VM-Stopps, Borg create, Wiederherstellung
+der Dienste, Rückleseprüfung der Pflichtdateien, Repositorywartung, Post-Skript
+und Abschlussbericht. Auch Testaktionen verwenden die gemeinsame Docker-Sperre.
+Externe Docker-Eingriffe sind dadurch nicht gesperrt und können den Export abbrechen.
+
+MariaDB sichert transaktional einschließlich Routinen, Events, Triggern und
+SQL zur Datenbankanlage. Nicht-InnoDB-Basistabellen werden abgewiesen. Während
+des Exports keine Schemaänderungen durchführen. Serverkonten/globale Grants
+sind nicht enthalten. PostgreSQL liefert ein Custom-Format. Das Plugin komprimiert
+alle neuen lokalen Exporte bereits während des Datenstroms mit gzip (Stufe 6):
+MariaDB als `.sql.gz`, PostgreSQL als `.dump.gz`, globale Objekte als
+`globals.sql.gz`. Es entsteht keine zweite vollständige unkomprimierte Dump-Datei.
+Der Speicherbedarf des Datenstroms ist begrenzt; Komprimierung benötigt zusätzliche
+CPU-Zeit. Die erreichte Größe hängt vom Inhalt ab. Borgs Komprimierung bleibt
+unabhängig nach Jobeinstellung aktiv; bereits komprimierte Daten können die
+Deduplizierung zwischen Läufen verringern. Optionale Rollen/Tablespaces werden getrennt
+und ohne Passwort-Hashes exportiert. Mehrere Datenbanken und globale Objekte
+bilden keine atomare Momentaufnahme des gesamten Clusters.
+
+Datenbank und Anwendungsdateien sind nicht automatisch gemeinsam konsistent.
+Falls nötig, die schreibende Anwendung mit bestehenden Pre-/Post-Skripten in den
+Wartungsmodus versetzen; die Datenbank muss erreichbar bleiben. Ein Anwendungsstopp
+erst nach dem Dump reicht dafür nicht. Wiederanlauf im Post-Skript mit passender
+Fehler-/Abbruchbedingung vorsehen.
+
+Das Manifest enthält Werkzeugversionen, Containeridentität, Umfang, Größen und
+SHA-256-Hashes der komprimierten Dateien sowie deren unkomprimierte Bytezahl.
+Neue Sicherungsordner tragen Profilname, Startzeit in Server-Ortszeit mit
+Zeitzonenoffset, ohne UUID, z. B.
+`bbui-mariadb-apps-2026-10-24_11-35-10+0200/`. Der Profilname wird
+für den Dateinamen vereinfacht; das Manifest bewahrt den ursprünglichen Namen
+und die Profil-ID. Die Übersicht zeigt Profil, Zeitpunkt und beide Größen.
+Vorhandene unkomprimierte Dumps und UUID-Ordner bleiben unverändert lesbar und
+bereinigbar. Ein bereits vorhandenes Dump-Verzeichnis für denselben Profilnamen
+und Zeitpunkt führt zum Fehler; es wird nichts überschrieben. Neue Borg-Archive
+verwenden auch bei Datenbank-Jobs `<präfix>-JJJJ-MM-TT_HH-MM-SS` ohne Zufallszusatz.
+Borg lehnt einen bereits vorhandenen Archivnamen ab. Bestehende Archive mit
+UUID-Zusatz bleiben unverändert auswählbar und wiederherstellbar.
+Im Archiv gilt derselbe Ordnername, im Manifest als
+`archive_directory` vermerkt. Ältere Testarchive verwenden den absoluten Staging-Pfad
+ohne führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
+zurück und vergleicht ihre Bytes. Fehlende, ausgeschlossene oder abweichende
+Dateien führen zum Fehler; lokale Exporte bleiben erhalten. Das Manifest im
+Archiv beschreibt den Exportzeitpunkt; das lokale Ergebnis und der Jobablauf
+dokumentieren die spätere Archivprüfung. **Archiviert und geprüft bedeutet
+nicht, dass die Datenbank-Wiederherstellung getestet wurde.**
+
+### 19.3 Lokale Aufbewahrung und unterbrochene Läufe
+
+Interne Daten in `database-operations` und `database-tests` werden stündlich geprüft,
+erstmals eine Minute nach dem normalen Dienststart. Sicher abgeschlossene Einträge
+werden entfernt, sobald ihr gültiger Abschlusszeitpunkt mehr als 30 Tage
+zurückliegt. Laufende, ungeklärte, beschädigte, unsichere oder nicht zuordenbare
+Einträge bleiben erhalten. Dasselbe gilt für zugehörige, im Journal identifizierte
+Reste unter `database-discovery`; normale Abfragen entfernen ihr temporäres
+Verzeichnis bereits unmittelbar. Alte temporäre Verzeichnisse ohne zugehöriges
+Journal bleiben zur manuellen Prüfung erhalten. Bei belegter Docker-Sperre wird
+das Aufräumen verschoben. Dumps, Secrets, Konfiguration und Borg-Archive bleiben
+unberührt. Interne Zustände werden dabei nicht auf SQLite umgestellt.
+
+
+**Lokale Sicherungsläufe** zeigt noch vorhandene Datenbank-Dumps profilübergreifend
+aus Backup-Jobs und Test-Dumps. Die Auswahl oben filtert diese Übersicht nicht.
+Borg-Archive und normale Dateisicherungen werden hier nicht aufgelistet. Entfernen
+lokaler Dateien erfordert eine Bestätigung im Anwendungsdialog mit dem konkreten
+Verzeichnispfad; Abbrechen lässt den Lauf unverändert.
+
+Standard: Exporte lokal behalten. Borg-Prune entfernt sie nicht. Optional werden
+nur eigene Laufdateien nach Borg create ohne Warnung und erfolgreicher
+Rückleseprüfung entfernt. Spätere Wartungs-/Post-Ergebnisse bleiben getrennt.
+Bei Fehlern/Warnungen bleiben Exporte erhalten. Unter **Lokale Sicherungsläufe >
+Lokale Dateien entfernen** ausdrücklich aufräumen. Unbekannte Dateien oder unsichere
+Pfade blockieren die Aktion. Vor Änderung des Profil-Speicherpfads oder Löschen des
+Profils vorhandene Läufe aufräumen; andernfalls den alten Pfad für manuelle Prüfung notieren.
+
+Abbruch beendet ausschließlich die eigene Prozessgruppe im Container. Das Ende
+von `docker exec` allein gilt nicht als Nachweis. Ohne bestätigtes Prozessende
+bleiben konkurrierende Vorgänge gesperrt. **Unterbrochene Exporte prüfen/beenden**
+verwenden, sobald Docker verfügbar ist; dabei kann ein eigener alter Export beendet
+werden. In einem entfernten/gestoppten Container läuft kein Export mehr. Bei weiterhin
+ungeklärtem Zustand den gemeldeten Container prüfen. Journale/Sperren nicht zum
+Umgehen eines aktiven Exports löschen. Verwaiste Teildateien bleiben für ausdrücklich
+bestätigtes Aufräumen sichtbar.
+
+Der bestehende Job-Konfigurationsexport enthält referenzierte Datenbankprofile
+mit ihren IDs. Import verweigert abweichende vorhandene Profile mit derselben ID,
+statt Einstellungen zu überschreiben. Nach Wiederherstellung fehlende Container
+und Zugangsdaten-Dateien einrichten und Verbindungen erneut prüfen.
+
+### 19.4 Wiederherstellung in ein isoliertes Ziel
+
+Manifest und Dumps des gewünschten Laufs über Browse & Restore in ein separates
+Verzeichnis extrahieren und Hashes prüfen. Einen frischen isolierten Container mit
+passenden Client-/Serverversionen verwenden. Nicht auf Produktionsdaten testen.
+
+Neue `.gz`-Dateien zuerst prüfen (`gzip -t database.sql.gz`) und in der isolierten
+Wiederherstellungsumgebung entpacken (`gzip -dk database.sql.gz`; entsprechend für
+`.dump.gz` und `globals.sql.gz`). Für diese zusätzliche Arbeitskopie genug Platz
+vorsehen. Vorhandene unkomprimierte Dumps benötigen diesen Schritt nicht.
+
+MariaDB: benötigte Konten/Grants separat einrichten und den SQL-Dump mit
+`mariadb --defaults-file=/geschuetzt/restore.cnf < database.sql` importieren.
+CREATE/USE verwenden den ursprünglichen Datenbanknamen: deshalb einen isolierten
+Server nutzen. Repräsentative Daten, Views, Trigger, Routinen und Events prüfen.
+Den Event-Scheduler beim Test deaktiviert lassen, damit keine Anwendungsaktionen laufen.
+
+PostgreSQL: erforderliche Erweiterungen und Rollen bereitstellen. Falls globale
+Objekte gesichert wurden, deren SQL prüfen, Tablespace-Pfade anpassen und mit
+`psql` einspielen. Bei bereits vorhandener Bootstrap-Rolle kann deren doppeltes
+CREATE in einer separaten Arbeitskopie entfernt werden. Passwörter sind nicht
+enthalten und müssen neu eingerichtet werden. Mit passenden Verbindungsoptionen
+`pg_restore --exit-on-error --create --dbname=postgres database.dump` ausführen.
+Eigentümer, Erweiterungen, repräsentative Datensätze und Anwendungsfunktion prüfen.
+Erst danach einen erfolgreichen Restore-Test dokumentieren.
+
+Logische Exporte ersetzen keine WAL-/Binlog-Aufbewahrung, physischen Serversicherungen
+oder Point-in-Time-Recovery. Neue Datenbanken außerhalb der ausdrücklichen Auswahl
+werden nicht automatisch aufgenommen.
+
+### 19.5 Unterstützte Online-Datenbanken (#593)
+
+Die Datenbanksicherung unterstützt ausschließlich **MariaDB, MySQL und PostgreSQL**.
+Der Export läuft ohne Container-Stopp. Separat konfigurierte Appdata-/Docker-Stopps
+im Job bleiben unabhängig und erfolgen erst nach dem Datenbankexport.
+
+| Datenbank | Online-Verfahren | Unterstützter Umfang |
+| --- | --- | --- |
+| MariaDB | `mariadb-dump --single-transaction` | Ausgewählte InnoDB-Datenbanken mit Routinen, Triggern und Events; Benutzer/Rechte separat sichern. |
+| MySQL | `mysqldump --single-transaction` | Ausgewählte InnoDB-Datenbanken mit Routinen, Triggern und Events; Benutzer/Rechte separat sichern. |
+| PostgreSQL | `pg_dump` im Custom-Format | Ausgewählte Datenbanken; optional globale Objekte ohne Rollenkennwörter. |
+
+Bei MariaDB/MySQL werden nichttransaktionale Tabellen abgewiesen. Während des
+Exports keine Schemaänderungen durchführen. Online-Sicherung bedeutet keine
+pauschale Konsistenzgarantie zwischen mehreren Datenbanken oder Anwendungsdateien.
+Die in Abschnitt 19.4 beschriebenen Grenzen gelten weiterhin.
+
+MySQL benötigt `mysql` und `mysqldump` mit passender Haupt-/Nebenversion sowie die
+Supervisor-Werkzeuge einschließlich `setsid` im Container. Fehlende Werkzeuge
+führen zu einer Fehlermeldung; das Plugin installiert keine Pakete automatisch.
+Die Wiederherstellung erfolgt manuell: Artefakte aus Borg extrahieren,
+dekomprimieren und mit `mariadb`, `mysql` beziehungsweise `pg_restore`/`psql`
+in ein vorbereitetes Ziel importieren.
+
+MongoDB, Redis und SQLite werden nicht mehr angeboten. Falls aus der vorherigen
+Testversion solche Profile vorhanden sind, erscheinen sie als Hinweis unter
+Datenbank-Sicherungen. Die gespeicherten Profile, Secrets und Dumps bleiben erhalten,
+werden nicht automatisch umgewandelt und bleiben im Konfigurationstransfer enthalten.
+Ihre Zuordnung muss aus betroffenen Jobs entfernt werden; bis dahin brechen diese
+Jobs mit „Profil nicht verfügbar“ ab, statt die angeforderte Sicherung zu überspringen.
+Andere Profile funktionieren weiter. Vorhandene Borg-Archive bleiben über
+Browse & Restore zugänglich; lokale Dumps bleiben an ihrem bisherigen Speicherort.

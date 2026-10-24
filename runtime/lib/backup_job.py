@@ -172,7 +172,7 @@ class BackupJobConfig:
     def from_config(cls, env: dict) -> "BackupJobConfig":
         """Build job configuration from the runner's environment mapping.
 
-        Requires a canonical job UUID and at least one absolute source path in
+        Requires a canonical job UUID and absolute source paths (or resolved database profiles) in
         ``BACKUP_PATHS_JSON``. Symlinked sources and matching exclusions are
         resolved for Borg. Invalid required fields raise ValueError; malformed
         optional exclusion JSON is ignored with a warning.
@@ -183,7 +183,7 @@ class BackupJobConfig:
             raw_paths = json.loads(env.get("BACKUP_PATHS_JSON", "") or "")
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             raise ValueError("BACKUP_PATHS_JSON is missing or invalid") from exc
-        if not isinstance(raw_paths, list) or not raw_paths:
+        if not isinstance(raw_paths, list) or (not raw_paths and env.get("BORG_UI_DATABASE_PROFILES") != "1"):
             raise ValueError("BACKUP_PATHS_JSON must contain at least one source path")
         backup_paths: List[Path] = []
         source_mappings: list[tuple[Path, Path]] = []

@@ -5858,20 +5858,27 @@ body.wizard-modal-open {
   min-height: 0;
 }
 
-#wiz-source-path-list {
-  flex: 1 1 0;
-  min-height: 64px;
-  max-height: none;
-  align-items: flex-start;
-  overscroll-behavior-y: contain;
-  scrollbar-width: auto;
-  scrollbar-color: var(--text-muted) transparent;
-  scrollbar-gutter: stable;
-}
-
-#wiz-source-path-list .wizard-path-chip-del {
-  flex-shrink: 0;
-}
+/* Source tabs keep large folder/profile selections inside the wizard (#591). */
+.wizard-source-tabs { display:flex; gap:16px; border-bottom:1px solid var(--border); }
+.wizard-source-tabs button { padding:8px 0; background:transparent; color:var(--text-muted); border:0; border-bottom:2px solid transparent; font:inherit; cursor:pointer; }
+.wizard-source-tabs button[aria-selected=true] { color:var(--text-primary); border-bottom-color:var(--accent); }
+.wizard-source-tabs button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.wizard-source-tabs button > span:last-child { font-variant-numeric:tabular-nums; margin-left:4px; }
+#wiz-source-panel-databases { display:flex; flex-direction:column; gap:10px; }
+#wiz-source-panel-databases > .form-help { margin:0; }
+#wiz-source-path-list, #wiz-databases { flex:0 1 auto; min-height:64px; max-height:clamp(140px, 30vh, 260px); overflow-y:auto; overscroll-behavior-y:contain; scrollbar-width:auto; scrollbar-color:var(--text-muted) transparent; scrollbar-gutter:stable; }
+#wiz-source-path-list { display:flex; flex-direction:column; flex-wrap:nowrap; align-items:stretch; }
+#wiz-source-path-list .wizard-path-chip { border-radius:var(--radius-sm); justify-content:space-between; }
+#wiz-source-path-list .wizard-path-chip-text { white-space:normal; overflow-wrap:anywhere; }
+#wiz-source-path-list .wizard-path-chip-del { flex-shrink:0; width:26px; height:26px; }
+#wiz-databases { display:grid; gap:8px; align-content:start; }
+.wizard-database-choice { display:flex; align-items:flex-start; gap:8px; padding:8px; border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; }
+.wizard-database-choice:has(input:checked) { background:var(--state-info-dim); border-color:var(--accent); }
+.wizard-database-choice input { flex-shrink:0; margin-top:3px; }
+.wizard-database-choice span { min-width:0; overflow-wrap:anywhere; }
+.wizard-database-choice strong, .wizard-database-choice small { display:block; }
+.wizard-database-choice strong { font-size:12px; }
+.wizard-database-choice small { color:var(--text-muted); margin-top:3px; }
 
 .wizard-step2-field-hint:empty {
   display: none;

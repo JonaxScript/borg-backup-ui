@@ -2,9 +2,14 @@
 
 [English](README.md)
 
-Sechs eigenstaendige Bash-Vorlagen fuer **Einstellungen > Skripte > Importieren
-(.sh)**. Die Dateien liegen im Repository und werden nicht automatisch installiert
-oder aktiviert. Jede Vorlage funktioniert ohne gemeinsame Hilfsdateien. Vor dem
+Vier eigenstaendige Bash-Vorlagen unter **Einstellungen > Skripte > Vorlagen**:
+Quellpruefung, Speicherpruefung, Wake-on-LAN und Webhook. Die beiden Datenbank-
+Beispiele unten bleiben Referenzdateien fuer manuellen Import; im UI-Katalog
+werden stattdessen die verwalteten Datenbankprofile verwendet.
+Die Quellen werden mitgeliefert, aber niemals automatisch aktiviert.
+**Als eigenes Skript uebernehmen** erstellt einen ungespeicherten, bearbeitbaren
+Entwurf. Updates erhalten gespeicherte eigene Kopien. Der manuelle Import
+ueber **Importieren (.sh)** bleibt moeglich. Jede Vorlage funktioniert ohne gemeinsame Hilfsdateien. Vor dem
 Einsatz muessen die Einstellungen und Voraussetzungen zum eigenen System passen.
 
 | Datei | Zweck | Vorschlag fuer Hook-Timeout |
@@ -20,13 +25,14 @@ Einsatz muessen die Einstellungen und Voraussetzungen zum eigenen System passen.
 
 1. Vorlage und Anleitung lesen. Die reine `.sh`-Datei als UTF-8 speichern, nicht
    die HTML-Seite des Repositories. Die Bash-Shebang bleibt in der ersten Zeile.
-2. Datei importieren und die Konstanten am Anfang anpassen. Keine Passwoerter
+2. Vorlage als eigenes Skript uebernehmen oder Datei importieren und Konstanten anpassen. Keine Passwoerter
    oder Tokens in den Editor schreiben: Skripte lassen sich exportieren.
 3. Erst nach Einrichtung der Voraussetzungen `CONFIGURED="yes"` setzen.
    Unveraenderte Vorlagen brechen mit Exitcode 2 vor der eigentlichen Aktion ab.
 4. Aussagekraeftigen Namen und Timeout setzen, speichern und in Wizard-Schritt 9
    zuordnen. Der Import uebertraegt weder Beschreibung noch Timeout; die Tabelle
-   liefert Startwerte, die fuer grosse Exporte angepasst werden muessen.
+   liefert Startwerte, die fuer grosse Exporte angepasst werden muessen. Kopien
+   aus der Vorlagenansicht uebernehmen diese Startwerte.
 5. Mit einem Testjob pruefen, Log und Archiv kontrollieren und Datenbank-Dumps
    testweise wiederherstellen. Erst danach die Zeitplanung aktivieren.
 

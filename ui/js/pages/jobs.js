@@ -341,10 +341,10 @@ function borgProgressDuration(seconds) {
     : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** Return this run's ordered steps; older reports retain only their known Borg ledger. */
+/** Return known run steps including managed database exports; older reports retain their Borg ledger. */
 function jobWorkflowSteps(job) {
   const configured = job.running ? job.run_job_steps : job.last_job_steps;
-  const allowed = ['pre_script', 'stop_docker', 'stop_vms', 'create', 'start_docker', 'start_vms', 'prune', 'compact', 'check', 'post_script'];
+  const allowed = ['pre_script', 'database_backup', 'stop_docker', 'stop_vms', 'create', 'start_docker', 'start_vms', 'prune', 'compact', 'check', 'post_script'];
   if (Array.isArray(configured) && configured.length) {
     return configured.filter(step => step && allowed.includes(step.id));
   }
@@ -390,6 +390,13 @@ function jobStepDetails(step, view) {
   const details = step.details || {};
   const parts = [];
   const count = key => Number.isSafeInteger(details[key]) && details[key] >= 0;
+  if (step.id === 'database_backup') {
+    const results = details.results || (details.result ? [details.result] : []);
+    for (const result of results) for (const file of result.files || []) {
+      parts.push(`${file.database}: ${borgProgressSize(file.bytes)} / ${borgProgressDuration(Math.floor(file.duration_seconds || 0))} / ${jobsT(result.archived ? 'jobs.databaseArchived' : 'jobs.databaseDumped')}`);
+    }
+    if (details.error_code) parts.push(apiErrorMessage({code: details.error_code}));
+  }
   if (count('target_count')) {
     const action = ['stop_docker', 'stop_vms'].includes(step.id) ? 'targetsStopped'
       : ['start_docker', 'start_vms'].includes(step.id) ? 'targetsStarted' : 'targetsDone';
@@ -462,7 +469,7 @@ function renderBorgRun(job, now = Date.now() / 1000) {
       return `<tr class="is-${view.state}" data-step="${escHtml(step.id)}"><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
     }).join('')}</tbody>
     </table></div>` : `<div id="job-step-details-${escHtml(job.key)}" hidden></div>`;
-  return `<ol class="borg-stepper" style="--workflow-cols:${Math.min(6, steps.length)}" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
+  return `<ol class="borg-stepper" tabindex="0" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
     ${details}<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div>
     <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button></div>`;
 }
@@ -473,7 +480,7 @@ function renderJobOperation(job, now = Date.now() / 1000) {
   const view = active && jobStepView(active, job, now);
   const progress = renderBorgProgress(job, now);
   let html = view ? `<div class="job-active-step"><strong>${escHtml(view.label)}</strong>${progress ? '' : `<small>${escHtml(jobsT('jobs.borgElapsed', {time:view.duration}))}</small>`}</div>` : '';
-  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
+  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'database_backup', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
     html += `<div class="job-active-step"><strong>${escHtml(jobsT(`jobGroups.phases.${job.run_phase}`))}</strong></div>`;
   }
   html += progress;

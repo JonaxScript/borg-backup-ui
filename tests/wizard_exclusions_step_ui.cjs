@@ -15,7 +15,7 @@ function wizard() {
   }
   const context = vm.createContext({
     window: {addEventListener() {}},
-    document: {getElementById: id => fields.get(id)},
+    document: {getElementById: id => fields.get(id), querySelectorAll: () => []},
     escHtml: String,
   });
   vm.runInContext(fs.readFileSync('ui/js/pages/wizard.js', 'utf8'), context);

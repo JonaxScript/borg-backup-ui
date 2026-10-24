@@ -392,6 +392,7 @@ class BorgRunner:
         archive_prefix: str,
         extra_env: Optional[Dict[str, str]] = None,
         exclude_paths: Optional[List[Path]] = None,
+        archive_name: Optional[str] = None,
     ) -> int:
         """
         Erstellt ein neues Borg-Archiv.
@@ -402,6 +403,7 @@ class BorgRunner:
         Abschlussstatistik, Diagnostik und optionale Dateiaktivitaet bleiben im Log.
 
         Args:
+            archive_name:   Optional exact archive name for verified database artifacts.
             paths:          Zu sichernde Verzeichnisse
             archive_prefix: Präfix des Archiv-Namens (z.B. "flash-backup")
             extra_env:      Zusätzliche Env-Vars für den borg-Subprocess (z.B. BORG_RSH)
@@ -416,7 +418,7 @@ class BorgRunner:
             logger.error("borg create: BORG_REPO is not set")
             return BORG_EXIT_ERROR
 
-        archive = f"{repo}::{archive_prefix}-{{now:%Y-%m-%d_%H-%M-%S}}"
+        archive = f"{repo}::{archive_name}" if archive_name else f"{repo}::{archive_prefix}-{{now:%Y-%m-%d_%H-%M-%S}}"
 
         exclusions = [Path(path) for path in (exclude_paths or [])]
         exclude_args: List[str] = []

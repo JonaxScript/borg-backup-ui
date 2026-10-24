@@ -1,5 +1,38 @@
 # Changelog
 
+## Pending - Online database engines and metadata housekeeping (#593)
+
+- Support only MariaDB, MySQL and PostgreSQL online exports. Keep MySQL/InnoDB native dumps and reject nontransactional tables. Remove MongoDB, Redis and SQLite from exports, settings and the managed script catalog.
+- Preserve retired test profiles, Secrets and dumps. Show a Settings notice, keep configuration transfer intact, and fail jobs referencing unavailable profiles without blocking supported profiles.
+- Show three managed Bash database helpers and four editable templates. Replace the remaining native browser confirmation when leaving unsaved database settings with the application dialog.
+- Remove only confirmed terminal operation/test metadata after 30 days; preserve unresolved records and clean only linked discovery remnants. Dumps, Secrets and archives remain untouched.
+
+## Pending - Integrated Docker database backups (#591)
+
+- Replace native database confirmations with shared Settings dialogs for profile deletion, draft discard and local cleanup. Include the exact cleanup path and explain the cross-profile local dump list.
+
+- Remove UUID suffixes from new dump directories and database-job archive names; fail on collisions without overwriting existing data. Retain legacy directory recognition and archive selection. Use readable versioned secret filenames with profile/connection metadata; show the current file in Settings and include both formats in encrypted Secrets transfer. Add resumable startup migration database_secret_names_v1 with profile snapshots and secret-free audit events, preserving original secrets for old configuration exports.
+
+- Remove the six-step workflow wrap limit and responsive row breaks. Keep a continuous, keyboard-focusable horizontal timeline with readable minimum step widths and local overflow on narrow cards.
+
+- Include database_backup in the job workflow and active-phase fallback so exports appear before Docker shutdown, with live duration and persisted outcomes. Match template/managed selector cards and detail tabs to the Own scripts content surface. Cover active/final database states, hook visibility and browser theme consistency.
+
+- Use a compact script dropdown and full-width Description/Source code tabs. Preserve own drafts and ignore stale source responses. Split wizard folder/database profile selection into counted tabs with bounded scrollable lists and wrapped paths/profile details.
+
+- Match script card headings to neutral Settings/Prometheus styling and remove MariaDB/PostgreSQL hook templates from the allowlisted UI catalog. Keep both managed database helpers and existing user copies unchanged.
+
+- Add accented script description/source cards and specific bilingual prerequisites, configuration and failure behavior for all eight catalog entries. Name new dump directories after profile and server-local timestamp/offset. Stream native exports through bounded host-side gzip, record compressed/original sizes, and retain listing/cleanup compatibility with uncompressed UUID runs. Document decompression before restore.
+
+- Separate custom scripts, six practical templates and the two managed database helpers in Settings. Add an admin-only allowlisted source catalog, syntax-highlighted read-only viewer, and explicit template-to-draft copying. Internal Python, service, restore and notification scripts are not exposed. Document and structure database helpers; replace container text entry with a native selector.
+
+- Accept normal Unraid pool ownership/modes without modifying them; require only the dump directory to be private. Anchor exports, Borg input/readback and cleanup to held directory descriptors, reject symlink components and unsupported backing filesystems, and report distinct storage diagnostics. New database archive entries use the manifest's stable `archive_directory` instead of process descriptor paths.
+
+- Simplify setup with managed versioned Secrets, native database discovery and explicit checkbox selection. Match Settings cards and expose shipped helpers read-only under Scripts. Preserve existing credential references; include managed files in encrypted Secrets exports.
+
+- Add credential-reference profiles, bundled managed exporters, asynchronous admin checks/dumps/cleanup, and job wizard integration for MariaDB and PostgreSQL.
+- Coordinate exports with existing Docker resource locks; journal owned process groups for cancellation/restart reconciliation. Stage private per-run files, reject overlapping ordinary sources, and verify required artifacts by streaming them back from Borg.
+- Preserve database profile references through configuration transfer and keep existing jobs unchanged. Add bilingual setup/restore guidance and Docker/Borg restore tests; real Unraid fresh-install/upgrade acceptance remains a maintainer test.
+
 ## Pending - Dashboard summaries and expandable job details (#589)
 
 - Count latest backup outcomes independently from overdue state and summarize restore evidence against jobs with a test plan. Keep unplanned and unknown restore states explicit.

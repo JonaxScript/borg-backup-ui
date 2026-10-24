@@ -157,7 +157,7 @@ function newJobWizardContext(language = 'en') {
       const value = key.split('.').reduce((value, part) => value?.[part], labels) || key;
       return value.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '');
     }}}}, addEventListener() {}},
-    document: {getElementById: element, body: element('body')},
+    document: {getElementById: element, body: element('body'), querySelectorAll: () => []},
     fetch(url, options) {return new Promise(resolve => requests.push({url, options, resolve}));},
     apiErrorMessage: data => data.message || 'Request failed',
   });
@@ -172,6 +172,8 @@ function newJobWizardContext(language = 'en') {
   }
   vm.runInContext(`
     wizardLoadScripts = async () => { wizardState.hooksLoaded = true; };
+    wizardLoadDatabases = async () => { wizardState.databasesLoaded = true; };
+    wizardApplyDatabases = () => {};
     wizardLoadStorageTargets = wizardLoadRepositories = wizardLoadRuntimeInventory = async () => {};
     wizardSelectedStorage = wizardSelectedRepository = () => ({});
     _wizardRuntimeMode = () => 'none';

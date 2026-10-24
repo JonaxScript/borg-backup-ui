@@ -640,10 +640,11 @@
 .jobs-redesign-operation > [id^="job-borg-progress-"] { width: 100%; min-width: 0; }
 .job-workflow { grid-column: 1 / -1; min-width: 0; padding: 0; }
 .job-workflow:empty { display: none; }
-.borg-stepper { display: grid; grid-template-columns: repeat(var(--workflow-cols, 4), minmax(0, 1fr)); list-style: none; padding: 12px 0; margin: 0 var(--ui-space-3); gap: 14px 0; border-top: 1px solid var(--ui-color-border); }
+/* Keep every configured step in one row; scroll locally when labels need more room. */
+.borg-stepper { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(9rem, 1fr); overflow-x: auto; list-style: none; padding: 12px 0; margin: 0 var(--ui-space-3); border-top: 1px solid var(--ui-color-border); }
+.borg-stepper:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .borg-step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 5px; min-width: 0; font-size: 12px; }
 .borg-step:not(:last-child)::after { content: ''; position: absolute; top: 13px; height: 1px; background: var(--ui-color-border); left: calc(50% + 17px); width: calc(100% - 34px); }
-.borg-step:nth-child(6n)::after { display: none; }
 .borg-step.is-success::after { background: var(--ui-state-success-border); }
 .borg-step-dot { display: flex; width: 28px; height: 28px; color: var(--text-muted); flex-shrink: 0; }
 .borg-step-dot svg { width: 100%; height: 100%; }
@@ -686,17 +687,10 @@
 .jobs-redesign-actions { border-right: 0; }
 @keyframes job-step-spin { to { transform: rotate(360deg); } }
 @media (max-width: 680px) {
-  .borg-stepper { gap: 14px 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .borg-step:nth-child(3n)::after { display: none; }
   .job-workflow-details th, .job-workflow-details td { padding-top: 4px; padding-bottom: 4px; }
   .job-workflow-details .job-detail-step-col { width: 30%; }
   .job-workflow-details .job-detail-duration-col { width: 46px; }
   .job-workflow-details .job-detail-duration { width: 46px; }
-}
-@media (max-width: 420px) {
-  .borg-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .borg-step:not(:last-child)::after { display: block; }
-  .borg-step:nth-child(2n)::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .borg-step.is-running svg, .job-workflow-details .is-running .job-detail-icon svg { animation: none; } }
 .borg-run-summary { display: block; margin-top: 12px; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }

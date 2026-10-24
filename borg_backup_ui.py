@@ -975,7 +975,12 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/repositories/archives": lambda: self._get_repository_archives(parsed.query),
                 "/api/repositories/archive-files": lambda: self._get_repository_archive_files(parsed.query),
                 "/api/settings": self._get_settings,
+                "/api/settings/databases": self._get_database_profiles,
+                "/api/settings/databases/runs": self._get_database_runs,
+                "/api/settings/databases/status": lambda: self._database_status(parsed.query),
                 "/api/settings/scripts": self._get_job_scripts,
+                "/api/settings/scripts/catalog": self._get_script_catalog,
+                "/api/settings/scripts/source": lambda: self._get_script_source(parsed.query),
                 "/api/settings/basic": self._get_settings_basic,
                 "/api/setup-status": self._get_setup_status,
                 "/api/settings/backup-history": self._get_settings_backup_history,
@@ -1031,6 +1036,9 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/storages/test": self._post_storage_target_test,
             "/api/repositories": self._post_repository,
             "/api/notification-profiles": self._post_apprise_profile,
+            "/api/settings/databases": self._save_database_profile,
+            "/api/settings/databases/action": self._database_action,
+            "/api/settings/databases/cancel": self._database_cancel,
             "/api/settings/scripts": self._save_job_script,
             "/api/settings/scripts/import": self._import_job_script,
             "/api/settings/scripts/export": self._export_job_script,
@@ -1129,6 +1137,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/repositories": self._delete_repository,
             "/api/repositories/archive": self._delete_repository_archive,
             "/api/notification-profiles": self._delete_apprise_profile,
+            "/api/settings/databases": self._delete_database_profile,
             "/api/settings/scripts": self._delete_job_script,
             "/api/auth/users": self._delete_auth_user,
             "/api/settings/homepage-widget-token": self._delete_homepage_widget_token,
@@ -1166,10 +1175,56 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "format": "markdown" if path.suffix.lower() == ".md" else "text",
         }
 
+    def _get_database_profiles(self) -> dict:
+        """List credential-free managed database profiles."""
+        from database_profiles import list_profiles
+        return list_profiles(self.config)
+
+    def _save_database_profile(self) -> dict:
+        """Persist an explicitly submitted database profile."""
+        from database_profiles import save_profile
+        return save_profile(self.config, self._read_json_body())
+
+    def _delete_database_profile(self) -> dict:
+        """Remove only an unreferenced profile."""
+        from database_profiles import delete_profile
+        return delete_profile(self.config, (parse_qs(urlparse(self.path).query).get("id") or [""])[0])
+
+    def _database_action(self) -> dict:
+        """Start an asynchronous check, export or authorized local cleanup."""
+        from database_api import start_operation
+        return start_operation(self.config, self._read_json_body())
+
+    def _database_cancel(self) -> dict:
+        """Request cancellation without claiming the container process has exited."""
+        from database_api import cancel_operation
+        return cancel_operation(self.config, self._read_json_body().get('id', ''))
+
+    def _database_status(self, query) -> dict:
+        """Read a bounded operation's durable status."""
+        from database_api import operation_status
+        return operation_status(self.config, (parse_qs(query).get('id') or [''])[0])
+
+    def _get_database_runs(self) -> dict:
+        """List retained managed exports and unavailable staging locations."""
+        from database_api import retained_runs
+        return retained_runs(self.config)
+
     def _get_job_scripts(self) -> dict:
         """Return script source and current job assignments to administrators only."""
         from job_scripts import list_scripts_with_assignments
-        return list_scripts_with_assignments(self.config)
+        from database_backup import managed_scripts
+        return {**list_scripts_with_assignments(self.config), 'managed_scripts': managed_scripts()}
+
+    def _get_script_catalog(self) -> dict:
+        """List practical hook templates and managed database helpers for administrators."""
+        from script_catalog import list_catalog
+        return list_catalog()
+
+    def _get_script_source(self, query) -> dict:
+        """Read a source by catalog ID; never accept arbitrary filesystem paths."""
+        from script_catalog import read_catalog_source
+        return read_catalog_source((parse_qs(query).get('id') or [''])[0])
 
     def _save_job_script(self) -> dict:
         """Validate Bash syntax and persist an explicitly submitted script."""
@@ -3977,7 +4032,7 @@ btn.addEventListener('click',doRecovery);
             self.send_header("Content-Length", str(len(content)))
             cache_control = (
                 "no-store"
-                if path in {"/api/widget/summary", "/api/settings/scripts", "/api/settings/scripts/import", "/api/settings/scripts/export", "/api/settings/homepage-widget-token", "/api/settings/prometheus", "/api/repositories/key-export", "/api/wizard/new-job-id"}
+                if path in {"/api/widget/summary", "/api/settings/scripts", "/api/settings/scripts/import", "/api/settings/scripts/export", "/api/settings/scripts/catalog", "/api/settings/scripts/source", "/api/settings/homepage-widget-token", "/api/settings/prometheus", "/api/repositories/key-export", "/api/wizard/new-job-id"}
                 else "no-cache"
             )
             self.send_header("Cache-Control", cache_control)
@@ -4432,6 +4487,28 @@ def _start_repository_info_refresh_loop(config: dict) -> threading.Thread | None
         return None
 
 
+def _start_database_housekeeping_loop(config: dict) -> threading.Thread | None:
+    """Prune completed database metadata hourly after startup; never log contents."""
+    def _run():
+        time.sleep(60)
+        while True:
+            try:
+                from database_housekeeping import prune_completed
+                result = prune_completed(config)
+                if result['removed'] or result['discovery_removed']:
+                    _log(f"Database housekeeping: removed={result['removed']} discovery={result['discovery_removed']}")
+            except Exception:
+                _log("WARNING: Database housekeeping could not complete; retained unprocessed records.")
+            time.sleep(3600)
+    try:
+        thread = threading.Thread(target=_run, name="database-housekeeping", daemon=True)
+        thread.start()
+        return thread
+    except Exception:
+        _log("WARNING: Database housekeeping could not start.")
+        return None
+
+
 def _start_apprise_runtime_warmup(config: dict) -> threading.Thread | None:
     """Warm the bundled Apprise runtime so the first profile API call is not cold."""
 
@@ -4606,6 +4683,7 @@ def _start_normal_runtime_services(config: dict) -> None:
     _start_notification_reminder_loop(config)
     _start_notification_delivery_loop(config)
     _start_repository_info_refresh_loop(config)
+    _start_database_housekeeping_loop(config)
     _start_apprise_runtime_warmup(config)
 
 
