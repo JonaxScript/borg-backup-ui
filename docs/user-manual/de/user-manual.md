@@ -186,21 +186,22 @@ Das Dashboard beantwortet die wichtigsten Betriebsfragen:
 
 Die Seite besteht aus:
 
-- **Backup-Läufe:** Gesamtzahl, erfolgreiche Läufe, übersprungene Läufe, Warnungen und Fehler.
-- **Restore-Nachweis:** Anzahl verifizierter, überfälliger, fehlgeschlagener, offener und nicht geplanter Restore-Tests.
-- **Standort-Sidebar:** Filtert die Tabelle nach `Alle Standorte`, `Lokal`, `USB`, `SMB` und `Storagebox`.
+- **Backup-Läufe:** Der erste Kreis zählt jeweils das letzte Ergebnis pro Job. Erfolgreiche, übersprungene, abgebrochene, unbekannte und fehlerhafte Läufe sowie Warnungen bleiben unterscheidbar. Überfällige Backups stehen zusätzlich unter dem Kreis; sie ändern das letzte Laufergebnis nicht.
+- **Restore-Nachweis:** Der zweite Kreis zeigt verifizierte Nachweise im Verhältnis zu Jobs mit Restore-Testplan. Überfällige, fehlgeschlagene und offene Nachweise stehen daneben. Jobs ohne Testplan oder mit unbekanntem Restore-Status werden separat genannt.
+- **Handlungsbedarf:** Zeigt Fehlertexte, Warnungen, Gründe für übersprungene Läufe und überfällige Backups oder Restore-Nachweise. **Ansehen** öffnet die Details des betroffenen Jobs.
+- **Standort-Sidebar:** Filtert die Tabelle nach `Alle Standorte`, `Lokal`, `USB`, `SMB` und `Storagebox`. Standorte ohne Jobs werden ausgeblendet. Unter **Alle Standorte** bleiben die Jobs nach Standort gruppiert; die bisherigen Standort-Icons bleiben erhalten.
 - **Auswahlkarte:** Zeigt den aktuell gewählten Standort und die Anzahl der Backups.
-- **Job-Tabelle:** Zeigt Job, Standort, Laufstatus inklusive nächstem geplanten Lauf, Restore-Status, Speicherdaten und Wachstum/Check.
+- **Job-Tabelle:** Zeigt Job mit Icon und letztem Archivnamen, Laufstatus, nächsten geplanten Lauf, Restore-Status und Repository-Größe. **Details** klappt weitere Daten auf. Geöffnete Details bleiben beim Aktualisieren, Standort- und Sprachwechsel erhalten.
 - **Aktualisieren:** Lädt Dashboard-Daten neu.
 
 ### 2.3 Wichtige Spalten
 
-- **Backup:** Name, Schlüssel und Icon des Jobs.
-- **Standort:** Speicherziel des Jobs.
-- **Laufstatus:** Letzter Lauf, Dauer, Ergebnis und nächster geplanter Lauf.
-- **Restore:** Letzter Restore-Test und Gültigkeit, sofern geplant.
-- **Speicherdaten:** Deduplizierte Größe, Quelle, komprimierte Größe und Repository-Größe.
-- **Wachstum / Check:** Größenänderung und letzter Repository-Check.
+- **Backup:** Name, konfiguriertes Icon samt Farbe und letzter Archivname. Den vollständigen Archivnamen finden Sie auch in den Details.
+- **Laufstatus:** Ergebnis, relativer Zeitpunkt und Dauer des letzten Laufs sowie vorhandene Fehler- oder Warntexte.
+- **Nächster Lauf:** Nächster geplanter Lauf einschließlich Gruppenzeitplänen; ein überfälliges Backup wird zusätzlich markiert.
+- **Restore:** Aktueller Nachweisstatus und Gültigkeit, sofern vorhanden.
+- **Repository:** Zuletzt bekannte Repository-Größe und Schalter **Details**.
+- **Aufgeklappte Details:** Deduplizierte Größe, Quelle, komprimierte Größe, Repository-Größe, Wachstum, Borg-Check im letzten Lauf und gespeicherter Repository-Check sowie Restore-Daten und Archivname. Es wird kein zusätzlicher Checkplan angelegt; die Anzeige verwendet vorhandene Laufdaten. Fehlende Daten bleiben unbekannt.
 
 ### 2.4 Typische Aktionen
 
@@ -208,7 +209,8 @@ Die Seite besteht aus:
 2. Prüfen Sie oben die Zusammenfassungen.
 3. Wählen Sie links einen Standort, wenn Sie nur lokale, USB-, SMB- oder Storagebox-Jobs sehen möchten.
 4. Lesen Sie pro Job den Laufstatus und Restore-Status.
-5. Klicken Sie auf **Aktualisieren**, wenn Sie unmittelbar nach einem Lauf neue Daten erwarten.
+5. Öffnen Sie **Details** für Speicherwerte, Borg-Checks, Restore-Daten und den vollständigen Archivnamen.
+6. Klicken Sie auf **Aktualisieren**, wenn Sie unmittelbar nach einem Lauf neue Daten erwarten.
 
 ### 2.5 Hinweise und Best Practices
 

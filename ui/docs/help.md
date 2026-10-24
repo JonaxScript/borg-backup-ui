@@ -49,14 +49,17 @@ Das Hauptmenü folgt dem Betriebsablauf: **Dashboard**, **Jobs**, **Repositories
 
 ## 3. Dashboard
 
-Das Dashboard beantwortet, ob Backups und Restore-Nachweise aktuell gesund sind. Die Kennzahlen oben fassen Backup-Läufe und Restore-Tests zusammen. Die Standort-Sidebar filtert die Jobtabelle nach Lokal, USB, SMB oder Storagebox.
+Zwei Kreise zeigen die letzten Backup-Ergebnisse und Restore-Nachweise. Überfällige Backups werden zusätzlich unter dem ersten Kreis angezeigt, ohne das letzte Laufergebnis zu verändern. Der Restore-Kreis bezieht sich auf Jobs mit Testplan; Jobs ohne Plan oder mit unbekanntem Status stehen separat darunter.
+
+**Handlungsbedarf** zeigt Fehlertexte, Warnungen, übersprungene Läufe und überfällige Backups oder Restore-Nachweise. **Ansehen** öffnet den betroffenen Job. Die Standort-Sidebar behält ihre Icons und filtert nach Lokal, USB, SMB oder Storagebox. Leere Standorte werden ausgeblendet; **Alle Standorte** bleibt nach Standorten gruppiert.
 
 ### Wichtige Spalten
 
-- **Laufstatus:** Ergebnis, Zeitpunkt und Dauer des letzten Backup-Laufs sowie der nächste geplante Lauf.
-- **Restore:** letzter Restore-Test und seine Gültigkeit.
-- **Speicherdaten:** Quellgröße, komprimierte und deduplizierte Daten sowie Repository-Größe.
-- **Wachstum / Check:** Größenänderung und letzter bekannter Repository-Check.
+- **Backup:** Job-Icon mit konfigurierter Farbe, Jobname und letzter Archivname.
+- **Laufstatus:** Ergebnis, relativer Zeitpunkt und Dauer des letzten Backup-Laufs sowie vorhandene Fehlertexte.
+- **Nächster Lauf:** Nächster geplanter Lauf einschließlich Gruppenzeitplänen und zusätzlichem Überfälligkeitshinweis.
+- **Restore:** Nachweisstatus und Gültigkeit.
+- **Repository:** Repository-Größe und **Details** zum Aufklappen. Die Details enthalten Quellgröße, komprimierte und deduplizierte Daten, Wachstum, Borg-Check im letzten Lauf, gespeicherten Repository-Check, Restore-Daten und den vollständigen Archivnamen. Es gibt keinen zusätzlichen Checkplan. Geöffnete Details bleiben bei Aktualisierung, Standort- und Sprachwechsel erhalten.
 
 > [!NOTE] Das Dashboard zeigt zuletzt gespeicherte Statusdaten. Für technische Details öffnen Sie **History**, **Berichte** oder **Repositories**.
 
