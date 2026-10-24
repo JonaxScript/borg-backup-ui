@@ -216,7 +216,7 @@ def export_jobs_bundle(config: dict, selected_keys: List[str] | None = None) -> 
     exported_ids = {j.get('job_id') or j.get('job_key') for j in jobs}
     from database_profiles import snapshot_profiles, list_profiles
     database_ids = list(dict.fromkeys(x for job in jobs for x in job.get('database_profile_ids', [])))
-    bundle['database_profiles'] = snapshot_profiles(config, database_ids, allow_disabled=True) if selected else list_profiles(config)['profiles']
+    bundle['database_profiles'] = snapshot_profiles(config, database_ids, allow_disabled=True, require_databases=False) if selected else list_profiles(config)['profiles']
     bundle['job_groups'] = [g for g in definitions(config)['groups'] if set(g['jobs']) <= exported_ids]
     if bundle['job_groups'] or bundle['database_profiles']:
         bundle['format'] = 'bbui-job-bundle-v5'
@@ -877,6 +877,9 @@ def _secrets_dir() -> Path:
 
 def _valid_secret_backup_name(name: str) -> bool:
     value = str(name or "")
+    import re
+    if re.fullmatch(r'\.database-[a-f0-9]{32}\.json', value):
+        return True
     if value.startswith((".borg-passphrase-", ".smb-", ".ntfy-")) and "/" not in value:
         return True
     if value.startswith("borg-keys/"):

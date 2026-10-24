@@ -14,11 +14,12 @@ import shutil
 import stat
 import subprocess
 import time
+import tempfile
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 
-from database_profiles import DatabaseError, data_root
+from database_profiles import DatabaseError, data_root, read_password
 from inventory_store import atomic_write_json
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'runtime' / 'scripts'
@@ -29,6 +30,7 @@ set -eu
 umask 077
 state=/dev/shm/bbui-db-$1; shift
 mkdir -m 700 "$state"
+trap 'rm -f "$state/credentials"' EXIT
 command -v setsid >/dev/null || { echo 20 > "$state/done"; exit 20; }
 exec 3<&0
 setsid sh -s -- "$state" "$@" <&3 &
@@ -68,7 +70,7 @@ for f in /proc/[0-9]*/stat; do
   if [ "$3" = "$pid" ] && [ "$1" != Z ]; then live=1; fi
 done
 if [ "$live" = 0 ] && [ -f "$state/done" ]; then
-  if [ "$action" = ack ]; then rm -f "$state/pid" "$state/identity" "$state/done"; rmdir "$state"; fi
+  if [ "$action" = ack ]; then rm -f "$state/pid" "$state/identity" "$state/done" "$state/credentials"; rmdir "$state"; fi
   echo done; exit
 fi
 if [ "$action" = cancel ] || [ "$action" = kill ]; then
@@ -170,10 +172,24 @@ def _operation(config, profile, cid, action, database, output, cancelled):
     journal = data_root(config) / 'database-operations' / (token + '.json')
     record = {'token': token, 'container_id': cid, 'execution_user': profile['execution_user'],
               'profile_id': profile['id'], 'status': 'running', 'started_at': utc_now()}
+    credentials = ''
+    credential_file = profile.get('credential_file', '')
+    if profile.get('auth_mode') == 'managed':
+        password = read_password(config, profile)
+        if profile['engine'] == 'mariadb':
+            escaped = password.replace('\\', '\\\\').replace('"', '\\"').replace('\t', '\\t')
+            content = '[client]\nuser=' + profile['database_user'] + '\npassword="' + escaped + '"\n'
+        else:
+            escaped = password.replace('\\', '\\\\').replace(':', '\\:')
+            content = f"127.0.0.1:{profile['port']}:*:{profile['database_user']}:{escaped}\n"
+        delimiter = 'BBUI_SECRET_' + uuid.uuid4().hex
+        # Only stdin carries secret bytes. A quoted here-document disables shell expansion.
+        credentials = f'cat > "$state/credentials" <<\'{delimiter}\'\n{content}{delimiter}\n'
+        credential_file = '/dev/shm/bbui-db-' + token + '/credentials'
+    script = LEADER + credentials + (SCRIPTS / ('database-dump-' + profile['engine'] + '.sh')).read_text()
     atomic_write_json(journal, record)
-    script = LEADER + (SCRIPTS / ('database-dump-' + profile['engine'] + '.sh')).read_text()
     cmd = _docker(profile, cid) + ['sh', '-c', SUPERVISOR, 'bbui', token, action,
-                                profile['credential_file'], str(profile['port']), profile['database_user'], database]
+                                credential_file, str(profile['port']), profile['database_user'], database]
     proc = None
     reason = None
     started = time.monotonic()
@@ -181,7 +197,7 @@ def _operation(config, profile, cid, action, database, output, cancelled):
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=output, stderr=subprocess.DEVNULL)
         proc.stdin.write(script.encode())
         proc.stdin.close()
-        limit = min(60, profile['timeout_seconds']) if action == 'probe' else profile['timeout_seconds']
+        limit = min(60, profile['timeout_seconds']) if action in ('probe', 'discover') else profile['timeout_seconds']
         while proc.poll() is None:
             if cancelled():
                 reason = 'cancelled'
@@ -238,11 +254,20 @@ def _private_path(path):
 
 
 def staging_root(profile, *, require_space=True):
-    """Validate local persistent storage and free-space reserve; never create the mount."""
+    """Validate local storage; create a missing private direct child only for an explicit export.
+
+    The selected mount must already exist. Listing/cleanup never creates storage.
+    """
     mount, path = Path(profile['staging_mount']), Path(profile['staging_dir'])
     try:
         if not os.path.ismount(mount) or mount.resolve() != mount or mount not in path.parents:
             raise DatabaseError('invalid_storage')
+        if require_space and not path.exists() and path.parent == mount and not path.is_symlink():
+            for parent in [mount, *mount.parents]:
+                info = parent.stat()
+                if info.st_mode & 0o022 or info.st_uid not in (0, os.geteuid()):
+                    raise DatabaseError('invalid_storage')
+            path.mkdir(mode=0o700)
         _private_path(path)
         # Verify the actual filesystem, not just its path/name.
         fs = _run(['stat', '-f', '-c', '%T', str(path)], stdout=subprocess.PIPE, text=True).stdout.strip()
@@ -371,6 +396,33 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
 def artifact_paths(results):
     """Return the exact completed files plus manifest from this run, never a staging tree."""
     return [Path(r['directory']) / name for r in results for name in [*[f['name'] for f in r['files']], 'manifest.json']]
+
+
+def discover_databases(config, profile, cancelled=lambda: False):
+    """List selectable names using the configured account; never change saved backup scope.
+
+    Caller holds docker-control. Query output is bounded and temporary, and does
+    not require dump storage or an existing database selection.
+    """
+    parent = data_root(config) / 'database-discovery'
+    parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=parent) as temporary:
+        path = Path(temporary) / 'names'
+        with path.open('xb') as output:
+            os.fchmod(output.fileno(), 0o600)
+            _operation(config, profile, container_identity(profile), 'discover', '', output, cancelled)
+        if path.stat().st_size > 1024 * 1024:
+            raise DatabaseError('export_failed')
+        names = path.read_text().splitlines()
+    excluded = {'mysql', 'information_schema', 'performance_schema', 'sys'} if profile['engine'] == 'mariadb' else {'template0', 'template1'}
+    return sorted(set(name for name in names if name.lower() not in excluded and re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', name)))
+
+
+def managed_scripts():
+    """Return fixed bundled helper sources for an administrator's read-only view."""
+    return [{'name': 'database-dump-' + engine + '.sh', 'engine': engine,
+             'content': (SCRIPTS / ('database-dump-' + engine + '.sh')).read_text()}
+            for engine in ('mariadb', 'postgresql')]
 
 
 def verify_archive(repo, archive, results, cancelled=lambda: False):

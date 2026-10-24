@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 
 from database_profiles import DatabaseError, data_root, snapshot_profiles, list_profiles
-from database_backup import export_profiles, reconcile_operations, staging_root, cleanup_run, utc_now
+from database_backup import export_profiles, reconcile_operations, staging_root, cleanup_run, utc_now, discover_databases
 from inventory_store import atomic_write_json
 
 _active = {}
@@ -45,9 +45,9 @@ def start_operation(config, payload):
     from wizard_runner import ResourceLockSet
     from jobs_api import resolve_resource_lock_dir
     action = payload.get('action')
-    if action not in ('check', 'dump', 'cleanup', 'reconcile'):
+    if action not in ('discover', 'check', 'dump', 'cleanup', 'reconcile'):
         raise DatabaseError('invalid_operation')
-    profiles = snapshot_profiles(config, [payload.get('profile_id')], allow_disabled=action in ('cleanup', 'reconcile'))
+    profiles = snapshot_profiles(config, [payload.get('profile_id')], allow_disabled=action != 'dump', require_databases=action == 'dump')
     profile = profiles[0]
     identifier = uuid.uuid4().hex
     event = threading.Event()
@@ -70,7 +70,9 @@ def start_operation(config, payload):
         """Own locks through termination/reconciliation and persist only safe diagnostics."""
         try:
             reconcile_operations(config)
-            if action in ('dump', 'check'):
+            if action in ('discover', 'check'):
+                state['databases'] = discover_databases(config, profile, event.is_set)
+            elif action == 'dump':
                 state['results'] = export_profiles(config, profiles, 'test', identifier, event.is_set,
                                                     check_only=action == 'check')
             elif action == 'cleanup':

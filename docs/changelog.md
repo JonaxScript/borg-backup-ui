@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Simplify setup with managed versioned Secrets, native database discovery and explicit checkbox selection. Match Settings cards and expose shipped helpers read-only under Scripts. Preserve existing credential references; include managed files in encrypted Secrets exports.
+
 - Add credential-reference profiles, bundled managed exporters, asynchronous admin checks/dumps/cleanup, and job wizard integration for MariaDB and PostgreSQL.
 - Coordinate exports with existing Docker resource locks; journal owned process groups for cancellation/restart reconciliation. Stage private per-run files, reject overlapping ordinary sources, and verify required artifacts by streaming them back from Borg.
 - Preserve database profile references through configuration transfer and keep existing jobs unchanged. Add bilingual setup/restore guidance and Docker/Borg restore tests; real Unraid fresh-install/upgrade acceptance remains a maintainer test.

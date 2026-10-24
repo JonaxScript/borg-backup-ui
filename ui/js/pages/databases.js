@@ -1,6 +1,6 @@
 'use strict';
-/** Managed database profiles and bounded test operations; credentials never enter this editor. */
-const databaseState = {profiles: [], containers: [], selected: '', operation: null, polling: false};
+/** Managed database profiles and bounded test operations; password inputs are write-only and never populated from API responses. */
+const databaseState = {profiles: [], containers: [], selected: '', operation: null, polling: false, available: {}};
 function dbT(key, params = {}) { return window.BBUI.components.i18n.t(`database.${key}`, params); }
 
 /** Fetch a database API response and expose only localized server error codes. */
@@ -35,39 +35,55 @@ function renderDatabaseSettings() {
   const panel = document.getElementById('settings-databases-panel');
   if (!panel) return;
   const row = databaseState.profiles.find(p => p.id === databaseState.selected) || {
-    engine:'mariadb', enabled:true, port:3306, timeout_seconds:1800, min_free_mib:1024, retention:'keep', databases:[],
+    engine:'mariadb', enabled:true, port:3306, timeout_seconds:1800, min_free_mib:1024, retention:'keep', databases:[], auth_mode:'managed', database_user:'root', staging_mount:'/mnt/cache', staging_dir:'/mnt/cache/borg-database-dumps',
   };
-  const input = (key, type='text', extra='') => `<label class="form-label" for="db-${key}">${escHtml(dbT(key))}</label><input class="form-input" id="db-${key}" name="${key}" type="${type}" value="${escHtml(row[key] ?? '')}" ${extra}>`;
-  panel.innerHTML = `<div class="settings-body">
-    <p class="status-message info">${escHtml(dbT('managed'))}</p>
-    <p>${escHtml(dbT('scope'))}</p><p>${escHtml(dbT('credentials'))}</p>
-    <label class="form-label" for="db-select">${escHtml(dbT('profile'))}</label>
-    <select class="form-select" id="db-select"><option value="">${escHtml(dbT('new'))}</option>${databaseState.profiles.map(p => `<option value="${escHtml(p.id)}" ${p.id === row.id ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('')}</select>
+  const input = (key, type='text', extra='') => `<label class="form-label" for="db-${key}">${escHtml(dbT(key))}</label><input class="form-input" id="db-${key}" name="${key}" type="${type}" value="${escHtml(key === 'database_user' ? (row[key] || (row.engine === 'postgresql' ? 'postgres' : 'root')) : (row[key] ?? ''))}" ${extra}>`;
+  panel.innerHTML = `<div class="database-settings">
+    <div class="database-intro"><span class="settings-menu-icon">${settingsMenuIcon('repository')}</span><div><h3>${escHtml(dbT('title'))}</h3><p>${escHtml(dbT('intro'))}</p></div></div>
+    <div class="form-group"><label class="form-label" for="db-select">${escHtml(dbT('profile'))}</label>
+    <select class="form-select" id="db-select"><option value="">${escHtml(dbT('new'))}</option>${databaseState.profiles.map(p => `<option value="${escHtml(p.id)}" ${p.id === row.id ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('')}</select></div>
     <form id="database-form" class="database-form">
+    ${settingsCard(escHtml(dbT('connection')), settingsMenuIcon('repository'), `<div class="settings-body database-fields">
       <div class="form-group">${input('name','text','required maxlength="100"')}</div>
       <div class="form-group"><label class="form-label" for="db-engine">${escHtml(dbT('engine'))}</label><select class="form-select" id="db-engine" name="engine"><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option></select></div>
       <div class="form-group">${input('container','text','required list="db-containers"')}<datalist id="db-containers">${databaseState.containers.map(p => `<option value="${escHtml(typeof p === 'string' ? p : p.name || p.Name || '')}"></option>`).join('')}</datalist></div>
-      <div class="form-group">${input('execution_user')}</div>
-      <div class="form-group">${input('database_user')}</div>
-      <div class="form-group">${input('port','number','required min="1" max="65535"')}</div>
-      <div class="form-group">${input('credential_file','text','required placeholder="/run/secrets/backup.cnf"')}</div>
-      <div class="form-group"><label class="form-label" for="db-databases">${escHtml(dbT('databases'))}</label><textarea class="form-input" id="db-databases" name="databases" rows="3" required>${escHtml(row.databases.join('\n'))}</textarea></div>
+      <div class="form-group">${input('database_user','text','required autocomplete="username"')}</div>
+      <div class="form-group"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id ? 'passwordKeep' : 'passwordEnter'))}"></div>
+      <p class="form-help">${escHtml(dbT('credentials'))}</p>
+      ${row.auth_mode === 'container' ? `<p class="status-message info">${escHtml(dbT('legacyCredentials'))} <code>${escHtml(row.credential_file)}</code></p>` : ''}
+      <details class="database-advanced"><summary>${escHtml(dbT('advancedConnection'))}</summary>
+        <div class="form-group">${input('port','number','required min="1" max="65535"')}</div>
+        <div class="form-group">${input('execution_user')}</div>
+      </details>
+    </div>`)}
+    ${settingsCard(escHtml(dbT('databases')), settingsMenuIcon('backup'), `<div class="settings-body">
+      <p class="form-help">${escHtml(dbT('selectionHint'))}</p>
+      <button class="btn btn-primary" type="submit" data-db-discover>${escHtml(dbT('discover'))}</button>
+      <div id="db-databases" class="database-selection"></div>
+      <div class="database-flags"><label id="db-globals-label"><input type="checkbox" id="db-globals" ${row.include_globals ? 'checked' : ''}> ${escHtml(dbT('globals'))}</label></div>
+      <p class="form-help">${escHtml(dbT('globalsHint'))}</p>
+    </div>`)}
+    ${settingsCard(escHtml(dbT('storageTitle')), settingsMenuIcon('backup'), `<div class="settings-body database-fields">
       <p class="form-help">${escHtml(dbT('storageHint'))}</p>
       <div class="form-group">${input('staging_mount','text','required placeholder="/mnt/cache"')}</div>
       <div class="form-group">${input('staging_dir','text','required placeholder="/mnt/cache/borg-database-dumps"')}</div>
-      <div class="form-group">${input('min_free_mib','number','required min="1" max="104857600"')}</div>
-      <div class="form-group">${input('timeout_seconds','number','required min="1" max="86400"')}</div>
       <div class="form-group"><label class="form-label" for="db-retention">${escHtml(dbT('retention'))}</label><select class="form-select" id="db-retention" name="retention"><option value="keep">${escHtml(dbT('keep'))}</option><option value="after_archive">${escHtml(dbT('after_archive'))}</option></select></div>
-      <div class="database-flags"><label><input type="checkbox" id="db-enabled" ${row.enabled ? 'checked' : ''}> ${escHtml(dbT('enabled'))}</label>
-      <label><input type="checkbox" id="db-globals" ${row.include_globals ? 'checked' : ''}> ${escHtml(dbT('globals'))}</label></div>
-      <p class="form-help">${escHtml(dbT('globalsHint'))}</p>
+      <details class="database-advanced"><summary>${escHtml(dbT('limits'))}</summary>
+        <div class="form-group">${input('min_free_mib','number','required min="1" max="104857600"')}</div>
+        <div class="form-group">${input('timeout_seconds','number','required min="1" max="86400"')}</div>
+      </details>
+    </div>`)}
+      <div class="database-footer"><label><input type="checkbox" id="db-enabled" ${row.enabled ? 'checked' : ''}> ${escHtml(dbT('enabled'))}</label>
       <div class="job-script-actions"><button class="btn btn-primary" type="submit">${escHtml(dbT('save'))}</button>
-        <button class="btn btn-danger" id="db-delete" type="button" ${row.id ? '' : 'disabled'}>${escHtml(dbT('delete'))}</button></div>
+        <button class="btn btn-danger" id="db-delete" type="button" ${row.id ? '' : 'disabled'}>${escHtml(dbT('delete'))}</button></div></div>
     </form>
-    <p>${escHtml(dbT('savedActions'))}</p><div class="job-script-actions">${['check','dump','reconcile'].map(action => `<button class="btn btn-secondary" data-db-action="${action}" ${row.id && row.enabled ? '' : 'disabled'}>${escHtml(dbT(action))}</button>`).join('')}
+    ${settingsCard(escHtml(dbT('actions')), settingsMenuIcon('restore'), `<div class="settings-body">
+      <p class="form-help">${escHtml(dbT('savedActions'))}</p><div class="job-script-actions">${['check','dump','reconcile'].map(action => `<button class="btn btn-secondary" type="button" data-db-action="${action}" ${row.id && (row.enabled || action === 'reconcile') ? '' : 'disabled'}>${escHtml(dbT(action))}</button>`).join('')}
       <button class="btn btn-secondary" id="db-cancel" ${databaseState.operation ? '' : 'disabled'}>${escHtml(dbT('cancel'))}</button></div>
-    <p id="db-result" role="status" aria-live="polite"></p>
-    <h3>${escHtml(dbT('runs'))}</h3><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div>
+      <p id="db-result" class="status-message hidden" role="status" aria-live="polite"></p>
+    </div>`)}
+    ${settingsCard(escHtml(dbT('runs')), settingsMenuIcon('backup'), `<div class="settings-body"><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div></div>`)}
+    <details class="database-advanced"><summary>${escHtml(dbT('managedTitle'))}</summary><p>${escHtml(dbT('managed'))}</p><p>${escHtml(dbT('scope'))}</p></details>
   </div>`;
   document.getElementById('db-engine').value = row.engine;
   document.getElementById('db-retention').value = row.retention;
@@ -75,16 +91,22 @@ function renderDatabaseSettings() {
   const form = document.getElementById('database-form');
   form.addEventListener('input', () => { settingsState.databaseDirty = true; _updateUnsavedChangesUi(); });
   databaseEngineFields(row.engine);
+  renderDatabaseChoices(databaseState.available[row.id] || [], row.databases);
   document.getElementById('db-engine').addEventListener('change', e => {
     databaseEngineFields(e.target.value);
     document.getElementById('db-port').value = e.target.value === 'postgresql' ? 5432 : 3306;
     document.getElementById('db-globals').checked = false;
+    document.getElementById('db-database_user').value = e.target.value === 'postgresql' ? 'postgres' : 'root';
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const body = Object.fromEntries(new FormData(form));
     if (row.id) body.id = row.id;
-    body.databases = body.databases.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    body.databases = [...form.querySelectorAll('#db-databases input:checked')].map(el => el.value);
+    body.auth_mode = row.auth_mode === 'container' && !body.password ? 'container' : 'managed';
+    if (body.auth_mode === 'container') body.credential_file = row.credential_file;
+    if (!body.password && row.credential_id) delete body.password;
+    const discover = e.submitter?.hasAttribute('data-db-discover');
     for (const k of ['port','timeout_seconds','min_free_mib']) body[k] = Number(body[k]);
     body.enabled = document.getElementById('db-enabled').checked;
     body.include_globals = document.getElementById('db-globals').checked;
@@ -93,6 +115,7 @@ function renderDatabaseSettings() {
       settingsState.databaseDirty = false;
       await loadDatabaseSettings(data.profile.id);
       databaseFeedback(dbT('saved'));
+      if (discover) await startDatabaseAction(data.profile.id, 'discover');
     } catch (err) { databaseFeedback(err.message); }
   });
   document.getElementById('db-select').addEventListener('change', e => {
@@ -115,16 +138,24 @@ function renderDatabaseSettings() {
 /** Show only applicable engine options, retaining shared profile fields. */
 function databaseEngineFields(engine) {
   const pg = engine === 'postgresql';
-  const user = document.getElementById('db-database_user');
-  user.closest('.form-group').classList.toggle('hidden', !pg);
-  user.required = pg;
-  document.getElementById('db-globals').closest('label').classList.toggle('hidden', !pg);
-  document.getElementById('db-credential_file').placeholder = pg ? '/run/secrets/backup.pgpass' : '/run/secrets/backup.cnf';
+  document.getElementById('db-globals-label').classList.toggle('hidden', !pg);
 }
-function databaseFeedback(message) { const node = document.getElementById('db-result'); if (node) node.textContent = message; }
+function databaseFeedback(message) {
+  const node = document.getElementById('db-result');
+  if (node) { node.textContent = message; node.classList.remove('hidden'); }
+}
+
+/** Render discovered names and retain explicit selections even when no longer discoverable. */
+function renderDatabaseChoices(available, selected) {
+  const node = document.getElementById('db-databases');
+  if (!node) return;
+  const names = [...new Set([...available, ...selected])].sort();
+  node.innerHTML = names.map(name => `<label class="database-choice"><input type="checkbox" value="${escHtml(name)}" ${selected.includes(name) ? 'checked' : ''}><span>${escHtml(name)}</span></label>`).join('') || `<p class="form-help">${escHtml(dbT('notLoaded'))}</p>`;
+}
 
 /** Start only saved profile operations; local cleanup always requires an explicit confirmation. */
 async function startDatabaseAction(profile_id, action, directory) {
+  if (databaseState.operation) { databaseFeedback(dbT('running')); return; }
   if (settingsState.databaseDirty) { databaseFeedback(dbT('saveFirst')); return; }
   if (action === 'cleanup' && !window.confirm(dbT('confirmCleanup'))) return;
   try {
@@ -145,7 +176,15 @@ async function pollDatabaseOperation() {
       const error = status.error_code ? apiErrorMessage({code:status.error_code}) : '';
       const locations = (status.results || []).map(r => r.directory).join(', ');
       databaseFeedback([dbT(status.status), error, locations, status.action === 'dump' && status.status === 'completed' ? dbT('testOnly') : ''].filter(Boolean).join(' · '));
-      if (status.status !== 'running') { databaseState.operation = null; await loadDatabaseRuns(); break; }
+      if (status.status !== 'running') {
+        if (status.status === 'completed' && Array.isArray(status.databases) && status.profile_id === databaseState.selected) {
+          databaseState.available[status.profile_id] = status.databases;
+          const selected = [...document.querySelectorAll('#db-databases input:checked')].map(el => el.value);
+          renderDatabaseChoices(status.databases, selected);
+          databaseFeedback(dbT('discovered', {count: status.databases.length}));
+        }
+        databaseState.operation = null; await loadDatabaseRuns(); break;
+      }
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
   } catch (e) { databaseFeedback(e.message); }
@@ -180,4 +219,9 @@ function wizardApplyDatabases(selected) {
   const rows = [...(wizardState.databaseProfiles || [])];
   for (const id of selected) if (!rows.some(p => p.id === id)) rows.push({id,name:dbT('missing'),databases:[]});
   node.innerHTML = rows.map(p => `<label class="form-label"><input type="checkbox" value="${escHtml(p.id)}" ${selected.includes(p.id) ? 'checked' : ''}> ${escHtml(p.name)} · ${escHtml(p.engine || '')}: ${escHtml(p.databases.join(', '))}${p.enabled ? '' : ' ('+escHtml(dbT('missing'))+')'}${p.include_globals ? ' · '+escHtml(dbT('globals')) : ''}</label>`).join('') || `<p>${escHtml(dbT('noProfiles'))}</p>`;
+}
+
+/** Keep shipped assets visible but separate from assignable user hooks; no write action. */
+function renderManagedDatabaseScripts(scripts) {
+  return settingsCard(escHtml(dbT('managedTitle')), settingsMenuIcon('repository'), `<div class="settings-body managed-database-scripts"><p>${escHtml(dbT('managed'))}</p><p class="form-help">${escHtml(dbT('managedExecution'))}</p>${scripts.map(script => `<details><summary><strong>${escHtml(script.name)}</strong> <span class="badge">${escHtml(dbT('readOnly'))}</span></summary><pre tabindex="0"><code>${escHtml(script.content)}</code></pre></details>`).join('')}</div>`);
 }

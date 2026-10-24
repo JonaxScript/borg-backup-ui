@@ -15,7 +15,7 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "api"))
 import database_backup as backup
-from database_profiles import validate_profile, DatabaseError
+from database_profiles import validate_profile, save_profile, DatabaseError
 
 pytestmark=pytest.mark.skipif(os.environ.get('BBUI_DATABASE_DOCKER_TESTS') != '1', reason='Opt-in real Docker integration')
 
@@ -65,10 +65,21 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     else:
         sql(source,'CREATE ROLE fixture_owner; ALTER DATABASE fixture OWNER TO fixture_owner;')
         sql(source,'CREATE EXTENSION IF NOT EXISTS hstore;','fixture')
-    cred='/run/backup.cnf' if engine=='mariadb' else '/run/backup.pgpass'
-    command(['docker','exec','-i',source,'sh','-c','umask 077; cat > "$1"','fixture',cred],input=b'[client]\nuser=root\n' if engine=='mariadb' else b'')
+    password='fixture:p\\ass"$word'
+    user='fixture_login'
+    if engine=='mariadb':
+        sql(source, "SET sql_mode='NO_BACKSLASH_ESCAPES'; CREATE USER 'fixture_login'@'127.0.0.1' IDENTIFIED BY '"+password+"'; GRANT ALL PRIVILEGES ON *.* TO 'fixture_login'@'127.0.0.1';")
+    else:
+        sql(source,"CREATE ROLE fixture_login WITH LOGIN SUPERUSER PASSWORD '"+password+"';")
+        command(['docker','exec','-i',source,'sh','-c','cat > /var/lib/postgresql/data/pg_hba.conf'],input=b'local all all trust\nhost all all 127.0.0.1/32 scram-sha-256\n')
+        sql(source,'SELECT pg_reload_conf();')
     staging=tmp_path/'staging'; staging.mkdir(mode=0o700)
-    profile=validate_profile(dict(id='db-aaaaaaaaaaaa',name='fixture',engine=engine,container=source,databases=['fixture'],credential_file=cred,database_user='postgres' if engine=='postgresql' else '',staging_mount=str(tmp_path),staging_dir=str(staging),include_globals=engine=='postgresql'))
+    cfg={'BACKUP_SCRIPTS_DIR':str(tmp_path/'config')}
+    profile=save_profile(cfg,dict(name='fixture',engine=engine,container=source,databases=['fixture'],auth_mode='managed',password=password,database_user=user,staging_mount=str(tmp_path),staging_dir=str(staging),include_globals=engine=='postgresql'))['profile']
+    assert 'fixture' in backup.discover_databases(cfg,profile)
+    assert profile['databases']==['fixture']
+    leftovers=command(['docker','exec',source,'sh','-c','find /dev/shm -name credentials -print'])
+    assert not leftovers
     # Host filesystem/mount safety is covered separately; all exporter/Borg/database operations are real.
     monkeypatch.setattr(backup,'staging_root',lambda *a,**k:staging)
     cfg={'BACKUP_SCRIPTS_DIR':str(tmp_path/'config')}
@@ -94,7 +105,7 @@ def test_real_export_borg_readback_restore(database_container,tmp_path,monkeypat
     else:
         globals_path=Path(results[0]['directory'])/'globals.sql'
         globals_sql=command(['borg','extract','--stdout',str(repo)+'::fixture',str(globals_path).lstrip('/')])
-        assert b'PASSWORD' not in globals_sql
+        assert b'PASSWORD' not in globals_sql and password.encode() not in globals_sql
         # The bootstrap role already exists in a fresh official image; skip only its CREATE.
         sql(target,globals_sql.decode().replace('CREATE ROLE postgres;',''))
         command(['docker','exec','-i',target,'pg_restore','-U','postgres','--exit-on-error','--create','--dbname=postgres'],input=content)

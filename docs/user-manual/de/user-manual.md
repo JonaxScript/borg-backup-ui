@@ -1981,9 +1981,11 @@ Produktionsdaten und dienen gezielten Tests.
 ### 19.1 Profile und Voraussetzungen
 
 Unter **Einstellungen > Datenbank-Sicherungen** ein Profil für einen laufenden
-lokalen MariaDB- oder PostgreSQL-Container anlegen. Datenbanken ausdrücklich
-angeben (ein Name pro Zeile), dazu den Loopback-Port im Container, optional den
-Ausführungsnutzer und den Pfad einer geschützten Zugangsdaten-Datei. Namen dürfen
+lokalen MariaDB- oder PostgreSQL-Container anlegen. Datenbankbenutzer (üblicherweise
+`root` bei MariaDB, `postgres` bei PostgreSQL) und Passwort eingeben. **Verbindung
+speichern und Datenbanken laden**, gewünschte Datenbanken anhaken und Profil
+speichern. Der Docker-Ausführungsnutzer root ersetzt keine Datenbankanmeldung.
+Neu gefundene Datenbanken werden niemals automatisch in Jobs aufgenommen. Namen dürfen
 Buchstaben, Ziffern, Unterstriche, Punkte und Bindestriche enthalten; Datenbanknamen
 müssen mit Buchstabe, Ziffer oder Unterstrich beginnen. Systemschemas sind keine
 normalen Sicherungsquellen. Fehlende/deaktivierte Profile blockieren zugeordnete
@@ -2005,31 +2007,43 @@ Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB dieselbe
 Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4` und
 `postgres:16`. Andere Images benötigen passende Voraussetzungen und eigene Restore-Tests.
 
-Zugangsdaten-Dateien selbst im Container einrichten: Eigentümer ist der
-Ausführungsnutzer, Modus `0600` oder `0400`. Das Plugin speichert nur den Pfad.
-MariaDB verwendet eine Optionsdatei mit `[client]`, `user=...` und `password=...`;
-optional sind `ssl-ca`, `ssl-cert`, `ssl-key` und `ssl-verify-server-cert` erlaubt.
-Andere Gruppen, Includes und Optionen zum Sicherungsumfang werden abgewiesen.
-PostgreSQL verwendet pgpass mit einem passenden Eintrag
-`127.0.0.1:PORT:DATENBANK:NUTZER:PASSWORT`; `:` und `\` nach pgpass-Regeln maskieren.
-Auch der Export globaler Objekte benötigt einen passenden Datenbankeintrag.
-Passwörter nicht in Profilfelder oder Skriptquelltext eintragen. Dateien im
-Container sind **nicht Teil des Plugin-Konfigurationsexports**.
+Zugangsdaten speichert das Plugin geschützt als `secrets/.database-<id>.json`
+unter seinem Datenverzeichnis. Passwortfelder werden nie zurückbefüllt; leer
+lassen behält ein gespeichertes Passwort. Jede Passwortänderung erzeugt eine
+neue Referenz, damit laufende Jobs ihren ursprünglichen Stand behalten. Ältere
+Versionen bleiben für laufende Snapshots und Wiederherstellung erhalten. Diese
+Dateien über das separate verschlüsselte **Secrets-Backup** sichern; normale
+Konfigurationsexporte enthalten nur Referenzen.
 
-Ein vorhandenes privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
+Neue Profile benötigen keine manuell angelegte Datei oder Container-Einbindung.
+Das Plugin überträgt Zugangsdaten über Docker-stdin in eine eigene temporäre Datei
+unter `/dev/shm`, niemals über Prozessargumente oder Logs. Nach bestätigtem Ende
+oder Abbruch wird sie entfernt, bei Unterbrechungen im Zuge der Abgleichaktion.
+Bestehende Profile mit Container-Datei bleiben nutzbar. Ein Passwort eingeben,
+um auf verwaltete Secrets umzustellen. Externe Dateien bleiben unverändert und
+werden nicht exportiert.
+
+Beide Helfer erscheinen unter **Einstellungen > Skripte > Mitgelieferte Skripte**
+in einer schreibgeschützten Ansicht. Die Ausführung erfolgt über Datenbankprofile,
+nicht über zusätzliche Hook-Zuordnungen.
+
+Ein privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
 auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Elternverzeichnisse
 müssen root/dem Ausführungsnutzer gehören und dürfen nicht für Gruppe/Andere
 beschreibbar sein. Symlinks werden abgewiesen. Unterstützt: Btrfs, XFS, ext-Dateisysteme
 und ZFS. Den echten Poolpfad statt `/mnt/user` verwenden. Bootstick, RAM und
 Netzwerk-Dateisysteme sind nicht unterstützt. Den tatsächlichen Mountpunkt separat
 angeben. Die Freiplatzgrenze schätzt die Dump-Größe nicht; Platz für vollständige
-Exporte vorsehen.
+Exporte vorsehen. Ein fehlendes Verzeichnis direkt unter dem eingebundenen Pool
+legt ein ausdrücklich gestarteter Dump mit Modus `0700` an. Mountpunkt und sichere
+Elternverzeichnisse müssen vorhanden sein.
 
 ### 19.2 Ablauf und Prüfung
 
-1. Profil speichern und **Verbindung prüfen** ausführen. Geprüft werden Speicher,
-   Zugang, Versionen und Datenbankzugriff, jedoch nicht sämtliche Exportrechte
-   oder die Wiederherstellbarkeit.
+1. Verbindung speichern, Datenbanken laden, gewünschte Namen anhaken und speichern.
+   **Verbindung prüfen** wiederholt die Abfrage ohne Änderung der Auswahl. Dies
+   prüft weder Exportrechte noch Dump-Speicher oder Wiederherstellbarkeit. Leere
+   Auswahlen sind als Entwurf speicherbar, aber nicht in Jobs verwendbar.
 2. **Test-Dump erstellen** erzeugt asynchron einen lokalen Export und erlaubt
    Abbruch. Dieser ist noch kein Borg-Backup. Pfad, Größe und Ergebnis prüfen und
    vor automatischen Sicherungen eine Wiederherstellung testen.

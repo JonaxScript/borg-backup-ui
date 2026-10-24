@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import uuid
 from pathlib import Path
-from inventory_store import inventory_lock, read_inventory, atomic_write_inventory
+from inventory_store import inventory_lock, read_inventory, atomic_write_inventory, atomic_write_bytes
 
 
 class DatabaseError(ValueError):
@@ -29,6 +30,28 @@ def store_path(config):
     return data_root(config) / 'config' / 'database-profiles.json'
 
 
+def secret_path(config, credential_id):
+    """Resolve an immutable managed credential reference inside the plugin Secrets directory."""
+    if not isinstance(credential_id, str) or not re.fullmatch(r'[a-f0-9]{32}', credential_id):
+        raise DatabaseError('credentials')
+    return data_root(config) / 'secrets' / ('.database-' + credential_id + '.json')
+
+
+def read_password(config, profile):
+    """Read a protected password for internal use only; never include it in public results."""
+    try:
+        path = secret_path(config, profile.get('credential_id'))
+        info = path.stat()
+        if path.is_symlink() or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise DatabaseError('credentials')
+        value = json.loads(path.read_text())['password']
+        if not isinstance(value, str) or len(value) > 4096 or any(c in value for c in '\x00\r\n'):
+            raise DatabaseError('credentials')
+        return value
+    except (OSError, ValueError, KeyError, TypeError):
+        raise DatabaseError('credentials') from None
+
+
 def _text(value, pattern=None, maximum=256):
     if not isinstance(value, str) or not value or len(value) > maximum or any(ord(c) < 32 for c in value):
         raise DatabaseError('invalid_profile')
@@ -45,6 +68,13 @@ def validate_profile(raw):
     if engine not in ('mariadb', 'postgresql'):
         raise DatabaseError('invalid_profile')
     row = {'engine': engine}
+    row['auth_mode'] = raw.get('auth_mode', 'container' if raw.get('credential_file') else 'managed')
+    if row['auth_mode'] not in ('managed', 'container'):
+        raise DatabaseError('invalid_profile')
+    if row['auth_mode'] == 'managed':
+        row['credential_id'] = raw.get('credential_id', '')
+        if row['credential_id']:
+            _text(row['credential_id'], r'[a-f0-9]{32}')
     for key, default in [('enabled', True), ('include_globals', False)]:
         row[key] = raw.get(key, default)
         if not isinstance(row[key], bool):
@@ -60,11 +90,11 @@ def validate_profile(raw):
     row['database_user'] = raw.get('database_user', '')
     if not isinstance(row['database_user'], str):
         raise DatabaseError('invalid_profile')
-    if engine == 'postgresql' or row['database_user']:
+    if row['auth_mode'] == 'managed' or engine == 'postgresql' or row['database_user']:
         _text(row['database_user'], r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63)
     if engine == 'mariadb' and row['include_globals']:
         raise DatabaseError('invalid_profile')
-    for key in ('credential_file', 'staging_mount', 'staging_dir'):
+    for key in (['credential_file'] if row['auth_mode'] == 'container' else []) + ['staging_mount', 'staging_dir']:
         value = _text(raw.get(key))
         path = Path(value)
         if not path.is_absolute() or '..' in path.parts or str(path) != value:
@@ -75,7 +105,7 @@ def validate_profile(raw):
         mount == Path(p) or Path(p) in mount.parents for p in ('/boot', '/proc', '/sys', '/dev', '/run', '/tmp')):
         raise DatabaseError('invalid_storage')
     databases = raw.get('databases')
-    if not isinstance(databases, list) or not 1 <= len(databases) <= 64:
+    if not isinstance(databases, list) or len(databases) > 64:
         raise DatabaseError('invalid_profile')
     system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine == 'mariadb' else {'template0', 'template1'}
     row['databases'] = list(dict.fromkeys(_text(x, r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63) for x in databases))
@@ -104,7 +134,7 @@ def list_profiles(config):
     return {'profiles': rows, 'schema_version': 1}
 
 
-def snapshot_profiles(config, identifiers, *, allow_disabled=False):
+def snapshot_profiles(config, identifiers, *, allow_disabled=False, require_databases=True):
     """Resolve required IDs into an independent snapshot, rejecting disabled/missing rows."""
     if identifiers is None:
         return []
@@ -116,19 +146,36 @@ def snapshot_profiles(config, identifiers, *, allow_disabled=False):
         rows = {r['id']: r for r in list_profiles(config)['profiles']}
         if any(x not in rows or (not allow_disabled and not rows[x]['enabled']) for x in identifiers):
             raise DatabaseError('profile_unavailable')
+        if require_databases and any(not rows[x]['databases'] for x in identifiers):
+            raise DatabaseError('selection_required')
         return copy.deepcopy([rows[x] for x in dict.fromkeys(identifiers)])
 
 
 def save_profile(config, raw):
-    """Create or update an explicitly submitted profile without persisting unknown fields."""
+    """Save a profile and optionally a new immutable secret; blank/omitted updates retain credentials.
+
+    Secrets never enter the inventory. Old secret versions remain available to
+    running snapshots and the explicit encrypted Secrets backup.
+    """
     if not isinstance(raw, dict):
         raise DatabaseError('invalid_profile')
     creating = not raw.get('id')
-    row = validate_profile({**raw, 'id': raw.get('id') or 'db-' + uuid.uuid4().hex[:12]})
     with inventory_lock(store_path(config).parent):
         rows = list_profiles(config)['profiles']
+        old = next((p for p in rows if p['id'] == raw.get('id')), {})
+        merged = {**raw, 'id': raw.get('id') or 'db-' + uuid.uuid4().hex[:12], 'credential_id': old.get('credential_id', '')}
+        row = validate_profile(merged)
         if not creating and not any(r['id'] == row['id'] for r in rows):
             raise DatabaseError('profile_unavailable')
+        if row['auth_mode'] == 'managed':
+            password = raw.get('password')
+            if password is not None and (not isinstance(password, str) or len(password) > 4096 or any(c in password for c in '\x00\r\n')):
+                raise DatabaseError('credentials')
+            if not row['credential_id'] and password is None:
+                raise DatabaseError('credentials')
+            if password or not row['credential_id']:
+                row['credential_id'] = uuid.uuid4().hex
+                atomic_write_bytes(secret_path(config, row['credential_id']), json.dumps({'password': password}).encode(), mode=0o600)
         rows = [r for r in rows if r['id'] != row['id']] + [row]
         atomic_write_inventory(store_path(config), {'schema_version': 1, 'profiles': rows})
     return {'profile': row}

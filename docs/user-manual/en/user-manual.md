@@ -1948,9 +1948,11 @@ modify production data.
 ### 19.1 Profiles and prerequisites
 
 Under **Settings > Database backups**, create a profile for a running local
-MariaDB or PostgreSQL container. Select explicit database names (one per line),
-the loopback port inside the container, an optional execution user, and a protected
-credential-file path. Names currently accept letters, digits, underscores, dots
+MariaDB or PostgreSQL container. Enter the database user (typically `root` for
+MariaDB or `postgres` for PostgreSQL) and password. Use **Save connection and load
+databases**, select databases with the checkboxes, then save the profile. A root
+Docker execution user alone does not bypass database authentication. Discovery
+uses the configured account and never automatically adds new databases to jobs. Names currently accept letters, digits, underscores, dots
 and hyphens; database names must start with a letter, digit or underscore.
 System schemas are not ordinary backup sources. Missing/disabled profiles block
 jobs that reference them. Profile deletion is blocked while any job references it.
@@ -1971,28 +1973,39 @@ Server/client major versions must match (major.minor for MariaDB). Validated
 images for this implementation are `mariadb:11.4` and `postgres:16`; other images
 must meet these prerequisites and require their own restore test.
 
-Provision credential files yourself inside the container, owned by the execution
-user with mode `0600` or `0400`. The plugin only stores the reference. MariaDB uses
-a `[client]` option file containing `user=...` and `password=...` (optional
-`ssl-ca`, `ssl-cert`, `ssl-key`, `ssl-verify-server-cert`). Other option groups,
-includes and dump-scope options are rejected. PostgreSQL uses a pgpass file with
-an entry matching `127.0.0.1:PORT:DATABASE:USER:PASSWORD`; escape `:` and `\` as
-required by pgpass. Include an appropriate database entry for the globals export.
-Do not paste passwords into profile fields or script source. Credential files
-inside Docker are **not included** in plugin configuration exports.
+Credentials are saved as private `secrets/.database-<id>.json` files below the
+plugin data root. Password fields are write-only: leave an existing password
+blank to keep it. Each password change creates a new credential reference, so
+running jobs keep their original snapshot. Previous credential versions remain
+for active snapshots and recovery. Include them in the explicit encrypted
+**Secrets backup**; ordinary configuration exports contain references only.
 
-Use an existing directory with mode `0700`, owned by the plugin execution user
+No container file or bind mount needs to be configured for new profiles. The
+plugin transfers credentials over Docker stdin into an owned temporary file in
+`/dev/shm`, never process arguments or logs. It removes that file after confirmed
+completion/cancellation, or during interrupted-operation reconciliation. Existing
+profiles using a container file continue to work; enter a password to switch to
+managed Secrets. Existing external files are preserved and are not exported.
+
+The two bundled helpers are visible under **Settings > Scripts > Bundled scripts**
+in a read-only view. They run through database profiles, not custom hook assignments.
+
+Use a directory with mode `0700`, owned by the plugin execution user
 (normally root), on a real mounted local pool/disk. Parent directories must be
 owned by root/the execution user and not group/world writable. Symlinks are
 rejected. Supported filesystem types are Btrfs, XFS, ext-family and ZFS. Use the
 actual pool path, not `/mnt/user`; boot storage, RAM and network filesystems are
 not supported. Select the actual mount point separately. The free-space reserve
 is a guard, not an estimate of dump size; allocate room for complete exports.
+An explicit dump creates a missing directory directly below the mounted pool
+with mode `0700`; the mount and safe parent directories must already exist.
 
 ### 19.2 Run and verify
 
-1. Save the profile and use **Check connection**. This checks storage, credentials,
-   versions and database access, but does not prove dump privileges or restoration.
+1. Save the connection and load databases. Select the required names and save.
+   **Check connection** repeats discovery without changing the selection; it does
+   not prove dump privileges, storage readiness or restoration. Empty selections
+   can be saved as drafts but cannot be used in a job.
 2. Use **Create test dump**. The operation runs asynchronously and supports cancel.
    Its output is local only. Review its directory, size and outcome, then perform
    a restore test before enabling scheduled jobs.

@@ -294,4 +294,4 @@ Practical extensions: [Pre/Post scripts](../../docs/user-manual/en/user-manual.m
 
 ## Database backups
 
-Configure MariaDB/PostgreSQL profiles in Settings > Database backups and select them in job wizard step 2. Bundled scripts are plugin-managed; updates may replace direct edits. Credential files remain inside Docker. Test restoration separately. See manual section 19.
+Configure MariaDB/PostgreSQL profiles in Settings > Database backups and select them in job wizard step 2. Bundled scripts are plugin-managed; updates may replace direct edits. Store credentials in plugin Secrets, load databases and select them with checkboxes. Bundled helpers appear read-only under Scripts. Test restoration separately. See manual section 19.

@@ -8,7 +8,7 @@
 # Konfiguration: Einstellungen > Datenbank-Sicherungen.
 # Eigene Anpassungen nur in einer separaten benutzerverwalteten Kopie.
 # Protocol 1: invoked inside Docker by database_backup.py under setsid.
-# Arguments: action (probe/dump/globals), credential file, port, user, database.
+# Arguments: action (discover/probe/dump/globals), credential file, port, user, database.
 # stdout: probe metadata or dump bytes; stderr is never forwarded to UI/logs.
 # Exit 0: complete; 21: credentials; 22: nontransactional tables; other: failure.
 # Reads protected credentials; writes dump only to stdout. No server mutations.
@@ -20,7 +20,8 @@ parent=${cred%/*}
 while [ -n "$parent" ]; do
     owner=$(stat -c %u "$parent"); mode=$(stat -c %a "$parent")
     [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || exit 21
-    [ "$((0$mode & 022))" = 0 ] || exit 21
+    # The owned 0700 run directory is beneath the system's sticky /dev/shm.
+    [ "$parent" = /dev/shm ] && [ "$mode" = 1777 ] || [ "$((0$mode & 022))" = 0 ] || exit 21
     parent=${parent%/*}
 done
 [ "$(stat -c %u "$cred")" = "$(id -u)" ] || exit 21
@@ -30,6 +31,10 @@ command -v pg_dump >/dev/null
 command -v pg_restore >/dev/null
 command -v psql >/dev/null
 case "$act" in
+ discover)
+   exec psql --no-password --host=127.0.0.1 --port="$port" --username="$dbuser" --dbname=postgres --no-psqlrc --tuples-only --no-align \
+     --command='SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn ORDER BY datname;'
+   ;;
  probe)
    psql --no-password --host=127.0.0.1 --port="$port" --username="$dbuser" --dbname="$database" --no-psqlrc --tuples-only --no-align --command='SHOW server_version;'
    pg_dump --version

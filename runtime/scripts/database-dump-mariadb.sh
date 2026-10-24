@@ -8,7 +8,7 @@
 # Konfiguration: Einstellungen > Datenbank-Sicherungen.
 # Eigene Anpassungen nur in einer separaten benutzerverwalteten Kopie.
 # Protocol 1: invoked inside Docker by database_backup.py under setsid.
-# Arguments: action (probe/dump/globals), credential file, port, user, database.
+# Arguments: action (discover/probe/dump), credential file, port, user, database.
 # stdout: probe metadata or dump bytes; stderr is never forwarded to UI/logs.
 # Exit 0: complete; 21: credentials; 22: nontransactional tables; other: failure.
 # Reads protected credentials; writes dump only to stdout. No server mutations.
@@ -20,7 +20,8 @@ parent=${cred%/*}
 while [ -n "$parent" ]; do
     owner=$(stat -c %u "$parent"); mode=$(stat -c %a "$parent")
     [ "$owner" = 0 ] || [ "$owner" = "$(id -u)" ] || exit 21
-    [ "$((0$mode & 022))" = 0 ] || exit 21
+    # The owned 0700 run directory is beneath the system's sticky /dev/shm.
+    [ "$parent" = /dev/shm ] && [ "$mode" = 1777 ] || [ "$((0$mode & 022))" = 0 ] || exit 21
     parent=${parent%/*}
 done
 [ "$(stat -c %u "$cred")" = "$(id -u)" ] || exit 21
@@ -37,6 +38,10 @@ done < "$cred"
 client() { mariadb --defaults-file="$cred" --protocol=tcp --host=127.0.0.1 --port="$port" --batch --skip-column-names "$@"; }
 command -v mariadb-dump >/dev/null
 command -v mariadb >/dev/null
+if [ "$act" = discover ]; then
+    exec mariadb --defaults-file="$cred" --protocol=tcp --host=127.0.0.1 --port="$port" --batch --skip-column-names --raw \
+      --execute="SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys') ORDER BY schema_name"
+fi
 # Names are restricted by the caller; no arbitrary SQL or command text is accepted.
 case "$database" in *[!a-zA-Z0-9_.-]*|'') exit 20;; esac
 count=$(client --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database' AND table_type='BASE TABLE' AND engine <> 'InnoDB'")

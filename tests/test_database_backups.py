@@ -300,3 +300,75 @@ def test_async_actions_share_configured_docker_lock_and_honor_cancel(config, pro
     assert status['status']=='cancelled'
     assert contender.acquire(['docker-control'])[0] is True
     contender.release()
+
+
+def test_managed_credentials_are_private_immutable_and_not_in_profile(config, profile):
+    raw={**profile,'auth_mode':'managed','database_user':'root','password':'s:ec\\ret"$word', 'databases':[]}
+    raw.pop('id');raw.pop('credential_file')
+    created=profiles.save_profile(config,raw)['profile']
+    assert created['auth_mode']=='managed' and 'password' not in created and 'credential_file' not in created
+    first=profiles.secret_path(config,created['credential_id'])
+    assert first.stat().st_mode & 0o777==0o600
+    assert profiles.read_password(config,created)==raw['password']
+    assert raw['password'] not in profiles.store_path(config).read_text()
+    with pytest.raises(profiles.DatabaseError,match='selection_required'):profiles.snapshot_profiles(config,[created['id']])
+    snap=profiles.snapshot_profiles(config,[created['id']],require_databases=False)[0]
+    kept=profiles.save_profile(config,{**created,'password':''})['profile']
+    assert kept['credential_id']==created['credential_id']
+    changed=profiles.save_profile(config,{**created,'password':'replacement','databases':['app']})['profile']
+    assert changed['credential_id']!=created['credential_id']
+    assert profiles.read_password(config,snap)==raw['password']
+    assert profiles.read_password(config,changed)=='replacement'
+    from settings_transfer_api import _valid_secret_backup_name
+    assert _valid_secret_backup_name(first.name)
+    assert not _valid_secret_backup_name('.database-../../anything.json')
+    first.chmod(0o644)
+    with pytest.raises(profiles.DatabaseError,match='credentials'):profiles.read_password(config,snap)
+
+
+def test_discovery_filters_names_without_changing_scope(config, profile, monkeypatch):
+    monkeypatch.setattr(backup,'container_identity',lambda _: 'a'*64)
+    def operation(config,profile,cid,action,database,output,cancelled):
+        assert action=='discover'
+        output.write(b'photos\napp\nmysql\n--bad\nnew_db\n')
+    monkeypatch.setattr(backup,'_operation',operation)
+    assert backup.discover_databases(config,profile)==['app','new_db','photos']
+    assert profile['databases']==['app']
+    assert not list((profiles.data_root(config)/'database-discovery').iterdir())
+
+
+def test_managed_secret_encrypted_export_and_restore(config, profile, monkeypatch, tmp_path):
+    import settings_transfer_api as transfer
+    row=profiles.save_profile(config,{**profile,'id':None,'auth_mode':'managed','database_user':'root','password':'only-in-secret'})['profile']
+    original=profiles.secret_path(config,row['credential_id'])
+    monkeypatch.setattr(transfer,'_secrets_dir',lambda:original.parent)
+    exported=transfer.export_secrets_backup('encrypted-fixture-passphrase')
+    assert exported['count']==1 and 'only-in-secret' not in json.dumps(exported)
+    destination=tmp_path/'restored-secrets';destination.mkdir()
+    monkeypatch.setattr(transfer,'_secrets_dir',lambda:destination)
+    transfer.import_secrets_backup('encrypted-fixture-passphrase',exported['payload_b64'])
+    restored=destination/original.name
+    assert restored.read_bytes()==original.read_bytes()
+    assert restored.stat().st_mode & 0o777==0o600
+
+
+def test_managed_secret_travels_only_over_stdin(config, profile, monkeypatch, tmp_path):
+    row=profiles.save_profile(config,{**profile,'id':None,'auth_mode':'managed','database_user':'root','password':'do-not-log-this'})['profile']
+    captured={}
+    class Process:
+        returncode=0
+        stdin=Mock()
+        def poll(self):return 0
+    def popen(cmd,**kwargs):
+        captured['command']=cmd
+        p=Process();p.stdin.write.side_effect=lambda data:captured.update(stdin=data)
+        return p
+    monkeypatch.setattr(backup.subprocess,'Popen',popen)
+    monkeypatch.setattr(backup,'_control',lambda *a:'done')
+    monkeypatch.setattr(backup,'container_identity',lambda _:'a'*64)
+    with (tmp_path/'output').open('wb') as handle:
+        backup._operation(config,row,'a'*64,'discover','',handle,lambda:False)
+    assert 'do-not-log-this' not in json.dumps(captured['command'])
+    assert b'do-not-log-this' in captured['stdin']
+    for journal in (profiles.data_root(config)/'database-operations').glob('*.json'):
+        assert 'do-not-log-this' not in journal.read_text()

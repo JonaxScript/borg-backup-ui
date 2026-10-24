@@ -294,4 +294,4 @@ Praktische Erweiterungen: [Pre/Post scripts](../../docs/user-manual/de/user-manu
 
 ## Datenbank-Sicherungen
 
-MariaDB-/PostgreSQL-Profile unter Einstellungen > Datenbank-Sicherungen anlegen und in Wizard-Schritt 2 auswählen. Die mitgelieferten Skripte werden vom Plugin gepflegt; Updates können direkte Änderungen überschreiben. Zugangsdaten-Dateien bleiben im Container. Wiederherstellung separat testen. Siehe Handbuch Abschnitt 19.
+MariaDB-/PostgreSQL-Profile unter Einstellungen > Datenbank-Sicherungen anlegen und in Wizard-Schritt 2 auswählen. Die mitgelieferten Skripte werden vom Plugin gepflegt; Updates können direkte Änderungen überschreiben. Zugangsdaten in den Plugin-Secrets speichern, Datenbanken laden und per Checkbox auswählen. Mitgelieferte Helfer stehen unter Skripte schreibgeschützt bereit. Wiederherstellung separat testen. Siehe Handbuch Abschnitt 19.
