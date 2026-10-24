@@ -3456,27 +3456,6 @@
             "prerequisites": "Laufender Docker-Container mit mysql und mysqldump, passende Datenbankrechte und ausschließlich InnoDB-Basistabellen. Schemaänderungen während des Exports vermeiden.",
             "configuration": "Unter Einstellungen > Datenbank-Sicherungen Container, Zugangsdaten, Datenbanken und privaten Dump-Speicher festlegen. Dieser Helfer wird nicht als Pre-/Post-Skript zugeordnet.",
             "behavior": "Borg Backup UI steuert Prüfung, Export, gzip-Komprimierung und Aufbewahrung. Fehler verhindern die Archivierung unvollständiger Dumps. Globale Benutzer und Rechte werden nicht exportiert; Änderungen am Helfer können durch Updates ersetzt werden."
-          },
-          "mongodb": {
-            "title": "MongoDB-Datenbanksicherung",
-            "purpose": "MongoDB: Online-Sicherung eines vollständigen Replica-Set-Mitglieds mit Oplog. Enthält alle Datenbanken sowie Benutzer/Rollen mit Kennwort-Hashes. Keine einzelne Datenbankauswahl, Standalone-Instanzen oder Sharding. Normale Schreibzugriffe dürfen weiterlaufen; während des Dumps keine Schema-, Rollen- oder FCV-Änderungen durchführen.",
-            "prerequisites": "mongosh und mongodump ab 100.3 im laufenden Replica Set ohne Sharding. Vollständige Backup-/Oplog-Rechte sowie getCmdLineOpts-Berechtigung; keine Downtime erforderlich.",
-            "configuration": "Unter Einstellungen > Datenbank-Sicherungen Container, Zugangsdaten, Datenbanken und privaten Dump-Speicher festlegen. Dieser Helfer wird nicht als Pre-/Post-Skript zugeordnet.",
-            "behavior": "Borg Backup UI steuert Abbruch, Zeitlimit, gzip-Komprimierung und Archivprüfung. Bei Fehlern bleiben unvollständige Dumps zur Prüfung erhalten. Updates können diesen verwalteten Helfer ersetzen."
-          },
-          "redis": {
-            "title": "Redis-Datenbanksicherung",
-            "purpose": "Redis: RDB-Snapshot der vollständigen Einzelinstanz mit allen logischen Datenbanken. Kein Redis Cluster; Konfiguration und ACL-Zugangsdaten separat sichern.",
-            "prerequisites": "redis-cli im laufenden Einzelcontainer. PING-, INFO- und Replikationsrechte. Redis Cluster wird abgelehnt.",
-            "configuration": "Unter Einstellungen > Datenbank-Sicherungen Container, Zugangsdaten, Datenbanken und privaten Dump-Speicher festlegen. Dieser Helfer wird nicht als Pre-/Post-Skript zugeordnet.",
-            "behavior": "Borg Backup UI steuert Abbruch, Zeitlimit, gzip-Komprimierung und Archivprüfung. Bei Fehlern bleiben unvollständige Dumps zur Prüfung erhalten. Updates können diesen verwalteten Helfer ersetzen."
-          },
-          "sqlite": {
-            "title": "SQLite-Datenbanksicherung",
-            "purpose": "SQLite: nativer Online-Snapshot einschließlich bestätigter WAL-Transaktionen. Die unkomprimierte Zwischenkopie benötigt zusätzlichen Platz im Dump-Speicher. Anwendungsdateien sind separat. Bei Stash auch Konfiguration und externe Binärdaten sichern oder Stashs eigene vollständige Sicherung verwenden.",
-            "prerequisites": "Laufender Anwendungscontainer mit lokalem Verzeichnis-Bind-Mount. Die Python-SQLite-Laufzeit läuft auf dem Host. Keine Netzwerkdateisysteme, benannten Volumes oder verschlüsselten SQLite-Quellen.",
-            "configuration": "Unter Einstellungen > Datenbank-Sicherungen Container, genauen Datenbankpfad im Container und privaten Dump-Speicher festlegen. Ein Datenbankpasswort ist nicht erforderlich.",
-            "behavior": "Borg Backup UI steuert Abbruch, Zeitlimit, gzip-Komprimierung und Archivprüfung. Bei Fehlern bleiben unvollständige Dumps zur Prüfung erhalten. Updates können diesen verwalteten Helfer ersetzen."
           }
         },
         "prerequisites": "Voraussetzungen",
@@ -3710,19 +3689,8 @@
     "containersEmpty": "Keine Container geladen. Docker-Verfügbarkeit prüfen; eine gespeicherte Auswahl bleibt erhalten.",
     "compressedSize": "Komprimiert: {size}",
     "originalSize": "Unkomprimiert: {size}",
-    "authentication": "Anmeldung",
-    "authenticated": "Zugangsdaten aus Secrets",
-    "noAuthentication": "Server ohne Anmeldung",
-    "sqlite_path": "Datenbankpfad im Container",
-    "sqliteHint": "Die genaue SQLite-Datei innerhalb eines Verzeichnis-Bind-Mounts auf einem lokalen Pool auswählen. Im Container ist kein zusätzliches SQLite-Programm erforderlich. Netzwerkpfade, /mnt/user und benannte Docker-Volumes werden nicht unterstützt.",
-    "authentication_database": "Anmeldedatenbank (MongoDB)",
-    "wholeInstance": "Gesamte Redis-Instanz (alle logischen Datenbanken)",
-    "selectedFile": "Ausgewählte SQLite-Datenbankdatei",
-    "mysqlScope": "MySQL: ausschließlich transaktionale InnoDB-Tabellen, einschließlich Routinen, Triggern und Events. Benutzerkonten und Rechte separat sichern.",
-    "mongodbScope": "MongoDB: Online-Sicherung eines vollständigen Replica-Set-Mitglieds mit Oplog. Enthält alle Datenbanken sowie Benutzer/Rollen mit Kennwort-Hashes. Keine einzelne Datenbankauswahl, Standalone-Instanzen oder Sharding. Normale Schreibzugriffe dürfen weiterlaufen; während des Dumps keine Schema-, Rollen- oder FCV-Änderungen durchführen.",
-    "redisScope": "Redis: RDB-Snapshot der vollständigen Einzelinstanz mit allen logischen Datenbanken. Kein Redis Cluster; Konfiguration und ACL-Zugangsdaten separat sichern.",
-    "sqliteScope": "SQLite: nativer Online-Snapshot einschließlich bestätigter WAL-Transaktionen. Die unkomprimierte Zwischenkopie benötigt zusätzlichen Platz im Dump-Speicher. Anwendungsdateien sind separat. Bei Stash auch Konfiguration und externe Binärdaten sichern oder Stashs eigene vollständige Sicherung verwenden.",
+    "mysqlScope": "MariaDB/MySQL: ausschließlich transaktionale InnoDB-Tabellen, einschließlich Routinen, Triggern und Events. Benutzerkonten und Rechte separat sichern.",
     "housekeeping": "Interne Vorgangs- und Testdaten werden 30 Tage nach bestätigtem Abschluss entfernt. Laufende, ungeklärte und nicht zuordenbare Einträge bleiben erhalten. Dumps und Secrets sind davon ausgenommen.",
-    "wholeReplicaSet": "Vollständiges Replica-Set-Mitglied (alle Datenbanken + Oplog)"
+    "unsupportedProfiles": "Diese Profile aus einer früheren Testversion werden nicht mehr unterstützt. Profile, Secrets und Sicherungen bleiben erhalten. Entferne ihre Zuordnung aus betroffenen Jobs; neue Sicherungen sind damit nicht möglich."
   }
 }

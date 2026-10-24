@@ -1981,8 +1981,8 @@ Produktionsdaten und dienen gezielten Tests.
 ### 19.1 Profile und Voraussetzungen
 
 Unter **Einstellungen > Datenbank-Sicherungen** ein Profil für einen laufenden
-lokalen MariaDB- oder PostgreSQL-Container anlegen (weitere Online-Verfahren siehe Abschnitt 19.5). Datenbankbenutzer (üblicherweise
-`root` bei MariaDB, `postgres` bei PostgreSQL) und Passwort eingeben. **Verbindung
+lokalen MariaDB-, MySQL- oder PostgreSQL-Container anlegen (Umfang siehe Abschnitt 19.5). Datenbankbenutzer (üblicherweise
+`root` bei MariaDB/MySQL, `postgres` bei PostgreSQL) und Passwort eingeben. **Verbindung
 speichern und Datenbanken laden**, gewünschte Datenbanken anhaken und Profil
 speichern. Der Docker-Ausführungsnutzer root ersetzt keine Datenbankanmeldung.
 Neu gefundene Datenbanken werden niemals automatisch in Jobs aufgenommen. Namen dürfen
@@ -1991,7 +1991,7 @@ müssen mit Buchstabe, Ziffer oder Unterstrich beginnen. Systemschemas sind kein
 normalen Sicherungsquellen. Fehlende/deaktivierte Profile blockieren zugeordnete
 Jobs. Solange ein Job ein Profil verwendet, lässt es sich nicht löschen.
 
-Das Plugin liefert `database-dump-mariadb.sh` und `database-dump-postgresql.sh`
+Das Plugin liefert `database-dump-mariadb.sh`, `database-dump-mysql.sh` und `database-dump-postgresql.sh`
 mit seiner Runtime aus. **Borg Backup UI pflegt diese Skripte; direkte Änderungen
 können beim nächsten Plugin-Update überschrieben werden.** Der Skriptkopf enthält
 diesen Hinweis auf Deutsch und Englisch. Profile und eigene Skripte bleiben bei
@@ -2001,10 +2001,10 @@ Dumps ins Archiv. Nicht denselben Export zugleich als Pre-Skript und Profil ausf
 
 Im Container werden `sh`, `env`, `setsid`, `stat`, `id`, `readlink`, übliche Shell-Werkzeuge,
 `/proc`, ein beschreibbares `/dev/shm` und die Datenbankwerkzeuge benötigt.
-MariaDB: `mariadb` und `mariadb-dump`; PostgreSQL: `psql`, `pg_dump`, `pg_restore`
+MariaDB: `mariadb` und `mariadb-dump`; MySQL: `mysql` und `mysqldump`; PostgreSQL: `psql`, `pg_dump`, `pg_restore`
 und für globale Objekte `pg_dumpall`. Fehlende Werkzeuge werden nicht installiert.
-Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB dieselbe
-Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4` und
+Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB/MySQL dieselbe
+Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4`, `mysql:8.0-debian` und
 `postgres:16`. Andere Images benötigen passende Voraussetzungen und eigene Restore-Tests.
 
 Zugangsdaten speichert das Plugin geschützt unter `secrets/`, zum Beispiel als
@@ -2050,7 +2050,7 @@ Unter **Einstellungen > Skripte** sind drei Bereiche getrennt:
   Konstanten anpassen, Voraussetzungen prüfen und erst dann `CONFIGURED="yes"`
   setzen, speichern und einem Job zuordnen. Die Originalvorlage bleibt unverändert;
   Updates überschreiben die eigene Kopie nicht.
-- **Von Borg Backup UI verwaltet**: ausschließlich die sechs verwalteten Datenbankhelfer,
+- **Von Borg Backup UI verwaltet**: ausschließlich die drei verwalteten Datenbankhelfer,
   schreibgeschützt mit Syntaxhervorhebung, Dokumentation und Update-Hinweis.
   Die Ausführung und Konfiguration erfolgen über Datenbankprofile. Interne
   Python-Bausteine, Startdienst, Restore-Test und Benachrichtigungsadapter sind
@@ -2223,60 +2223,35 @@ Logische Exporte ersetzen keine WAL-/Binlog-Aufbewahrung, physischen Serversiche
 oder Point-in-Time-Recovery. Neue Datenbanken außerhalb der ausdrücklichen Auswahl
 werden nicht automatisch aufgenommen.
 
-### 19.5 Weitere Online-Datenbanksicherungen (#593)
+### 19.5 Unterstützte Online-Datenbanken (#593)
 
-Datenbankprofile sichern online: Dafür werden weder Container heruntergefahren
-noch schreibende Anwendungen pausiert. Separat konfigurierte Appdata-/Docker-
-Stopps eines Jobs bleiben unabhängig und erfolgen nach dem Datenbankexport.
-Nicht unterstützte Konfigurationen brechen mit einer Fehlermeldung ab; es gibt
-keinen Rückfall auf Offline-Sicherung oder das Kopieren einer laufenden Rohdatei.
+Die Datenbanksicherung unterstützt ausschließlich **MariaDB, MySQL und PostgreSQL**.
+Der Export läuft ohne Container-Stopp. Separat konfigurierte Appdata-/Docker-Stopps
+im Job bleiben unabhängig und erfolgen erst nach dem Datenbankexport.
 
 | Datenbank | Online-Verfahren | Unterstützter Umfang |
 | --- | --- | --- |
-| MySQL | `mysqldump --single-transaction` | Ausgewählte InnoDB-Datenbanken mit Routinen, Triggern und Events; keine Benutzer/Rechte. Gleichzeitige Schemaänderungen vermeiden. |
-| MongoDB | `mongodump --archive --oplog` | Vollständiges initialisiertes Replica-Set-Mitglied einschließlich Benutzern/Rollen und Kennwort-Hashes. Keine einzelne Datenbankauswahl, Standalone-Server, Shard-/Config-Server oder mongos. |
-| Redis | `redis-cli --rdb -` | Alle logischen Datenbanken einer Einzelinstanz. Kein Redis Cluster, keine Serverkonfiguration oder ACL-Zugangsdaten. |
-| SQLite | Native SQLite Online Backup API | Eine konkrete Datei in einem lokalen Verzeichnis-Bind-Mount des Containers einschließlich bestätigter WAL-Daten. |
+| MariaDB | `mariadb-dump --single-transaction` | Ausgewählte InnoDB-Datenbanken mit Routinen, Triggern und Events; Benutzer/Rechte separat sichern. |
+| MySQL | `mysqldump --single-transaction` | Ausgewählte InnoDB-Datenbanken mit Routinen, Triggern und Events; Benutzer/Rechte separat sichern. |
+| PostgreSQL | `pg_dump` im Custom-Format | Ausgewählte Datenbanken; optional globale Objekte ohne Rollenkennwörter. |
+
+Bei MariaDB/MySQL werden nichttransaktionale Tabellen abgewiesen. Während des
+Exports keine Schemaänderungen durchführen. Online-Sicherung bedeutet keine
+pauschale Konsistenzgarantie zwischen mehreren Datenbanken oder Anwendungsdateien.
+Die in Abschnitt 19.4 beschriebenen Grenzen gelten weiterhin.
 
 MySQL benötigt `mysql` und `mysqldump` mit passender Haupt-/Nebenversion sowie die
-üblichen Supervisor-Werkzeuge einschließlich `setsid`. Minimal-Images ohne diese
-Werkzeuge werden abgewiesen; das Plugin installiert keine Pakete im Container.
-MongoDB benötigt zusätzlich `mongosh`, Database Tools mit `--config` ab 100.3,
-vollständige Backup-/Oplog-Rechte und `getCmdLineOpts` zur Prüfung auf Sharding.
-Normale Schreibzugriffe laufen weiter; während des Exports keine Schema-,
-Rollen-/Rechte- oder FCV-Änderungen durchführen. Oplog-Überlauf und native Fehler
-lassen die Sicherung fehlschlagen. Das Plugin richtet kein Replica Set ein und
-ändert die Topologie nicht. Restore benötigt passende Server-/FCV- und
-Werkzeugversionen. Redis benötigt PING-, INFO- und Replikationsrechte.
-MongoDB und Redis können ausdrücklich **Server ohne Anmeldung** verwenden, wenn
-dies der Serverkonfiguration entspricht. Standard bleiben geschützte Secrets.
+Supervisor-Werkzeuge einschließlich `setsid` im Container. Fehlende Werkzeuge
+führen zu einer Fehlermeldung; das Plugin installiert keine Pakete automatisch.
+Die Wiederherstellung erfolgt manuell: Artefakte aus Borg extrahieren,
+dekomprimieren und mit `mariadb`, `mysql` beziehungsweise `pg_restore`/`psql`
+in ein vorbereitetes Ziel importieren.
 
-Für SQLite den Anwendungscontainer und den **Datenbankpfad im Container** angeben,
-zum Beispiel `/root/.stash/stash-go.sqlite`, sofern Stash diesen Pfad verwendet.
-Das Plugin ermittelt den lokalen Host-Pfad des Verzeichnis-Bind-Mounts und verwendet
-die SQLite-Laufzeit des Hosts. Im Container wird kein SQLite-Programm benötigt.
-Benannte Volumes, einzelne Datei-Bind-Mounts, Netzwerk-/FUSE-Pfade (einschließlich
-`/mnt/user`), Symlinks und verschlüsselte SQLite-Dateien werden nicht unterstützt.
-Den tatsächlichen lokalen Pool-Pfad als Verzeichnis-Bind-Mount verwenden.
-Die unkomprimierte Zwischenkopie benötigt zusätzlichen Platz im Dump-Speicher,
-wird auf Integrität geprüft, mit gzip komprimiert und nach Abschluss oder einem
-behandelten Fehler entfernt. Das sichert die Datenbank, nicht die vollständige
-Anwendung: Bei Stash Konfiguration, Medien und externe Binärdaten separat aufnehmen.
-Wenn Stash selbst die Binärdaten einbeziehen soll, bietet sich seine eigene
-vollständige Backup-Funktion an.
-
-Die Wiederherstellung erfolgt weiterhin bewusst und manuell in ein isoliertes
-Ziel. Zuerst das gewählte Artefakt aus Borg extrahieren und dekomprimieren.
-MySQL-SQL mit `mysql` importieren; MongoDB mit
-`mongorestore --archive=<Datei> --oplogReplay` bei passenden Versionen und Rechten
-wiederherstellen. Das vollständige MongoDB-Archiv enthält vertrauliche Kontodaten.
-Bei Redis die RDB entsprechend dem Persistenzverfahren einspielen; eine vorhandene
-AOF darf die wiederhergestellte RDB nicht überlagern. Für SQLite/Stash die
-Zielanwendung stoppen, alte Datenbank und Begleitdateien separat erhalten, den
-Snapshot am konfigurierten Pfad mit passenden Eigentümern ablegen und die
-Anwendungsvorgaben zu WAL/SHM und externen Binärdaten beachten. Das Stoppen des
-Ziels zur Wiederherstellung bedeutet keine Downtime während der Sicherung.
-
-Details: [MongoDB-Oplog](https://www.mongodb.com/docs/database-tools/mongodump/),
-[SQLite-Backup-API](https://www.sqlite.org/backup.html) und
-[Stash-Backup und Restore](https://docs.stashapp.cc/guides/backup-and-restore-database/).
+MongoDB, Redis und SQLite werden nicht mehr angeboten. Falls aus der vorherigen
+Testversion solche Profile vorhanden sind, erscheinen sie als Hinweis unter
+Datenbank-Sicherungen. Die gespeicherten Profile, Secrets und Dumps bleiben erhalten,
+werden nicht automatisch umgewandelt und bleiben im Konfigurationstransfer enthalten.
+Ihre Zuordnung muss aus betroffenen Jobs entfernt werden; bis dahin brechen diese
+Jobs mit „Profil nicht verfügbar“ ab, statt die angeforderte Sicherung zu überspringen.
+Andere Profile funktionieren weiter. Vorhandene Borg-Archive bleiben über
+Browse & Restore zugänglich; lokale Dumps bleiben an ihrem bisherigen Speicherort.

@@ -21,7 +21,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
-from database_profiles import DatabaseError, data_root, read_password, profile_slug
+from database_profiles import DatabaseError, data_root, read_password, profile_slug, SUPPORTED_ENGINES
 from inventory_store import atomic_write_json
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'runtime' / 'scripts'
@@ -177,8 +177,8 @@ def _operation(config, profile, cid, action, database, output, cancelled):
     Journal before launch; monitor timeout/cancellation while draining Docker stdout.
     Sink/pipe failures terminate the owned exporter group and never mark completion.
     """
-    if profile['engine'] == 'sqlite':
-        return _sqlite_operation(profile, cid, action, output, cancelled)
+    if profile.get('engine') not in SUPPORTED_ENGINES:
+        raise DatabaseError('profile_unavailable')
     token = uuid.uuid4().hex
     journal = data_root(config) / 'database-operations' / (token + '.json')
     record = {'token': token, 'container_id': cid, 'execution_user': profile['execution_user'],
@@ -187,15 +187,11 @@ def _operation(config, profile, cid, action, database, output, cancelled):
         record['discovery_directory'] = Path(output.name).parent.name
     credentials = ''
     credential_file = profile.get('credential_file', '')
-    if profile.get('auth_mode') in ('managed', 'none'):
-        password = read_password(config, profile) if profile['auth_mode'] == 'managed' else ''
+    if profile.get('auth_mode') == 'managed':
+        password = read_password(config, profile)
         if profile['engine'] in ('mariadb', 'mysql'):
             escaped = password.replace('\\', '\\\\').replace('"', '\\"').replace('\t', '\\t')
             content = '[client]\nuser=' + profile['database_user'] + '\npassword="' + escaped + '"\n'
-        elif profile['engine'] == 'mongodb':
-            content = json.dumps({'password': password}) + '\n'
-        elif profile['engine'] == 'redis':
-            content = password + '\n'
         else:
             escaped = password.replace('\\', '\\\\').replace(':', '\\:')
             content = f"127.0.0.1:{profile['port']}:*:{profile['database_user']}:{escaped}\n"
@@ -207,9 +203,7 @@ def _operation(config, profile, cid, action, database, output, cancelled):
     journal.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     atomic_write_json(journal, record)
     cmd = _docker(profile, cid) + ['sh', '-c', SUPERVISOR, 'bbui', token, action,
-                                credential_file, str(profile['port']), '' if profile.get('auth_mode') == 'none' else profile['database_user'], database]
-    if profile['engine'] == 'mongodb':
-        cmd += [profile['authentication_database']]
+                                credential_file, str(profile['port']), profile['database_user'], database]
     proc = None
     reason = None
     started = time.monotonic()
@@ -241,7 +235,7 @@ def _operation(config, profile, cid, action, database, output, cancelled):
             if not _terminate(record):
                 raise DatabaseError('unresolved_export')
         if proc.returncode:
-            raise DatabaseError({21: 'credentials', 22: 'nontransactional', 23: 'mongodb_replica_required', 24: 'tools_missing'}.get(proc.returncode, 'export_failed'))
+            raise DatabaseError({21: 'credentials', 22: 'nontransactional', 24: 'tools_missing'}.get(proc.returncode, 'export_failed'))
         if container_identity(profile) != cid:
             raise DatabaseError('container_changed')
         record['status'] = 'completed'
@@ -267,74 +261,6 @@ def _operation(config, profile, cid, action, database, output, cancelled):
         atomic_write_json(journal, record)
         if record['status'] != 'unresolved':
             _control(record, 'ack')
-
-
-def _sqlite_operation(profile, cid, action, output, cancelled):
-    """Back up an explicit SQLite path from local Docker bind storage in this process.
-
-    No background exporter survives cancellation or process exit. Named volumes,
-    network/FUSE paths, links, missing files and paths outside directory binds are
-    rejected. The container path is mapped using the captured immutable Docker ID.
-    """
-    import importlib.util
-    try:
-        import sqlite3
-    except ImportError:
-        raise DatabaseError('tools_missing') from None
-    from contextlib import ExitStack
-    started = time.monotonic()
-    def check():
-        if cancelled():
-            raise DatabaseError('cancelled')
-        if time.monotonic() - started > profile['timeout_seconds']:
-            raise DatabaseError('timeout')
-    try:
-        mounts = json.loads(_run(['docker', 'inspect', '--format', '{{json .Mounts}}', cid], stdout=subprocess.PIPE, text=True).stdout)
-        source = Path(profile['sqlite_path'])
-        matches = [m for m in mounts if source == Path(m['Destination']) or Path(m['Destination']) in source.parents]
-        if not matches:
-            raise DatabaseError('sqlite_source')
-        mount = max(matches, key=lambda m: len(Path(m['Destination']).parts))
-        if mount['Type'] != 'bind' or source == Path(mount['Destination']):
-            raise DatabaseError('sqlite_source')
-        host = Path(mount['Source']) / source.relative_to(mount['Destination'])
-        # Anchor every parent and validate the final source; WAL must remain next
-        # to the opened database, so use the held parent path, not a file FD URI.
-        with ExitStack() as stack:
-            fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
-            stack.callback(os.close, fd)
-            for part in host.parent.parts[1:]:
-                fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-                stack.callback(os.close, fd)
-            try:
-                _local_filesystem(fd)
-            except DatabaseError:
-                raise DatabaseError('sqlite_source') from None
-            anchored = _descriptor_path(fd) / host.name
-            for suffix in ('', '-wal', '-shm', '-journal'):
-                p = Path(str(anchored) + suffix)
-                if p.is_symlink():
-                    raise DatabaseError('sqlite_source')
-            source_fd = os.open(host.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
-            stack.callback(os.close, source_fd)
-            info = os.fstat(source_fd)
-            if not stat.S_ISREG(info.st_mode) or os.read(source_fd, 16) != b'SQLite format 3\x00':
-                raise DatabaseError('sqlite_source')
-            filename = output.fileobj.name if isinstance(output, gzip.GzipFile) else output.name
-            directory = Path(filename).parent
-            spec = importlib.util.spec_from_file_location('bbui_sqlite_helper', SCRIPTS / 'database-dump-sqlite.py')
-            helper = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(helper)
-            helper.run(anchored, action, output, check, directory if action == 'dump' else None)
-            if not os.path.samestat(info, anchored.stat()):
-                raise DatabaseError('sqlite_source')
-        if container_identity(profile) != cid:
-            raise DatabaseError('container_changed')
-    except DatabaseError:
-        raise
-    except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
-        check()
-        raise DatabaseError('sqlite_source') from None
 
 
 def _private_path(path):
@@ -513,12 +439,9 @@ def _probe(config, profile, cid, database, cancelled, directory):
         if not server or not client:
             raise DatabaseError('version_mismatch')
         sv, cv = server[0], client[1]
-        if profile['engine'] == 'mongodb' and tuple(map(int, cv.split('.')[:2])) < (100, 3):
-            raise DatabaseError('tools_missing')
-        # SQL/Redis major versions match (major.minor for MySQL/MariaDB).
-        # MongoDB Database Tools use independent 100.x version numbers.
+        # SQL major versions match (major.minor for MySQL/MariaDB).
         width = 2 if profile['engine'] in ('mariadb', 'mysql') else 1
-        if profile['engine'] != 'mongodb' and sv.split('.')[:width] != cv.split('.')[:width]:
+        if sv.split('.')[:width] != cv.split('.')[:width]:
             raise DatabaseError('version_mismatch')
         return {'server_version': sv, 'client_version': cv,
                 'extensions': [line for line in lines[2:] if re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', line)]}
@@ -551,6 +474,8 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
     """
     results = results if results is not None else []
     for profile in profiles:
+        if profile.get('engine') not in SUPPORTED_ENGINES:
+            raise DatabaseError('profile_unavailable')
         if cancelled():
             raise DatabaseError('cancelled')
         started_at = utc_now()
@@ -569,9 +494,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                     'retention': profile['retention'], 'directory': str(Path(profile['staging_dir']) / name),
                     'archive_directory': name,
                     'scope': {'databases': profile['databases'], 'globals': profile['include_globals'],
-                              'credentials': profile['engine'] == 'mongodb', 'application_files_consistent': False,
-                              **({'oplog': True, 'users_roles_included': True} if profile['engine'] == 'mongodb' else {}),
-                              **({'container_database_path': profile['sqlite_path']} if profile['engine'] == 'sqlite' else {})},
+                              'credentials': False, 'application_files_consistent': False},
                     'restore': restore_hint(profile['engine'])})
         results.append(manifest)
         try:
@@ -602,8 +525,8 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                         os.fsync(handle.fileno())
                     if not uncompressed_bytes:
                         raise DatabaseError('empty_dump')
-                    if profile['engine'] in ('postgresql', 'redis', 'sqlite') and action == 'dump':
-                        magic = {'postgresql': b'PGDMP', 'redis': b'REDIS', 'sqlite': b'SQLite format 3\x00'}[profile['engine']]
+                    if profile['engine'] == 'postgresql' and action == 'dump':
+                        magic = b'PGDMP'
                         with gzip.open(partial, 'rb') as handle:
                             if handle.read(len(magic)) != magic:
                                 raise DatabaseError('invalid_dump')
@@ -653,7 +576,7 @@ def discover_databases(config, profile, cancelled=lambda: False):
         if path.stat().st_size > 1024 * 1024:
             raise DatabaseError('export_failed')
         names = path.read_text().splitlines()
-    excluded = {'mysql', 'information_schema', 'performance_schema', 'sys'} if profile['engine'] in ('mariadb', 'mysql') else {'admin', 'config', 'local'} if profile['engine'] == 'mongodb' else {'template0', 'template1'}
+    excluded = {'mysql', 'information_schema', 'performance_schema', 'sys'} if profile['engine'] in ('mariadb', 'mysql') else {'template0', 'template1'}
     return sorted(set(name for name in names if name.lower() not in excluded and re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', name)))
 
 
@@ -663,9 +586,6 @@ def restore_hint(engine):
         'mariadb': 'Import SQL with a compatible mariadb client; reprovision users/grants.',
         'mysql': 'Import SQL with a compatible mysql client; reprovision users/grants.',
         'postgresql': 'Use pg_restore for custom dumps and psql for optional globals; reprovision role passwords and extensions.',
-        'mongodb': 'Use compatible mongorestore --archive=<file> --oplogReplay. Full archive includes users/roles and credential hashes.',
-        'redis': 'Restore the RDB with compatible Redis persistence settings; existing AOF must not override it. Reprovision config/ACLs.',
-        'sqlite': 'Stop the destination application; preserve old database/sidecars separately and restore the snapshot with correct ownership. Follow app WAL/SHM handling; external blobs/config are separate.',
     }
     return 'Decompress .gz files first. Restore into an isolated destination. ' + instructions[engine]
 
@@ -673,8 +593,7 @@ def restore_hint(engine):
 def dump_suffix(engine):
     """Return the native artifact suffix; reject unrecognized manifest engines."""
     try:
-        return {'mariadb': '.sql', 'mysql': '.sql', 'postgresql': '.dump',
-                'mongodb': '.archive', 'redis': '.rdb', 'sqlite': '.sqlite'}[engine]
+        return {'mariadb': '.sql', 'mysql': '.sql', 'postgresql': '.dump'}[engine]
     except KeyError:
         raise DatabaseError('invalid_dump') from None
 
@@ -683,8 +602,8 @@ def managed_scripts():
     """Return fixed bundled helper sources for an administrator's read-only view."""
     return [{'name': 'database-dump-' + engine + suffix, 'engine': engine,
              'content': (SCRIPTS / ('database-dump-' + engine + suffix)).read_text()}
-            for engine in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis', 'sqlite')
-            for suffix in ['.py' if engine == 'sqlite' else '.sh']]
+            for engine in ('mariadb', 'postgresql', 'mysql')
+            for suffix in ['.sh']]
 
 
 def verify_archive(repo, archive, results, cancelled=lambda: False):
@@ -758,8 +677,6 @@ def _cleanup_run(path, profile, *, verified, interrupted):
     if verified and manifest.get('status') != 'archived':
         raise DatabaseError('cleanup_blocked')
     allowed = {'manifest.json', '.probe', '.verify'}
-    if manifest.get('engine') == 'sqlite':
-        allowed.update('.sqlite-snapshot' + suffix for suffix in ('', '-journal', '-wal', '-shm'))
     databases = manifest.get('scope', {}).get('databases', [])
     if not isinstance(databases, list) or any(not isinstance(db, str) or not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', db) for db in databases):
         raise DatabaseError('cleanup_blocked')

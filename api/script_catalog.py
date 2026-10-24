@@ -35,7 +35,7 @@ def _entries():
     """Build an ID-to-file allowlist from managed database helpers and four explicitly selected hook templates, excluding user data."""
     templates = _template_root()
     entries = {}
-    for name in ('database-dump-mariadb.sh', 'database-dump-postgresql.sh', 'database-dump-mysql.sh', 'database-dump-mongodb.sh', 'database-dump-redis.sh', 'database-dump-sqlite.py'):
+    for name in ('database-dump-mariadb.sh', 'database-dump-postgresql.sh', 'database-dump-mysql.sh'):
         path = APP_ROOT / 'runtime/scripts' / name
         if _regular_source(path):
             relative = 'runtime/scripts/' + name
@@ -54,7 +54,7 @@ def _metadata(identifier, entry):
     """Describe source ownership and language without loading source contents."""
     path, kind, relative = entry
     return {'id': identifier, 'kind': kind, 'name': path.name, 'path': relative,
-            'language': 'python' if path.suffix == '.py' else 'bash',
+            'language': 'bash',
             'timeout_seconds': 1800 if path.name.startswith('pre-dump-') else 150 if path.name == 'pre-wake-server.sh' else 30}
 
 

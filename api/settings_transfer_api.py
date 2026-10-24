@@ -76,12 +76,12 @@ def _validate_jobs_bundle(bundle: dict) -> None:
             group_ids.add(key)
         except (ValueError, TypeError, AttributeError) as exc:
             raise ConfigurationExportError() from exc
-    from database_profiles import validate_profile
+    from database_profiles import validate_stored_profile
     db_rows = bundle.get('database_profiles', [])
     if not isinstance(db_rows, list):
         raise ConfigurationExportError()
     try:
-        db_rows = [validate_profile(row) for row in db_rows]
+        db_rows = [validate_stored_profile(row) for row in db_rows]
         if len({row['id'] for row in db_rows}) != len(db_rows):
             raise ConfigurationExportError()
     except (ValueError, TypeError):
@@ -214,9 +214,12 @@ def export_jobs_bundle(config: dict, selected_keys: List[str] | None = None) -> 
     }
     from job_groups import definitions
     exported_ids = {j.get('job_id') or j.get('job_key') for j in jobs}
-    from database_profiles import snapshot_profiles, list_profiles
+    from database_profiles import stored_profiles
     database_ids = list(dict.fromkeys(x for job in jobs for x in job.get('database_profile_ids', [])))
-    bundle['database_profiles'] = snapshot_profiles(config, database_ids, allow_disabled=True, require_databases=False) if selected else list_profiles(config)['profiles']
+    database_rows = stored_profiles(config)
+    if any(identifier not in {row['id'] for row in database_rows} for identifier in database_ids):
+        raise ConfigurationExportError()
+    bundle['database_profiles'] = [row for row in database_rows if not selected or row['id'] in database_ids]
     bundle['job_groups'] = [g for g in definitions(config)['groups'] if set(g['jobs']) <= exported_ids]
     if bundle['job_groups'] or bundle['database_profiles']:
         bundle['format'] = 'bbui-job-bundle-v5'
@@ -780,11 +783,11 @@ def _import_jobs_bundle_locked(
     key_map.update({r['job_key']: r['job_key'] for r in report
                     if r.get('status') == 'skipped_exists' and r['job_key'] in current_jobs})
     group_rows, group_report = prepare_import(config, bundle.get('job_groups', []), key_map, mode)
-    from database_profiles import list_profiles, store_path, validate_profile
-    db_existing = {p['id']: p for p in list_profiles(config)['profiles']}
+    from database_profiles import stored_profiles, store_path, validate_stored_profile
+    db_existing = {p['id']: p for p in stored_profiles(config)}
     db_merged = dict(db_existing)
     for profile in bundle.get('database_profiles', []):
-        row = validate_profile(profile)
+        row = validate_stored_profile(profile)
         if row['id'] in db_existing and db_existing[row['id']] != row:
             raise ConfigurationExportError()
         db_merged[row['id']] = row

@@ -13,7 +13,7 @@ from job_scripts import save_script, list_scripts
 def test_catalog_contains_only_database_helpers_and_practical_templates():
     entries = catalog.list_catalog()['entries']
     paths = {row['path'] for row in entries if row['kind'] == 'managed'}
-    assert paths == {f'runtime/scripts/database-dump-{engine}.sh' for engine in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis')} | {'runtime/scripts/database-dump-sqlite.py'}
+    assert paths == {f'runtime/scripts/database-dump-{engine}.sh' for engine in ('mariadb', 'postgresql', 'mysql')}
     assert len([row for row in entries if row['kind']=='template']) == 4
     assert all('content' not in row for row in entries)
     for row in entries:
@@ -21,7 +21,7 @@ def test_catalog_contains_only_database_helpers_and_practical_templates():
         assert result['content'] and result['kind'] == row['kind']
 
 
-@pytest.mark.parametrize('identifier', ['../../etc/passwd', '/etc/passwd', 'managed:../secrets/password', 'managed:runtime/scripts/../../../../etc/passwd', 'template:../README.md', 'template:practical/pre-dump-mariadb.sh', 'template:practical/pre-dump-postgresql.sh', 'managed:api/wizard_runner.py', 'managed:runtime/scripts/borg_restore_test.py', 'managed:runtime/scripts/unraid-notification-agent-env.sh', ''])
+@pytest.mark.parametrize('identifier', ['../../etc/passwd', '/etc/passwd', 'managed:../secrets/password', 'managed:runtime/scripts/../../../../etc/passwd', 'template:../README.md', 'template:practical/pre-dump-mariadb.sh', 'template:practical/pre-dump-postgresql.sh', 'managed:runtime/scripts/database-dump-mongodb.sh', 'managed:runtime/scripts/database-dump-redis.sh', 'managed:runtime/scripts/database-dump-sqlite.py', 'managed:api/wizard_runner.py', 'managed:runtime/scripts/borg_restore_test.py', 'managed:runtime/scripts/unraid-notification-agent-env.sh', ''])
 def test_source_rejects_non_catalog_ids(identifier):
     with pytest.raises(FileNotFoundError, match='Script source is unavailable'):
         catalog.read_catalog_source(identifier)

@@ -37,14 +37,14 @@ Fresh Unraid installation and upgrade acceptance remain maintainer tests.
 
 Manual test-channel acceptance on Unraid:
 
-- Fresh install: open both translated settings pages, confirm all six helpers ship
+- Fresh install: open both translated settings pages, confirm all three helpers ship
   executable with the bilingual ownership warning and appear read-only with syntax
   highlighting under Scripts > Managed by Borg Backup UI. Only managed database
-  helpers appear there, including the explicit SQLite helper (no unrelated Python modules). No export runs at install.
+  helpers appear there, with no unrelated Python modules. No export runs at install.
 - Open all four Templates, create an own draft, edit/save/assign the copy and verify
   the original is unchanged. Switching categories retains unsaved own edits.
   Check the script dropdown, Description/Source code tabs (including keyboard navigation),
-  neutral gray card headings matching Prometheus and all ten specific descriptions.
+  neutral gray card headings matching Prometheus and all seven specific descriptions.
   Intro/selection cards and detail tabs must match the Own scripts content surface
   in both themes.
   In Sources & destination, test many folders/profiles, wrapped long names, selection
@@ -98,38 +98,32 @@ implementation PR before stable promotion. These host-specific checks are not
 replaced by the Linux Docker suite.
 
 
-Additional online engines and retention (#593):
+MySQL and retention (#593):
 
 - Run `tests/test_database_housekeeping.py` and `tests/test_database_engines.py`:
   exact 30-day boundary, terminal states, unresolved/running protection, busy lock,
-  symlink/invalid records, linked discovery cleanup, native WAL snapshot restore,
-  uncommitted transaction exclusion and cancellation cleanup.
+  symlink/invalid records, linked discovery cleanup and retired-profile preservation.
 - With prepared images, run the opt-in MySQL Docker/Borg restore and cancellation
-  tests (`BBUI_DATABASE_DOCKER_TESTS=1`, `-k mysql`) and MongoDB/Redis online tests
-  (`BBUI_DATABASE_ONLINE_DOCKER_TESTS=1`). Use repository-local TMPDIR/basetemp.
-  MongoDB restoration replays oplog while the source fixture accepts transactional
-  writes; Redis restoration checks keys from multiple logical databases.
+  tests (`BBUI_DATABASE_DOCKER_TESTS=1`, `-k mysql`). Use repository-local TMPDIR/basetemp.
 - On Unraid, check each image for required supervisor/client tools. In particular,
   the minimal official MySQL 8.4 Oracle image lacks setsid and must fail clearly.
-  Check SQLite mapping from a real Stash directory bind to the actual local pool;
-  reject named volumes, file-only binds, /mnt/user, links and encrypted databases.
-- Verify no database export invokes container stop, write locks or pauses. MongoDB
-  standalone/sharded nodes and Redis Cluster must fail, with no raw/offline fallback.
+- Verify that only MariaDB, MySQL and PostgreSQL are selectable and exactly three
+  managed helpers appear. No exporter stops the database container.
+- Seed an old MongoDB/Redis/SQLite test profile beside a supported profile. Verify
+  the warning, supported-profile CRUD, configuration export/import and rejection
+  of jobs referencing retired engines. Preserve the old profile, Secrets and dumps.
+- Leave unsaved database settings via the Settings menu: test application-dialog
+  Cancel/close and Discard, repeated clicks, both languages/themes, and no native
+  browser confirm. Reload/close-tab protection remains browser-managed.
 - Confirm hourly housekeeping removes only expired proven-terminal metadata and
-  linked discovery files. Unresolved crash remnants remain visible on disk, even
-  beyond 30 days; no dumps, Secrets, archives or configuration are deleted.
+  linked discovery files. Unresolved crash remnants remain on disk beyond 30 days;
+  no dumps, Secrets, archives or configuration are deleted.
 
-Recorded local verification for #593 (2026-10-24):
+Recorded local native verification for #593 (2026-10-24):
 
 - MySQL 8.0.46 (`mysql:8.0-debian`): native dump, Borg readback, restore of data,
   view, routine, trigger/event, MyISAM rejection and owned cancellation passed.
-- Redis 7.4.11 (`redis:7.4`): authenticated online RDB export, native RDB validation
-  and restoration of multiple logical databases passed.
-- MongoDB 7.0.45 (`mongo:7.0`): managed authentication, replica-set export with
-  concurrent transactional writes, full archive/oplog replay and standalone
-  rejection passed. The local Ubuntu 7.0.0-38 kernel cannot start the tested
-  MongoDB 8.0 image (upstream SERVER-121912); no guard bypass was used.
-- Native SQLite WAL tests verify committed data, exclude an open transaction,
-  run integrity_check after restore, exercise gzip/manifest/cleanup integration
-  and preserve the source during cancellation. A real Stash/Unraid acceptance
-  test remains required before stable promotion.
+- The previously tested MongoDB, Redis and SQLite exporters were withdrawn at the
+  maintainer's request. They are not shipped or offered by the current candidate.
+- Unraid fresh-install/upgrade and real container restore acceptance remain required
+  before stable promotion.

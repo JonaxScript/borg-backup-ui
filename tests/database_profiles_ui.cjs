@@ -18,7 +18,7 @@ const {chromium} = require('playwright');
         if (url.pathname==='/api/settings/databases') {
           if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:credential};profiles=[row];body={profile:row};}
           else if(req.method()==='DELETE'){deletes++;profiles=[];body={deleted:true};}
-          else body={profiles};
+          else body={profiles,unsupported_profiles:[{id:'db-cccccccccccc',name:'<img retired>',engine:'sqlite'}]};
         } else if(url.pathname.endsWith('/runs')) body={runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
         else if(url.pathname.endsWith('/action')) {actions++;lastAction=req.postDataJSON();action=lastAction.action;body={id:'a'.repeat(32),status:'running'};}
         else if(url.pathname.endsWith('/status')) body={status:'completed',profile_id:'db-aaaaaaaaaaaa',action,results:[],...(action==='discover'?{databases:['app','photos','new_unselected']}:{})};
@@ -45,7 +45,15 @@ const {chromium} = require('playwright');
       await page.addScriptTag({content:settings.match(/function settingsCard[\s\S]*?\n}/)[0] + settings.match(/function settingsMenuIcon[\s\S]*?\n}/)[0]});
       await page.addScriptTag({content:settings.match(/function _openSettingsDialog[\s\S]*?\n}/)[0]});
       await page.addScriptTag({content:fs.readFileSync('ui/js/pages/databases.js','utf8')});
+      await page.addScriptTag({content:settings.match(/async function activateSettingsTab[\s\S]*?\n}/)[0]});
+      await page.evaluate(()=>{
+        window.SETTINGS_PROFILE_CONFIG={};
+        window.getSettingsTabs=()=>[{key:'databases',label:'Databases',description:''},{key:'general',label:'General',description:''}];
+        settingsState.activeTab='databases';
+      });
       await page.evaluate(()=>loadDatabaseSettings());
+      assert.ok((await page.locator('#db-unsupported').textContent()).includes('<img retired>'));
+      assert.equal(await page.locator('#db-unsupported img').count(),0);
       assert.equal(await page.locator('#db-container').evaluate(el=>el.tagName), 'SELECT');
       assert.equal(await page.locator('#db-container option').count(), 3);
       assert.equal(await page.locator('#settings-databases-panel').textContent().then(text=>text.includes(language==='de'?'Mitgelieferte Skripte':'Bundled scripts')), false);
@@ -114,23 +122,29 @@ const {chromium} = require('playwright');
       await page.locator('#settings-dialog-confirm-btn').click();
       await page.waitForFunction(()=>document.querySelectorAll('#db-select option').length===1);
       assert.equal(deletes,1);
-      for (const engine of ['mysql','mongodb','redis','sqlite']) {
+      assert.deepEqual(await page.locator('#db-engine option').evaluateAll(nodes=>nodes.map(n=>n.value).sort()),['mariadb','mysql','postgresql']);
+      for (const engine of ['mysql','mariadb','postgresql']) {
         await page.locator('#db-engine').selectOption(engine);
-        assert.equal(await page.locator('#db-globals-label').isVisible(),false);
-        assert.equal(await page.locator('#db-sqlite-field').isVisible(),engine==='sqlite');
-        assert.ok((await page.locator('#db-engine-scope').textContent()).length>30);
-        if (engine==='sqlite') {
-          assert.equal(await page.locator('#db-password').isVisible(),false);
-          assert.equal(await page.locator('#db-sqlite_path').getAttribute('required'),'');
-          assert.equal(await page.locator('#db-databases input[value=database]:checked').count(),1);
-        }
-        if (engine==='redis') {
-          assert.equal(await page.locator('#db-port').inputValue(),'6379');
-          assert.equal(await page.locator('#db-databases input[value=all]:checked').count(),1);
-          await page.locator('#db-auth-mode').selectOption('none');
-          assert.equal(await page.locator('#db-password').isVisible(),false);
-        }
+        assert.equal(await page.locator('#db-globals-label').isVisible(),engine==='postgresql');
+        assert.equal(await page.locator('#db-port').inputValue(),engine==='postgresql'?'5432':'3306');
+        assert.equal(await page.locator('#db-password').isVisible(),true);
       }
+      assert.equal(await page.locator('#db-sqlite-field, #db-auth-choice, #db-mongo-auth').count(),0);
+      await page.locator('#db-name').fill('Keep draft on cancel');
+      await page.evaluate(()=>{void activateSettingsTab('general');});
+      assert.equal(await page.locator('#settings-dialog-modal').isVisible(),true);
+      await page.evaluate(()=>{void activateSettingsTab('general');});
+      assert.equal(await page.evaluate(()=>settingsState.activeTab),'databases');
+      await page.locator('#settings-dialog-cancel-btn').click();
+      assert.equal(await page.locator('#db-name').inputValue(),'Keep draft on cancel');
+      assert.equal(await page.evaluate(()=>settingsState.databaseDirty),true);
+      await page.evaluate(()=>{void activateSettingsTab('general');});
+      await page.locator('#settings-dialog-close-btn').click();
+      assert.equal(await page.evaluate(()=>settingsState.activeTab),'databases');
+      await page.evaluate(()=>{void activateSettingsTab('general');});
+      await page.locator('#settings-dialog-confirm-btn').click();
+      await page.waitForFunction(()=>settingsState.activeTab==='general');
+      assert.equal(await page.evaluate(()=>settingsState.databaseDirty),false);
       assert.deepEqual(browserDialogs,[]);
       assert.deepEqual(errors,[]);
       await page.close();

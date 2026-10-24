@@ -293,7 +293,7 @@ def test_http_script_routes_validate_before_save(tmp_path, monkeypatch):
         original = job_scripts.store_path(Handler.config).read_bytes()
         status, catalog, headers = request('GET', suffix='/catalog')
         assert status == 200 and headers['Cache-Control'] == 'no-store'
-        assert sum(entry['kind'] == 'managed' for entry in catalog['entries']) == 6
+        assert sum(entry['kind'] == 'managed' for entry in catalog['entries']) == 3
         assert sum(entry['kind'] == 'template' for entry in catalog['entries']) == 4
         for entry in catalog['entries']:
             status, source, headers = request('GET', suffix='/source?id=' + entry['id'])

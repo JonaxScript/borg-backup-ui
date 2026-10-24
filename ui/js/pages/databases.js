@@ -1,6 +1,6 @@
 'use strict';
 /** Managed database profiles and bounded test operations; password inputs are write-only and never populated from API responses. */
-const databaseState = {profiles: [], containers: [], selected: '', operation: null, polling: false, available: {}};
+const databaseState = {profiles: [], unsupportedProfiles: [], containers: [], selected: '', operation: null, polling: false, available: {}};
 function dbT(key, params = {}) { return window.BBUI.components.i18n.t(`database.${key}`, params); }
 
 /** Fetch a database API response and expose only localized server error codes. */
@@ -22,6 +22,7 @@ async function loadDatabaseSettings(selected = databaseState.selected) {
       databaseRequest('', undefined), fetch('/api/wizard/runtime-inventory').then(r => r.json()).catch(() => ({})),
     ]);
     databaseState.profiles = data.profiles;
+    databaseState.unsupportedProfiles = data.unsupported_profiles || [];
     databaseState.containers = inventory.docker_containers || [];
     databaseState.selected = selected;
     renderDatabaseSettings();
@@ -42,19 +43,17 @@ function renderDatabaseSettings() {
   if (row.container && !containers.includes(row.container)) containers.unshift(row.container);
   panel.innerHTML = `<div class="database-settings">
     <div class="database-intro"><span class="settings-menu-icon">${settingsMenuIcon('repository')}</span><div><h3>${escHtml(dbT('title'))}</h3><p>${escHtml(dbT('intro'))}</p></div></div>
+    ${databaseState.unsupportedProfiles.length ? `<p class="status-message warning" id="db-unsupported">${escHtml(dbT('unsupportedProfiles'))}<br>${databaseState.unsupportedProfiles.map(p => `${escHtml(p.name)} (${escHtml(p.engine)})`).join(', ')}</p>` : ''}
     <div class="form-group"><label class="form-label" for="db-select">${escHtml(dbT('profile'))}</label>
     <select class="form-select" id="db-select"><option value="">${escHtml(dbT('new'))}</option>${databaseState.profiles.map(p => `<option value="${escHtml(p.id)}" ${p.id === row.id ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('')}</select></div>
     <form id="database-form" class="database-form">
     ${settingsCard(escHtml(dbT('connection')), settingsMenuIcon('repository'), `<div class="settings-body database-fields">
       <div class="form-group">${input('name','text','required maxlength="100"')}</div>
-      <div class="form-group"><label class="form-label" for="db-engine">${escHtml(dbT('engine'))}</label><select class="form-select" id="db-engine" name="engine"><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option><option value="mongodb">MongoDB</option><option value="redis">Redis</option><option value="sqlite">SQLite</option></select></div>
+      <div class="form-group"><label class="form-label" for="db-engine">${escHtml(dbT('engine'))}</label><select class="form-select" id="db-engine" name="engine"><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option></select></div>
       <div class="form-group"><label class="form-label" for="db-container">${escHtml(dbT('container'))}</label><div><select class="form-select" id="db-container" name="container" required aria-describedby="db-container-hint"><option value="" disabled ${row.container ? '' : 'selected'}>${escHtml(dbT('chooseContainer'))}</option>${containers.map(name => `<option value="${escHtml(name)}" ${name === row.container ? 'selected' : ''}>${escHtml(name)}</option>`).join('')}</select><p class="form-help" id="db-container-hint">${escHtml(dbT(databaseState.containers.length ? 'containerHint' : 'containersEmpty'))}</p></div></div>
       <div class="form-group database-auth-field">${input('database_user','text','required autocomplete="username"')}</div>
       <div class="form-group database-auth-field"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id ? 'passwordKeep' : 'passwordEnter'))}"></div>
       <p class="form-help database-auth-field">${escHtml(dbT('credentials'))}</p>
-      <div class="form-group" id="db-auth-choice"><label for="db-auth-mode">${escHtml(dbT('authentication'))}</label><select class="form-select" id="db-auth-mode"><option value="managed">${escHtml(dbT('authenticated'))}</option><option value="none">${escHtml(dbT('noAuthentication'))}</option></select></div>
-      <div class="form-group" id="db-sqlite-field">${input('sqlite_path','text','placeholder="/root/.stash/stash-go.sqlite"')}<p class="form-help">${escHtml(dbT('sqliteHint'))}</p></div>
-      <div class="form-group" id="db-mongo-auth">${input('authentication_database','text','placeholder="admin"')}</div>
       <p class="form-help" id="db-engine-scope"></p>
       ${row.auth_mode === 'managed' && row.credential_id ? `<p class="form-help database-secret-file">${escHtml(dbT('secretFile'))}: <code>${escHtml('secrets/' + (/^[a-f0-9]{32}$/.test(row.credential_id) ? '.database-' : '') + row.credential_id + '.json')}</code></p>` : ''}
       ${row.auth_mode === 'container' ? `<p class="status-message info">${escHtml(dbT('legacyCredentials'))} <code>${escHtml(row.credential_file)}</code></p>` : ''}
@@ -96,18 +95,14 @@ function renderDatabaseSettings() {
   settingsState.databaseDirty = false;
   const form = document.getElementById('database-form');
   form.addEventListener('input', () => { settingsState.databaseDirty = true; _updateUnsavedChangesUi(); });
-  document.getElementById('db-auth-mode').value = row.auth_mode === 'none' ? 'none' : 'managed';
   databaseEngineFields(row.engine);
   renderDatabaseChoices(databaseState.available[row.id] || [], row.databases);
-  document.getElementById('db-auth-mode').addEventListener('change', () => databaseEngineFields(document.getElementById('db-engine').value));
   document.getElementById('db-engine').addEventListener('change', e => {
     databaseEngineFields(e.target.value);
-    document.getElementById('db-port').value = {mariadb:3306,mysql:3306,postgresql:5432,mongodb:27017,redis:6379,sqlite:1}[e.target.value];
-    document.getElementById('db-auth-mode').value = 'managed';
+    document.getElementById('db-port').value = {mariadb:3306,mysql:3306,postgresql:5432}[e.target.value];
     renderDatabaseChoices([], []);
-    databaseEngineFields(e.target.value);
     document.getElementById('db-globals').checked = false;
-    document.getElementById('db-database_user').value = e.target.value === 'postgresql' ? 'postgres' : e.target.value === 'redis' ? 'default' : 'root';
+    document.getElementById('db-database_user').value = e.target.value === 'postgresql' ? 'postgres' : 'root';
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -116,9 +111,6 @@ function renderDatabaseSettings() {
     body.databases = [...form.querySelectorAll('#db-databases input:checked')].map(el => el.value);
     body.auth_mode = row.auth_mode === 'container' && !body.password ? 'container' : 'managed';
     if (body.engine !== row.engine && body.auth_mode === 'container') body.auth_mode = 'managed';
-    if (body.engine === 'sqlite' || (['mongodb','redis'].includes(body.engine) && document.getElementById('db-auth-mode').value === 'none')) body.auth_mode = 'none';
-    if (body.engine === 'sqlite') {body.port=1; body.database_user='';}
-    if (body.engine === 'mongodb' && !body.authentication_database) body.authentication_database='admin';
     if (body.auth_mode === 'container') body.credential_file = row.credential_file;
     if (!body.password && row.credential_id) delete body.password;
     const discover = e.submitter?.hasAttribute('data-db-discover');
@@ -158,16 +150,7 @@ function renderDatabaseSettings() {
 function databaseEngineFields(engine) {
   const pg = engine === 'postgresql';
   document.getElementById('db-globals-label').classList.toggle('hidden', !pg);
-  const sqlite = engine === 'sqlite', mongo = engine === 'mongodb';
-  document.getElementById('db-auth-choice').classList.toggle('hidden', !['mongodb','redis'].includes(engine));
-  const noAuth = sqlite || (['mongodb','redis'].includes(engine) && document.getElementById('db-auth-mode').value === 'none');
-  document.querySelectorAll('.database-auth-field').forEach(el => el.classList.toggle('hidden', noAuth));
-  document.getElementById('db-database_user').required = !noAuth;
-  document.getElementById('db-sqlite-field').classList.toggle('hidden', !sqlite);
-  document.getElementById('db-sqlite_path').required = sqlite;
-  document.getElementById('db-mongo-auth').classList.toggle('hidden', !mongo || noAuth);
-  document.getElementById('db-port').closest('.form-group').classList.toggle('hidden', sqlite);
-  document.getElementById('db-engine-scope').textContent = ['sqlite','mongodb','redis','mysql'].includes(engine) ? dbT(engine+'Scope') : '';
+  document.getElementById('db-engine-scope').textContent = ['mariadb','mysql'].includes(engine) ? dbT('mysqlScope') : '';
 
 }
 function databaseFeedback(message) {
@@ -179,10 +162,8 @@ function databaseFeedback(message) {
 function renderDatabaseChoices(available, selected) {
   const node = document.getElementById('db-databases');
   if (!node) return;
-  const engine = document.getElementById('db-engine')?.value;
-  if (['redis','mongodb','sqlite'].includes(engine)) available = selected = [engine === 'sqlite' ? 'database' : 'all'];
   const names = [...new Set([...available, ...selected])].sort();
-  node.innerHTML = names.map(name => `<label class="database-choice"><input type="checkbox" value="${escHtml(name)}" ${selected.includes(name) ? 'checked' : ''}><span>${escHtml(engine === 'mongodb' ? dbT('wholeReplicaSet') : engine === 'redis' ? dbT('wholeInstance') : engine === 'sqlite' ? dbT('selectedFile') : name)}</span></label>`).join('') || `<p class="form-help">${escHtml(dbT('notLoaded'))}</p>`;
+  node.innerHTML = names.map(name => `<label class="database-choice"><input type="checkbox" value="${escHtml(name)}" ${selected.includes(name) ? 'checked' : ''}><span>${escHtml(name)}</span></label>`).join('') || `<p class="form-help">${escHtml(dbT('notLoaded'))}</p>`;
 }
 
 /** Start only saved profile operations; local cleanup always requires an explicit confirmation. */
@@ -247,7 +228,7 @@ async function wizardLoadDatabases(request) {
   try {
     const data = await databaseRequest('', undefined);
     if (request !== wizardState.jobIdRequest) return;
-    wizardState.databaseProfiles = data.profiles;
+    wizardState.databaseProfiles = [...data.profiles, ...(data.unsupported_profiles || []).map(p => ({...p, enabled:false, databases:[]}))];
     wizardState.databasesLoaded = true;
     wizardApplyDatabases([]);
   } catch (_) { if (request === wizardState.jobIdRequest) { wizardState.databasesLoaded = false; _wizardShowError(2, dbT('loadError')); } }

@@ -376,12 +376,21 @@ function renderSettingsMenu(tabs) {
   }).join('');
 }
 
-function activateSettingsTab(tabKey) {
+/** Switch Settings panels after resolving database draft discard; cancellation preserves the draft. */
+async function activateSettingsTab(tabKey) {
   const tabs = getSettingsTabs();
   const active = tabs.find((tab) => tab.key === tabKey) || tabs[0];
   if (!active) return;
   const previousTab = settingsState.activeTab;
-  if (previousTab !== active.key && settingsState.databaseDirty && !window.confirm(dbT('discard'))) return;
+  if (previousTab !== active.key && settingsState.databaseDirty) {
+    if (settingsState.databaseDiscardPending) return;
+    settingsState.databaseDiscardPending = true;
+    let discard;
+    try {
+      discard = await _openSettingsDialog({title:dbT('discardTitle'), message:dbT('discard'), confirmText:dbT('discardAction'), confirmClass:'btn-danger'});
+    } finally { settingsState.databaseDiscardPending = false; }
+    if (!discard) return;
+  }
   if (previousTab !== active.key) settingsState.databaseDirty = false;
   if (previousTab !== active.key) window.BBUI?.utils?.dom?.clearPageFeedback?.();
   settingsState.activeTab = active.key;
@@ -6371,7 +6380,7 @@ async function onSettingsContentClick(event) {
       await refreshSettings();
     }
     const tab = tabBtn.dataset.settingsTab || 'general';
-    activateSettingsTab(tab);
+    await activateSettingsTab(tab);
     return;
   }
   const advancedTabBtn = event.target.closest('[data-settings-advanced-tab]');

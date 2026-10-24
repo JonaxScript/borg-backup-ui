@@ -294,6 +294,6 @@ Practical extensions: [Pre/Post scripts](../../docs/user-manual/en/user-manual.m
 
 ## Database backups
 
-Configure MariaDB/PostgreSQL profiles in Settings > Database backups and select them in job wizard step 2. Bundled scripts are plugin-managed; updates may replace direct edits. Store credentials in plugin Secrets, load databases and select them with checkboxes. Scripts separates editable own scripts, practical templates to copy, and read-only managed database helpers with syntax highlighting. Test restoration separately. See manual section 19.
+Configure MariaDB/MySQL/PostgreSQL profiles in Settings > Database backups and select them in job wizard step 2. Bundled scripts are plugin-managed; updates may replace direct edits. Store credentials in plugin Secrets, load databases and select them with checkboxes. Scripts separates editable own scripts, practical templates to copy, and read-only managed database helpers with syntax highlighting. Test restoration separately. See manual section 19.
 
 New local database dumps are gzip-compressed. Folder names identify profile and time; the overview shows compressed and original sizes. Validate and decompress `.gz` files before restoration; existing dumps remain unchanged.

@@ -2,10 +2,10 @@
 
 ## Pending - Online database engines and metadata housekeeping (#593)
 
-- Add MySQL transactional exports, complete standalone Redis RDB snapshots, and full MongoDB replica-set dumps with oplog. Reject nontransactional MySQL tables, MongoDB standalone/sharded deployments and Redis Cluster. No offline fallback, writer-pause workflow or automatic container reconfiguration.
-- Add SQLite Online Backup API snapshots of explicit files on local Docker directory binds, including WAL data, integrity checks, cancellation and temporary-file cleanup. Explain separate Stash configuration/blob scope and manual restoration.
-- Expose six managed database helpers with engine-specific bilingual descriptions; include offline Python syntax highlighting for the SQLite helper. Preserve existing profiles, Secrets, archives and four editable templates.
-- Prune confirmed completed operation/test metadata after 30 days under docker-control, hourly after startup. Retain running/unresolved, malformed, unsafe and unidentifiable records. Only journal-linked discovery leftovers qualify; dumps and Secrets are unaffected. No state-store migration.
+- Support only MariaDB, MySQL and PostgreSQL online exports. Keep MySQL/InnoDB native dumps and reject nontransactional tables. Remove MongoDB, Redis and SQLite from exports, settings and the managed script catalog.
+- Preserve retired test profiles, Secrets and dumps. Show a Settings notice, keep configuration transfer intact, and fail jobs referencing unavailable profiles without blocking supported profiles.
+- Show three managed Bash database helpers and four editable templates. Replace the remaining native browser confirmation when leaving unsaved database settings with the application dialog.
+- Remove only confirmed terminal operation/test metadata after 30 days; preserve unresolved records and clean only linked discovery remnants. Dumps, Secrets and archives remain untouched.
 
 ## Pending - Integrated Docker database backups (#591)
 

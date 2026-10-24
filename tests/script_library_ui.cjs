@@ -13,7 +13,6 @@ const {chromium}=require('playwright');
    {id:'template:source',kind:'template',group:'practical',name:'pre-check-source.sh',path:'practical/pre-check-source.sh',language:'bash',timeout_seconds:30,content:fs.readFileSync('docs/examples/job-hooks/practical/pre-check-source.sh','utf8')},
    {id:'managed:xss',kind:'managed',name:'<img onerror=alert(1)>',path:'malicious.sh',language:'bash',content:'# <img src=x onerror=alert(1)>\nprint("<script>alert(1)</script>")'},
   ];
-  sources.push({id:'managed:sqlite',kind:'managed',name:'database-dump-sqlite.py',path:'runtime/scripts/database-dump-sqlite.py',language:'python',content:fs.readFileSync('runtime/scripts/database-dump-sqlite.py','utf8')});
   let saved=[],writes=0, holdPostgres=false, releaseSource, sourceBlocked;
   await page.route('http://bbui.test/**',async route=>{
    const request=route.request(),url=new URL(request.url());let body={};
@@ -41,7 +40,7 @@ const {chromium}=require('playwright');
    window._openSettingsDialog=async()=>window.approveDiscard!==false;
    window.showMsg=(id,kind,text)=>{const node=document.getElementById(id);node.textContent=text;node.classList.remove('hidden');};
   },JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`,'utf8')));
-  for(const file of ['ui/vendor/prism/prism-core.min.js','ui/vendor/prism/prism-bash.min.js','ui/vendor/prism/prism-python.min.js','ui/js/components/bash-editor.js','ui/js/pages/script-library.js'])await page.addScriptTag({content:fs.readFileSync(file,'utf8')});
+  for(const file of ['ui/vendor/prism/prism-core.min.js','ui/vendor/prism/prism-bash.min.js','ui/js/components/bash-editor.js','ui/js/pages/script-library.js'])await page.addScriptTag({content:fs.readFileSync(file,'utf8')});
   const settings=fs.readFileSync('ui/js/pages/settings.js','utf8');
   for(const name of ['settingsCard','settingsMenuIcon','loadSettingsScripts','renderSettingsScriptEditor','settingsScriptValues','uniqueSettingsScriptName','persistSettingsScript']){
    const expression=new RegExp('(?:async )?function '+name+'[\\s\\S]*?\\n}');
@@ -61,11 +60,6 @@ const {chromium}=require('playwright');
   await page.locator('#script-library-select').selectOption('managed:postgresql');
   await page.waitForFunction(()=>document.querySelector('pre code')?.textContent.includes('pg_dump'));
   assert.ok(await page.locator('pre .token.keyword').count()>0);
-  await page.locator('#script-library-select').selectOption('managed:sqlite');
-  await page.waitForFunction(()=>document.querySelector('pre code')?.textContent.includes('sqlite3.connect'));
-  assert.ok(await page.locator('pre .token.keyword').count()>0);
-  assert.ok((await page.locator('.script-library-source-meta').textContent()).includes('Python / SQLite'));
-  assert.equal(await page.locator('pre code').textContent(),sources.at(-1).content);
   await page.locator('#script-library-select').selectOption('managed:xss');
   await page.waitForFunction(()=>document.querySelector('pre code')?.textContent.includes('alert(1)'));
   assert.equal(await page.locator('#script-library-browser img, #script-library-browser script').count(),0);

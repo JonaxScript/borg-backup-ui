@@ -32,6 +32,10 @@ def store_path(config):
     return data_root(config) / 'config' / 'database-profiles.json'
 
 
+SUPPORTED_ENGINES = ('mariadb', 'mysql', 'postgresql')
+RETIRED_ENGINES = ('mongodb', 'redis', 'sqlite')
+
+
 LEGACY_CREDENTIAL = r'[a-f0-9]{32}'
 NAMED_CREDENTIAL = r'database-[a-z0-9][a-z0-9-]{0,59}-v[0-9]{3,9}'
 
@@ -132,17 +136,11 @@ def validate_profile(raw):
     if not isinstance(raw, dict):
         raise DatabaseError('invalid_profile')
     engine = raw.get('engine')
-    if engine not in ('mariadb', 'postgresql', 'mysql', 'mongodb', 'redis', 'sqlite'):
+    if engine not in SUPPORTED_ENGINES:
         raise DatabaseError('invalid_profile')
     row = {'engine': engine}
     row['auth_mode'] = raw.get('auth_mode', 'container' if raw.get('credential_file') else 'managed')
-    if row['auth_mode'] not in ('managed', 'container', 'none'):
-        raise DatabaseError('invalid_profile')
-    if engine == 'sqlite':
-        row['auth_mode'] = 'none'
-    if row['auth_mode'] == 'none' and engine not in ('sqlite', 'redis', 'mongodb'):
-        raise DatabaseError('invalid_profile')
-    if row['auth_mode'] == 'container' and engine in ('redis', 'mongodb'):
+    if row['auth_mode'] not in ('managed', 'container'):
         raise DatabaseError('invalid_profile')
     if row['auth_mode'] == 'managed':
         row['credential_id'] = raw.get('credential_id', '')
@@ -180,43 +178,80 @@ def validate_profile(raw):
     databases = raw.get('databases')
     if not isinstance(databases, list) or len(databases) > 64:
         raise DatabaseError('invalid_profile')
-    system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine in ('mariadb', 'mysql') else {'admin', 'config', 'local'} if engine == 'mongodb' else {'template0', 'template1'}
+    system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine in ('mariadb', 'mysql') else {'template0', 'template1'}
     row['databases'] = list(dict.fromkeys(_text(x, r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63) for x in databases))
     if any(x.lower() in system for x in row['databases']):
         raise DatabaseError('system_database')
-    for key, default, minimum, maximum in [('port', {'mariadb':3306, 'mysql':3306, 'postgresql':5432, 'mongodb':27017, 'redis':6379, 'sqlite':1}[engine], 1, 65535),
+    for key, default, minimum, maximum in [('port', {'mariadb':3306, 'mysql':3306, 'postgresql':5432}[engine], 1, 65535),
                                          ('timeout_seconds', 1800, 1, 86400), ('min_free_mib', 1024, 1, 104857600)]:
         value = raw.get(key, default)
         if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
             raise DatabaseError('invalid_profile')
         row[key] = value
-    if engine in ('redis', 'mongodb') and any(x != 'all' for x in row['databases']):
-        raise DatabaseError('invalid_profile')
-    if engine == 'sqlite':
-        value = _text(raw.get('sqlite_path'), maximum=4096)
-        path = Path(value)
-        if not path.is_absolute() or '..' in path.parts or str(path) != value:
-            raise DatabaseError('invalid_profile')
-        row['sqlite_path'] = value
-        if any(x != 'database' for x in row['databases']):
-            raise DatabaseError('invalid_profile')
-    if engine == 'mongodb':
-        row['authentication_database'] = _text(raw.get('authentication_database', 'admin'), r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63)
     row['retention'] = raw.get('retention', 'keep')
     if row['retention'] not in ('keep', 'after_archive'):
         raise DatabaseError('invalid_profile')
     return row
 
 
-def list_profiles(config):
-    """Read validated profiles; corrupt inventories fail closed."""
+def validate_stored_profile(raw):
+    """Validate active profiles or preserve retired, credential-free test metadata.
+
+    Retired records are never execution inputs. Only their former inventory keys
+    are accepted for configuration transfer; passwords and arbitrary extra fields
+    are rejected. No stored enable flag or connection data is rewritten.
+    """
+    if not isinstance(raw, dict) or raw.get('engine') not in RETIRED_ENGINES:
+        return validate_profile(raw)
+    allowed = {'id', 'name', 'engine', 'enabled', 'auth_mode', 'credential_id',
+               'credential_file', 'container', 'execution_user', 'database_user',
+               'include_globals', 'staging_mount', 'staging_dir', 'databases',
+               'port', 'timeout_seconds', 'min_free_mib', 'retention',
+               'sqlite_path', 'authentication_database'}
+    if set(raw) - allowed or len(json.dumps(raw)) > 32768:
+        raise DatabaseError('invalid_profile')
+    for key, value in raw.items():
+        if key in ('enabled', 'include_globals'):
+            valid = isinstance(value, bool)
+        elif key in ('port', 'timeout_seconds', 'min_free_mib'):
+            valid = isinstance(value, int) and not isinstance(value, bool)
+        elif key == 'databases':
+            valid = isinstance(value, list) and len(value) <= 64 and all(
+                isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}', name)
+                for name in value)
+        else:
+            valid = isinstance(value, str) and len(value) <= 4096 and not any(ord(c) < 32 for c in value)
+        if not valid:
+            raise DatabaseError('invalid_profile')
+    _text(raw.get('id'), r'db-[a-f0-9]{12}')
+    _text(raw.get('name'), maximum=100)
+    if raw.get('credential_id'):
+        _text(raw['credential_id'], f'(?:{LEGACY_CREDENTIAL}|{NAMED_CREDENTIAL})')
+    return copy.deepcopy(raw)
+
+
+def stored_profiles(config):
+    """Read validated inventory for preservation/transfer, including inert retired rows.
+
+    Never pass these rows to an exporter: execution uses snapshot_profiles, which
+    excludes retired engines. Corrupt inventories and duplicate IDs fail closed.
+    """
     inventory = read_inventory(store_path(config), collection_key='profiles', schema_version=1)
     if inventory.get('schema_version') != 1:
         raise DatabaseError('invalid_profile')
-    rows = [validate_profile(row) for row in inventory['profiles']]
+    rows = [validate_stored_profile(row) for row in inventory['profiles']]
     if len({r['id'] for r in rows}) != len(rows):
         raise DatabaseError('invalid_profile')
-    return {'profiles': rows, 'schema_version': 1}
+    return rows
+
+
+def list_profiles(config):
+    """List executable profiles and safe summaries of preserved unavailable profiles."""
+    rows = stored_profiles(config)
+    return {'profiles': [r for r in rows if r['engine'] in SUPPORTED_ENGINES],
+            'unsupported_profiles': [{k: r[k] for k in ('id', 'name', 'engine')}
+                                     for r in rows if r['engine'] in RETIRED_ENGINES],
+            'schema_version': 1}
 
 
 def snapshot_profiles(config, identifiers, *, allow_disabled=False, require_databases=True):
@@ -247,8 +282,10 @@ def save_profile(config, raw):
         raise DatabaseError('invalid_profile')
     creating = not raw.get('id')
     with inventory_lock(store_path(config).parent):
-        rows = list_profiles(config)['profiles']
+        rows = stored_profiles(config)
         old = next((p for p in rows if p['id'] == raw.get('id')), {})
+        if old.get('engine') in RETIRED_ENGINES:
+            raise DatabaseError('profile_unavailable')
         merged = {**raw, 'id': raw.get('id') or 'db-' + uuid.uuid4().hex[:12], 'credential_id': old.get('credential_id', '')}
         row = validate_profile(merged)
         if not creating and not any(r['id'] == row['id'] for r in rows):
@@ -273,7 +310,7 @@ def save_profile(config, raw):
 def delete_profile(config, identifier):
     """Delete only an unreferenced profile; disabled jobs also retain their references."""
     with inventory_lock(store_path(config).parent):
-        rows = list_profiles(config)['profiles']
+        rows = stored_profiles(config)
         for path in (store_path(config).parent / 'jobs').glob('*.json'):
             job = json.loads(path.read_text())
             if identifier in job.get('database_profile_ids', []):
