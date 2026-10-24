@@ -1253,6 +1253,7 @@
 .database-fields { display: grid; gap: var(--ui-space-3); }
 .database-fields > .form-group { display: grid; grid-template-columns: minmax(10rem, .7fr) minmax(0, 1.3fr); align-items: center; gap: var(--ui-space-3); }
 .database-fields .form-label { margin: 0; }
+.database-confirmation .modal-description { white-space: pre-line; overflow-wrap: anywhere; }
 .database-secret-file { min-width: 0; overflow-wrap: anywhere; }
 .database-advanced { padding: var(--ui-space-3); background: var(--ui-color-surface-subtle); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-sm); }
 .database-advanced summary { cursor: pointer; color: var(--ui-color-text); }

@@ -85,7 +85,7 @@ function renderDatabaseSettings() {
       <button class="btn btn-secondary" id="db-cancel" ${databaseState.operation ? '' : 'disabled'}>${escHtml(dbT('cancel'))}</button></div>
       <p id="db-result" class="status-message hidden" role="status" aria-live="polite"></p>
     </div>`)}
-    ${settingsCard(escHtml(dbT('runs')), settingsMenuIcon('backup'), `<div class="settings-body"><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div></div>`)}
+    ${settingsCard(escHtml(dbT('runs')), settingsMenuIcon('backup'), `<div class="settings-body"><p class="form-help">${escHtml(dbT('runsHint'))}</p><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div></div>`)}
   </div>`;
   document.getElementById('db-engine').value = row.engine;
   document.getElementById('db-retention').value = row.retention;
@@ -120,12 +120,16 @@ function renderDatabaseSettings() {
       if (discover) await startDatabaseAction(data.profile.id, 'discover');
     } catch (err) { databaseFeedback(err.message); }
   });
-  document.getElementById('db-select').addEventListener('change', e => {
-    if (settingsState.databaseDirty && !window.confirm(dbT('discard'))) { e.target.value = databaseState.selected; return; }
-    databaseState.selected = e.target.value; renderDatabaseSettings(); loadDatabaseRuns();
+  document.getElementById('db-select').addEventListener('change', async e => {
+    const selected = e.target.value;
+    if (settingsState.databaseDirty) {
+      e.target.value = databaseState.selected;
+      if (!await _openSettingsDialog({title:dbT('discardTitle'), message:dbT('discard'), confirmText:dbT('discardAction'), confirmClass:'btn-danger'})) return;
+    }
+    databaseState.selected = selected; renderDatabaseSettings(); loadDatabaseRuns();
   });
   document.getElementById('db-delete').addEventListener('click', async () => {
-    if (!window.confirm(dbT('confirmDelete'))) return;
+    if (!await _openSettingsDialog({dialogClass:'database-confirmation', title:dbT('delete'), message:dbT('confirmDelete') + '\n\n' + row.name, confirmText:dbT('delete'), confirmClass:'btn-danger'})) return;
     try { await databaseRequest(`?id=${encodeURIComponent(row.id)}`, {}, 'DELETE'); await loadDatabaseSettings(''); }
     catch (e) { databaseFeedback(e.message); }
   });
@@ -159,7 +163,7 @@ function renderDatabaseChoices(available, selected) {
 async function startDatabaseAction(profile_id, action, directory) {
   if (databaseState.operation) { databaseFeedback(dbT('running')); return; }
   if (settingsState.databaseDirty) { databaseFeedback(dbT('saveFirst')); return; }
-  if (action === 'cleanup' && !window.confirm(dbT('confirmCleanup'))) return;
+  if (action === 'cleanup' && !await _openSettingsDialog({dialogClass:'database-confirmation', title:dbT('cleanup'), message:dbT('confirmCleanup') + '\n\n' + directory, confirmText:dbT('cleanup'), confirmClass:'btn-danger'})) return;
   try {
     const result = await databaseRequest('/action', {profile_id, action, directory});
     databaseState.operation = result.id;
@@ -193,7 +197,7 @@ async function pollDatabaseOperation() {
   finally { databaseState.polling = false; const b = document.getElementById('db-cancel'); if (b) b.disabled = !databaseState.operation; }
 }
 
-/** Show retained/orphaned exports and their owned cleanup action, never dump contents. */
+/** Show retained exports across saved profiles, with local cleanup; never dump contents. */
 async function loadDatabaseRuns() {
   const node = document.getElementById('db-runs'); if (!node) return;
   try {

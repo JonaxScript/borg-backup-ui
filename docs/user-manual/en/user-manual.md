@@ -2106,6 +2106,12 @@ archive verification. **Archived and verified is not a database restore test.**
 
 ### 19.3 Local retention and interrupted operations
 
+**Local backup runs** shows retained database dumps across saved profiles, from
+backup jobs and test dumps. The profile selector above does not filter this list.
+Borg archives and ordinary file backups are not listed here. Removing local files
+requires confirmation in the application dialog showing the exact directory;
+cancelling leaves the run unchanged.
+
 Default: keep local exports. Borg Prune does not remove them. The optional policy
 removes this run's managed files only after Borg create exits without warnings
 and all required artifacts pass readback verification. Later maintenance/Post

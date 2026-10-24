@@ -71,6 +71,10 @@ Manual test-channel acceptance on Unraid:
   explicit dump, and mount/path/mode/filesystem errors are distinguished.
 - Save a profile, check its connection, export a test dump, cancel an active dump
   and reconcile an interrupted operation. Check per-run status/space and cleanup.
+- Check shared application confirmations for local cleanup, profile deletion and
+  discarding edits. Cancel must leave files/profiles/drafts unchanged; confirmed
+  cleanup must target the displayed directory. Local run help explains its
+  cross-profile job/test-dump scope and the absence of Borg archives.
 - Run a mixed file/database job and a database-only job. Verify current dumps and
   manifest in Borg, missing/excluded artifacts cause failure, warnings retain
   local dumps, and no previous/partial dump appears in the current archive.

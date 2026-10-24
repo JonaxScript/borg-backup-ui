@@ -2153,6 +2153,12 @@ nicht, dass die Datenbank-Wiederherstellung getestet wurde.**
 
 ### 19.3 Lokale Aufbewahrung und unterbrochene Läufe
 
+**Lokale Sicherungsläufe** zeigt noch vorhandene Datenbank-Dumps profilübergreifend
+aus Backup-Jobs und Test-Dumps. Die Auswahl oben filtert diese Übersicht nicht.
+Borg-Archive und normale Dateisicherungen werden hier nicht aufgelistet. Entfernen
+lokaler Dateien erfordert eine Bestätigung im Anwendungsdialog mit dem konkreten
+Verzeichnispfad; Abbrechen lässt den Lauf unverändert.
+
 Standard: Exporte lokal behalten. Borg-Prune entfernt sie nicht. Optional werden
 nur eigene Laufdateien nach Borg create ohne Warnung und erfolgreicher
 Rückleseprüfung entfernt. Spätere Wartungs-/Post-Ergebnisse bleiben getrennt.

@@ -2,6 +2,8 @@
 
 ## Pending - Integrated Docker database backups (#591)
 
+- Replace native database confirmations with shared Settings dialogs for profile deletion, draft discard and local cleanup. Include the exact cleanup path and explain the cross-profile local dump list.
+
 - Remove UUID suffixes from new dump directories and database-job archive names; fail on collisions without overwriting existing data. Retain legacy directory recognition and archive selection. Use readable versioned secret filenames with profile/connection metadata; show the current file in Settings and include both formats in encrypted Secrets transfer. Add resumable startup migration database_secret_names_v1 with profile snapshots and secret-free audit events, preserving original secrets for old configuration exports.
 
 - Remove the six-step workflow wrap limit and responsive row breaks. Keep a continuous, keyboard-focusable horizontal timeline with readable minimum step widths and local overflow on narrow cards.
