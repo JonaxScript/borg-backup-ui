@@ -270,8 +270,13 @@ def validate_params(
     params["file_activity"] = _bool_value(params.get("file_activity"), default=False)
     for period, value in retention.items():
         params[f"keep_{period}"] = value
-    raw_sources = normalize_source_paths(params.get("source_paths"))
+    raw_sources = normalize_source_paths(params.get("source_paths"), allow_empty=bool(params.get("database_profile_ids")))
     params["source_paths"] = raw_sources
+    from database_profiles import snapshot_profiles
+    from database_backup import validate_sources
+    database_profiles = snapshot_profiles(ui_config or {"BACKUP_SCRIPTS_DIR": str(data_root)}, params.get("database_profile_ids"))
+    params["database_profile_ids"] = [p["id"] for p in database_profiles]
+    validate_sources(database_profiles, raw_sources)
     selected_repo = _repository_from_params(params, ui_config)
     if not selected_repo:
         raise ValueError("Repository selection is required")
@@ -396,7 +401,7 @@ def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dic
             raise ValueError(f"Wizard metadata root is not an object: {job_key}")
         try:
             meta_source_paths = normalize_source_paths(
-                candidate.get("source_paths"), field=f"Job '{job_key}' source_paths"
+                candidate.get("source_paths"), field=f"Job '{job_key}' source_paths", allow_empty=bool(candidate.get("database_profile_ids"))
             )
         except SourcePathValidationError as exc:
             raise ValueError(
@@ -467,6 +472,7 @@ def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dic
         "use_vm": meta_vm_control["mode"] != "none",
         "docker_control": meta_docker_control,
         "vm_control": meta_vm_control,
+        "database_profile_ids": meta.get("database_profile_ids", []),
         "hooks": meta.get("hooks", {}),
         "source_paths": meta_source_paths,
         "exclude_paths": meta_exclude_paths,
@@ -503,7 +509,7 @@ def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dic
 def generate_flow_preview(params: dict, ui_config: Optional[dict] = None, scripts_dir: Optional[Path] = None) -> dict:
     """Erzeugt eine textuelle Backup-Flow-Vorschau fuer den Wizard."""
     location = params.get("location", "local")
-    source_paths = normalize_source_paths(params.get("source_paths"))
+    source_paths = normalize_source_paths(params.get("source_paths"), allow_empty=bool(params.get("database_profile_ids")))
     exclude_paths = _exclude_paths(params.get("exclude_paths", []))
     selected_repo = _repository_from_params(params, ui_config)
     repo_path = _repository_path(selected_repo, ui_config)
@@ -529,11 +535,15 @@ def generate_flow_preview(params: dict, ui_config: Optional[dict] = None, script
     from job_scripts import normalize_hooks
     hooks = normalize_hooks(params.get("hooks"), ui_config)
     add_step("resourceLocksAcquire", "Acquire resource locks (repo, optional docker-control/vm-control)")
+    from database_profiles import snapshot_profiles
+    database_profiles = snapshot_profiles(ui_config or {}, params.get("database_profile_ids"))
     if hooks["pre"]:
         add_step("preScript", "Run Pre script before any backup preparation")
     if location == "smb":
         add_step("mountShares", "Mount required network shares")
     add_step("prechecks", "Prechecks (prerequisites, parity, paths)")
+    if database_profiles:
+        add_step("databaseBackup", "Create required database dumps", count=sum(len(p['databases']) for p in database_profiles))
     if use_docker:
         if docker_control["mode"] == "selected":
             add_step("dockerStop", f"Stop selected Docker containers ({len(docker_control['selected'])})")
@@ -587,6 +597,7 @@ def generate_flow_preview(params: dict, ui_config: Optional[dict] = None, script
             "repository_key": str((selected_repo or {}).get("repository_key") or params.get("repository_key") or "").strip(),
             "repository_name": str((selected_repo or {}).get("repository_name") or "").strip(),
             "encryption": encryption,
+            "database_profiles": [{"name": p["name"], "databases": p["databases"], "include_globals": p["include_globals"]} for p in database_profiles],
             "sources_count": len(source_paths),
             "exclusions_count": len(exclude_paths),
             "exclude_paths": exclude_paths,
@@ -709,7 +720,7 @@ def _save_job_locked(params: dict, scripts_dir: Path, data_root: Optional[Path] 
         "unmount_after_run": unmount_after_run if location == "smb" else True,
         "script": "",
         "runner": "scriptless-wizard-runner",
-        "source_paths": normalize_source_paths(params.get("source_paths")),
+        "source_paths": normalize_source_paths(params.get("source_paths"), allow_empty=bool(params.get("database_profile_ids"))),
         "exclude_paths": _exclude_paths(params.get("exclude_paths", [])),
         "exclude_if_present": marker_names(params.get("exclude_if_present", existing.get("exclude_if_present"))),
         "features": {
@@ -719,6 +730,7 @@ def _save_job_locked(params: dict, scripts_dir: Path, data_root: Optional[Path] 
         },
         "docker_control": {**existing.get("docker_control", {}), **docker_control},
         "vm_control": {**existing.get("vm_control", {}), **vm_control},
+        "database_profile_ids": params.get("database_profile_ids", existing.get("database_profile_ids", [])),
         "hooks": hooks,
         "compression": str(params.get("compression", "lz4")).strip() or "lz4",
         "file_activity": file_activity,
@@ -746,6 +758,8 @@ def _save_job_locked(params: dict, scripts_dir: Path, data_root: Optional[Path] 
     from job_exclusions import prepare_file, cleanup_files
     metadata["exclude_from"] = prepare_file(params.get("exclude_from", existing.get("exclude_from")), jobs_meta_dir, job_key)
     try:
+        from database_profiles import snapshot_profiles
+        snapshot_profiles(repo_config, metadata.get("database_profile_ids"))
         save_job_repository_transaction(
             repo_config,
             meta_path,

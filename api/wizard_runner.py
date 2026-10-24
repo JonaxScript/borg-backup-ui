@@ -6,6 +6,7 @@ api/wizard_runner.py - Scriptless Runner fuer Wizard-Jobs (Phase 4)
 from __future__ import annotations
 
 import json
+import uuid
 import fcntl
 import logging
 import os
@@ -404,7 +405,10 @@ def _load_env_from_job(job_key: str, borg_scripts_dir: Path, backup_scripts_dir:
     log_dir = env.get("GLOBAL_LOG_DIR", "/mnt/user/Logs")
 
     from job_source_paths import normalize_source_paths
-    source_paths = normalize_source_paths(meta.get("source_paths"), field=f"Job '{job_key}' source_paths")
+    from database_profiles import snapshot_profiles
+    meta["_database_profiles"] = snapshot_profiles({"BACKUP_SCRIPTS_DIR": str(data_root)}, meta.get("database_profile_ids"))
+    env["BORG_UI_DATABASE_PROFILES"] = "1" if meta["_database_profiles"] else "0"
+    source_paths = normalize_source_paths(meta.get("source_paths"), field=f"Job '{job_key}' source_paths", allow_empty=bool(meta["_database_profiles"]))
     exclude_paths = meta.get("exclude_paths") if isinstance(meta.get("exclude_paths"), list) else []
 
     from job_settings import explicit_job_settings
@@ -576,7 +580,7 @@ def _build_resources(env: dict, meta: dict) -> list[str]:
         smb_key = str(storage.get("profile_key") or "").strip()
         if smb_key:
             resources.append(f"smb-mount:{smb_key}")
-    if _runtime_control_enabled_for_lock(meta, "docker"):
+    if _runtime_control_enabled_for_lock(meta, "docker") or meta.get("database_profile_ids"):
         resources.append("docker-control")
     if _runtime_control_enabled_for_lock(meta, "vm"):
         resources.append("vm-control")
@@ -630,6 +634,7 @@ def main() -> int:
         return 2
 
     from job_control import JobControl
+    from database_profiles import DatabaseError
 
     control = JobControl(job_key, run_id)
 
@@ -688,6 +693,7 @@ def main() -> int:
         hooks=meta.get("hooks"), docker=_runtime_control(meta, "docker")["mode"] != "none",
         vms=_runtime_control(meta, "vm")["mode"] != "none",
         prune=BorgRunner(borg_config).retention().get("mode") != "all", controller=control,
+        databases=bool(meta.get("_database_profiles")),
     )
     mail_config = MailConfig.from_config(env)
 
@@ -770,9 +776,11 @@ def main() -> int:
             elif workflow.get("post_script") is not None:
                 workflow.update("post_script", status="skipped", reason="post_condition")
 
+    database_results = []
+
     def execute_backup(job):
         """Execute the backup body; the context manager always completes cleanup."""
-        nonlocal exclusion_temp
+        nonlocal exclusion_temp, database_results
         set_phase("preparing")
         borg_config.exclude_if_present = meta.get("exclude_if_present", [])
         if meta.get("exclude_from"):
@@ -802,6 +810,19 @@ def main() -> int:
             job.set_cancelled()
             result_code = 130
             return result_code
+        if meta.get("_database_profiles"):
+            from database_backup import export_profiles, validate_sources, artifact_paths
+            validate_sources(meta["_database_profiles"], job_config.backup_paths)
+            set_phase("database_backup")
+            with workflow.track("database_backup"):
+                database_results = export_profiles(
+                    {"BACKUP_SCRIPTS_DIR": str(data_root)}, meta["_database_profiles"], job_key, run_id,
+                    control.is_cancel_requested,
+                    progress=lambda result: workflow.update("database_backup", details={"results": database_results}),
+                    results=database_results,
+                )
+                workflow.update("database_backup", details={"results": database_results})
+            job_config.backup_paths.extend(artifact_paths(database_results))
         if docker_mgr is not None:
             set_phase("stopping_docker")
             selected = docker_control["selected"]
@@ -833,10 +854,13 @@ def main() -> int:
             workflow=workflow,
         )
         job.borg_steps = runner.steps
+        database_archive = archive_prefix + "-" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "-" + uuid.uuid4().hex[:8] if database_results else None
+        create_options = {"archive_name": database_archive} if database_archive else {}
         create_exit = runner.create(
             job_config.backup_paths,
             archive_prefix,
             exclude_paths=job_config.exclude_paths,
+            **create_options,
         )
         job.backup_exit_code = create_exit
         if create_exit < 2:
@@ -851,6 +875,19 @@ def main() -> int:
             return result_code
 
         job.recover_runtime()
+        if database_results:
+            from database_backup import verify_archive, cleanup_run
+            from inventory_store import atomic_write_json
+            try:
+                verify_archive(borg_config.repo, database_archive, database_results, control.is_cancel_requested)
+                workflow.update("database_backup", details={"results": database_results})
+                for result, profile in zip(database_results, meta["_database_profiles"]):
+                    atomic_write_json(Path(result['directory']) / 'manifest.json', result)
+                    if create_exit == 0 and profile['retention'] == 'after_archive':
+                        cleanup_run(result['directory'], profile, verified=True)
+            except Exception:
+                workflow.update("database_backup", status="error")
+                raise
         if control.is_cancel_requested():
             job.set_cancelled()
             result_code = 130
@@ -886,6 +923,9 @@ def main() -> int:
             phase_callback=set_phase, completion_callback=complete_job,
         ) as job:
             job.workflow = workflow
+            if "docker-control" in resources:
+                from database_backup import reconcile_operations
+                reconcile_operations({"BACKUP_SCRIPTS_DIR": str(data_root)})
             hooks, scripts = snapshot_hooks({"BACKUP_SCRIPTS_DIR": str(data_root)}, meta.get("hooks"))
             if control.is_cancel_requested():
                 job.set_cancelled()
@@ -899,7 +939,15 @@ def main() -> int:
                 if pre_ok and not control.is_cancel_requested():
                     set_phase("mounting")
                     smb_session = _ensure_smb_mount(env, meta)
-                    execute_backup(job)
+                    try:
+                        execute_backup(job)
+                    except DatabaseError as exc:
+                        workflow.update("database_backup", status="interrupted" if exc.reason == "cancelled" else "error",
+                                        details={"results": database_results, "error_code": exc.api_code})
+                        if exc.reason == "cancelled":
+                            job.set_cancelled()
+                        else:
+                            job.set_result(2, final_msg=exc.api_code)
                 elif control.is_cancel_requested():
                     job.set_cancelled()
         result_code = job.exit_code
@@ -907,6 +955,14 @@ def main() -> int:
     except SystemExit as exc:
         result_code = job.exit_code if exc.code == 0 else 2
         return result_code
+    except DatabaseError as exc:
+        logging.error("%s", exc.api_code)
+        if exc.reason == "cancelled" and job is not None:
+            job.set_cancelled()
+            result_code = 130
+            return 130
+        result_code = 2
+        return 2
     except (RequiredSourcePathsMissing, UsbMountAccessError, VmShutdownError):
         result_code = 2
         return 2

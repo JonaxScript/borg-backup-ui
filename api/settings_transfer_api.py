@@ -76,6 +76,16 @@ def _validate_jobs_bundle(bundle: dict) -> None:
             group_ids.add(key)
         except (ValueError, TypeError, AttributeError) as exc:
             raise ConfigurationExportError() from exc
+    from database_profiles import validate_profile
+    db_rows = bundle.get('database_profiles', [])
+    if not isinstance(db_rows, list):
+        raise ConfigurationExportError()
+    try:
+        db_rows = [validate_profile(row) for row in db_rows]
+        if len({row['id'] for row in db_rows}) != len(db_rows):
+            raise ConfigurationExportError()
+    except (ValueError, TypeError):
+        raise ConfigurationExportError() from None
     for job in bundle["jobs"]:
         if not isinstance(job, dict) or job.get("schema_version") != JOB_SETTINGS_SCHEMA:
             raise ConfigurationExportError()
@@ -83,7 +93,7 @@ def _validate_jobs_bundle(bundle: dict) -> None:
             metadata_job_id(job)
             explicit_job_settings(job)
             job_archive_prefixes(job)
-            normalize_source_paths(job.get("source_paths"))
+            normalize_source_paths(job.get("source_paths"), allow_empty=bool(job.get("database_profile_ids")))
             from job_exclusions import marker_names, upload_bytes
             marker_names(job.get("exclude_if_present"))
             if job.get("exclude_from") is not None:
@@ -204,8 +214,11 @@ def export_jobs_bundle(config: dict, selected_keys: List[str] | None = None) -> 
     }
     from job_groups import definitions
     exported_ids = {j.get('job_id') or j.get('job_key') for j in jobs}
+    from database_profiles import snapshot_profiles, list_profiles
+    database_ids = list(dict.fromkeys(x for job in jobs for x in job.get('database_profile_ids', [])))
+    bundle['database_profiles'] = snapshot_profiles(config, database_ids, allow_disabled=True) if selected else list_profiles(config)['profiles']
     bundle['job_groups'] = [g for g in definitions(config)['groups'] if set(g['jobs']) <= exported_ids]
-    if bundle['job_groups']:
+    if bundle['job_groups'] or bundle['database_profiles']:
         bundle['format'] = 'bbui-job-bundle-v5'
     bundle["keyfile_meta"] = _collect_job_key_files(config, bundle, include_content=False)
     text = json.dumps(bundle, indent=2, ensure_ascii=False) + "\n"
@@ -767,6 +780,17 @@ def _import_jobs_bundle_locked(
     key_map.update({r['job_key']: r['job_key'] for r in report
                     if r.get('status') == 'skipped_exists' and r['job_key'] in current_jobs})
     group_rows, group_report = prepare_import(config, bundle.get('job_groups', []), key_map, mode)
+    from database_profiles import list_profiles, store_path, validate_profile
+    db_existing = {p['id']: p for p in list_profiles(config)['profiles']}
+    db_merged = dict(db_existing)
+    for profile in bundle.get('database_profiles', []):
+        row = validate_profile(profile)
+        if row['id'] in db_existing and db_existing[row['id']] != row:
+            raise ConfigurationExportError()
+        db_merged[row['id']] = row
+    for _, job in applied_jobs:
+        if any(identifier not in db_merged for identifier in job.get('database_profile_ids', [])):
+            raise ConfigurationExportError()
     settings_applied = False
     settings_report = {"mode": settings_mode, "applied": 0, "conflicts": 0}
     settings_backup = None
@@ -783,6 +807,8 @@ def _import_jobs_bundle_locked(
 
     if not dry_run:
         from inventory_store import atomic_write_json
+        if db_merged != db_existing:
+            atomic_write_json(store_path(config), {'schema_version': 1, 'profiles': list(db_merged.values())})
         for key, raw in applied_jobs:
             target = jobs_dir / f"{key}.json"
             from job_exclusions import prepare_file, cleanup_files

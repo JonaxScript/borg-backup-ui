@@ -93,6 +93,7 @@ function getSettingsTabs() {
   { key: 'users', label: settingsT('tabs.users'), group: 'system', description: settingsT('menu.usersDescription'), icon: settingsMenuIcon('users') },
   { key: 'about', label: settingsT('tabs.about'), group: 'system', description: settingsT('menu.aboutDescription'), icon: settingsMenuIcon('about') },
   { key: 'notifications', label: settingsT('tabs.notifications'), group: 'operations', description: settingsT('menu.notificationsDescription'), icon: settingsMenuIcon('notifications') },
+  { key: 'databases', label: settingsT('databases.title'), group: 'operations', description: settingsT('databases.description'), icon: settingsMenuIcon('backup') },
   { key: 'scripts', label: settingsT('scripts.title'), group: 'operations', description: settingsT('scripts.description'), icon: settingsMenuIcon('advanced') },
   { key: 'backup', label: settingsT('tabs.backup'), group: 'operations', description: settingsT('menu.backupDescription'), icon: settingsMenuIcon('backup') },
   { key: 'restore', label: settingsT('tabs.restore'), group: 'operations', description: settingsT('menu.restoreDescription'), icon: settingsMenuIcon('restore') },
@@ -260,7 +261,7 @@ function renderSettings(data, systemHealth) {
   const active = tabs.find((tab) => tab.key === settingsState.activeTab) || tabs[0];
   if (!tabs.some((tab) => tab.key === settingsState.activeTab)) settingsState.activeTab = active.key;
   const profileTab = ['local', 'usb', 'smb', 'storagebox'].includes(settingsState.activeTab);
-  const hideGlobalSave = profileTab || ['about', 'factory-reset', 'integrations', 'scripts'].includes(settingsState.activeTab);
+  const hideGlobalSave = profileTab || ['about', 'factory-reset', 'integrations', 'scripts', 'databases'].includes(settingsState.activeTab);
   const saveBtn = document.getElementById('settings-save-btn');
   if (saveBtn) saveBtn.classList.toggle('hidden', hideGlobalSave);
   el.innerHTML = `
@@ -297,6 +298,7 @@ function renderSettings(data, systemHealth) {
     <div class="settings-tab-panel ${settingsState.activeTab === 'smb' ? '' : 'hidden'}" data-settings-panel="smb">
       ${renderSettingsSmbProfiles(data.smb_profiles || [])}
     </div>
+    <div class="settings-tab-panel ${settingsState.activeTab === 'databases' ? '' : 'hidden'}" data-settings-panel="databases"><div id="settings-databases-panel"></div></div>
     <div class="settings-tab-panel ${settingsState.activeTab === 'scripts' ? '' : 'hidden'}" data-settings-panel="scripts">
       <div id="settings-scripts-panel"></div>
     </div>
@@ -348,6 +350,7 @@ function renderSettings(data, systemHealth) {
   initializeSettingsProfileManagers();
   if (settingsState.activeTab === 'notifications') maybeLoadAppriseProviders();
   if (settingsState.activeTab === 'about') maybeLoadAboutLicenses();
+  if (settingsState.activeTab === 'databases') loadDatabaseSettings();
   if (settingsState.activeTab === 'scripts') loadSettingsScripts();
   _updateUnsavedChangesUi();
 }
@@ -378,6 +381,8 @@ function activateSettingsTab(tabKey) {
   const active = tabs.find((tab) => tab.key === tabKey) || tabs[0];
   if (!active) return;
   const previousTab = settingsState.activeTab;
+  if (previousTab !== active.key && settingsState.databaseDirty && !window.confirm(dbT('discard'))) return;
+  if (previousTab !== active.key) settingsState.databaseDirty = false;
   if (previousTab !== active.key) window.BBUI?.utils?.dom?.clearPageFeedback?.();
   settingsState.activeTab = active.key;
   settingsState.profileEditing = '';
@@ -396,11 +401,12 @@ function activateSettingsTab(tabKey) {
   if (description) description.textContent = active.description;
 
   const profileTab = ['local', 'usb', 'smb', 'storagebox'].includes(active.key);
-  document.getElementById('settings-save-btn')?.classList.toggle('hidden', profileTab || ['about', 'factory-reset', 'integrations', 'scripts'].includes(active.key));
+  document.getElementById('settings-save-btn')?.classList.toggle('hidden', profileTab || ['about', 'factory-reset', 'integrations', 'scripts', 'databases'].includes(active.key));
   if (SETTINGS_PROFILE_CONFIG[previousTab]) syncSettingsProfileManager(previousTab);
   if (SETTINGS_PROFILE_CONFIG[active.key]) syncSettingsProfileManager(active.key);
   if (active.key === 'notifications') maybeLoadAppriseProviders();
   if (active.key === 'about') maybeLoadAboutLicenses();
+  if (active.key === 'databases') loadDatabaseSettings();
   if (active.key === 'scripts' && !settingsState.scriptDirty) {
     loadSettingsScripts(document.getElementById('settings-script-select')?.value || '');
   }
@@ -7434,14 +7440,14 @@ function _updateUnsavedChangesUi() {
   btn?.classList.toggle('btn-save-dirty', !!settingsState.dirty);
   const state = document.getElementById('settings-workspace-save-state');
   if (state) {
-    const dirty = settingsState.dirty || settingsState.scriptDirty;
+    const dirty = settingsState.dirty || settingsState.scriptDirty || settingsState.databaseDirty;
     state.className = `badge ${dirty ? 'warning' : 'success'}`;
     state.textContent = settingsT(dirty ? 'menu.unsaved' : 'menu.saved');
   }
 }
 
 async function canLeaveSettingsPage() {
-  if (!settingsState.dirty && !settingsState.scriptDirty) return true;
+  if (!settingsState.dirty && !settingsState.scriptDirty && !settingsState.databaseDirty) return true;
   const discard = await _openSettingsDialog({
     title: settingsT('forms.unsavedTitle'),
     message: settingsT('forms.leaveUnsavedMessage'),
@@ -7450,6 +7456,7 @@ async function canLeaveSettingsPage() {
   });
   if (!discard) return false;
   settingsState.scriptDirty = false;
+  settingsState.databaseDirty = false;
   await refreshSettings();
   return true;
 }
@@ -7458,7 +7465,7 @@ window.canLeaveSettingsPage = canLeaveSettingsPage;
 
 if (!window.__bbuiSettingsBeforeUnloadBound) {
   window.addEventListener('beforeunload', (event) => {
-    if (!settingsState.dirty && !settingsState.scriptDirty) return;
+    if (!settingsState.dirty && !settingsState.scriptDirty && !settingsState.databaseDirty) return;
     event.preventDefault();
     event.returnValue = '';
   });

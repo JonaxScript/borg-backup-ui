@@ -239,7 +239,30 @@
       "notification_template_event": "Die Benachrichtigungstexte enthalten ein unbekanntes oder doppeltes Ereignis.",
       "notification_template_title": "Benachrichtigungstitel müssen einzeilig sein und dürfen höchstens {max} Zeichen haben.",
       "notification_template_message": "Benachrichtigungsnachrichten dürfen höchstens {max} Zeichen haben.",
-      "notification_template_payload": "Die Benachrichtigungstexte haben ein ungültiges Format."
+      "notification_template_payload": "Die Benachrichtigungstexte haben ein ungültiges Format.",
+      "database_invalid_profile": "Ungültiges Datenbankprofil. Felder, Namen und Werte prüfen.",
+      "database_invalid_storage": "Dump-Speicher nicht verfügbar oder unsicher. Mount, lokales Dateisystem, Eigentümer und Rechte prüfen.",
+      "database_system_database": "Systemdatenbanken sind nicht als normale Sicherungsquelle unterstützt.",
+      "database_profile_unavailable": "Datenbankprofil fehlt oder ist deaktiviert.",
+      "database_profile_in_use": "Dieses Profil wird noch von einem Job verwendet.",
+      "database_container_unavailable": "Docker-Container nicht erreichbar oder nicht gestartet.",
+      "database_container_changed": "Der Datenbank-Container wurde während des Exports ersetzt.",
+      "database_unresolved_export": "Ein Container-Export konnte nicht sicher beendet werden. Unterbrochene Exporte prüfen, bevor weitere Jobs starten.",
+      "database_cancelled": "Datenbank-Sicherung abgebrochen.",
+      "database_timeout": "Zeitlimit der Datenbank-Sicherung überschritten.",
+      "database_credentials": "Zugangsdaten-Datei fehlt oder hat falsche Eigentümer/Rechte.",
+      "database_nontransactional": "Nichttransaktionale Tabellen gefunden. Online-Sicherung abgebrochen.",
+      "database_export_failed": "Export fehlgeschlagen. Werkzeuge, Zugangsdaten und Datenbankrechte in einer geschützten Administratorsitzung prüfen.",
+      "database_no_space": "Nicht genügend freier Speicher für den Dump.",
+      "database_source_overlap": "Das Dump-Verzeichnis darf sich nicht mit normalen Dateiquellen überschneiden.",
+      "database_version_mismatch": "Datenbank- und Clientversion sind nicht kompatibel.",
+      "database_empty_dump": "Der Export ist leer.",
+      "database_invalid_dump": "Ungültiges Dump-Format.",
+      "database_archive_verification": "Dump im Borg-Archiv fehlt oder stimmt bei der Rückleseprüfung nicht überein. Lokale Dateien bleiben erhalten.",
+      "database_cleanup_blocked": "Lokales Aufräumen gesperrt: unbekannte Dateien oder noch aktiver Lauf.",
+      "database_invalid_operation": "Ungültige Datenbankaktion.",
+      "database_busy": "Docker wird bereits von einem anderen Plugin-Vorgang verwendet.",
+      "database_operation_failed": "Datenbankaktion fehlgeschlagen."
     },
     "messages": {
       "smb_already_mounted": "SMB-Freigabe ist bereits eingehängt.",
@@ -754,7 +777,8 @@
     "activityLogEnded": "Lauf beendet; Exit-Code nicht verfügbar",
     "phases": {
       "pre_script": "Pre-Skript",
-      "post_script": "Post-Skript"
+      "post_script": "Post-Skript",
+      "database_backup": "Datenbank-Sicherungen"
     },
     "createTitle": "Archiv erstellen",
     "checkTitle": "Integritätsprüfung",
@@ -806,7 +830,8 @@
         "stop_docker": "Docker stoppen",
         "start_docker": "Docker starten",
         "stop_vms": "VMs stoppen",
-        "start_vms": "VMs starten"
+        "start_vms": "VMs starten",
+        "database_backup": "Datenbank-Sicherungen"
       },
       "duration": "Laufzeit",
       "newData": "Neu gespeichert (dedupliziert): {size}",
@@ -814,7 +839,9 @@
       "createMeaning": "Verarbeitete Dateien einschließlich unveränderter Dateien. Originaldaten sind die unkomprimierte Datenmenge; neu gespeichert sind die laut Borg zusätzlich gespeicherten, deduplizierten und komprimierten Daten, nicht die gesamte Archivgröße oder eine Dateisystemmessung.",
       "compactMeaning": "Von Borg geschätzter freigegebener Repository-Speicherplatz."
     },
-    "showLiveLog": "Live-Log anzeigen"
+    "showLiveLog": "Live-Log anzeigen",
+    "databaseArchived": "archiviert und geprüft",
+    "databaseDumped": "Dump erstellt"
   },
   "schedule": {
     "title": "Zeitplan",
@@ -1097,7 +1124,8 @@
       "repositoryStats": "Abschließende Repository-Statistik lesen",
       "unmountShares": "Netzwerkfreigaben gemäß Jobeinstellungen aufräumen",
       "postScriptAlways": "Post-Skript nach dem Aufräumen ausführen (auch bei Fehler/Abbruch/Überspringen)",
-      "postScriptSuccess": "Post-Skript nach dem Aufräumen ausführen (bei Erfolg einschließlich Borg-Warnungen)"
+      "postScriptSuccess": "Post-Skript nach dem Aufräumen ausführen (bei Erfolg einschließlich Borg-Warnungen)",
+      "databaseBackup": "Datenbanken exportieren ({count})"
     },
     "yes": "ja",
     "no": "nein",
@@ -3351,6 +3379,10 @@
       "beforeBackup": "Vor allen Backup-Vorbereitungen",
       "assignedHint": "Änderungen gelten ab dem nächsten Lauf dieser Jobs. Zum Löschen zuerst alle Zuordnungen im Job-Wizard entfernen.",
       "validationHint": "Beim Speichern wird die Bash-Syntax geprüft. Das Skript wird dabei nicht ausgeführt. Fehler während der Ausführung können daher trotzdem auftreten."
+    },
+    "databases": {
+      "title": "Datenbank-Sicherungen",
+      "description": "MariaDB und PostgreSQL in Docker sichern."
     }
   },
   "jobGroups": {
@@ -3481,7 +3513,66 @@
       "recovering_docker": "Container starten",
       "recovering_vms": "VMs starten",
       "unmounting": "Aushängen",
-      "post_script": "Post-Skript"
+      "post_script": "Post-Skript",
+      "database_backup": "Datenbank-Sicherungen"
     }
+  },
+  "database": {
+    "title": "Datenbank-Sicherungen",
+    "profile": "Profil",
+    "new": "Neues Profil",
+    "managed": "Die mitgelieferten Skripte werden von Borg Backup UI gepflegt. Direkte Änderungen können beim nächsten Plugin-Update überschrieben werden. Profile und eigene importierte Skripte bleiben erhalten.",
+    "scope": "Logische Sicherung ausdrücklich ausgewählter Datenbanken. Keine gemeinsame Momentaufnahme mit Anwendungsdateien. Nicht gleichzeitig denselben Export als Pre-Skript konfigurieren.",
+    "credentials": "Zugangsdaten als geschützte Datei im Container einrichten (Eigentümer: Ausführungsnutzer, Modus 0600/0400). Hier wird nur der Pfad gespeichert. Diese Datei ist nicht im Konfigurationsexport enthalten.",
+    "name": "Name",
+    "engine": "Datenbanktyp",
+    "container": "Docker-Container",
+    "execution_user": "Ausführungsnutzer im Container (optional)",
+    "database_user": "PostgreSQL-Datenbanknutzer",
+    "port": "Port im Container (127.0.0.1)",
+    "credential_file": "Zugangsdaten-Datei im Container",
+    "databases": "Datenbanken (ein Name pro Zeile)",
+    "storageHint": "Vorhandenes privates Verzeichnis (0700) auf einem lokalen Pool/Datenträger wählen, außerhalb normaler Backupquellen. Kein Bootstick, RAM oder Netzwerk-Share.",
+    "staging_mount": "Mountpunkt",
+    "staging_dir": "Privates Dump-Verzeichnis",
+    "min_free_mib": "Mindestfreiplatz (MiB)",
+    "timeout_seconds": "Timeout pro Datenbank (Sekunden)",
+    "retention": "Lokale Dumps",
+    "keep": "Behalten; manuell aufräumen",
+    "after_archive": "Nach fehlerfreier Archivierung und Rückleseprüfung entfernen",
+    "enabled": "Aktiviert",
+    "globals": "PostgreSQL-Rollen und Tablespaces einschließen",
+    "globalsHint": "Globale Objekte sind optional und enthalten keine Rollen-Passwörter. MariaDB-Konten/Berechtigungen werden nicht gesichert. Zugangsdaten beim Restore neu einrichten.",
+    "save": "Profil speichern",
+    "delete": "Profil löschen",
+    "saved": "Profil gespeichert.",
+    "savedActions": "Aktionen verwenden das gespeicherte Profil. Ein Test-Dump wird nicht automatisch mit Borg archiviert.",
+    "check": "Verbindung prüfen",
+    "dump": "Test-Dump erstellen",
+    "reconcile": "Unterbrochene Exporte prüfen/beenden",
+    "cancel": "Abbrechen",
+    "cancelling": "Abbruch angefordert; Containerprozess wird geprüft.",
+    "runs": "Lokale Sicherungsläufe",
+    "refresh": "Aktualisieren",
+    "cleanup": "Lokale Dateien entfernen",
+    "discard": "Ungespeicherte Profiländerungen verwerfen?",
+    "confirmDelete": "Dieses Profil löschen? Vorhandene Dumps und Zugangsdaten bleiben erhalten.",
+    "confirmCleanup": "Die lokalen Dateien dieses Sicherungslaufs dauerhaft entfernen? Diese Aktion erstellt kein Borg-Archiv.",
+    "saveFirst": "Bitte zuerst das Profil speichern.",
+    "testOnly": "Nur lokaler Test-Dump; nicht archiviert und nicht wiederherstellungsgeprüft.",
+    "running": "Läuft",
+    "completed": "Abgeschlossen",
+    "failed": "Fehlgeschlagen",
+    "cancelled": "Abgebrochen",
+    "interrupted": "Unterbrochen",
+    "checked": "Verbindung geprüft",
+    "dump_completed": "Dump erstellt",
+    "archived": "Archiviert und zurückgelesen; kein Restore-Test",
+    "notArchived": "Nicht als archiviert bestätigt",
+    "noRuns": "Keine lokalen Läufe gefunden.",
+    "noProfiles": "Profile unter Einstellungen → Datenbank-Sicherungen anlegen.",
+    "loadError": "Datenbankprofile konnten nicht geladen werden.",
+    "missing": "Fehlt oder deaktiviert",
+    "wizardHint": "Optional: gespeicherte Datenbankprofile auswählen. Alle ausgewählten Datenbanken müssen erfolgreich exportiert werden. Ohne Dateiquellen ist ein reiner Datenbank-Job möglich."
   }
 }

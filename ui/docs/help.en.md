@@ -291,3 +291,7 @@ Protect repository, passphrase, Borg key, profiles/secrets and plugin configurat
 [Recovery guide and exact export limits](../../docs/user-manual/en/user-manual.md#16-disaster-recovery). Import existing repositories; never initialize them again.
 
 Practical extensions: [Pre/Post scripts](../../docs/user-manual/en/user-manual.md#116-configure-and-verify-prepost-scripts) and [Grafana](../../docs/user-manual/en/user-manual.md#117-monitor-backup-health-in-grafana).
+
+## Database backups
+
+Configure MariaDB/PostgreSQL profiles in Settings > Database backups and select them in job wizard step 2. Bundled scripts are plugin-managed; updates may replace direct edits. Credential files remain inside Docker. Test restoration separately. See manual section 19.

@@ -291,3 +291,7 @@ Sichern Sie Repository, Passphrase, Borg-Key, Profile/Secrets und Plugin-Konfigu
 [Notfallleitfaden und genaue Exportgrenzen](../../docs/user-manual/de/user-manual.md#16-notfallwiederherstellung). Vorhandene Repositorys importieren, niemals neu initialisieren.
 
 Praktische Erweiterungen: [Pre/Post scripts](../../docs/user-manual/de/user-manual.md#116-pre-post-skripte-einrichten-und-prüfen) und [Grafana](../../docs/user-manual/de/user-manual.md#117-backup-zustand-in-grafana-verfolgen).
+
+## Datenbank-Sicherungen
+
+MariaDB-/PostgreSQL-Profile unter Einstellungen > Datenbank-Sicherungen anlegen und in Wizard-Schritt 2 auswählen. Die mitgelieferten Skripte werden vom Plugin gepflegt; Updates können direkte Änderungen überschreiben. Zugangsdaten-Dateien bleiben im Container. Wiederherstellung separat testen. Siehe Handbuch Abschnitt 19.

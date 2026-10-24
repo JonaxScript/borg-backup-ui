@@ -390,6 +390,13 @@ function jobStepDetails(step, view) {
   const details = step.details || {};
   const parts = [];
   const count = key => Number.isSafeInteger(details[key]) && details[key] >= 0;
+  if (step.id === 'database_backup') {
+    const results = details.results || (details.result ? [details.result] : []);
+    for (const result of results) for (const file of result.files || []) {
+      parts.push(`${file.database}: ${borgProgressSize(file.bytes)} / ${borgProgressDuration(Math.floor(file.duration_seconds || 0))} / ${jobsT(result.archived ? 'jobs.databaseArchived' : 'jobs.databaseDumped')}`);
+    }
+    if (details.error_code) parts.push(apiErrorMessage({code: details.error_code}));
+  }
   if (count('target_count')) {
     const action = ['stop_docker', 'stop_vms'].includes(step.id) ? 'targetsStopped'
       : ['start_docker', 'start_vms'].includes(step.id) ? 'targetsStarted' : 'targetsDone';

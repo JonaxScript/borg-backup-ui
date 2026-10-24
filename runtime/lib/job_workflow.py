@@ -18,10 +18,11 @@ class JobWorkflow:
         self.publish()
 
     @classmethod
-    def configured(cls, *, hooks=None, docker=False, vms=False, prune=True, controller=None):
+    def configured(cls, *, hooks=None, docker=False, vms=False, prune=True, controller=None, databases=False):
         """Build the existing runner order from enabled hooks/workload policies."""
         hooks = hooks or {}
         names = (["pre_script"] if hooks.get("pre") else [])
+        names += (["database_backup"] if databases else [])
         names += (["stop_docker"] if docker else []) + (["stop_vms"] if vms else [])
         names += ["create"]
         names += (["start_docker"] if docker else []) + (["start_vms"] if vms else [])

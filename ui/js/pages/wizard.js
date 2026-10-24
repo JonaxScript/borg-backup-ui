@@ -579,6 +579,7 @@ function openWizard(existingJobKey = '') {
   if (title) title.textContent = wizardT('wizard.newTitle');
   document.getElementById('wiz-job-name').value = '';
   wizardState.hooksLoaded = false;
+  wizardState.databasesLoaded = false;
   document.getElementById('wiz-pre-script').value = '';
   document.getElementById('wiz-post-script').value = '';
   document.getElementById('wiz-post-when').value = 'success';
@@ -655,6 +656,7 @@ function openWizard(existingJobKey = '') {
     wizardLoadRepositories(),
     wizardLoadRuntimeInventory(),
     wizardLoadScripts(request),
+    wizardLoadDatabases(request),
   ]).finally(() => {
     if (request !== wizardState.jobIdRequest) return;
     wizardAutoFill();
@@ -705,6 +707,7 @@ function _wizardFillFromJob(job) {
   const selectedRepo = (wizardState.repositories || []).find((repo) => String(repo.repository_key || '') === wizardState.selectedRepositoryKey);
   wizardState.selectedStorageKey = String(selectedRepo?.storage_key || job.storage_key || '').trim();
   wizardApplyHooks(job.hooks || {});
+  wizardApplyDatabases(job.database_profile_ids || []);
   document.getElementById('wiz-compression').value = job.compression || 'lz4';
   document.getElementById('wiz-file-activity').checked = !!job.file_activity;
   wizardState.excludeFile = job.exclude_from || null;
@@ -976,6 +979,7 @@ function _wizardCollectParams() {
       force_stop: vmMode !== 'none' && document.getElementById('wiz-vm-force-stop')?.checked === true,
     },
     source_paths: rawPaths,
+    database_profile_ids: [...document.querySelectorAll('#wiz-databases input:checked')].map(el => el.value),
     exclude_paths: _wizardUniqueList(wizardState.excludePaths || []),
     exclude_if_present: wizardMarkerNames(),
     exclude_from: wizardFilePayload(),
@@ -1302,7 +1306,7 @@ function _wizardValidate(step) {
     }
   }
   if (step === 2) {
-    if (!Array.isArray(p.source_paths) || !p.source_paths.length) { _wizardShowError(2, wizardT('wizard.validationSource')); return false; }
+    if ((!Array.isArray(p.source_paths) || !p.source_paths.length) && !p.database_profile_ids.length) { _wizardShowError(2, wizardT('wizard.validationSource')); return false; }
     if (!p.storage_key) { _wizardShowError(2, wizardT('wizard.validationStorageTarget')); return false; }
     if (!p.repository_key) { _wizardShowError(2, wizardT('wizard.validationRepositorySelect')); return false; }
   }
@@ -1329,6 +1333,7 @@ function _wizardValidate(step) {
       return false;
     }
   }
+  if ((step === 2 || step === 10) && wizardState.databasesLoaded === false) { _wizardShowError(step, dbT('loadError')); return false; }
   if ((step === 9 || step === 10) && wizardState.hooksLoaded === false) {
     _wizardShowError(step, wizardT('wizard.scriptsLoadError'));
     return false;
@@ -1446,6 +1451,7 @@ async function _wizardPreview() {
       }));
     }
     lines.push(wizardT('wizard.previewEncryption', { value: summary.encryption || '-' }));
+    for (const profile of summary.database_profiles || []) lines.push(`${dbT('title')}: ${profile.name} (${profile.databases.join(', ')})`);
     lines.push(wizardT('wizard.previewSources', { value: summary.sources_count ?? '-' }));
     lines.push(wizardT('wizard.previewExclusions', {
       value: Array.isArray(summary.exclude_paths) && summary.exclude_paths.length ? summary.exclude_paths.join(', ') : wizardT('wizard.none'),

@@ -1237,3 +1237,10 @@
   .notification-template-fields { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: var(--ui-space-4); }
   .notification-template-column { grid-template-rows: auto auto auto auto minmax(13rem, auto); }
 }
+
+/* Managed database profiles follow existing settings forms (#591). */
+.database-form { display: grid; gap: var(--ui-space-3, 12px); margin: 16px 0; }
+.database-form .form-group { margin: 0; }
+.database-flags { display: flex; flex-wrap: wrap; gap: 12px; }
+#wiz-databases .form-label { display: block; margin: 8px 0; }
+#db-runs code { overflow-wrap: anywhere; }

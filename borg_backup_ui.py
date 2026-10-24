@@ -975,6 +975,9 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/repositories/archives": lambda: self._get_repository_archives(parsed.query),
                 "/api/repositories/archive-files": lambda: self._get_repository_archive_files(parsed.query),
                 "/api/settings": self._get_settings,
+                "/api/settings/databases": self._get_database_profiles,
+                "/api/settings/databases/runs": self._get_database_runs,
+                "/api/settings/databases/status": lambda: self._database_status(parsed.query),
                 "/api/settings/scripts": self._get_job_scripts,
                 "/api/settings/basic": self._get_settings_basic,
                 "/api/setup-status": self._get_setup_status,
@@ -1031,6 +1034,9 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/storages/test": self._post_storage_target_test,
             "/api/repositories": self._post_repository,
             "/api/notification-profiles": self._post_apprise_profile,
+            "/api/settings/databases": self._save_database_profile,
+            "/api/settings/databases/action": self._database_action,
+            "/api/settings/databases/cancel": self._database_cancel,
             "/api/settings/scripts": self._save_job_script,
             "/api/settings/scripts/import": self._import_job_script,
             "/api/settings/scripts/export": self._export_job_script,
@@ -1129,6 +1135,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/repositories": self._delete_repository,
             "/api/repositories/archive": self._delete_repository_archive,
             "/api/notification-profiles": self._delete_apprise_profile,
+            "/api/settings/databases": self._delete_database_profile,
             "/api/settings/scripts": self._delete_job_script,
             "/api/auth/users": self._delete_auth_user,
             "/api/settings/homepage-widget-token": self._delete_homepage_widget_token,
@@ -1165,6 +1172,41 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "content": text,
             "format": "markdown" if path.suffix.lower() == ".md" else "text",
         }
+
+    def _get_database_profiles(self) -> dict:
+        """List credential-free managed database profiles."""
+        from database_profiles import list_profiles
+        return list_profiles(self.config)
+
+    def _save_database_profile(self) -> dict:
+        """Persist an explicitly submitted database profile."""
+        from database_profiles import save_profile
+        return save_profile(self.config, self._read_json_body())
+
+    def _delete_database_profile(self) -> dict:
+        """Remove only an unreferenced profile."""
+        from database_profiles import delete_profile
+        return delete_profile(self.config, (parse_qs(urlparse(self.path).query).get("id") or [""])[0])
+
+    def _database_action(self) -> dict:
+        """Start an asynchronous check, export or authorized local cleanup."""
+        from database_api import start_operation
+        return start_operation(self.config, self._read_json_body())
+
+    def _database_cancel(self) -> dict:
+        """Request cancellation without claiming the container process has exited."""
+        from database_api import cancel_operation
+        return cancel_operation(self.config, self._read_json_body().get('id', ''))
+
+    def _database_status(self, query) -> dict:
+        """Read a bounded operation's durable status."""
+        from database_api import operation_status
+        return operation_status(self.config, (parse_qs(query).get('id') or [''])[0])
+
+    def _get_database_runs(self) -> dict:
+        """List retained managed exports and unavailable staging locations."""
+        from database_api import retained_runs
+        return retained_runs(self.config)
 
     def _get_job_scripts(self) -> dict:
         """Return script source and current job assignments to administrators only."""

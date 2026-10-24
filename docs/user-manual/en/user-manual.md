@@ -1942,3 +1942,138 @@ modify production data.
 | Test timeout or contradictory report | Read exit code and individual steps | Apply section 8.3 limits; check load, reachability and runtime | Repeat without timeout and verify an actual restore |
 | No reminder | Check event, recipient, tolerance and last delivery | Save settings and test the channel; no restore overdue reminder without a previous report | Verify test message and next eligible event |
 | Migration blocked / workloads remain off | Read health, migration and Runtime Recovery | Fix specific cause and check workloads; do not delete status files as a repair | Successful restart and verified workload state |
+
+## 19. Database backups in Docker (#591)
+
+### 19.1 Profiles and prerequisites
+
+Under **Settings > Database backups**, create a profile for a running local
+MariaDB or PostgreSQL container. Select explicit database names (one per line),
+the loopback port inside the container, an optional execution user, and a protected
+credential-file path. Names currently accept letters, digits, underscores, dots
+and hyphens; database names must start with a letter, digit or underscore.
+System schemas are not ordinary backup sources. Missing/disabled profiles block
+jobs that reference them. Profile deletion is blocked while any job references it.
+
+The plugin ships `database-dump-mariadb.sh` and `database-dump-postgresql.sh` in
+its runtime. **Borg Backup UI maintains these scripts; direct edits may be
+replaced by the next plugin update.** The scripts contain the same notice in
+English and German. Profiles and existing custom scripts are preserved during
+updates. For custom behavior, maintain a separate imported Pre script. A custom
+copy does not receive updates or automatic dump inclusion. Do not configure the
+same export as both a Pre script and an integrated profile.
+
+The container must provide `sh`, `env`, `setsid`, `stat`, `id`, `readlink`, standard shell
+utilities, `/proc`, writable `/dev/shm`, and its database clients. MariaDB requires
+`mariadb` and `mariadb-dump`; PostgreSQL requires `psql`, `pg_dump`, `pg_restore`
+and, for global objects, `pg_dumpall`. Tools are not installed automatically.
+Server/client major versions must match (major.minor for MariaDB). Validated
+images for this implementation are `mariadb:11.4` and `postgres:16`; other images
+must meet these prerequisites and require their own restore test.
+
+Provision credential files yourself inside the container, owned by the execution
+user with mode `0600` or `0400`. The plugin only stores the reference. MariaDB uses
+a `[client]` option file containing `user=...` and `password=...` (optional
+`ssl-ca`, `ssl-cert`, `ssl-key`, `ssl-verify-server-cert`). Other option groups,
+includes and dump-scope options are rejected. PostgreSQL uses a pgpass file with
+an entry matching `127.0.0.1:PORT:DATABASE:USER:PASSWORD`; escape `:` and `\` as
+required by pgpass. Include an appropriate database entry for the globals export.
+Do not paste passwords into profile fields or script source. Credential files
+inside Docker are **not included** in plugin configuration exports.
+
+Use an existing directory with mode `0700`, owned by the plugin execution user
+(normally root), on a real mounted local pool/disk. Parent directories must be
+owned by root/the execution user and not group/world writable. Symlinks are
+rejected. Supported filesystem types are Btrfs, XFS, ext-family and ZFS. Use the
+actual pool path, not `/mnt/user`; boot storage, RAM and network filesystems are
+not supported. Select the actual mount point separately. The free-space reserve
+is a guard, not an estimate of dump size; allocate room for complete exports.
+
+### 19.2 Run and verify
+
+1. Save the profile and use **Check connection**. This checks storage, credentials,
+   versions and database access, but does not prove dump privileges or restoration.
+2. Use **Create test dump**. The operation runs asynchronously and supports cancel.
+   Its output is local only. Review its directory, size and outcome, then perform
+   a restore test before enabling scheduled jobs.
+3. In job wizard step 2 select the profile(s). File sources are optional for a
+   database-only job. Every selected database is required; failure stops the job.
+4. Select a repository and the existing job schedule/retention as usual. The
+   profile's staging directory must not overlap ordinary source directories.
+   The job automatically adds only its current completed exports and manifest.
+
+Order: resource locks, existing Pre hook, existing mounts/prerequisites,
+**database backup**, existing Docker/VM stop policies, Borg create, workload
+recovery, required-artifact readback, repository maintenance, Post hook and final
+report. The shared Docker resource lock also protects test operations. An
+external Docker administrator can still stop a container; that fails the export.
+
+MariaDB exports use a transaction and include routines, events, triggers and SQL
+for database creation. Non-InnoDB base tables are rejected; avoid concurrent
+schema changes. Server accounts/global grants are excluded. PostgreSQL exports
+use uncompressed custom format; Borg applies job compression. Optional global
+roles/tablespaces are exported separately, without password hashes. Databases
+and globals do not share a cluster-wide atomic snapshot.
+
+A database dump and ordinary application files are not automatically a consistent
+pair. If needed, put the writing application into maintenance mode using your
+existing Pre/Post hooks, keeping the database running. Stopping the application
+only after the dump does not establish a common recovery point. Arrange recovery
+in Post with the appropriate error/cancellation policy.
+
+Completed artifacts include a manifest with tool versions, container identity,
+selected scope, sizes and SHA-256 hashes. Paths inside Borg match the absolute
+staging path without its leading slash. The job reads each required artifact back
+from the new archive and checks its bytes. Excluded/missing/corrupt output fails
+verification; completed local files remain. The manifest inside the archive
+records export-time status; the local result and job workflow record subsequent
+archive verification. **Archived and verified is not a database restore test.**
+
+### 19.3 Local retention and interrupted operations
+
+Default: keep local exports. Borg Prune does not remove them. The optional policy
+removes this run's managed files only after Borg create exits without warnings
+and all required artifacts pass readback verification. Later maintenance/Post
+results remain separate. Failed/warning exports are retained. Use **Local backup
+runs > Remove local files** for an explicitly confirmed cleanup; unfamiliar files
+or unsafe paths block cleanup. Remove retained runs before changing their profile's
+staging path or deleting that profile, otherwise retain the old path for manual
+administrative inspection.
+
+Cancel requests terminate only the owned in-container client group. Merely
+stopping `docker exec` is not treated as successful cancellation. If termination
+cannot be confirmed, further conflicting operations fail closed. Use **Reconcile
+interrupted exports** after Docker is available; this may terminate an owned
+leftover export. A removed/stopped container cannot contain a running exporter.
+Inspect the reported container if reconciliation remains unresolved. Never clear
+journals/locks merely to bypass an active exporter. Orphaned partial files remain
+visible for explicit cleanup.
+
+The existing job configuration export includes referenced database profiles and
+preserves their IDs. Import refuses differing profiles with the same ID instead
+of overwriting local settings. Reprovision missing containers/credential files
+and run connection checks after restoring configuration.
+
+### 19.4 Restore into an isolated destination
+
+Extract the chosen run's manifest and dumps through Browse & Restore into a
+separate directory. Verify the manifest hashes. Use a fresh, isolated container
+and matching client/server versions. Never test by overwriting production.
+
+MariaDB: provision required database accounts/grants, then import the SQL with
+`mariadb --defaults-file=/protected/restore.cnf < database.sql`. It contains
+CREATE/USE statements for the original database name, so use an isolated server.
+Verify representative rows, views, triggers, stored routines and events. Keep
+the event scheduler disabled during a test to avoid application side effects.
+
+PostgreSQL: provision required extensions and roles. If global objects were
+included, inspect their SQL, adapt tablespace paths, and apply it with `psql`.
+An existing bootstrap role may need its duplicate CREATE removed in a separate
+working copy. Passwords are omitted and must be reprovisioned. Restore using
+`pg_restore --exit-on-error --create --dbname=postgres database.dump` with the
+appropriate connection options. Check ownership, extensions, representative
+rows and application behavior. Log a restore as tested only after these checks.
+
+Logical exports do not provide WAL/binlog retention, physical server backups or
+point-in-time recovery. New tables/databases outside the explicit selection are
+not automatically included.

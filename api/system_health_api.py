@@ -271,7 +271,9 @@ def _collect_job_health(config: dict, jobs_dir: Path) -> Dict[str, Any]:
 
         try:
             from job_source_paths import normalize_source_paths
-            source_paths = normalize_source_paths(raw.get("source_paths"), field=f"Job '{job_key}' source_paths")
+            source_paths = normalize_source_paths(raw.get("source_paths"), field=f"Job '{job_key}' source_paths", allow_empty=bool(raw.get("database_profile_ids")))
+            from database_profiles import snapshot_profiles
+            snapshot_profiles(config, raw.get("database_profile_ids"))
             missing = [p for p in source_paths if not Path(p).exists()]
             if missing:
                 add_error("source_paths_not_found", f"{len(missing)} source path(s) do not exist", count=len(missing))

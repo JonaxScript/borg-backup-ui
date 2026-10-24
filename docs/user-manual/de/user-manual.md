@@ -1975,3 +1975,144 @@ Produktionsdaten und dienen gezielten Tests.
 | Test-Timeout oder widersprüchlicher Bericht | Exit-Code und einzelne Schritte lesen | Grenzen aus 8.3 beachten; Last/Erreichbarkeit und Laufzeit prüfen | Ohne Timeout wiederholen und tatsächlichen Restore prüfen |
 | Kein Reminder | Ereignis, Empfänger, Toleranz, letzten Versand prüfen | Einstellungen speichern; Kanal testen; ohne bisherigen Restore-Bericht kein entsprechender Überfälligkeits-Reminder | Testnachricht und nächstes berechtigtes Ereignis kontrollieren |
 | Migration blockiert / Dienste bleiben aus | Systemzustand, Migration und Runtime-Recovery lesen | Konkrete Ursache beheben; Dienste bewusst prüfen; keine Statusdateien als Reparatur löschen | Fehlerfreier Neustart und geprüfter Dienstzustand |
+
+## 19. Datenbank-Sicherungen in Docker (#591)
+
+### 19.1 Profile und Voraussetzungen
+
+Unter **Einstellungen > Datenbank-Sicherungen** ein Profil für einen laufenden
+lokalen MariaDB- oder PostgreSQL-Container anlegen. Datenbanken ausdrücklich
+angeben (ein Name pro Zeile), dazu den Loopback-Port im Container, optional den
+Ausführungsnutzer und den Pfad einer geschützten Zugangsdaten-Datei. Namen dürfen
+Buchstaben, Ziffern, Unterstriche, Punkte und Bindestriche enthalten; Datenbanknamen
+müssen mit Buchstabe, Ziffer oder Unterstrich beginnen. Systemschemas sind keine
+normalen Sicherungsquellen. Fehlende/deaktivierte Profile blockieren zugeordnete
+Jobs. Solange ein Job ein Profil verwendet, lässt es sich nicht löschen.
+
+Das Plugin liefert `database-dump-mariadb.sh` und `database-dump-postgresql.sh`
+mit seiner Runtime aus. **Borg Backup UI pflegt diese Skripte; direkte Änderungen
+können beim nächsten Plugin-Update überschrieben werden.** Der Skriptkopf enthält
+diesen Hinweis auf Deutsch und Englisch. Profile und eigene Skripte bleiben bei
+Updates erhalten. Eigene Anpassungen als separate importierte Pre-Skripte pflegen.
+Solche Kopien erhalten keine automatischen Updates oder automatische Aufnahme der
+Dumps ins Archiv. Nicht denselben Export zugleich als Pre-Skript und Profil ausführen.
+
+Im Container werden `sh`, `env`, `setsid`, `stat`, `id`, `readlink`, übliche Shell-Werkzeuge,
+`/proc`, ein beschreibbares `/dev/shm` und die Datenbankwerkzeuge benötigt.
+MariaDB: `mariadb` und `mariadb-dump`; PostgreSQL: `psql`, `pg_dump`, `pg_restore`
+und für globale Objekte `pg_dumpall`. Fehlende Werkzeuge werden nicht installiert.
+Server und Client müssen dieselbe Hauptversion verwenden (bei MariaDB dieselbe
+Haupt-/Nebenversion). Geprüfte Images dieser Umsetzung: `mariadb:11.4` und
+`postgres:16`. Andere Images benötigen passende Voraussetzungen und eigene Restore-Tests.
+
+Zugangsdaten-Dateien selbst im Container einrichten: Eigentümer ist der
+Ausführungsnutzer, Modus `0600` oder `0400`. Das Plugin speichert nur den Pfad.
+MariaDB verwendet eine Optionsdatei mit `[client]`, `user=...` und `password=...`;
+optional sind `ssl-ca`, `ssl-cert`, `ssl-key` und `ssl-verify-server-cert` erlaubt.
+Andere Gruppen, Includes und Optionen zum Sicherungsumfang werden abgewiesen.
+PostgreSQL verwendet pgpass mit einem passenden Eintrag
+`127.0.0.1:PORT:DATENBANK:NUTZER:PASSWORT`; `:` und `\` nach pgpass-Regeln maskieren.
+Auch der Export globaler Objekte benötigt einen passenden Datenbankeintrag.
+Passwörter nicht in Profilfelder oder Skriptquelltext eintragen. Dateien im
+Container sind **nicht Teil des Plugin-Konfigurationsexports**.
+
+Ein vorhandenes privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
+auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Elternverzeichnisse
+müssen root/dem Ausführungsnutzer gehören und dürfen nicht für Gruppe/Andere
+beschreibbar sein. Symlinks werden abgewiesen. Unterstützt: Btrfs, XFS, ext-Dateisysteme
+und ZFS. Den echten Poolpfad statt `/mnt/user` verwenden. Bootstick, RAM und
+Netzwerk-Dateisysteme sind nicht unterstützt. Den tatsächlichen Mountpunkt separat
+angeben. Die Freiplatzgrenze schätzt die Dump-Größe nicht; Platz für vollständige
+Exporte vorsehen.
+
+### 19.2 Ablauf und Prüfung
+
+1. Profil speichern und **Verbindung prüfen** ausführen. Geprüft werden Speicher,
+   Zugang, Versionen und Datenbankzugriff, jedoch nicht sämtliche Exportrechte
+   oder die Wiederherstellbarkeit.
+2. **Test-Dump erstellen** erzeugt asynchron einen lokalen Export und erlaubt
+   Abbruch. Dieser ist noch kein Borg-Backup. Pfad, Größe und Ergebnis prüfen und
+   vor automatischen Sicherungen eine Wiederherstellung testen.
+3. In Wizard-Schritt 2 Profile auswählen. Ohne Dateiquellen ist ein reiner
+   Datenbank-Job möglich. Jede ausgewählte Datenbank ist erforderlich.
+4. Repository, Zeitplan und Borg-Aufbewahrung wie bisher auswählen. Das
+   Dump-Verzeichnis darf sich nicht mit normalen Quellen überschneiden. Nur die
+   fertigen Exporte des aktuellen Laufs und ihr Manifest werden automatisch hinzugefügt.
+
+Reihenfolge: Sperren, vorhandenes Pre-Skript, Mounts/Voraussetzungen,
+**Datenbank-Sicherung**, bisherige Docker-/VM-Stopps, Borg create, Wiederherstellung
+der Dienste, Rückleseprüfung der Pflichtdateien, Repositorywartung, Post-Skript
+und Abschlussbericht. Auch Testaktionen verwenden die gemeinsame Docker-Sperre.
+Externe Docker-Eingriffe sind dadurch nicht gesperrt und können den Export abbrechen.
+
+MariaDB sichert transaktional einschließlich Routinen, Events, Triggern und
+SQL zur Datenbankanlage. Nicht-InnoDB-Basistabellen werden abgewiesen. Während
+des Exports keine Schemaänderungen durchführen. Serverkonten/globale Grants
+sind nicht enthalten. PostgreSQL nutzt das unkomprimierte Custom-Format; Borg
+komprimiert nach Jobeinstellung. Optionale Rollen/Tablespaces werden getrennt
+und ohne Passwort-Hashes exportiert. Mehrere Datenbanken und globale Objekte
+bilden keine atomare Momentaufnahme des gesamten Clusters.
+
+Datenbank und Anwendungsdateien sind nicht automatisch gemeinsam konsistent.
+Falls nötig, die schreibende Anwendung mit bestehenden Pre-/Post-Skripten in den
+Wartungsmodus versetzen; die Datenbank muss erreichbar bleiben. Ein Anwendungsstopp
+erst nach dem Dump reicht dafür nicht. Wiederanlauf im Post-Skript mit passender
+Fehler-/Abbruchbedingung vorsehen.
+
+Das Manifest enthält Werkzeugversionen, Containeridentität, Umfang, Größen und
+SHA-256-Hashes. Im Archiv entspricht der Pfad dem absoluten Staging-Pfad ohne
+führenden Schrägstrich. Der Job liest jede Pflichtdatei aus dem neuen Archiv
+zurück und vergleicht ihre Bytes. Fehlende, ausgeschlossene oder abweichende
+Dateien führen zum Fehler; lokale Exporte bleiben erhalten. Das Manifest im
+Archiv beschreibt den Exportzeitpunkt; das lokale Ergebnis und der Jobablauf
+dokumentieren die spätere Archivprüfung. **Archiviert und geprüft bedeutet
+nicht, dass die Datenbank-Wiederherstellung getestet wurde.**
+
+### 19.3 Lokale Aufbewahrung und unterbrochene Läufe
+
+Standard: Exporte lokal behalten. Borg-Prune entfernt sie nicht. Optional werden
+nur eigene Laufdateien nach Borg create ohne Warnung und erfolgreicher
+Rückleseprüfung entfernt. Spätere Wartungs-/Post-Ergebnisse bleiben getrennt.
+Bei Fehlern/Warnungen bleiben Exporte erhalten. Unter **Lokale Sicherungsläufe >
+Lokale Dateien entfernen** ausdrücklich aufräumen. Unbekannte Dateien oder unsichere
+Pfade blockieren die Aktion. Vor Änderung des Profil-Speicherpfads oder Löschen des
+Profils vorhandene Läufe aufräumen; andernfalls den alten Pfad für manuelle Prüfung notieren.
+
+Abbruch beendet ausschließlich die eigene Prozessgruppe im Container. Das Ende
+von `docker exec` allein gilt nicht als Nachweis. Ohne bestätigtes Prozessende
+bleiben konkurrierende Vorgänge gesperrt. **Unterbrochene Exporte prüfen/beenden**
+verwenden, sobald Docker verfügbar ist; dabei kann ein eigener alter Export beendet
+werden. In einem entfernten/gestoppten Container läuft kein Export mehr. Bei weiterhin
+ungeklärtem Zustand den gemeldeten Container prüfen. Journale/Sperren nicht zum
+Umgehen eines aktiven Exports löschen. Verwaiste Teildateien bleiben für ausdrücklich
+bestätigtes Aufräumen sichtbar.
+
+Der bestehende Job-Konfigurationsexport enthält referenzierte Datenbankprofile
+mit ihren IDs. Import verweigert abweichende vorhandene Profile mit derselben ID,
+statt Einstellungen zu überschreiben. Nach Wiederherstellung fehlende Container
+und Zugangsdaten-Dateien einrichten und Verbindungen erneut prüfen.
+
+### 19.4 Wiederherstellung in ein isoliertes Ziel
+
+Manifest und Dumps des gewünschten Laufs über Browse & Restore in ein separates
+Verzeichnis extrahieren und Hashes prüfen. Einen frischen isolierten Container mit
+passenden Client-/Serverversionen verwenden. Nicht auf Produktionsdaten testen.
+
+MariaDB: benötigte Konten/Grants separat einrichten und den SQL-Dump mit
+`mariadb --defaults-file=/geschuetzt/restore.cnf < database.sql` importieren.
+CREATE/USE verwenden den ursprünglichen Datenbanknamen: deshalb einen isolierten
+Server nutzen. Repräsentative Daten, Views, Trigger, Routinen und Events prüfen.
+Den Event-Scheduler beim Test deaktiviert lassen, damit keine Anwendungsaktionen laufen.
+
+PostgreSQL: erforderliche Erweiterungen und Rollen bereitstellen. Falls globale
+Objekte gesichert wurden, deren SQL prüfen, Tablespace-Pfade anpassen und mit
+`psql` einspielen. Bei bereits vorhandener Bootstrap-Rolle kann deren doppeltes
+CREATE in einer separaten Arbeitskopie entfernt werden. Passwörter sind nicht
+enthalten und müssen neu eingerichtet werden. Mit passenden Verbindungsoptionen
+`pg_restore --exit-on-error --create --dbname=postgres database.dump` ausführen.
+Eigentümer, Erweiterungen, repräsentative Datensätze und Anwendungsfunktion prüfen.
+Erst danach einen erfolgreichen Restore-Test dokumentieren.
+
+Logische Exporte ersetzen keine WAL-/Binlog-Aufbewahrung, physischen Serversicherungen
+oder Point-in-Time-Recovery. Neue Datenbanken außerhalb der ausdrücklichen Auswahl
+werden nicht automatisch aufgenommen.
