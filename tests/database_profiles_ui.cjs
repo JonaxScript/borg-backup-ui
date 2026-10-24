@@ -75,6 +75,7 @@ const {chromium} = require('playwright');
       await page.locator('[data-cleanup]').click();
       assert.equal(await page.locator('#settings-dialog-modal').isVisible(),true);
       assert.equal(actions,2);
+      assert.ok((await page.locator('#settings-dialog-description').textContent()).includes(language==='de'?'Borg-Archive bleiben unverändert':'Borg archives remain unchanged'));
       assert.ok((await page.locator('#settings-dialog-description').textContent()).includes('/mnt/cache/db-dumps/'));
       assert.ok((await page.locator('#settings-dialog-confirm-btn').getAttribute('class')).includes('btn-danger'));
       if(process.env.BBUI_SCREENSHOT_DIR)await page.locator('#settings-dialog-modal .modal').screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/cleanup-${language}.png`});

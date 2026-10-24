@@ -3640,7 +3640,7 @@
     "cleanup": "Lokale Dateien entfernen",
     "discard": "Ungespeicherte Profiländerungen verwerfen?",
     "confirmDelete": "Dieses Profil löschen? Vorhandene Dumps und Zugangsdaten bleiben erhalten.",
-    "confirmCleanup": "Die lokalen Dateien dieses Sicherungslaufs dauerhaft entfernen? Diese Aktion erstellt kein Borg-Archiv.",
+    "confirmCleanup": "Die lokalen Dateien dieses Sicherungslaufs dauerhaft entfernen? Bereits vorhandene Borg-Archive bleiben unverändert.",
     "saveFirst": "Bitte zuerst das Profil speichern.",
     "testOnly": "Nur lokaler Test-Dump; nicht archiviert und nicht wiederherstellungsgeprüft.",
     "running": "Läuft",

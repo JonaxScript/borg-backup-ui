@@ -3640,7 +3640,7 @@
     "cleanup": "Remove local files",
     "discard": "Discard unsaved profile changes?",
     "confirmDelete": "Delete this profile? Existing dumps and credentials are preserved.",
-    "confirmCleanup": "Permanently remove the local files of this run? This action does not create a Borg archive.",
+    "confirmCleanup": "Permanently remove the local files of this run? Existing Borg archives remain unchanged.",
     "saveFirst": "Save the profile first.",
     "testOnly": "Local test dump only; not archived or restore-tested.",
     "running": "Running",
