@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.23.1054">
+<!ENTITY version   "2026.10.24.1534">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,37 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.24.1534###
+### Bug Fixes
+
+- Show database exports as an active job step with elapsed time and retain their outcomes in run details. Match template and managed-script selection cards to Own scripts, with themed content surfaces and neutral headers. (#591)
+
+- Allow normal Unraid pool ownership and permissions for database dump storage while keeping dump directories private. Anchor file access against path replacement and report specific storage errors. (#591)
+
+### Improvements
+
+- **Dashboard overview:** Two circular summaries show the latest backup outcomes and restore evidence, with overdue backups and jobs without a restore test plan listed separately. Needs attention links errors, warnings and missed backups to expandable job details. Location groups, job icons and archive names remain visible; repository sizes stay in the overview and complete storage, Borg-check and restore information is available under Details. Empty locations are hidden. (#589)
+- Use application dialogs for database confirmations, clarify that local cleanup leaves Borg archives unchanged, and explain that local backup runs include retained job/test dumps across profiles, not Borg archives. (#591)
+
+- Name new database dump folders and Borg archives without UUID suffixes. Keep existing backups readable. Store database Secrets under readable profile/version names with connection metadata; migrate current references at startup while preserving old credentials for recovery. Existing names are never overwritten. (#591)
+
+- Keep job workflow steps in a single row, with horizontal scrolling when space is limited and keyboard access to the full sequence. (#591)
+
+- Select script templates and managed helpers from a dropdown with Description/Source code tabs. Keep large folder and database profile selections manageable in the job wizard with separate tabs, selection counts and scrollable lists. (#591)
+
+- Add reusable MariaDB and PostgreSQL Docker backup profiles, connection checks and cancellable test dumps under Settings. Jobs can archive database exports together with files or on their own, with artifact readback verification and explicit local retention. (#591)
+- Ship managed database export scripts with clear update-ownership notices; preserve profiles and custom scripts during plugin updates. Document credential-file setup, backup scope and isolated restoration. (#591)
+- Manage database credentials in plugin Secrets, discover selectable databases, and show bundled helpers read-only under Scripts. Align database settings with the shared themed Settings cards. (#591)
+- Clearly distinguish editable script templates from plugin-managed database helpers. Browse both with syntax highlighting and line numbers, create independent custom copies from templates, and select Docker containers from a visible dropdown. (#591)
+
+- Add detailed script descriptions and separate description and source cards. Name database backup folders by profile and time, compress new local dumps while streaming, and display compressed/original sizes. Existing dumps remain unchanged; decompress new gzip files before restoration. (#591)
+
+- Match script headings to the neutral Settings style. Offer four general hook templates; MariaDB/PostgreSQL exports remain available through managed database profiles. (#591)
+- Add MySQL/InnoDB online backups alongside MariaDB and PostgreSQL. Remove MongoDB, Redis and SQLite from the previous test candidate; preserve existing profiles, Secrets and backups and flag unavailable job assignments. (#593)
+- Show the three managed database helpers with detailed bilingual descriptions and syntax highlighting. Existing MariaDB/PostgreSQL profiles and backups remain supported. (#593)
+- Automatically remove confirmed completed database operation/test metadata after 30 days. Keep running, unresolved, malformed and unidentifiable records; clean only journal-linked discovery leftovers. Dumps, Secrets and Borg archives are unaffected. (#593)
+- Use the application dialog when leaving unsaved database settings. (#591, #593)
+
 ###2026.10.23.1054###
 ### Bug Fixes
 
@@ -48,11 +79,6 @@
 - Separate job cards with clear location headings for populated destinations, compact step results and live logs that open only on click. Distinguish original data from newly stored deduplicated data and show Borg-reported approximate space reclaimed by compact. (#579)
 - Keep live step animations continuous during updates and retain the workflow until its final result is loaded. Show create counters on separate lines and identify services as stopped or started. (#579)
 
-###2026.10.18.1217###
-### Improvements
-
-- View and edit shared job Pre/Post scripts and Post conditions directly from job groups. Changes are saved to the original job for individual and group starts; running jobs keep their script snapshot. Concurrent assignment edits are detected before saving. (#573)
-
 ]]>
 </CHANGES>
 
@@ -78,7 +104,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="153271267dcff40a826076651ed488ba"
+EXPECTED_MD5="f5fd72ee815b42f795fdd34c4e532b8f"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
