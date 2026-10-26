@@ -228,6 +228,8 @@ Active runs count backups, restores and restore tests tracked by resource locks,
 
 The card refreshes every **2 seconds** during active runs and every **10 seconds** otherwise. Requests pause when leaving the dashboard or hiding the browser tab. Shared server sampling continues after the first dashboard visit: once per second during active runs, every ten seconds otherwise. **Show history** opens the last ten minutes; the transferred trend is thinned to approximately five seconds. There is no persistent storage or complete per-run analysis; restarting the UI service clears history.
 
+The expanded charts show the current value and labeled percentage or GiB scales. Point or tap inside a chart to inspect a sample with its timestamp. Focus a chart with Tab; arrow keys navigate samples and Home/End select the first/last point. Times use the browser time zone. Missing measurements are explicitly identified instead of replaced with zero.
+
 The display does not introduce new limits. Memory enforcement currently protects restore tests only. The configured host reserve is a monitored cancellation threshold, not preallocated RAM. Backups and Browse & Restore can also consume RAM; in particular, large archive browser indexes are currently outside this protection.
 
 ## 3. Jobs

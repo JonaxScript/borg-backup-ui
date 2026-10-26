@@ -3725,6 +3725,9 @@
     "showHistory": "Show history",
     "hideHistory": "Hide history",
     "now": "Now",
-    "historyNote": "Last 10 minutes since the first dashboard visit, held only in RAM. Sampling: every second during active runs, every 10 s otherwise; trend thinned to 5 s. Missing measurements appear as gaps. Active runs include tracked backup, restore and test runs, not browsing requests. Individual measurements are available only for protected restore tests."
+    "historyNote": "Last 10 minutes since the first dashboard visit, held only in RAM. Sampling: every second during active runs, every 10 s otherwise; trend thinned to 5 s. Missing measurements appear as gaps. Active runs include tracked backup, restore and test runs, not browsing requests. Individual measurements are available only for protected restore tests.",
+    "current": "Current",
+    "noMeasurement": "No measurement",
+    "inspectHint": "Select a sample with the pointer or touch; navigate with arrow keys, Home and End."
   }
 }

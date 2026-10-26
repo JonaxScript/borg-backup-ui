@@ -788,6 +788,18 @@
 .resource-plots h3 { font-size: var(--ui-font-size-sm); overflow-wrap: anywhere; margin: 14px 0 4px; }
 .resource-plots small, .resource-axis { font-size: var(--ui-font-size-xs); color: var(--ui-color-text-muted); }
 .resource-chart-large { height: 120px; margin-top: 8px; border-bottom: 1px solid var(--ui-color-border); }
+.resource-plot-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.resource-plot-heading > span { font-size: var(--ui-font-size-xs); color: var(--ui-color-text-muted); white-space: nowrap; }
+.resource-plot-heading strong { font-size: var(--ui-font-size-sm); color: var(--ui-color-text); font-variant-numeric: tabular-nums; }
+.resource-plot-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; margin-top: 8px; }
+.resource-y-axis { display: flex; flex-direction: column; justify-content: space-between; height: 120px; box-sizing: border-box; padding: 7px 0; font-size: var(--ui-font-size-xs); line-height: 0; color: var(--ui-color-text-muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.resource-plot-canvas { position: relative; min-width: 0; cursor: crosshair; touch-action: pan-y; }
+.resource-plot-canvas:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 3px; border-radius: 3px; }
+.resource-plot-canvas .resource-chart-large { margin-top: 0; }
+.resource-plot-grid .resource-axis { grid-column: 2; }
+.resource-crosshair { position: absolute; top: 7px; bottom: 7px; width: 1px; background: var(--ui-color-accent); opacity: .65; pointer-events: none; }
+.resource-crosshair[hidden] { display: none; }
+.resource-readout { min-height: 1.25rem; margin-top: 6px; font-size: var(--ui-font-size-xs); color: var(--ui-color-text-muted); text-align: right; font-variant-numeric: tabular-nums; }
 .resource-axis { display: flex; justify-content: space-between; margin-top: 4px; }
 .resource-tests[hidden], .resource-history[hidden] { display: none; }
 @media (max-width: 1100px) { .resource-value { grid-template-columns: 1fr; } .resource-value .resource-chart { grid-column: 1; grid-row: 4; margin-top: 10px; } }

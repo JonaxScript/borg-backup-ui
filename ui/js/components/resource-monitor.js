@@ -11,6 +11,7 @@
   let failed = false;
   let expanded = false;
   let chartId = 0;
+  let selectedPoint = null;
   const el = id => document.getElementById(id);
   const t = (key, params = {}) => root.components.i18n.t(`resources.${key}`, params);
   const valid = value => typeof value === 'number' && Number.isFinite(value);
@@ -18,6 +19,63 @@
   const percent = value => valid(value) ? `${number(value)} %` : '—';
   const gib = value => valid(value) ? `${number(value / 1073741824)} GiB` : '—';
   const visible = () => !document.hidden && root.core?.state?.currentPage === 'dashboard';
+  const timeLabel = timestamp => valid(timestamp) ? new Date(timestamp * 1000).toLocaleTimeString(
+    root.components.i18n.getLanguage(), {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '—';
+
+  /** Bind pointer/touch and keyboard inspection to real history samples.
+   * A pointer further than ten seconds from a sample shows a missing value;
+   * keyboard arrows visit recorded timestamps. Selection survives live refresh.
+   */
+  function bindPlots(plots, focusKey) {
+    el('resource-history').querySelectorAll('[data-resource-plot-key]').forEach((node, index) => {
+      const plot = plots[index];
+      const samples = plot.history;
+      const end = samples[samples.length - 1]?.timestamp;
+      const marker = node.querySelector('.resource-crosshair');
+      const readout = node.querySelector('.resource-readout');
+      const canvas = node.querySelector('.resource-plot-canvas');
+      const draw = () => {
+        const selection = selectedPoint?.key === plot.key ? selectedPoint : null;
+        const target = selection?.time ?? end;
+        const nearest = samples.reduce((best, sample) => !best || Math.abs(sample.timestamp - target) < Math.abs(best.timestamp - target) ? sample : best, null);
+        const found = nearest && Math.abs(nearest.timestamp - target) <= 10;
+        const value = found ? plot.getter(nearest) : null;
+        const timestamp = found ? nearest.timestamp : target;
+        const text = `${timeLabel(timestamp)} · ${valid(value) ? plot.format(value) : t('noMeasurement')}`;
+        readout.textContent = text;
+        canvas.setAttribute('aria-label', `${plot.label}. ${text}. ${t('inspectHint')}`);
+        marker.hidden = !selection || !valid(value) || !valid(plot.maximum) || plot.maximum <= 0;
+        if (!marker.hidden) marker.style.left = `${Math.max(0, Math.min(100, (timestamp - end + 600) / 6))}%`;
+      };
+      const pointer = event => {
+        const rect = canvas.getBoundingClientRect();
+        if (!samples.length || rect.width <= 0) return;
+        selectedPoint = {key: plot.key, time: end - 600 + 600 * Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), mode: 'pointer'};
+        draw();
+      };
+      canvas.addEventListener('pointermove', pointer);
+      canvas.addEventListener('pointerdown', pointer);
+      canvas.addEventListener('pointerleave', event => {
+        if (event.pointerType !== 'touch' && selectedPoint?.key === plot.key && selectedPoint.mode === 'pointer') {
+          selectedPoint = null;
+          draw();
+        }
+      });
+      canvas.addEventListener('keydown', event => {
+        if (!samples.length) return;
+        if (event.key === 'Escape') { selectedPoint = null; draw(); return; }
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const time = selectedPoint?.key === plot.key ? selectedPoint.time : end;
+        let current = samples.reduce((best, sample, i) => Math.abs(sample.timestamp - time) < Math.abs(samples[best].timestamp - time) ? i : best, 0);
+        current = event.key === 'Home' ? 0 : event.key === 'End' ? samples.length - 1 : Math.max(0, Math.min(samples.length - 1, current + (event.key === 'ArrowLeft' ? -1 : 1)));
+        selectedPoint = {key: plot.key, time: samples[current].timestamp, mode: 'keyboard'};
+        draw();
+      });
+      draw();
+      if (focusKey === plot.key) canvas.focus({preventScroll: true});
+    });
+  }
 
   /**
    * Draw a fixed-scale ten-minute trend with a fading area under each segment.
@@ -99,13 +157,24 @@
     el('resource-history-toggle').setAttribute('aria-expanded', String(expanded));
     el('resource-history').hidden = !expanded;
     if (expanded) {
-      const plot = (label, getter, max, unit) => `<div><h3>${escHtml(label)}</h3><small>0 – ${escHtml(unit)}</small>${chart(history, getter, max, label, true)}<div class="resource-axis"><span>−10 min</span><span>${escHtml(t('now'))}</span></div></div>`;
+      const focusKey = document.activeElement?.dataset?.resourceFocusKey;
+      const plots = [];
+      const plot = (key, label, getter, maximum, format) => {
+        plots.push({key, label, getter, maximum, format, history});
+        const ticks = [1, .75, .5, .25, 0].map(fraction => `<span>${escHtml(valid(maximum) && maximum > 0 ? format(maximum * fraction) : '—')}</span>`).join('');
+        return `<div data-resource-plot-key="${escHtml(key)}"><div class="resource-plot-heading"><h3>${escHtml(label)}</h3><span>${escHtml(t('current'))} <strong>${escHtml(format(getter(unavailable ? {host: {}, protected_tests: []} : data)))}</strong></span></div>
+          <div class="resource-plot-grid"><div class="resource-y-axis" aria-hidden="true">${ticks}</div>
+          <div class="resource-plot-canvas" tabindex="0" role="group" data-resource-focus-key="${escHtml(key)}" title="${escHtml(t('inspectHint'))}">${chart(history, getter, maximum, label, true)}<span class="resource-crosshair" hidden></span></div>
+          <div class="resource-axis"><span>−10 min</span><span>−5 min</span><span>${escHtml(t('now'))}</span></div></div>
+          <div class="resource-readout"></div></div>`;
+      };
       el('resource-history').innerHTML = `<p class="resource-note">${escHtml(t('historyNote'))}</p><div class="resource-plots">` +
-        plot(t('cpu'), s => s.host.cpu_percent, 100, '100 %') +
-        plot(t('ram'), s => s.host.memory_available_bytes, host.memory_total_bytes, gib(host.memory_total_bytes)) +
-        tests.map(test => plot(`${jobName(test.job_key)} · CPU`, s => s.protected_tests.find(row => row.id === test.id)?.cpu_percent, 100, '100 %') +
-          plot(`${jobName(test.job_key)} · RAM`, s => s.protected_tests.find(row => row.id === test.id)?.memory_bytes,
-            test.memory_limit_bytes, gib(test.memory_limit_bytes))).join('') + '</div>';
+        plot('host-cpu', t('cpu'), s => s.host.cpu_percent, 100, percent) +
+        plot('host-ram', t('ram'), s => s.host.memory_available_bytes, host.memory_total_bytes, gib) +
+        tests.map(test => plot(`${test.id}-cpu`, `${jobName(test.job_key)} · CPU`, s => s.protected_tests.find(row => row.id === test.id)?.cpu_percent, 100, percent) +
+          plot(`${test.id}-ram`, `${jobName(test.job_key)} · RAM`, s => s.protected_tests.find(row => row.id === test.id)?.memory_bytes,
+            test.memory_limit_bytes, gib)).join('') + '</div>';
+      bindPlots(plots, focusKey);
     }
   }
 

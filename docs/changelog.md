@@ -2,6 +2,8 @@
 
 ## Pending - Dashboard resource monitoring (#602)
 
+- Label expanded charts with current values, five unit-aware Y-axis ticks and timestamped sample readouts. Support pointer/touch and keyboard inspection, preserve keyboard focus across live refresh, and keep missing values distinct from zero.
+
 - Match the approved graph styling with wider sparklines, a fading area below each contiguous segment, rounded line joins and subtle expanded-chart guides. Preserve fixed scales, real sample coordinates and missing-data gaps.
 
 - Add shared, read-only host CPU/MemAvailable sampling and protected restore-test cgroup CPU/RAM measurements, matching groups to live lock owners. Keep ten minutes in memory and thin transferred trends; never invoke Borg or alter limits.

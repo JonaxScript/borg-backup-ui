@@ -20,13 +20,27 @@ function harness(lang = 'de') {
     getLanguage: () => lang}}, core: {state: {currentPage: 'dashboard', data: {backups: [{key: 'appdata', name: '<img onerror="oops">'}]}}}},
     addEventListener: (key, callback) => {listeners[key] = callback;}};
   const document = {hidden: false, getElementById: id => elements.get(id), addEventListener: (key, callback) => {listeners[key] = callback;}};
+  let graphs = [];
+  elements.get('resource-history').querySelectorAll = () => {
+    graphs = [...elements.get('resource-history').innerHTML.matchAll(/data-resource-plot-key="([^"]+)"/g)].map(match => {
+      const marker = {style: {}, hidden: true};
+      const readout = {textContent: ''};
+      const canvas = {listeners: {}, attrs: {}, dataset: {resourceFocusKey: match[1]},
+        getBoundingClientRect: () => ({left: 0, width: 400}),
+        addEventListener(key, fn) {this.listeners[key] = fn;},
+        setAttribute(key, value) {this.attrs[key] = value;},
+        focus() {document.activeElement = this;}};
+      return {marker, readout, canvas, querySelector: selector => ({'.resource-crosshair':marker, '.resource-readout':readout, '.resource-plot-canvas':canvas})[selector]};
+    });
+    return graphs;
+  };
   const context = vm.createContext({window, document, Intl, AbortController,
     escHtml: s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c])),
     setTimeout: (fn, delay) => {timers.set(++timerId, {fn, delay}); return timerId;},
     clearTimeout: id => timers.delete(id),
     fetch: (url, options) => {requests.push({url, options}); return next();}});
   vm.runInContext(fs.readFileSync('ui/js/components/resource-monitor.js', 'utf8'), context);
-  return {elements, timers, window, document, listeners, requests, monitor: window.BBUI.resourceMonitor,
+  return {elements, timers, window, document, listeners, requests, get graphs() {return graphs;}, monitor: window.BBUI.resourceMonitor,
     setResponse: callback => {next = callback;}, tick: delay => {const [id, task] = [...timers].find(([, t]) => t.delay === delay); timers.delete(id); task.fn();}};
 }
 function sample(active = true) {
@@ -50,6 +64,8 @@ for (const lang of ['de', 'en']) {
     const toggle = h.elements.get('resource-history-toggle'); toggle.listeners.click();
     assert.equal(toggle.attrs['aria-expanded'], 'true');
     assert.match(h.elements.get('resource-history').innerHTML, /resource-chart-large/);
+    assert.match(h.elements.get('resource-history').innerHTML, /75 %/);
+    assert.match(h.elements.get('resource-history').innerHTML, /24 GiB/);
     assert.doesNotMatch(h.elements.get('resource-history').innerHTML, /NaN|undefined/);
     h.setResponse(async () => ({ok: true, json: async () => sample(false)}));
     h.tick(2000); await flush();
@@ -59,6 +75,34 @@ for (const lang of ['de', 'en']) {
     h.monitor.stop(); assert.equal(h.timers.size, 0);
   });
 }
+
+test('sample inspection distinguishes gaps from zero and preserves keyboard selection across refresh', async () => {
+  const h = harness(); h.monitor.start(); await flush();
+  h.elements.get('resource-history-toggle').listeners.click();
+  const first = h.graphs[0];
+  assert.match(first.readout.textContent, /38 %/);
+  first.canvas.listeners.pointermove({clientX: 0});
+  assert.match(first.readout.textContent, /Keine Messung/);
+  assert.equal(first.marker.hidden, true);
+  first.canvas.listeners.pointermove({clientX: 400});
+  assert.match(first.readout.textContent, /38 %/);
+  assert.equal(first.marker.hidden, false);
+  first.canvas.focus();
+  first.canvas.listeners.keydown({key: 'Home', preventDefault() {}});
+  assert.match(first.readout.textContent, /Keine Messung/);
+  h.tick(2000); await flush();
+  assert.notEqual(h.graphs[0].canvas, first.canvas);
+  assert.equal(h.document.activeElement, h.graphs[0].canvas);
+  assert.match(h.graphs[0].readout.textContent, /Keine Messung/);
+  h.graphs[0].canvas.listeners.keydown({key: 'ArrowRight', preventDefault() {}});
+  assert.match(h.graphs[0].readout.textContent, /38 %/);
+  h.setResponse(async () => ({ok:true, json:async () => {
+    const data = sample(); data.host.cpu_percent = 0; data.history[1].host.cpu_percent = 0; return data;
+  }}));
+  h.tick(2000); await flush();
+  assert.match(h.graphs[0].readout.textContent, /· 0 %/);
+  h.monitor.stop();
+});
 
 test('failed and stale samples do not display old numbers as live', async () => {
   const h = harness(); h.monitor.start(); await flush();

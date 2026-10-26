@@ -3725,6 +3725,9 @@
     "showHistory": "Verlauf anzeigen",
     "hideHistory": "Verlauf ausblenden",
     "now": "Jetzt",
-    "historyNote": "Letzte 10 Minuten ab dem ersten Dashboard-Aufruf, nur im Arbeitsspeicher. Messung: bei aktiven Läufen jede Sekunde, sonst alle 10 s; Verlauf auf 5 s ausgedünnt. Fehlende Messwerte erscheinen als Lücken. Aktive Läufe umfassen erfasste Backup-, Restore- und Testläufe, keine reinen Browse-Anfragen. Einzelwerte gibt es nur für geschützte Restore-Tests."
+    "historyNote": "Letzte 10 Minuten ab dem ersten Dashboard-Aufruf, nur im Arbeitsspeicher. Messung: bei aktiven Läufen jede Sekunde, sonst alle 10 s; Verlauf auf 5 s ausgedünnt. Fehlende Messwerte erscheinen als Lücken. Aktive Läufe umfassen erfasste Backup-, Restore- und Testläufe, keine reinen Browse-Anfragen. Einzelwerte gibt es nur für geschützte Restore-Tests.",
+    "current": "Aktuell",
+    "noMeasurement": "Keine Messung",
+    "inspectHint": "Messpunkt mit Maus oder Antippen auswählen; Pfeiltasten, Pos1 und Ende zum Navigieren."
   }
 }
