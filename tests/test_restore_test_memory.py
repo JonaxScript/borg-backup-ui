@@ -12,6 +12,7 @@ import pytest
 
 from restore_test_io import ArchiveSample, run_borg
 from restore_test_reports import save_report
+from restore_test_resources import MemoryGroup
 import restore_test_resources as resources
 from job_fixtures import job_id
 
@@ -216,7 +217,8 @@ def test_supervisor_cancellation_restores_signal_handlers(tmp_path, guard_fakes,
     assert not guard_fakes["started"]
 
 
-def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, monkeypatch):
+@pytest.mark.parametrize("missing", [None, "cgroup.events", "cgroup.procs", "memory.max"])
+def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, monkeypatch, missing):
     root = tmp_path / "cgroups"
     root.mkdir()
     (root / "cgroup.controllers").write_text("memory cpu")
@@ -228,8 +230,9 @@ def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, m
         if path.parent == root:
             for name, value in {"memory.max": "max", "memory.oom.group": "0", "memory.swap.max": "max",
                                 "memory.events": "oom 0\noom_kill 0\n", "cgroup.kill": "",
-                                "cgroup.events": "populated 0\n"}.items():
-                (path / name).write_text(value)
+                                "cgroup.events": "populated 0\n", "cgroup.procs": ""}.items():
+                if name != missing:
+                    (path / name).write_text(value)
     def remove(path):
         if path.parent == root:
             for file in path.iterdir():
@@ -237,6 +240,10 @@ def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, m
         rmdir(path)
     monkeypatch.setattr(Path, "mkdir", create)
     monkeypatch.setattr(Path, "rmdir", remove)
+    if missing:
+        with pytest.raises(OSError, match=f"Required cgroup interface is unavailable: {missing}"):
+            resources.MemoryGroup(256 * 1024**2)
+        return
     group = resources.MemoryGroup(256 * 1024**2)
     path = group.path
     assert (path / "memory.max").read_text() == str(256 * 1024**2)
@@ -246,6 +253,69 @@ def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, m
     assert group.events() == {"oom": 0, "oom_kill": 0}
     group.close()
     assert not path.exists()
+
+
+@pytest.mark.parametrize("stage", ["before-close", "during-remove"])
+def test_cgroup_cleanup_accepts_only_a_removed_group(tmp_path, monkeypatch, stage):
+    group = resources.MemoryGroup.__new__(resources.MemoryGroup)
+    group.path = tmp_path / "group"
+    if stage == "during-remove":
+        group.path.mkdir()
+        (group.path / "cgroup.events").write_text("populated 0\n")
+        remove = Path.rmdir
+        def removed_elsewhere(path):
+            (path / "cgroup.events").unlink()
+            remove(path)
+            raise FileNotFoundError(str(path))
+        monkeypatch.setattr(Path, "rmdir", removed_elsewhere)
+    group.close()
+    assert group.path is None
+    group.close()
+
+
+def test_cgroup_cleanup_rejects_missing_events_in_existing_group(tmp_path):
+    group = resources.MemoryGroup.__new__(resources.MemoryGroup)
+    group.path = tmp_path
+    with pytest.raises(FileNotFoundError):
+        group.close()
+    assert group.path == tmp_path
+
+
+@pytest.mark.parametrize("final_counters_read", [True, False])
+def test_guard_accepts_removed_group_only_after_final_counter_check(tmp_path, guard_fakes, monkeypatch, final_counters_read):
+    # Use production cleanup on a group removed around the final counter read.
+    monkeypatch.setattr(resources.MemoryGroup, "close", MemoryGroup.close)
+    def events(_group):
+        if not final_counters_read:
+            raise FileNotFoundError("memory.events")
+        return {"oom": 0, "oom_kill": 0}
+    monkeypatch.setattr(resources.MemoryGroup, "events", events)
+    if final_counters_read:
+        assert resources.run_guarded(["worker"], {}, tmp_path, 2048, 1024, print) == 0
+    else:
+        with pytest.raises(resources.ResourceGuardError, match="memory.events") as error:
+            resources.run_guarded(["worker"], {}, tmp_path, 2048, 1024, print)
+        assert error.value.code == "RT_RESOURCE_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("failure", ["oom", "counters-missing", "none"])
+def test_cleanup_cannot_mask_memory_failure_or_missing_final_counters(tmp_path, guard_fakes, monkeypatch, failure):
+    def missing(_group):
+        raise FileNotFoundError("memory.events")
+    def broken_cleanup(_group):
+        raise FileNotFoundError("cgroup.events")
+    monkeypatch.setattr(resources.MemoryGroup, "close", broken_cleanup)
+    if failure == "counters-missing":
+        monkeypatch.setattr(resources.MemoryGroup, "events", missing)
+    elif failure == "oom":
+        guard_fakes["events"] = {"oom": 1}
+    messages = []
+    with pytest.raises(resources.ResourceGuardError) as error:
+        resources.run_guarded(["worker"], {}, tmp_path, 2048, 1024, messages.append)
+    assert error.value.code == ("RT_MEMORY_LIMIT" if failure == "oom" else "RT_RESOURCE_UNAVAILABLE")
+    if failure == "counters-missing":
+        assert "memory.events" in str(error.value)
+    assert any("cleanup also failed" in message for message in messages) == (failure != "none")
 
 
 def test_supervisors_queue_instead_of_combining_budgets(tmp_path):

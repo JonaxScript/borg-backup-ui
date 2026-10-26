@@ -966,6 +966,12 @@ dann gelten auch Warteschlange und Hostreserve nicht. Ein höheres Limit sollte
 nur mit ausreichend freiem RAM gewählt werden. Ein Limit-Abbruch ist kein
 Nachweis eines beschädigten Archivs und wird nicht als erfolgreiche Prüfung gewertet.
 
+Der Schutz verwendet die Linux-Kernelschnittstelle direkt und benötigt kein systemd.
+Ein erfolgreiches Worker-Protokoll allein ist noch kein bestätigtes Gesamtergebnis:
+Der Supervisor prüft anschließend die Speicherzähler. Fehlen diese, schlägt die
+Prüfung fehl. Eine erst beim Aufräumen bereits entfernte Gruppe ist dagegen kein
+zusätzlicher Fehler. Maßgeblich sind der abschließende Prüfbericht und die Zusammenfassung.
+
 
 Die [Borg-1.4.5-Referenz zu extract](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
 erläutert Dry-Run und Standardausgabe. Für die normale Bedienung ist sie nicht erforderlich.

@@ -956,6 +956,12 @@ host reserve then do not apply either. Increase the budget only with sufficient
 available host RAM. A memory-limit failure is not evidence of archive corruption
 and never counts as successful verification.
 
+Protection uses the Linux kernel interface directly and does not require systemd.
+A successful worker log alone is not yet a confirmed overall result: the supervisor
+then checks the memory counters. Missing counters fail verification. A group already
+removed at cleanup is not an additional failure. The final report and summary are
+the authoritative result.
+
 
 The [Borg 1.4.5 extract reference](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
 explains dry-run and standard output. It is optional for routine operation.

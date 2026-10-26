@@ -43,7 +43,8 @@ class MemoryGroup:
 
     Creation may enable the memory controller at the hierarchy root. Only
     plugin-owned groups are inspected/removed. Other processes are never moved.
-    ``close`` kills remaining members and requires an empty group before removal.
+    ``close`` kills remaining members and requires an empty group before removal;
+    an already removed group is accepted, but missing files in a live group fail.
     """
 
     def __init__(self, limit: int):
@@ -60,7 +61,8 @@ class MemoryGroup:
         self.path = root / f"borg-backup-ui-restore-{uuid.uuid4().hex}"
         self.path.mkdir()
         try:
-            for name in ("memory.max", "memory.oom.group", "memory.events", "cgroup.kill"):
+            for name in ("memory.max", "memory.oom.group", "memory.events", "cgroup.kill",
+                         "cgroup.events", "cgroup.procs"):
                 if not (self.path / name).exists():
                     raise OSError(f"Required cgroup interface is unavailable: {name}")
             (self.path / "memory.max").write_text(str(limit))
@@ -70,7 +72,12 @@ class MemoryGroup:
             if int((self.path / "memory.max").read_text()) != limit:
                 raise OSError("The kernel did not accept the memory limit")
         except BaseException:
-            self.close()
+            try:
+                self.close()
+            except OSError:
+                # Keep the setup failure, rather than replacing it with cleanup.
+                # The next protected run will inspect any remaining owned group.
+                pass
             raise
 
     def events(self) -> dict[str, int]:
@@ -83,18 +90,30 @@ class MemoryGroup:
         (self.path / "cgroup.kill").write_text("1")
 
     def close(self) -> None:
-        """Kill leftover members and remove the empty group, or raise OSError."""
+        """Remove the empty group idempotently; fail if an existing group is unreadable.
+
+        A concurrent removal is harmless here. Missing final memory counters are
+        still an error in ``events`` and cannot turn an unverified run into success.
+        """
         if self.path is None:
             return
-        if "populated 1" in (self.path / "cgroup.events").read_text():
-            self.kill()
-        for _ in range(40):
-            if "populated 1" not in (self.path / "cgroup.events").read_text():
-                self.path.rmdir()
+        try:
+            if "populated 1" in (self.path / "cgroup.events").read_text():
+                self.kill()
+            for _ in range(40):
+                if "populated 1" not in (self.path / "cgroup.events").read_text():
+                    self.path.rmdir()
+                    self.path = None
+                    return
+                time.sleep(0.05)
+            raise OSError("Restore-test descendants did not exit; resources remain reserved")
+        except FileNotFoundError:
+            try:
+                self.path.stat()
+            except FileNotFoundError:
                 self.path = None
                 return
-            time.sleep(0.05)
-        raise OSError("Restore-test descendants did not exit; resources remain reserved")
+            raise
 
 
 def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
@@ -147,9 +166,15 @@ def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
                     raise ResourceGuardError("RT_RESOURCE_UNAVAILABLE", "The restore-test worker could not enter its memory group")
                 return proc.returncode
             finally:
+                failure = sys.exc_info()[1]
                 try:
                     if group is not None:
-                        group.close()
+                        try:
+                            group.close()
+                        except OSError as exc:
+                            if failure is None:
+                                raise
+                            log(f"WARNING: Memory group cleanup also failed ({type(exc).__name__}): {exc}")
                 finally:
                     if proc is not None:
                         # The launcher may not yet have joined the cgroup.
