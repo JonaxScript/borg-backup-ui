@@ -976,6 +976,8 @@ explains dry-run and standard output. It is optional for routine operation.
 
 Use **Test now** next to a job to start it manually with its configured test level. Watch the live log and review **Test reports** afterwards. Fixed schedules run automatically through cron. If an existing global interval schedule is active, **Run due interval tests** remains available for its due jobs. Repeated manual starts of the same job open the existing run; repository conflicts are recorded as skipped.
 
+Running tests are marked directly beside the job in the plan with **Running** and a red, temporarily disabled start button. The status refreshes when opening the page and every ten seconds. **Test now** becomes available again when the test finishes. Parallel tests mark each affected job; global interval runs mark the job currently being checked.
+
 ### 8.5 Reports
 
 ![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)

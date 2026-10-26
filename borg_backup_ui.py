@@ -2318,12 +2318,24 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         return list_restore_test_plan(self.config)
 
     def _get_rt_running(self) -> dict:
-        from jobs_api import JobManager
+        """Return managed test runs and active job IDs for the plan's row status.
+
+        Live restore-test locks identify the current job in interval batches and
+        survive UI process restarts. Managed single-job runs also cover startup
+        before the runner acquires its locks. Existing run/log fields are kept.
+        """
+        from jobs_api import JobManager, active_resource_locks
         states = JobManager.get().get_all_states()
         runs = [{**state, "run_key": key} for key, state in states.items()
                 if key == "restore_test" or key.startswith("restore_test_")]
         runs.sort(key=lambda row: (bool(row.get("running")), row.get("start_time", "")), reverse=True)
-        return {**(runs[0] if runs else {"running": False}), "runs": runs}
+        active_jobs = {row["job_key"] for row in active_resource_locks(self.config)
+                       if row["operation"] == "restore_test"}
+        active_jobs.update(row["run_key"][len("restore_test_"):]
+                           for row in runs if row.get("running")
+                           and row["run_key"].startswith("restore_test_"))
+        return {**(runs[0] if runs else {"running": False}), "runs": runs,
+                "active_job_keys": sorted(active_jobs)}
 
     def _restore_test_log_key(self, query: str) -> str:
         requested = (parse_qs(query).get("job") or [""])[0]

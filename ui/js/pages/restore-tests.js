@@ -13,6 +13,7 @@ window.BBUI.restoreTestsState = window.BBUI.restoreTestsState || {
   jobs: [],
   defaultsInitialized: false,
   rowBusy: {},
+  runningJobs: [],
   subtab: 'plan',
   filteredReports: [],
   logState: null,
@@ -56,6 +57,7 @@ function handleRestoreTestAlreadyRunning(payload) {
     return false;
   }
   resumeRestoreTestLiveLog('alreadyRunningOpenLog');
+  refreshRestorePlanOnly();
   return true;
 }
 
@@ -299,7 +301,6 @@ function _openRTLogPanel() {
       setRTLogStatus('error', -1);
       es.close();
       restoreTestsState.activeEventSource = null;
-      stopRTPolling();
       return;
     }
     handleRTLogTransportError(es);
@@ -395,18 +396,30 @@ function stopRTPolling() {
   }
 }
 
+/** Apply a successful running snapshot; return whether the marked job set changed.
+ * @param {Object} snapshot Running API response, including active job IDs.
+ * @returns {boolean} Whether the plan needs repainting. Failed requests must not call this.
+ */
+function updateRTRunningJobs(snapshot) {
+  const keys = snapshot.active_job_keys || (snapshot.runs || [snapshot])
+    .filter(run => run.running && String(run.run_key || '').startsWith('restore_test_'))
+    .map(run => run.run_key.slice('restore_test_'.length));
+  const next = [...new Set(keys)].sort();
+  if (JSON.stringify(next) === JSON.stringify(restoreTestsState.runningJobs)) return false;
+  restoreTestsState.runningJobs = next;
+  return true;
+}
+
+/** Refresh row status while the page is open, including externally started tests. */
 async function _pollRTRunning() {
   try {
     const res = await fetch('/api/restore-tests/running');
     if (!res.ok) return;
     const state = await res.json();
-    if (state.running && !restoreTestsState.activeEventSource) {
-      showMsg('restore-tests-message', 'warning', restoreTestsT('runningWithoutFinalLog'));
-    }
-    if (!state.running && restoreTestsState.pollingTimer) {
-      stopRTPolling();
-    }
-  } catch (_) {}
+    if (updateRTRunningJobs(state)) renderRestorePlan(restoreTestsState.plan);
+  } catch (_) {
+    // Preserve the last known state until a successful snapshot arrives.
+  }
 }
 
 async function refreshRestoreTests() {
@@ -440,13 +453,15 @@ async function refreshRestoreTests() {
         key: job.job_key,
       }));
     if (runningRes.ok) {
-      const runningState = await runningRes.json().catch(() => ({}));
+      const runningState = await runningRes.json();
+      updateRTRunningJobs(runningState);
       if (runningState.running) {
         restoreTestsState.runKey = runningState.run_key || '';
         resumeRestoreTestLiveLog('runningWithoutFinalLog');
       }
     }
     restoreTestsState.loaded = true;
+    startRTPolling();
     renderRestorePlan(restoreTestsState.plan);
     renderRTReportFilterOptions(restoreTestsState.data);
     renderRestoreTests(restoreTestsState.data);
@@ -516,11 +531,12 @@ function renderRestorePlan(plan) {
     const p = j.policy || {};
     const mode = String(p.mode || 'off');
     const busy = restoreTestsState.rowBusy[j.job_key];
+    const running = restoreTestsState.runningJobs.includes(j.job_key);
     const state = j.scheduler_state || 'needs_schedule';
     const schedule = p.cron ? rtScheduleLabel(p.cron)
       : (state === 'legacy' ? restoreTestsT('legacySchedule', { days: p.interval_days, cron: j.legacy_cron }) : '—');
-    return `<tr>
-      <td>${escHtml(j.name || j.display_name || j.job_key)}</td>
+    return `<tr class="${running ? 'rt-plan-running' : ''}" data-rt-job-key="${escHtml(j.job_key)}">
+      <td>${escHtml(j.name || j.display_name || j.job_key)}${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
       <td><span class="history-loc-chip ${(j.location || '').toLowerCase()}" title="${escHtml(restoreTestsLocationLabel(j.location || ''))}">${escHtml(String(j.location || '').toLowerCase() === 'usb' ? 'USB' : restoreTestsLocationLabel(j.location || ''))}</span></td>
       <td>${escHtml(restoreTestsT(mode === 'manual_only' ? 'manualOnly' : mode))}</td>
       <td class="rt-plan-schedule">${escHtml(schedule)}</td>
@@ -530,7 +546,7 @@ function renderRestorePlan(plan) {
       <td><span class="badge ${state === 'active' || state === 'legacy' ? 'success' : state === 'off' ? '' : 'warning'}">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</span></td>
       <td><div class="rt-plan-actions">
         <button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button>
-        <button type="button" class="btn btn-primary btn-sm" data-rt-plan-action="run" data-job-key="${escHtml(j.job_key)}" aria-busy="${busy === 'run'}" ${busy || j.enabled === false ? 'disabled' : ''}>${escHtml(restoreTestsT(busy === 'run' ? 'startingTest' : 'testNow'))}</button>
+        <button type="button" class="btn ${running ? 'btn-danger' : 'btn-primary'} btn-sm" data-rt-plan-action="run" data-job-key="${escHtml(j.job_key)}" aria-busy="${running || busy === 'run'}" ${running || busy || j.enabled === false ? 'disabled' : ''}>${escHtml(restoreTestsT(running ? 'running' : busy === 'run' ? 'startingTest' : 'testNow'))}</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -648,6 +664,7 @@ async function saveRestorePlanPolicy(jobKey) {
 }
 
 async function runRestorePlanJob(jobKey) {
+  if (restoreTestsState.runningJobs.includes(jobKey) || restoreTestsState.rowBusy[jobKey]) return;
   restoreTestsState.runKey = `restore_test_${jobKey}`;
   restoreTestsState.rowBusy[jobKey] = 'run';
   renderRestorePlan(restoreTestsState.plan);
@@ -663,6 +680,7 @@ async function runRestorePlanJob(jobKey) {
       if (handleRestoreTestAlreadyRunning(data)) return;
       throw new Error(apiErrorMessage(data, res.status));
     }
+    updateRTRunningJobs({ active_job_keys: [...restoreTestsState.runningJobs, jobKey] });
     const jobLabel = restoreTestsState.plan?.jobs?.find(job => job.job_key === jobKey)?.display_name || jobKey;
     showMsg('restore-tests-message', 'success', restoreTestsT('testStarted', { job: jobLabel }));
     restoreTestsState.runKey = data.run_key || '';
@@ -679,7 +697,7 @@ async function runRestorePlanJob(jobKey) {
 
 function onRestoreTestsPlanClick(event) {
   const btn = event.target.closest('[data-rt-plan-action]');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   event.preventDefault();
   event.stopPropagation();
   const action = btn.dataset.rtPlanAction || '';
@@ -697,12 +715,13 @@ async function refreshRestorePlanOnly() {
     ]);
     if (planRes.ok) {
       restoreTestsState.plan = await planRes.json();
-      renderRestorePlan(restoreTestsState.plan);
     }
     if (runningRes.ok) {
       const running = await runningRes.json();
-      if (running?.running) startRTPolling();
+      updateRTRunningJobs(running);
     }
+    renderRestorePlan(restoreTestsState.plan);
+    startRTPolling();
   } catch (_) {}
 }
 

@@ -987,6 +987,8 @@ erläutert Dry-Run und Standardausgabe. Für die normale Bedienung ist sie nicht
 
 Mit **Jetzt testen** neben einem Job starten Sie den Test manuell mit seinem konfigurierten Testlevel. Verfolgen Sie das Live-Protokoll und prüfen Sie anschließend die **Prüfberichte**. Feste Zeitpläne werden automatisch über Cron ausgeführt. Bei einem aktiven bisherigen globalen Intervallplan steht zusätzlich **Fällige Intervalltests ausführen** zur Verfügung. Wiederholte manuelle Starts desselben Jobs öffnen den vorhandenen Lauf; Repository-Konflikte werden als übersprungen protokolliert.
 
+Laufende Tests sind im Testplan direkt am Job mit **Läuft** und einem roten, vorübergehend deaktivierten Startbutton erkennbar. Die Anzeige wird beim Öffnen und alle zehn Sekunden aktualisiert. Nach Testende steht **Jetzt testen** wieder zur Verfügung. Bei parallelen Tests werden alle betroffenen Jobs markiert; bei globalen Intervallläufen der aktuell geprüfte Job.
+
 ### 8.5 Prüfberichte
 
 ![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
