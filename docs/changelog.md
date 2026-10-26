@@ -2,6 +2,8 @@
 
 ## Pending - Bounded restore-test memory and retained evidence (#599)
 
+- Retain the cgroup with an acknowledged idle keeper until final memory counters have been read. This closes the confirmed race with Unraid removing empty cgroups immediately after worker exit. Only the keeper is OOM-exempt; worker/Borg remain eligible, and keeper startup failure or unexpected exit fails closed. Pipe EOF ends the keeper if the supervisor dies. Log final OOM counters and cover readiness, EOF, failure cleanup and an empty-group reaper; real kernel tests remain opt-in.
+
 - Validate cleanup interfaces before launching protected tests. Accept an already removed cgroup during cleanup only; missing final memory counters still fail verification. Preserve the original memory/supervision failure when cleanup also fails. Covers the Unraid test-channel report of a missing cgroup after a successful worker run.
 - Stream archive JSON-lines into a bounded uniform reservoir; keep exact regular-file counts, existing size thresholds, file limits and complete-archive L2 verification. Stream L3 hashing and concurrently drain bounded stderr; kill subprocess groups on timeouts.
 - Add cgroup v2 worker supervision with a default 2048 MiB combined memory budget and 1024 MiB monitored host reserve. Serialize protected tests, fail closed when enforcement is unavailable, and publish final reports only after the supervisor accepts worker completion. Preserve repository locks and SMB cleanup in the supervisor.

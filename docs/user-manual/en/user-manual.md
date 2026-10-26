@@ -958,7 +958,13 @@ and never counts as successful verification.
 
 Protection uses the Linux kernel interface directly and does not require systemd.
 A successful worker log alone is not yet a confirmed overall result: the supervisor
-then checks the memory counters. Missing counters fail verification. A group already
+then checks the memory counters. A small idle keeper keeps the group populated
+until then so Unraid's automatic cleanup cannot remove it early. Only this helper
+is exempt from OOM killing; worker and Borg remain limited and eligible for killing.
+The plugin therefore requires permission to set the helper's OOM score to -1000.
+Missing permission or premature keeper exit fails the protected test. Cleanup ends
+the helper; it also exits when its pipe to the supervisor closes. Missing final
+counters fail verification. A group already
 removed at cleanup is not an additional failure. The final report and summary are
 the authoritative result.
 

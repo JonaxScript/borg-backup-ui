@@ -6,6 +6,7 @@ import fcntl
 import os
 from pathlib import Path
 import subprocess
+import select
 import signal
 import sys
 import time
@@ -45,10 +46,13 @@ class MemoryGroup:
     plugin-owned groups are inspected/removed. Other processes are never moved.
     ``close`` kills remaining members and requires an empty group before removal;
     an already removed group is accepted, but missing files in a live group fail.
+    A small OOM-exempt keeper holds the group until counters have been collected,
+    preventing host cleanup of empty groups. It never launches workload children.
     """
 
     def __init__(self, limit: int):
         self.path = None
+        self.keeper = None
         root = cgroup_root()
         for old in root.glob("borg-backup-ui-restore-*"):
             if "populated 1" in (old / "cgroup.events").read_text():
@@ -71,6 +75,7 @@ class MemoryGroup:
                 (self.path / "memory.swap.max").write_text("0")
             if int((self.path / "memory.max").read_text()) != limit:
                 raise OSError("The kernel did not accept the memory limit")
+            self._start_keeper()
         except BaseException:
             try:
                 self.close()
@@ -80,16 +85,62 @@ class MemoryGroup:
                 pass
             raise
 
+    def _start_keeper(self) -> None:
+        """Pin the group with an idle process; require its startup acknowledgement.
+
+        The keeper requires permission to set its own oom_score_adj to -1000.
+        A pipe EOF makes it exit if the supervisor dies; no workload inherits it.
+        """
+        self.keeper = subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve()), "--keepalive", str(self.path)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True,
+        )
+        ready, _, _ = select.select([self.keeper.stdout], [], [], 5)
+        if not ready or self.keeper.stdout.read(1) != b"1" or self.keeper.poll() is not None:
+            raise OSError("The memory-group keeper could not start (requires OOM-protection permission)")
+        self.keeper.stdout.close()
+
+    def check_alive(self) -> None:
+        """Fail closed if the process retaining final memory counters has exited."""
+        if self.keeper is None or self.keeper.poll() is not None:
+            raise OSError("The memory-group keeper exited before final counter collection")
+
+    def _stop_keeper(self) -> None:
+        """Close the lifeline and reap the keeper, including failed startup."""
+        keeper = self.keeper
+        if keeper is None:
+            return
+        try:
+            keeper.stdin.close()
+            try:
+                keeper.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                keeper.kill()
+                keeper.wait()
+        finally:
+            keeper.stdout.close()
+            self.keeper = None
+
     def events(self) -> dict[str, int]:
         """Return kernel memory-event counters for this fresh group."""
-        return {key: int(value) for key, value in
-                (line.split() for line in (self.path / "memory.events").read_text().splitlines())}
+        self.check_alive()
+        events = {key: int(value) for key, value in
+                  (line.split() for line in (self.path / "memory.events").read_text().splitlines())}
+        self.check_alive()
+        return events
 
     def kill(self) -> None:
         """Kill all workload members, including descendants in other sessions."""
         (self.path / "cgroup.kill").write_text("1")
 
     def close(self) -> None:
+        """Clean up the workload group and always reap its keeper."""
+        try:
+            self._remove_group()
+        finally:
+            self._stop_keeper()
+
+    def _remove_group(self) -> None:
         """Remove the empty group idempotently; fail if an existing group is unreadable.
 
         A concurrent removal is harmless here. Missing final memory counters are
@@ -147,15 +198,17 @@ def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
                     raise ResourceGuardError("RT_HOST_MEMORY_LOW",
                                              f"Insufficient available RAM for {limit_mib} MiB test budget plus {reserve_mib} MiB host reserve")
                 group = MemoryGroup(limit)
-                log(f"Memory protection active: {limit_mib} MiB for worker and Borg children; host reserve {reserve_mib} MiB")
+                log(f"Memory protection active: {limit_mib} MiB for worker and Borg children; host reserve {reserve_mib} MiB; group retained until final counter check")
                 launch = [sys.executable, str(Path(__file__).resolve()), str(group.path), *command]
                 proc = subprocess.Popen(launch, env=env)
                 while proc.poll() is None:
+                    group.check_alive()
                     if available_memory() < reserve:
                         group.kill()
                         raise ResourceGuardError("RT_HOST_MEMORY_LOW", "Restore test stopped because available host RAM fell below the reserve")
                     time.sleep(0.1)
                 events = group.events()
+                log(f"Final memory counters: oom={events.get('oom', 0)}, oom_kill={events.get('oom_kill', 0)}")
                 if events.get("oom", 0):
                     raise ResourceGuardError("RT_MEMORY_LIMIT", f"Restore test exceeded its {limit_mib} MiB memory budget")
                 if events.get("oom_kill", 0):
@@ -189,11 +242,39 @@ def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
             signal.signal(sig, handler)
 
 
+def keep_group_alive(path: Path) -> None:
+    """Hold a group until supervisor pipe EOF, exempting only this idle process.
+
+    Linux memory.oom.group excludes oom_score_adj=-1000 processes. The separate
+    workload launcher resets its own score to 0; no Borg process is exempted.
+    Startup failures propagate as OSError and produce no ready acknowledgement.
+    """
+    score = Path("/proc/self/oom_score_adj")
+    score.write_text("-1000")
+    if score.read_text().strip() != "-1000":
+        raise OSError("The kernel did not accept keeper OOM protection")
+    (path / "cgroup.procs").write_text(str(os.getpid()))
+    os.write(1, b"1")
+    os.close(1)
+    os.read(0, 1)
+
+
+def launch_worker(path: Path, command: list[str]) -> None:
+    """Join the limited group and exec the workload with normal OOM eligibility.
+
+    Raises OSError before exec if either the OOM score or group cannot be set.
+    """
+    Path("/proc/self/oom_score_adj").write_text("0")
+    (path / "cgroup.procs").write_text(str(os.getpid()))
+    os.execvpe(command[0], command, os.environ)
+
+
 if __name__ == "__main__":
     # Join before importing the runner or starting Borg, then replace the launcher.
     try:
-        Path("/proc/self/oom_score_adj").write_text("0")
-        (Path(sys.argv[1]) / "cgroup.procs").write_text(str(os.getpid()))
-        os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
+        if sys.argv[1] == "--keepalive":
+            keep_group_alive(Path(sys.argv[2]))
+            sys.exit(0)
+        launch_worker(Path(sys.argv[1]), sys.argv[2:])
     except OSError:
         sys.exit(125)

@@ -968,7 +968,14 @@ Nachweis eines beschädigten Archivs und wird nicht als erfolgreiche Prüfung ge
 
 Der Schutz verwendet die Linux-Kernelschnittstelle direkt und benötigt kein systemd.
 Ein erfolgreiches Worker-Protokoll allein ist noch kein bestätigtes Gesamtergebnis:
-Der Supervisor prüft anschließend die Speicherzähler. Fehlen diese, schlägt die
+Der Supervisor prüft anschließend die Speicherzähler. Ein kleiner, untätiger
+Halteprozess hält die Gruppe bis dahin belegt, damit Unraids automatische Bereinigung
+sie nicht vorzeitig entfernt. Nur dieser Hilfsprozess wird vom OOM-Killer ausgenommen;
+Worker und Borg bleiben normal begrenzt und beendbar. Dafür benötigt das Plugin die
+Berechtigung, den OOM-Wert des Hilfsprozesses auf -1000 zu setzen. Fehlt diese
+Berechtigung oder endet der Halteprozess vorzeitig, schlägt der geschützte Test fehl.
+Der Hilfsprozess wird beim Aufräumen beendet und beendet sich auch, wenn seine
+Pipe zum Supervisor geschlossen wird. Fehlen die abschließenden Speicherzähler, schlägt die
 Prüfung fehl. Eine erst beim Aufräumen bereits entfernte Gruppe ist dagegen kein
 zusätzlicher Fehler. Maßgeblich sind der abschließende Prüfbericht und die Zusammenfassung.
 

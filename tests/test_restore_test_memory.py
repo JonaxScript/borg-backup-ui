@@ -147,8 +147,13 @@ def guard_fakes(tmp_path, monkeypatch):
     state = {"events": {}, "memory": 8 * 1024**3, "rc": 0, "closed": False, "killed": False, "started": False}
     class Group:
         path = tmp_path / "group"
+        keeper = None
+        _remove_group = MemoryGroup._remove_group
+        _stop_keeper = MemoryGroup._stop_keeper
         def __init__(self, limit):
             state["limit"] = limit
+        def check_alive(self):
+            pass
         def events(self):
             return state["events"]
         def kill(self):
@@ -224,6 +229,8 @@ def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, m
     (root / "cgroup.controllers").write_text("memory cpu")
     (root / "cgroup.subtree_control").write_text("")
     monkeypatch.setattr(resources, "cgroup_root", lambda: root)
+    monkeypatch.setattr(resources.MemoryGroup, "_start_keeper", lambda _self: None)
+    monkeypatch.setattr(resources.MemoryGroup, "check_alive", lambda _self: None)
     mkdir, rmdir = Path.mkdir, Path.rmdir
     def create(path, *args, **kwargs):
         mkdir(path, *args, **kwargs)
@@ -258,6 +265,7 @@ def test_cgroup_configuration_checks_kernel_interfaces_and_cleans_up(tmp_path, m
 @pytest.mark.parametrize("stage", ["before-close", "during-remove"])
 def test_cgroup_cleanup_accepts_only_a_removed_group(tmp_path, monkeypatch, stage):
     group = resources.MemoryGroup.__new__(resources.MemoryGroup)
+    group.keeper = None
     group.path = tmp_path / "group"
     if stage == "during-remove":
         group.path.mkdir()
@@ -275,6 +283,7 @@ def test_cgroup_cleanup_accepts_only_a_removed_group(tmp_path, monkeypatch, stag
 
 def test_cgroup_cleanup_rejects_missing_events_in_existing_group(tmp_path):
     group = resources.MemoryGroup.__new__(resources.MemoryGroup)
+    group.keeper = None
     group.path = tmp_path
     with pytest.raises(FileNotFoundError):
         group.close()
@@ -332,6 +341,7 @@ class Group:
         self.path = root / tag
         self.path.mkdir()
     def events(self): return {}
+    def check_alive(self): pass
     def close(self):
         for file in self.path.iterdir(): file.unlink()
         self.path.rmdir()
@@ -468,3 +478,169 @@ def test_kernel_limit_kills_worker_and_children_but_not_supervisor(tmp_path):
     with pytest.raises(resources.ResourceGuardError) as error:
         resources.run_guarded(command, dict(os.environ), tmp_path, 256, 256, print)
     assert error.value.code == "RT_MEMORY_LIMIT"
+
+
+@pytest.fixture
+def keeper_harness(tmp_path, monkeypatch):
+    """Run real keeper pipes/processes, mapping only kernel files to fixture files."""
+    harness = tmp_path / "keeper.py"
+    harness.write_text('''
+import sys
+from pathlib import Path
+import restore_test_resources as r
+root = Path(sys.argv[2])
+def mapped_path(value):
+    return root / 'oom_score_adj' if str(value) == '/proc/self/oom_score_adj' else Path(value)
+r.Path = mapped_path
+try:
+    r.keep_group_alive(root)
+except OSError:
+    sys.exit(125)
+''')
+    monkeypatch.setattr(resources, "__file__", str(harness))
+    group = MemoryGroup.__new__(MemoryGroup)
+    group.path = tmp_path / "group"
+    group.path.mkdir()
+    group.keeper = None
+    (group.path / "oom_score_adj").write_text("0")
+    (group.path / "cgroup.procs").write_text("")
+    return group
+
+
+def test_keeper_is_ready_in_group_before_work_and_exits_on_pipe_eof(keeper_harness):
+    group = keeper_harness
+    try:
+        group._start_keeper()
+        keeper = group.keeper
+        group.check_alive()
+        assert int((group.path / "cgroup.procs").read_text()) == keeper.pid
+        assert (group.path / "oom_score_adj").read_text() == "-1000"
+        # EOF also occurs automatically when the supervisor dies.
+        keeper.stdin.close()
+        assert keeper.wait(timeout=5) == 0
+        with pytest.raises(OSError, match="keeper exited"):
+            group.check_alive()
+    finally:
+        group._stop_keeper()
+    assert keeper.stdout.closed
+    assert group.keeper is None
+
+
+def test_keeper_startup_failure_never_acknowledges_readiness(keeper_harness):
+    group = keeper_harness
+    # A directory at the OOM setting simulates a failed kernel write.
+    (group.path / "oom_score_adj").unlink()
+    (group.path / "oom_score_adj").mkdir()
+    try:
+        with pytest.raises(OSError, match="keeper could not start"):
+            group._start_keeper()
+        keeper = group.keeper
+        assert (group.path / "cgroup.procs").read_text() == ""
+    finally:
+        group._stop_keeper()
+    assert keeper.returncode == 125
+
+
+def test_keeper_startup_timeout_is_reaped(keeper_harness, monkeypatch):
+    monkeypatch.setattr(resources.select, "select", lambda *_args: ([], [], []))
+    try:
+        with pytest.raises(OSError, match="keeper could not start"):
+            keeper_harness._start_keeper()
+        process = keeper_harness.keeper
+    finally:
+        keeper_harness._stop_keeper()
+    assert process.poll() is not None
+
+
+@pytest.mark.parametrize("oom", [0, 1])
+def test_empty_group_reaper_cannot_remove_counters_before_collection(keeper_harness, oom):
+    """Model Unraid's empty-group reaper with real keeper/workload processes."""
+    group = keeper_harness
+    counter = group.path / "memory.events"
+    counter.write_text(f"oom {oom}\noom_kill {oom}\n")
+    group._start_keeper()
+    keeper = group.keeper
+    worker = subprocess.Popen([sys.executable, "-c", "pass"])
+    try:
+        worker.wait(timeout=5)
+        # On the reported host, removal happens when the last member exits.
+        def reap_empty_group():
+            if worker.poll() is not None and keeper.poll() is not None:
+                for file in group.path.iterdir():
+                    file.unlink()
+                group.path.rmdir()
+        reap_empty_group()
+        assert group.events() == {"oom": oom, "oom_kill": oom}
+        group._stop_keeper()
+        reap_empty_group()
+        assert not group.path.exists()
+        group.close()
+    finally:
+        group._stop_keeper()
+
+
+def test_supervisor_stops_if_keeper_dies_during_work(tmp_path, guard_fakes, monkeypatch):
+    guard_fakes['rc'] = None
+    def died(_group):
+        raise OSError("keeper exited")
+    monkeypatch.setattr(resources.MemoryGroup, "check_alive", died)
+    monkeypatch.setattr(resources.subprocess.Popen, "kill", lambda _self: guard_fakes.update(rc=-9), raising=False)
+    monkeypatch.setattr(resources.subprocess.Popen, "poll", lambda _self: guard_fakes['rc'])
+    with pytest.raises(resources.ResourceGuardError, match="keeper exited"):
+        resources.run_guarded(["worker"], {}, tmp_path, 2048, 1024, print)
+    assert guard_fakes['closed']
+    assert guard_fakes['rc'] == -9
+
+
+def test_workload_is_never_exempted_from_oom_killing(tmp_path, monkeypatch):
+    score = tmp_path / 'oom_score_adj'
+    score.write_text('-1000')
+    monkeypatch.setattr(resources, 'Path', lambda value: score if value == '/proc/self/oom_score_adj' else Path(value))
+    executed = []
+    def exec_workload(executable, command, _env):
+        assert score.read_text() == '0'
+        assert (tmp_path / 'cgroup.procs').read_text() == str(os.getpid())
+        executed.append(command)
+    monkeypatch.setattr(resources.os, 'execvpe', exec_workload)
+    resources.launch_worker(tmp_path, ['borg', 'extract'])
+    assert executed == [['borg', 'extract']]
+
+
+@pytest.mark.skipif(os.environ.get('BBUI_CGROUP_TESTS') != '1', reason='Requires an explicitly enabled writable cgroup v2 test host')
+@pytest.mark.parametrize('oom', [False, True])
+def test_kernel_final_counters_survive_an_empty_group_reaper(tmp_path, monkeypatch, oom):
+    """Exercise real cgroup retention against an independent empty-group remover."""
+    groups, reapers = [], []
+    class ObservedGroup(MemoryGroup):
+        def __init__(self, limit):
+            super().__init__(limit)
+            groups.append(self)
+            reapers.append(subprocess.Popen([sys.executable, '-c', '''
+import pathlib,sys,time
+p=pathlib.Path(sys.argv[1])
+while p.exists():
+    try:
+        if 'populated 1' not in (p/'cgroup.events').read_text():
+            p.rmdir()
+            break
+    except FileNotFoundError:
+        break
+    except OSError:
+        pass
+    time.sleep(0.001)
+''', str(self.path)]))
+    monkeypatch.setattr(resources, 'MemoryGroup', ObservedGroup)
+    workload = 'import os; os.fork(); data=bytearray(180*1024*1024); import time; time.sleep(20)' if oom else 'pass'
+    try:
+        if oom:
+            with pytest.raises(resources.ResourceGuardError) as error:
+                resources.run_guarded([sys.executable, '-c', workload], dict(os.environ), tmp_path, 256, 256, print)
+            assert error.value.code == 'RT_MEMORY_LIMIT'
+        else:
+            assert resources.run_guarded([sys.executable, '-c', workload], dict(os.environ), tmp_path, 256, 256, print) == 0
+        assert groups[0].path is None
+        assert groups[0].keeper is None
+    finally:
+        for reaper in reapers:
+            reaper.terminate()
+            reaper.wait(timeout=5)
