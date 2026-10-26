@@ -10,6 +10,7 @@
   let data = null;
   let failed = false;
   let expanded = false;
+  let chartId = 0;
   const el = id => document.getElementById(id);
   const t = (key, params = {}) => root.components.i18n.t(`resources.${key}`, params);
   const valid = value => typeof value === 'number' && Number.isFinite(value);
@@ -18,24 +19,43 @@
   const gib = value => valid(value) ? `${number(value / 1073741824)} GiB` : '—';
   const visible = () => !document.hidden && root.core?.state?.currentPage === 'dashboard';
 
-  /** Draw a ten-minute SVG trend with explicit gaps for missing/reset samples. */
+  /**
+   * Draw a fixed-scale ten-minute trend with a fading area under each segment.
+   * Missing samples/time gaps split both stroke and fill; no interpolated values
+   * or smoothing are introduced. Each SVG owns a unique gradient definition.
+   */
   function chart(history, getter, maximum, label, large = false) {
     if (!history?.length || !valid(maximum) || maximum <= 0) return '';
     const end = history[history.length - 1].timestamp;
     let path = '';
+    let area = '';
+    let segment = [];
     let previous = null;
+    const finishSegment = () => {
+      if (!segment.length) return;
+      path += `M${segment.join(' L')} `;
+      if (segment.length === 1) path += 'l0.1,0 ';
+      else area += `M${segment[0].split(',')[0]},60 L${segment.join(' L')} L${segment[segment.length - 1].split(',')[0]},60 Z `;
+      segment = [];
+    };
     for (const sample of history) {
       const value = getter(sample);
-      if (!valid(value) || !valid(sample.timestamp)) { previous = null; continue; }
+      if (!valid(value) || !valid(sample.timestamp)) { finishSegment(); previous = null; continue; }
       const x = Math.max(0, Math.min(400, 400 * (sample.timestamp - end + 600) / 600));
       const y = 60 - Math.max(0, Math.min(60, value / maximum * 60));
       const connected = previous !== null && sample.timestamp - previous <= 20;
-      path += `${connected ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)} `;
-      // A short mark keeps a single observation visible without inventing history.
-      if (!connected) path += `l0.1,0 `;
+      if (!connected) finishSegment();
+      segment.push(`${x.toFixed(1)},${y.toFixed(1)}`);
       previous = sample.timestamp;
     }
-    return `<svg class="resource-chart${large ? ' resource-chart-large' : ''}" viewBox="0 0 400 64" preserveAspectRatio="none" role="img" aria-label="${escHtml(label)}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+    finishSegment();
+    const gradient = `resource-area-${++chartId}`;
+    return `<svg class="resource-chart${large ? ' resource-chart-large' : ''}" viewBox="0 -4 400 68" preserveAspectRatio="none" role="img" aria-label="${escHtml(label)}">
+      <defs><linearGradient id="${gradient}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.24"/><stop offset="100%" stop-color="currentColor" stop-opacity="0.02"/></linearGradient></defs>
+      ${large ? '<path class="resource-chart-grid" d="M0,15 H400 M0,30 H400 M0,45 H400" fill="none" stroke="currentColor" vector-effect="non-scaling-stroke"/>' : ''}
+      <path class="resource-chart-area" d="${area}" fill="url(#${gradient})"/>
+      <path d="${path}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    </svg>`;
   }
 
   /** Resolve job labels from the dashboard's existing metadata, never fetch Borg. */
