@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.24.1534">
+<!ENTITY version   "2026.10.26.1618">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,21 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.26.1618###
+### Migration and compatibility
+
+- Restore Tests default to a 2048 MiB memory budget and a 1024 MiB host reserve, including existing installations. Protected tests require a writable cgroup v2 memory controller with cgroup.kill and permission to protect the idle keeper from OOM killing and fail with a clear report if enforcement is unavailable. Setting the memory limit to 0 explicitly disables protection, the reserve check and sequential execution. No backup data or existing configuration is overwritten. (#599)
+
+### Bug Fixes
+
+- Keep the Restore Test memory group alive until final counters are checked, preventing false failures when Unraid automatically removes empty groups after worker exit. Missing final memory counters still fail verification, and cleanup errors no longer hide the original failure. (#599)
+- Reduce Restore Test memory consumption for archives with millions of files by streaming file lists while preserving full L2 verification and existing sampling rules. (#599)
+- Report timed-out full dry-runs and failed metadata checks as failures instead of successful verification. (#599)
+
+### Improvements
+
+- Add configurable Restore Test memory protection covering the worker and Borg children, monitored host headroom, and sequential execution of protected tests. Preserve per-run reports and log references after retries. (#599)
+
 ###2026.10.24.1534###
 ### Bug Fixes
 
@@ -62,23 +77,6 @@
 - **Custom notification texts:** Replace the title and message of backup notifications for Unraid, email and Apprise under Settings > Notifications. Placeholders such as {job}, {status} and {error} insert backup details, a preview shows the result, and empty fields keep the default text. Thanks to [JonaxScript](https://github.com/JonaxScript) for contributing this feature. (#582)
 - **Notification text editor:** Use one shared placeholder reference with event-specific example values, insert placeholders at the cursor, and compare equally sized template and preview fields. All five backup events offer example templates containing placeholders; switching events preserves unsaved edits. (#584)
 
-###2026.10.22.1457###
-### Bug Fixes
-
-- VM shutdown failures now explain why the backup could not start. Already stopped VMs are restarted where possible; unresolved shutdowns and failed restarts remain visible. (#541)
-- Preserve all weekdays and other custom cron settings when opening and saving individual job schedules, and refresh the next-run preview when switching schedule modes. (#547)
-- Prevent changed or re-enabled individual job schedules from retroactively reporting missed backups before successful activation. Unchanged saves preserve genuine overdue conditions; failed schedule installation is shown in reminder diagnostics. Existing unchanged schedules retain their previous monitoring behavior. (#547)
-
-### Improvements
-
-- Optionally allow the job wizard to force off VMs after the shutdown timeout. Off by default; warns about possible data loss and guest damage. (#541)
-- Show configured backup steps across the full job-card width, including Pre/Post scripts and Docker/VM stop and recovery. Keep names, measured durations and distinct status symbols visible, with expandable measured results. (#579)
-- Preserve completed workflows and the last successful backup date, relative age and duration across reloads and later unsuccessful runs. Keep older reports compatible without inventing missing steps. (#579)
-- Show current-operation Borg progress only after one minute per command, without log flooding or an estimated overall percentage. Suppress empty INFO lines and internal cache progress while keeping archive decisions, final statistics, warnings and errors. (#579)
-
-- Separate job cards with clear location headings for populated destinations, compact step results and live logs that open only on click. Distinguish original data from newly stored deduplicated data and show Borg-reported approximate space reclaimed by compact. (#579)
-- Keep live step animations continuous during updates and retain the workflow until its final result is loaded. Show create counters on separate lines and identify services as stopped or started. (#579)
-
 ]]>
 </CHANGES>
 
@@ -104,7 +102,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="f5fd72ee815b42f795fdd34c4e532b8f"
+EXPECTED_MD5="ae147cfe556b13e6da78cf7921a1306c"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
