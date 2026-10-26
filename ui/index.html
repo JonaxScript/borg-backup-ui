@@ -223,6 +223,19 @@
           <div id="restore-summary-bar" class="dashboard-summary-content"></div>
         </section>
       </div>
+      <section id="dashboard-resources" class="dashboard-resources" aria-labelledby="resource-title">
+        <header class="resource-header">
+          <h2 id="resource-title" data-i18n="resources.title">Server-Auslastung</h2>
+          <span id="resource-live" class="resource-live"></span>
+        </header>
+        <div id="resource-values" class="resource-values"></div>
+        <div id="resource-tests" class="resource-tests" hidden></div>
+        <div class="resource-footer">
+          <span data-i18n="resources.scope">Gesamter Server einschließlich VMs und Containern</span>
+          <button type="button" id="resource-history-toggle" aria-expanded="false" aria-controls="resource-history" data-i18n="resources.showHistory">Verlauf anzeigen</button>
+        </div>
+        <div id="resource-history" class="resource-history" hidden></div>
+      </section>
       <section id="dashboard-attention" class="dashboard-attention" hidden></section>
       <div id="dashboard-data-dir-warning" class="status-message hidden"></div>
       <div id="dashboard-system-warning" class="status-message hidden"></div>

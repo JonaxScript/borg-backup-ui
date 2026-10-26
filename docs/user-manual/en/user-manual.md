@@ -220,6 +220,16 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 > **Note:** This native Unraid widget is different from the optional **Homepage** integration under **Settings > General**. Homepage uses its own restricted token.
 
+### 2.7 Server Resources
+
+The card below the two summaries shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
+
+Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
+
+The card refreshes every **2 seconds** during active runs and every **10 seconds** otherwise. Requests pause when leaving the dashboard or hiding the browser tab. Shared server sampling continues after the first dashboard visit: once per second during active runs, every ten seconds otherwise. **Show history** opens the last ten minutes; the transferred trend is thinned to approximately five seconds. There is no persistent storage or complete per-run analysis; restarting the UI service clears history.
+
+The display does not introduce new limits. Memory enforcement currently protects restore tests only. The configured host reserve is a monitored cancellation threshold, not preallocated RAM. Backups and Browse & Restore can also consume RAM; in particular, large archive browser indexes are currently outside this protection.
+
 ## 3. Jobs
 
 ![Jobs page with target filter, new-job action, and job list](../assets/en/jobs-guide.png)
