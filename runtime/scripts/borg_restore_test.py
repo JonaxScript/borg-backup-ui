@@ -29,6 +29,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -265,7 +266,9 @@ class RestoreTest:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         date_tag = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.log_path = self.log_dir / f"Borg-Restore-Test--{date_tag}-{os.getpid()}.log"
-        self._fh = open(self.log_path, "w", buffering=1, encoding="utf-8")
+        if getattr(args, "resource_worker", False):
+            self.log_path = Path(os.environ["BORG_UI_RESTORE_LOG"])
+        self._fh = open(self.log_path, "a", buffering=1, encoding="utf-8")
         self.mail_config = self._load_notification_config()
 
     def log(self, msg: str = "") -> None:
@@ -342,23 +345,23 @@ class RestoreTest:
         configure_borg_ssh(env, storage, repository)
         return env
 
-    def _borg(self, args: list, env: dict, timeout: int | None = None) -> subprocess.CompletedProcess:
-        if timeout is None:
-            timeout = self.borg_timeout
-        run_timeout = None if int(timeout) <= 0 else int(timeout)
-        try:
-            return subprocess.run(
-                ["borg"] + args,
-                capture_output=True, text=True, env=env, timeout=run_timeout,
-            )
-        except subprocess.TimeoutExpired as exc:
-            cmd = ["borg"] + args
-            stderr = f"Command timed out after {run_timeout}s: {' '.join(cmd)}"
-            if exc.stderr:
-                stderr = f"{stderr}\n{exc.stderr}"
-            return subprocess.CompletedProcess(
-                cmd, 124, exc.stdout or "", stderr
-            )
+    def _borg(self, args: list, env: dict, timeout: int | None = None, consume=None) -> subprocess.CompletedProcess:
+        """Run Borg with bounded output or a streaming stdout consumer."""
+        from restore_test_io import run_borg
+        return run_borg(args, env, self.borg_timeout if timeout is None else timeout, consume)
+
+    def _list_sample(self, path: str, archive: str, env: dict, limit: int, *, first: bool = False):
+        """Return Borg's result and a bounded file sample with an exact count."""
+        from restore_test_io import ArchiveSample
+        sample = ArchiveSample(limit, first=first)
+        result = self._borg(["list", "--json-lines", f"{path}::{archive}"], env,
+                            timeout=300, consume=sample.feed)
+        if result.returncode == 0:
+            try:
+                sample.finish()
+            except (ValueError, UnicodeError):
+                result = subprocess.CompletedProcess(result.args, 2, "", "Invalid archive listing output")
+        return result, sample
 
     @staticmethod
     def _read_passphrase(pp_file: str) -> str:
@@ -453,22 +456,8 @@ class RestoreTest:
         Legacy-kompatibel: Stichprobenpool aus regulären Dateien des gesamten Archivs
         (ähnlich zu bash: borg list --format ... | head -1000).
         """
-        r = self._borg(["list", "--json-lines", f"{path}::{archive}"], env, timeout=300)
-        if r.returncode != 0:
-            return []
-        files = []
-        for line in r.stdout.splitlines():
-            try:
-                e = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if e.get("type") == "-":
-                p = str(e.get("path", "")).strip()
-                if p:
-                    files.append(p)
-                    if len(files) >= limit:
-                        break
-        return files
+        result, sample = self._list_sample(path, archive, env, limit, first=True)
+        return sample.paths if result.returncode == 0 else []
 
     # ── Intervall-Prüfung ──────────────────────────────────────────────────────
 
@@ -610,9 +599,59 @@ class RestoreTest:
                            run_id=os.environ.get("BORG_UI_RUN_ID", ""), status="skipped", reason=reason)
             return 2
         try:
-            return self._test_repo_locked(repo)
+            if str(self.conf.get("RESTORE_TEST_MEMORY_LIMIT_MIB", "2048")).strip() == "0":
+                self.log("Memory protection explicitly disabled (RESTORE_TEST_MEMORY_LIMIT_MIB=0)")
+                return self._test_repo_locked(repo)
+            return self._test_repo_guarded(repo, resolve_resource_lock_dir(config))
         finally:
             locks.release()
+
+    def _test_repo_guarded(self, repo: dict, lock_dir: Path) -> int:
+        """Supervise one limited worker; keep locks, mount cleanup and failure reporting outside it."""
+        from restore_test_resources import ResourceGuardError, run_guarded
+        started = time.time()
+        mounted = False
+        pending = self.status_dir / f".pending-{uuid.uuid4().hex}.json"
+        try:
+            limit = int(self.conf.get("RESTORE_TEST_MEMORY_LIMIT_MIB", 2048))
+            reserve = int(self.conf.get("RESTORE_TEST_HOST_RESERVE_MIB", 1024))
+            if repo.get("location") == "smb":
+                mounted, error = self._ensure_smb_mount(repo)
+                if error:
+                    raise ResourceGuardError("RT_SMB_MOUNT_FAILED", error)
+            command = [sys.executable, str(Path(__file__).resolve()), "--resource-worker",
+                       "--job-key", repo["job_key"], "--level", str(self.test_level), "--location", "all", "--force"]
+            if getattr(self.args, "scheduled", False):
+                command.append("--scheduled")
+            env = dict(os.environ, BORG_UI_RESTORE_LOG=str(self.log_path), BORG_UI_RESTORE_RESULT=str(pending),
+                       BORG_UI_DATA_ROOT=str(_repository_data_root()))
+            rc = run_guarded(command, env, lock_dir, limit, reserve, self.log)
+            if not pending.exists():
+                raise ResourceGuardError("RT_WORKER_INTERRUPTED", "Restore-test worker ended without a new report; see the run log")
+            data = json.loads(pending.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or data.get("job_id") != repo["job_key"] or data.get("test_exit_code") != rc:
+                raise ResourceGuardError("RT_WORKER_INTERRUPTED", "Restore-test worker returned inconsistent evidence")
+            self._publish_report(self.status_dir / f"{repo['job_key']}.test", data, repo)
+            return rc
+        except (ResourceGuardError, ValueError) as exc:
+            self._cancelled = bool(getattr(exc, "cancelled", False))
+            code = getattr(exc, "code", "RT_RESOURCE_CONFIG")
+            message = str(exc)
+            self.log(f"ERROR {code}: {message}")
+            steps = [{"step_id": "resource_guard", "status": "failed", "duration_ms": 0,
+                      "message": message, "error_code": code}]
+            steps.extend({"step_id": step, "status": "not_tested", "duration_ms": 0,
+                          "message": "Completion not confirmed; see the run log"} for step in self.STEP_IDS)
+            self._write(repo["job_key"], repo, "failed", int(time.time() - started), 0, 0, 0,
+                        "unknown", "", {}, [], exit_code=1, steps=steps,
+                        error_category="resource_limit", error_details=message,
+                        failure_code=code, failure_hint=message)
+            emit_lifecycle("RESTORE_TEST", "failed", job_key=repo["job_key"],
+                           failure_code=code, reason=message, log_file=str(self.log_path))
+            return 1
+        finally:
+            pending.unlink(missing_ok=True)
+            self._cleanup_smb_mount(repo, mounted)
 
     def _test_repo_locked(self, repo: dict) -> int:
         """0=OK, 1=Fehler, 2=übersprungen, 3=unavailable"""
@@ -771,6 +810,16 @@ class RestoreTest:
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             })
 
+            if r_info.returncode != 0:
+                err = self._analyze_error(r_info.stderr)
+                code = self._failure_code_from_category(err["category"])
+                self._mark_not_tested(steps, "metadata_check")
+                self._write(key, repo, "failed", int(time.time() - t0), 0, 0, 0, "unknown",
+                            last_archive, archive_stats, [], exit_code=1, steps=steps,
+                            error_category=err["category"], error_details=err["details"],
+                            failure_code=code, failure_hint=err["details"])
+                return 1
+
             if self.test_level < 2:
                 duration = int(time.time() - t0)
                 steps.append({
@@ -808,7 +857,8 @@ class RestoreTest:
 
             self.log("Level 2: Extract Dry-Run")
             s_probe = time.time()
-            r_list = self._borg(["list", "--json-lines", f"{path}::{last_archive}"], env, timeout=300)
+            sample_limit = min(max(1, self.max_entries), max(1, self.dryrun_max_files))
+            r_list, listing = self._list_sample(path, last_archive, env, sample_limit)
             if r_list.returncode != 0:
                 err = self._analyze_error(r_list.stderr)
                 code = self._failure_code_from_category(err["category"])
@@ -822,20 +872,12 @@ class RestoreTest:
                             error_category=err["category"], error_details=err["details"],
                             failure_code=code, failure_hint=err["details"])
                 return 1
-            file_paths = []
-            for line in r_list.stdout.splitlines():
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("type") == "-" and entry.get("path"):
-                    file_paths.append(entry["path"])
-            full_count = len(file_paths)
+            full_count = listing.count
             archive_stats["files_count"] = full_count
-            # Coverage and both existing limits refer to regular files, not directories (#495).
+            # Reservoir sampling preserves uniform selection without retaining every path (#599).
             target_count = max(1, (full_count * self.min_coverage + 99) // 100)
-            test_count = min(full_count, target_count, max(1, self.max_entries), max(1, self.dryrun_max_files))
-            tested_paths = random.sample(file_paths, test_count)
+            test_count = min(full_count, target_count, sample_limit)
+            tested_paths = random.sample(listing.paths, test_count)
             tested_entries = [f"- {path}" for path in tested_paths]
             tested_files = tested_total = len(tested_paths)
             tested_folders = 0
@@ -879,7 +921,9 @@ class RestoreTest:
             else:
                 self.log(f"  Testing the complete archive ({full_count} files)")
                 r_dry = self._borg(["extract", "--dry-run", f"{path}::{last_archive}"], env, timeout=self.dryrun_timeout)
-                if r_dry.returncode != 0 and not (r_dry.returncode == 124 and tested_entries):
+                if r_dry.returncode != 0:
+                    tested_files = tested_total = 0
+                    tested_entries = []
                     err = self._analyze_error(r_dry.stderr)
                     code = self._failure_code_from_category(err["category"])
                     steps.append({
@@ -929,14 +973,9 @@ class RestoreTest:
                 checksums: list = []
                 failed_files: list = []
                 for fpath in sample:
-                    proc = subprocess.Popen(["borg", "extract", "--stdout", f"{path}::{last_archive}", fpath], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
                     sha = hashlib.sha256()
-                    while True:
-                        chunk = proc.stdout.read(65536)
-                        if not chunk:
-                            break
-                        sha.update(chunk)
-                    proc.wait()
+                    proc = self._borg(["extract", "--stdout", f"{path}::{last_archive}", fpath],
+                                      env, timeout=self.dryrun_timeout, consume=sha.update)
                     if proc.returncode == 0:
                         checksums.append(f"{fpath}:{sha.hexdigest()}")
                     else:
@@ -1020,7 +1059,8 @@ class RestoreTest:
         data = {
             "job_id":                   key,
             "report_schema_version":    1,
-            "report_id":                f"RT-{now.strftime('%Y%m%d-%H%M%S')}-{key}",
+            "report_id":                f"RT-{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex}",
+            "log_file":                 str(getattr(self, "log_path", "")),
             "repository":              repo["path"],
             "job_name":                repo.get("name") or key,
             "location":                repo["location"],
@@ -1065,16 +1105,26 @@ class RestoreTest:
         if reason:
             data["reason"] = reason
 
-        test_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        if getattr(self.args, "resource_worker", False):
+            from restore_test_reports import _atomic_write
+            _atomic_write(Path(os.environ["BORG_UI_RESTORE_RESULT"]), json.dumps(data, ensure_ascii=False))
+        else:
+            self._publish_report(test_file, data, repo)
+
+    def _publish_report(self, test_file: Path, data: dict, repo: dict) -> None:
+        """Persist final evidence before updating dashboard and scheduled notifications."""
+        from restore_test_reports import save_report
+        save_report(test_file, data)
+        result_str = data["test_result"]
         if result_str != "skipped":
-            (self.status_dir / f"{key}.skip.test").unlink(missing_ok=True)
+            (self.status_dir / f"{data['job_id']}.skip.test").unlink(missing_ok=True)
         self.log(f"  → Ergebnis: {test_file}")
         _refresh_unraid_dashboard_widget_cache(self.conf, "restore test result written", self.log)
         if result_str == "success":
-            self._notify_event("restore_test_success", repo, "Successful", duration, coverage)
+            self._notify_event("restore_test_success", repo, "Successful", data["test_duration_seconds"], data["test_coverage"])
         elif result_str in {"failed", "unavailable"}:
-            detail = failure_hint or error_details or reason or "Restore test failed"
-            self._notify_event("restore_test_failed", repo, "Failed", duration, coverage, detail)
+            detail = data.get("failure_hint") or data["error_analysis"].get("error_details") or data.get("reason") or "Restore test failed"
+            self._notify_event("restore_test_failed", repo, "Failed", data["test_duration_seconds"], data["test_coverage"], detail)
 
 
 # ── Hauptprogramm ─────────────────────────────────────────────────────────────
@@ -1096,10 +1146,20 @@ def main() -> None:
                         help="Run was started by the scheduler; enables background notifications")
     parser.add_argument("--job-key",  dest="job_keys", action="append", default=[],
                         help="Optionally test only selected jobs (for example flash_local); may be repeated")
+    parser.add_argument("--resource-worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     conf  = load_conf()
     tester = RestoreTest(conf, args)
+    if args.resource_worker:
+        try:
+            repos = [repo for repo in discover_repos(conf) if repo["job_key"] in args.job_keys]
+            if len(repos) != 1:
+                tester.log("ERROR: protected worker requires exactly one configured repository")
+                sys.exit(1)
+            sys.exit(tester._test_repo_locked(repos[0]))
+        finally:
+            tester.close()
     run_id = os.environ.get("BORG_UI_RUN_ID", "").strip()
     request_id = os.environ.get("BORG_UI_REQUEST_ID", "").strip()
     source = os.environ.get("BORG_UI_REQUEST_SOURCE", "").strip() or ("schedule" if args.scheduled else "manual")
@@ -1172,6 +1232,8 @@ def main() -> None:
         elif rc == 1: fail    += 1
         elif rc == 2: skipped += 1
         elif rc == 3: unavail += 1
+        if getattr(tester, "_cancelled", False):
+            break
 
     tester.log(f"{'='*60}")
     tester.log(f"Summary: {ok} OK | {fail} failed | {unavail} unavailable | {skipped} skipped")

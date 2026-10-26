@@ -414,7 +414,7 @@ async function refreshRestoreTests() {
   if (btn) btn.classList.add('loading');
   try {
     const [testsRes, planRes, schedsRes, settingsRes, runningRes] = await Promise.all([
-      fetch('/api/restore-tests'),
+      fetch('/api/restore-tests?history=1'),
       fetch('/api/restore-tests/plan'),
       fetch('/api/schedules'),
       fetch('/api/settings/basic'),
@@ -961,6 +961,7 @@ function renderRTReportRow(t, idx) {
           <div class="rt-report-sections">
             ${rtReportSection(restoreTestsT('execution'), [
               [restoreTestsT('reportId'), reportId, true],
+              [restoreTestsT('runLogFile'), t.log_file, true],
               [restoreTestsT('site'), location],
               [restoreTestsT('level'), t.test_level != null ? `L${t.test_level}` : null],
               [restoreTestsT('start'), t.start_ts || t.started_at],
@@ -1042,6 +1043,7 @@ function renderRTTechnicalEvidence(report, steps) {
 
 function rtStepLabel(stepId) {
   const map = {
+    resource_guard: restoreTestsT('stepResourceGuard'),
     repo_reachable: restoreTestsT('stepRepoReachable'),
     archive_readable: restoreTestsT('stepArchiveReadable'),
     metadata_check: restoreTestsT('stepMetadata'),

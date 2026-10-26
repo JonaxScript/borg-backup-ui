@@ -537,6 +537,14 @@ def canonical_backup_conf_plan(
 
     effective = {key: current_map.get(key, example_map.get(key, "")) for key in schema_keys}
     effective.update(requested)
+    for key in ("RESTORE_TEST_MEMORY_LIMIT_MIB", "RESTORE_TEST_HOST_RESERVE_MIB"):
+        if key in requested:
+            try:
+                value = int(requested[key])
+            except ValueError as exc:
+                raise ValueError(f"{key} must be an integer in MiB") from exc
+            if not (256 <= value <= 1048576 or (key == "RESTORE_TEST_MEMORY_LIMIT_MIB" and value == 0)):
+                raise ValueError(f"{key} must be 256..1048576 MiB; only the memory limit permits 0 (disabled)")
     output: List[str] = []
     for line in example_content.splitlines(keepends=True):
         stripped = line.strip()
@@ -797,6 +805,8 @@ def get_settings_data(ui_config: dict, include_storagebox_setup: bool = True) ->
             "VM_STARTUP_WAIT":             conf.get("VM_STARTUP_WAIT", "60"),
         },
         "restore_tests": {
+            "RESTORE_TEST_MEMORY_LIMIT_MIB": conf.get("RESTORE_TEST_MEMORY_LIMIT_MIB", "2048"),
+            "RESTORE_TEST_HOST_RESERVE_MIB": conf.get("RESTORE_TEST_HOST_RESERVE_MIB", "1024"),
             "RESTORE_TEST_LEVEL":         conf.get("RESTORE_TEST_LEVEL", "2"),
             "RESTORE_TEST_INTERVAL_DAYS": conf.get("RESTORE_TEST_INTERVAL_DAYS", "30"),
             "RESTORE_TEST_LOCATION":      conf.get("RESTORE_TEST_LOCATION", "local"),

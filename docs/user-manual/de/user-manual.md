@@ -927,9 +927,9 @@ verwenden Sie die explizite Archivauswahl in **Browse & Restore**.
 
 | Level | Tatsächliches Verfahren | Umfang und Schreibzugriffe | Last und Aussagegrenze |
 | --- | --- | --- | --- |
-| L1 | Archivliste abrufen, neuestes Archiv auswählen, `borg info --json` versuchen | Metadaten, keine Nutzdateien am Restore-Ziel; Logs/Status und Borg-Verwaltungsdaten können geschrieben werden | Geringer als L2; kein `borg check`, keine vollständige Datenprüfung. Ein Fehler im Info-Schritt kann trotz Gesamtstatus „Erfolgreich“ auftreten: Einzelschritte lesen. |
+| L1 | Archivliste abrufen, neuestes Archiv auswählen, `borg info --json` versuchen | Metadaten, keine Nutzdateien am Restore-Ziel; Logs/Status und Borg-Verwaltungsdaten können geschrieben werden | Geringer als L2; kein `borg check`, keine vollständige Datenprüfung. Ein Fehler im Info-Schritt beendet den Test als fehlgeschlagen. |
 | L2 | L1, Dateiliste und `borg extract --dry-run` | Liest Metadaten und Datenblöcke, Borg prüft Hash/HMAC, entschlüsselt und dekomprimiert. Schreibt keine wiederhergestellten Nutzdateien. Unter dem Größenschwellwert vollständiger Dry-Run, darüber begrenzte Auswahl regulärer Dateien | Kann viel I/O und Netzwerkverkehr verursachen. Prüft weder Ziel-Dateisystem, Schreibrechte, freien Restore-Platz noch Anwendungsstart. |
-| L3 | L2, danach ausgewählte reguläre Dateien mit `borg extract --stdout` lesen und SHA-256 berechnen | Dateiinhalte werden durch eine Pipe gelesen; Hashes landen im Bericht. Kein unabhängiger Soll-Hash-Vergleich und keine Dateien im Restore-Ziel | Zusätzlicher Datenabruf; Stichprobe standardmäßig 5 Dateien. Keine Garantie für alle Dateien oder einen vollständigen Anwendungs-Restore. Für diesen Streaming-Schritt gibt es hier keinen expliziten Datei-Timeout. |
+| L3 | L2, danach ausgewählte reguläre Dateien mit `borg extract --stdout` lesen und SHA-256 berechnen | Dateiinhalte werden durch eine Pipe gelesen; Hashes landen im Bericht. Kein unabhängiger Soll-Hash-Vergleich und keine Dateien im Restore-Ziel | Zusätzlicher Datenabruf; Stichprobe standardmäßig 5 Dateien. Keine Garantie für alle Dateien oder einen vollständigen Anwendungs-Restore. Pro Datei gilt ebenfalls der Dry-Run-Timeout (0 = unbegrenzt). |
 
 Borgs interne Datenintegritätsprüfung ist vom zusätzlichen SHA-256-Wert im Bericht
 zu unterscheiden. Ein berechneter Hash ohne unabhängig gesicherten Sollwert
@@ -937,12 +937,48 @@ belegt keinen Inhaltsvergleich. Die technische Berichtsbezeichnung
 `sha256 sample compare` ist im geprüften Stand irreführend: L2 führt keinen
 solchen Vergleich aus; L3 berechnet nur Hashes.
 
-> **Warnung:** Im geprüften Stand kann ein vollständiger L2-Dry-Run nach Timeout
-> (Exit-Code 124) als bestanden mit einer vorab ausgewählten Stichprobe erscheinen.
-> Diese Auswahl belegt nicht, dass deren Dateien vor dem Timeout gelesen wurden.
-> Behandeln Sie diesen Lauf als unvollständig. Prüfen Sie Log und Einzelschritte,
-> wiederholen Sie mit geeigneten Grenzen und führen Sie einen echten Restore mit
-> Inhaltsvergleich durch. Auch „100 %“ beschreibt keine getestete Anwendung.
+Ein Timeout (Exit-Code 124), Speicherabbruch oder fehlgeschlagener Metadatenschritt
+endet als fehlgeschlagener Test. Ein abgebrochener vollständiger Dry-Run meldet
+keine bestätigte Datei-Abdeckung. Bei einer gruppenweisen Prüfung zählen nur
+vollständig abgeschlossene Gruppen. Auch „100 %“ beschreibt keine getestete Anwendung.
+
+**Speicherschutz:** Unter **Einstellungen > Restore > Restore Tests** beträgt das
+RAM-Limit standardmäßig 2048 MiB für den Testprozess und seine Borg-Unterprozesse
+zusammen. Die separate, kleine Überwachung läuft außerhalb dieses Budgets.
+Die Dateiliste wird zeilenweise verarbeitet; im RAM bleiben ein Zähler und eine
+begrenzte Zufallsstichprobe. Vollständiges L2 prüft weiterhin das gesamte Archiv,
+begrenztes L2 verwendet dieselben Dateilimits und L3 dieselben Auswahlregeln.
+Borgs eigener Speicherbedarf wird dadurch nicht beseitigt.
+
+Begrenzte Tests laufen nacheinander, auch bei verschiedenen Repositorys. Weitere
+Starts warten mit einer Meldung im Laufprotokoll. Vor dem Start müssen das Budget
+und die Hostreserve (standardmäßig 1024 MiB) verfügbar sein. Fällt der verfügbare
+Host-RAM während des Laufs unter die Reserve, wird der Test gestoppt. Diese
+regelmäßig geprüfte Reserve ist keine garantierte Reservierung gegen andere
+Dienste. Das Kernel-Limit gilt für den Test, einschließlich angerechneter Caches;
+Swap wird für diese Gruppe deaktiviert, sofern der Kernel die Schnittstelle anbietet.
+
+Voraussetzung ist eine beschreibbare cgroup-v2-Speichersteuerung mit `cgroup.kill`.
+Fehlt sie, startet kein ungeschützter Test; der Bericht zeigt den Grund. Das gilt
+auch nach einem Update für bestehende Installationen. Beide Werte benötigen
+mindestens 256 MiB. Nur **RAM-Limit = 0** schaltet den Schutz ausdrücklich aus;
+dann gelten auch Warteschlange und Hostreserve nicht. Ein höheres Limit sollte
+nur mit ausreichend freiem RAM gewählt werden. Ein Limit-Abbruch ist kein
+Nachweis eines beschädigten Archivs und wird nicht als erfolgreiche Prüfung gewertet.
+
+Der Schutz verwendet die Linux-Kernelschnittstelle direkt und benötigt kein systemd.
+Ein erfolgreiches Worker-Protokoll allein ist noch kein bestätigtes Gesamtergebnis:
+Der Supervisor prüft anschließend die Speicherzähler. Ein kleiner, untätiger
+Halteprozess hält die Gruppe bis dahin belegt, damit Unraids automatische Bereinigung
+sie nicht vorzeitig entfernt. Nur dieser Hilfsprozess wird vom OOM-Killer ausgenommen;
+Worker und Borg bleiben normal begrenzt und beendbar. Dafür benötigt das Plugin die
+Berechtigung, den OOM-Wert des Hilfsprozesses auf -1000 zu setzen. Fehlt diese
+Berechtigung oder endet der Halteprozess vorzeitig, schlägt der geschützte Test fehl.
+Der Hilfsprozess wird beim Aufräumen beendet und beendet sich auch, wenn seine
+Pipe zum Supervisor geschlossen wird. Fehlen die abschließenden Speicherzähler, schlägt die
+Prüfung fehl. Eine erst beim Aufräumen bereits entfernte Gruppe ist dagegen kein
+zusätzlicher Fehler. Maßgeblich sind der abschließende Prüfbericht und die Zusammenfassung.
+
 
 Die [Borg-1.4.5-Referenz zu extract](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
 erläutert Dry-Run und Standardausgabe. Für die normale Bedienung ist sie nicht erforderlich.
@@ -954,6 +990,17 @@ Mit **Jetzt testen** neben einem Job starten Sie den Test manuell mit seinem kon
 ### 8.5 Prüfberichte
 
 ![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
+
+Prüfberichte bleiben pro Lauf erhalten, einschließlich Fehlern vor einem erneuten
+Test. Die Detailansicht nennt die zugehörige Logdatei. Der vorherige Bericht einer
+bestehenden Installation wird vor dem ersten Ersetzen gesichert; bereits früher
+überschriebene Berichte können nicht rekonstruiert werden. Die aktuelle
+`<Job-ID>.test` bleibt für Dashboard und Nachweisgültigkeit maßgeblich; die
+Historie liegt daneben unter `runs/<Job-ID>/`. Es gibt keine automatische Löschung
+der neuen Berichtshistorie. Das Löschen des aktuellen Nachweises löscht diese
+Historie nicht. Textprotokolle liegen im konfigurierten Logverzeichnis
+(`Borg-Restore-Test--<Zeitstempel>-<PID>.log`), Ablaufmeldungen im Anwendungslog
+`/var/log/borg_backup_ui.log`; sie werden nicht automatisch in den Unraid-Syslog kopiert.
 
 Der Reiter **Prüfberichte** zeigt strukturierte Nachweise abgeschlossener Restore-Tests:
 

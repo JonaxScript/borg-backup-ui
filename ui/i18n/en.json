@@ -1898,6 +1898,8 @@
     "runSimulationHelp": "Borg is reading and checking the selected data. No files are written to the destination."
   },
   "restoreTests": {
+    "stepResourceGuard": "Memory protection",
+    "runLogFile": "Run log file",
     "title": "Restore tests",
     "subtitle": "Verify that backups can be restored",
     "selection": "Selection",
@@ -2079,6 +2081,11 @@
       "RT_SMB_MOUNT_FAILED": "The SMB share could not be mounted.",
       "RT_REPO_UNAVAILABLE": "The repository is unreachable.",
       "RT_METADATA_CHECK_FAILED": "The archive metadata could not be checked.",
+      "RT_MEMORY_LIMIT": "The restore test reached its RAM limit and was stopped. The archive was not fully verified.",
+      "RT_HOST_MEMORY_LOW": "Insufficient available host RAM for the restore test. Reduce other workloads or run the test later.",
+      "RT_RESOURCE_UNAVAILABLE": "Memory protection could not be configured. The test did not start unprotected. See the run log for details.",
+      "RT_RESOURCE_CONFIG": "Invalid RAM limit or host reserve. Both require at least 256 MiB; only the limit accepts 0 to explicitly disable protection.",
+      "RT_WORKER_INTERRUPTED": "The restore test was interrupted or did not produce a complete report.",
       "RT_UNKNOWN": "The restore test failed for an unknown reason.",
       "RT_REPO_BUSY": "Repository busy: the test was skipped. Previous verification evidence is preserved."
     },
@@ -2801,6 +2808,9 @@
       "chunkFromSize": "Use chunk mode from size (GB)",
       "chunkHint": "At this archive size, a file sample is checked in groups. 0 disables switching. File limits can reduce the target coverage.",
       "limitsPerformance": "Limits & performance",
+      "restoreMemoryLimit": "RAM limit per restore test (MiB; 0 = off)",
+      "restoreHostReserve": "Host memory reserve (MiB)",
+      "restoreMemoryHint": "Default: 2048 MiB for the test and Borg together, 1024 MiB host reserve. Limited tests run sequentially. Requires writable cgroup v2; tests do not start without working enforcement. 0 explicitly disables protection.",
       "minimumCoverage": "Target file coverage (%)",
       "maxEntries": "Maximum files per sample",
       "sampleFiles": "Level 3 sample files",

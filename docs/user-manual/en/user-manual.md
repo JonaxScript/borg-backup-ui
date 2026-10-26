@@ -918,9 +918,9 @@ Use explicit archive selection in **Browse & Restore** to test a particular back
 
 | Level | Actual method | Scope and writes | Cost and limits |
 | --- | --- | --- | --- |
-| L1 | List archives, select newest, attempt `borg info --json` | Metadata only; no restored user files. Logs/status and Borg management data may be written | Lower cost than L2; neither `borg check` nor full data verification. An info-step failure can coexist with overall success: read individual steps. |
+| L1 | List archives, select newest, attempt `borg info --json` | Metadata only; no restored user files. Logs/status and Borg management data may be written | Lower cost than L2; neither `borg check` nor full data verification. An info-step failure ends the test as failed. |
 | L2 | L1, file listing and `borg extract --dry-run` | Reads metadata and chunks; Borg checks hash/HMAC, decrypts and decompresses. Writes no restored user files. Full archive below the size threshold; bounded regular-file selection above it | Potentially substantial I/O/network traffic. Does not test destination filesystem, write permissions, restore free space or application startup. |
-| L3 | L2, then read selected regular files through `borg extract --stdout` and calculate SHA-256 | Streams content through a pipe and records hashes. No independent expected-hash comparison and no restored destination files | Additional reads; default sample 5 files. No guarantee for all files or full application recovery. This streaming phase has no explicit per-file timeout here. |
+| L3 | L2, then read selected regular files through `borg extract --stdout` and calculate SHA-256 | Streams content through a pipe and records hashes. No independent expected-hash comparison and no restored destination files | Additional reads; default sample 5 files. No guarantee for all files or full application recovery. The dry-run timeout also applies per file (0 = unlimited). |
 
 Borg's internal data-integrity checks are separate from the additional SHA-256
 value in the report. Computing a hash without an independently stored expected
@@ -928,12 +928,46 @@ value does not prove a content comparison. The technical report label
 `sha256 sample compare` is misleading in this baseline: L2 performs no such
 comparison and L3 only calculates hashes.
 
-> **Warning:** In this baseline, a full L2 dry-run that times out (exit 124) can
-> be recorded as passed with a previously selected sample. That selection does
-> not prove that those files were read before timeout. Treat the run as incomplete.
-> Review the log and individual steps, repeat with suitable limits and perform
-> an actual restore with content comparison. Even “100%” does not mean an
-> application was tested.
+A timeout (exit 124), memory interruption or failed metadata step ends the test
+as failed. An interrupted full dry-run reports no confirmed file coverage.
+For grouped checks, only fully completed groups count. Even "100%" does not
+mean an application was tested.
+
+**Memory protection:** Under **Settings > Restore > Restore Tests**, the default
+RAM limit is 2048 MiB for the test worker and its Borg children together. A small
+separate supervisor runs outside that budget. Archive listings are processed
+line by line; only a counter and a bounded random sample remain in memory.
+Full L2 still checks the entire archive; bounded L2 retains the same file limits,
+and L3 retains its selection rules. This does not remove Borg's own memory needs.
+
+Limited tests run sequentially, including across different repositories. Further
+starts wait with a message in their run log. Before starting, available RAM must
+cover both the budget and the host reserve (default 1024 MiB). The test is stopped
+if available host RAM falls below that reserve during execution. This periodically
+checked reserve is not a guaranteed reservation against other services. The kernel
+limit covers the test, including accounted caches; group swap is disabled when
+the kernel exposes that interface.
+
+A writable cgroup v2 memory controller with `cgroup.kill` is required. Without it,
+the test does not run unprotected; the report explains the failure. This also
+applies to existing installations after an update. Both values require at least
+256 MiB. Only **RAM limit = 0** explicitly disables protection; the queue and
+host reserve then do not apply either. Increase the budget only with sufficient
+available host RAM. A memory-limit failure is not evidence of archive corruption
+and never counts as successful verification.
+
+Protection uses the Linux kernel interface directly and does not require systemd.
+A successful worker log alone is not yet a confirmed overall result: the supervisor
+then checks the memory counters. A small idle keeper keeps the group populated
+until then so Unraid's automatic cleanup cannot remove it early. Only this helper
+is exempt from OOM killing; worker and Borg remain limited and eligible for killing.
+The plugin therefore requires permission to set the helper's OOM score to -1000.
+Missing permission or premature keeper exit fails the protected test. Cleanup ends
+the helper; it also exits when its pipe to the supervisor closes. Missing final
+counters fail verification. A group already
+removed at cleanup is not an additional failure. The final report and summary are
+the authoritative result.
+
 
 The [Borg 1.4.5 extract reference](https://borgbackup.readthedocs.io/en/1.4.5/usage/extract.html)
 explains dry-run and standard output. It is optional for routine operation.
@@ -945,6 +979,16 @@ Use **Test now** next to a job to start it manually with its configured test lev
 ### 8.5 Reports
 
 ![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)
+
+Reports are retained per run, including failures before a retry. Details identify
+the corresponding log file. An existing installation's previous report is saved
+before its first replacement; reports overwritten before this change cannot be
+reconstructed. The current `<job-id>.test` remains authoritative for the dashboard
+and evidence validity; history lives alongside it under `runs/<job-id>/`. The new
+report history is not automatically pruned. Deleting the current evidence does not
+remove that history. Text logs live in the configured log directory as
+`Borg-Restore-Test--<timestamp>-<PID>.log`. Lifecycle events go to the application
+log `/var/log/borg_backup_ui.log`, not automatically to Unraid syslog.
 
 The **Reports** tab shows structured evidence for completed restore tests:
 

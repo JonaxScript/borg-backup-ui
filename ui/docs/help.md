@@ -225,9 +225,13 @@ Ein Skip erneuert keinen Nachweis. Legacy-Intervalltests bleiben getrennt unter
 - **L3:** Zusätzlich ausgewählte Dateien über `--stdout` lesen und SHA-256 berechnen; kein unabhängiger Soll-Hash-Vergleich.
 
 > [!WARNING] Die Auswahl ist das neueste Archiv des Repositorys, nicht zwingend
-> des Jobs. Prüfen Sie den Archivnamen und die Einzelschritte. Im dokumentierten
-> Stand können L1-Infofehler oder ein L2-Timeout hinter einem erfolgreichen
-> Gesamtstatus stehen. Ein solcher Lauf ist kein belastbarer vollständiger Nachweis.
+> des Jobs. Prüfen Sie den Archivnamen und die Einzelschritte. Metadatenfehler,
+> Timeout und Speicherabbruch ergeben einen fehlgeschlagenen Test.
+
+Dateilisten werden speichersparend verarbeitet. Standardmäßig gelten 2048 MiB
+RAM-Limit und 1024 MiB Hostreserve; begrenzte Tests laufen nacheinander und
+benötigen cgroup v2. Ohne wirksame Begrenzung startet kein Test. Prüfberichte
+bleiben pro Lauf erhalten; ihre Details nennen die Logdatei.
 
 [Verfahren, Schreibzugriffe, Abdeckung und Grenzen](../../docs/user-manual/de/user-manual.md#83-testlevel).
 Ein echter Restore in ein separates Ziel mit Inhalts- und Anwendungstest bleibt nötig.
