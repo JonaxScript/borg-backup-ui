@@ -105,7 +105,7 @@ def _restore_test_instance(runner, monkeypatch, tmp_path):
     instance = object.__new__(runner.RestoreTest)
     instance.args = SimpleNamespace(dry_run=False)
     instance.test_level = 1
-    instance.conf = {"BACKUP_SCRIPTS_DIR": str(tmp_path), "BORG_RESOURCE_LOCK_DIR": str(tmp_path / "locks")}
+    instance.conf = {"RESTORE_TEST_MEMORY_LIMIT_MIB": "0", "BACKUP_SCRIPTS_DIR": str(tmp_path), "BORG_RESOURCE_LOCK_DIR": str(tmp_path / "locks")}
     monkeypatch.setattr(instance, "_should_test", lambda _key: True)
     monkeypatch.setattr(instance, "_write", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(instance, "_cleanup_smb_mount", lambda *_args, **_kwargs: None)
@@ -125,7 +125,7 @@ def test_restore_runner_tests_unencrypted_repository_without_passphrase(tmp_path
         passphrases.append(passphrase)
         return {}
 
-    def fake_borg(args, _env, timeout=None):
+    def fake_borg(args, _env, timeout=None, consume=None):
         if args[:3] == ["list", "--short", "--last"]:
             return SimpleNamespace(returncode=0, stdout="archive-1\n", stderr="")
         if args[:2] == ["info", "--json"]:
@@ -298,13 +298,15 @@ def test_restore_probe_uses_size_and_regular_file_limits(tmp_path, monkeypatch, 
     rows += [{"type": "-", "path": f"folder-{i % 10}/file-{i}"} for i in range(file_count)]
     rows += [{"type": "l", "path": "symbolic-link"}]
     calls, results = [], []
-    def fake_borg(args, _env, timeout=None):
+    def fake_borg(args, _env, timeout=None, consume=None):
         if args[:3] == ["list", "--short", "--last"]:
             output = "archive-1\n"
         elif args[:2] == ["info", "--json"]:
             output = json.dumps({"archives": [{"stats": {"original_size": size_gb * 1024**3}}]})
         elif args[:2] == ["list", "--json-lines"]:
-            output = "\n".join(json.dumps(row) for row in rows)
+            for row in rows:
+                consume((json.dumps(row) + "\n").encode())
+            output = ""
         elif args[:2] == ["extract", "--dry-run"]:
             calls.append(args)
             output = ""

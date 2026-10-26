@@ -6171,6 +6171,8 @@ function renderSettingsRestoreTests(rt) {
 
       <h4 class="settings-subtitle">${settingsT('forms.limitsPerformance')}</h4>
       <div class="two-col">
+        ${fnum('RESTORE_TEST_MEMORY_LIMIT_MIB', settingsT('forms.restoreMemoryLimit'), rt.RESTORE_TEST_MEMORY_LIMIT_MIB ?? '2048')}
+        ${fnum('RESTORE_TEST_HOST_RESERVE_MIB', settingsT('forms.restoreHostReserve'), rt.RESTORE_TEST_HOST_RESERVE_MIB ?? '1024')}
         ${fnum('RESTORE_TEST_MIN_COVERAGE', settingsT('forms.minimumCoverage'), rt.RESTORE_TEST_MIN_COVERAGE || '5')}
         ${fnum('RESTORE_TEST_MAX_ENTRIES', settingsT('forms.maxEntries'), rt.RESTORE_TEST_MAX_ENTRIES || '1000')}
         ${fnum('RESTORE_TEST_SAMPLE_SIZE', settingsT('forms.sampleFiles'), rt.RESTORE_TEST_SAMPLE_SIZE || '5')}
@@ -6179,6 +6181,7 @@ function renderSettingsRestoreTests(rt) {
         ${fnum('RESTORE_TEST_DRY_RUN_CHUNK_SIZE', settingsT('forms.chunkSize'), rt.RESTORE_TEST_DRY_RUN_CHUNK_SIZE || '100')}
         ${fnum('RESTORE_TEST_DRY_RUN_MAX_FILES', settingsT('forms.maxDryRunFiles'), rt.RESTORE_TEST_DRY_RUN_MAX_FILES || '1000')}
       </div>
+      <p class="muted">${settingsT('forms.restoreMemoryHint')}</p>
       <label class="form-checkbox-row" style="margin-top:10px">
         <input type="checkbox" data-key="RESTORE_TEST_LEVEL3_LEGACY_SAMPLING"
           ${(rt.RESTORE_TEST_LEVEL3_LEGACY_SAMPLING || 'false') === 'true' ? 'checked' : ''}

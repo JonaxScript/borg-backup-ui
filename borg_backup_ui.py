@@ -2311,7 +2311,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
 
     def _get_restore_tests(self) -> dict:
         from restore_tests_api import list_restore_tests
-        return {"tests": list_restore_tests(self.config)}
+        return {"tests": list_restore_tests(self.config, history=parse_qs(urlparse(self.path).query).get("history") == ["1"])}
 
     def _get_restore_tests_plan(self) -> dict:
         from restore_tests_api import list_restore_test_plan

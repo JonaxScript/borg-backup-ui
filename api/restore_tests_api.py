@@ -2,6 +2,7 @@
 api/restore_tests_api.py – Restore-Test-Ergebnisse aus .test-Dateien lesen
 """
 import json
+import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -22,11 +23,12 @@ def resolve_restore_test_dir(config: dict) -> Path:
     return configured or (status_dir.parent / "restore-status")
 
 
-def list_restore_tests(config: dict) -> List[dict]:
+def list_restore_tests(config: dict, *, history: bool = False) -> List[dict]:
     """Load active jobs' restore-test reports from the configured directory.
 
     Unreadable JSON and reports for unknown jobs are skipped. Returned rows
     include formatted status/duration fields and are sorted by result/date.
+    With history=True, also include retained runs, deduplicated by report ID.
     """
     test_dir = resolve_restore_test_dir(config)
     if not test_dir.exists():
@@ -35,12 +37,25 @@ def list_restore_tests(config: dict) -> List[dict]:
     from job_identity import active_job_ids
     job_ids = active_job_ids(config)
     results = []
-    for test_file in sorted(test_dir.glob("*.test")):
+    files = sorted(test_dir.glob("*.test"))
+    if history:
+        for job in sorted(job_ids):
+            files.extend(sorted((test_dir / "runs" / job).glob("*.test")))
+    seen = set()
+    for test_file in files:
         try:
             data = json.loads(test_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
 
+        if not isinstance(data, dict):
+            continue
+        identity = json.dumps(data, sort_keys=True)
+        # Older reports can lack IDs, or have IDs shared by runs in the same second.
+        identity = hashlib.sha256(identity.encode()).digest()
+        if identity in seen:
+            continue
+        seen.add(identity)
         data["job_key"] = str(data.get("job_id") or "")
         if data["job_key"] not in job_ids:
             continue

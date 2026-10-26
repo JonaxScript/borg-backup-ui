@@ -109,7 +109,7 @@ def _tester(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, 'emit_lifecycle', lambda *_a, **_k: None)
     monkeypatch.setattr(runner, '_refresh_unraid_dashboard_widget_cache', lambda *_a: None)
     args = SimpleNamespace(level=2, force=False, scheduled=True, dry_run=False)
-    conf = {'BACKUP_SCRIPTS_DIR': str(tmp_path), 'BORG_RESOURCE_LOCK_DIR': str(tmp_path / 'locks'),
+    conf = {'RESTORE_TEST_MEMORY_LIMIT_MIB': '0', 'BACKUP_SCRIPTS_DIR': str(tmp_path), 'BORG_RESOURCE_LOCK_DIR': str(tmp_path / 'locks'),
             'GLOBAL_LOG_DIR': str(tmp_path / 'logs'), 'RESTORE_TEST_STATUS_DIR': str(tmp_path / 'reports')}
     monkeypatch.setattr(runner.RestoreTest, '_load_notification_config', lambda _s: {})
     tester = runner.RestoreTest(conf, args)

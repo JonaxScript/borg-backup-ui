@@ -77,6 +77,10 @@ UI_SESSION_TIMEOUT_MINUTES="30"
 # =============================================================================
 # RESTORE TESTS / WEEKLY REPORT
 # =============================================================================
+# Combined worker/Borg RAM budget; 0 explicitly disables protection.
+# Protected tests require writable cgroup v2 and run sequentially.
+RESTORE_TEST_MEMORY_LIMIT_MIB="2048"
+RESTORE_TEST_HOST_RESERVE_MIB="1024"
 RESTORE_TEST_LEVEL="2"
 RESTORE_TEST_INTERVAL_DAYS="30"
 RESTORE_TEST_LOCATION="local"

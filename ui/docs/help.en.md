@@ -224,9 +224,13 @@ Restore**. No corresponding overdue reminder is sent without a previous report.
 - **L3:** Additionally stream selected files through `--stdout` and calculate SHA-256; no independent expected-hash comparison.
 
 > [!WARNING] Selection uses the newest repository archive, not necessarily the
-> job's archive. Check its name and individual steps. In this baseline, L1 info
-> failures or an L2 timeout may coexist with overall success. Such a run is not
-> dependable evidence of complete verification.
+> job's archive. Check its name and individual steps. Metadata failures,
+> timeout and memory interruptions produce a failed test.
+
+Archive listings use bounded memory. Defaults are a 2048 MiB RAM limit and a
+1024 MiB host reserve; limited tests run sequentially and require cgroup v2.
+Tests do not start without working enforcement. Reports are retained per run;
+their details identify the log file.
 
 [Methods, writes, coverage and limits](../../docs/user-manual/en/user-manual.md#83-test-levels).
 An actual restore to a separate destination, content comparison and application

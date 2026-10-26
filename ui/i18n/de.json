@@ -1898,6 +1898,8 @@
     "runSimulationHelp": "Borg liest und prüft die ausgewählten Daten. Es werden keine Dateien ins Ziel geschrieben."
   },
   "restoreTests": {
+    "stepResourceGuard": "Speicherschutz",
+    "runLogFile": "Laufprotokoll",
     "title": "Restore Tests",
     "subtitle": "Verifizierung der Wiederherstellbarkeit",
     "selection": "Auswahl",
@@ -2079,6 +2081,11 @@
       "RT_SMB_MOUNT_FAILED": "Die SMB-Freigabe konnte nicht eingehängt werden.",
       "RT_REPO_UNAVAILABLE": "Das Repository ist nicht erreichbar.",
       "RT_METADATA_CHECK_FAILED": "Die Archivmetadaten konnten nicht geprüft werden.",
+      "RT_MEMORY_LIMIT": "Der Restore-Test hat sein RAM-Limit erreicht und wurde abgebrochen. Das Archiv wurde nicht vollständig verifiziert.",
+      "RT_HOST_MEMORY_LOW": "Für den Restore-Test ist zu wenig verfügbarer Host-RAM vorhanden. Andere Last reduzieren oder den Test später ausführen.",
+      "RT_RESOURCE_UNAVAILABLE": "Der Speicherschutz konnte nicht eingerichtet werden. Der Test wurde nicht ungeschützt gestartet. Details stehen im Laufprotokoll.",
+      "RT_RESOURCE_CONFIG": "RAM-Limit oder Hostreserve sind ungültig. Beide benötigen mindestens 256 MiB; nur das Limit erlaubt 0 zum ausdrücklichen Abschalten.",
+      "RT_WORKER_INTERRUPTED": "Der Restore-Test wurde unterbrochen oder hat keinen vollständigen Prüfbericht geliefert.",
       "RT_UNKNOWN": "Der Restore-Test ist aus einem unbekannten Grund fehlgeschlagen.",
       "RT_REPO_BUSY": "Repository belegt: Der Test wurde übersprungen. Der vorherige Testnachweis bleibt erhalten."
     },
@@ -2801,6 +2808,9 @@
       "chunkFromSize": "Ab Größe (GB) direkt Chunk-Modus",
       "chunkHint": "Ab dieser Archivgröße wird eine Dateistichprobe in Gruppen geprüft. 0 deaktiviert die Umschaltung. Dateigrenzen können die angestrebte Abdeckung begrenzen.",
       "limitsPerformance": "Limits & Performance",
+      "restoreMemoryLimit": "RAM-Limit pro Restore-Test (MiB; 0 = aus)",
+      "restoreHostReserve": "Freizuhaltende Hostreserve (MiB)",
+      "restoreMemoryHint": "Standard: 2048 MiB für Test und Borg zusammen, 1024 MiB Hostreserve. Begrenzte Tests laufen nacheinander. Benötigt beschreibbare cgroup v2; ohne wirksame Begrenzung startet der Test nicht. 0 deaktiviert den Schutz ausdrücklich.",
       "minimumCoverage": "Angestrebte Datei-Abdeckung (%)",
       "maxEntries": "Maximale Dateien pro Stichprobe",
       "sampleFiles": "Level-3 Sample-Dateien",

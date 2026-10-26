@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Bounded restore-test memory and retained evidence (#599)
+
+- Stream archive JSON-lines into a bounded uniform reservoir; keep exact regular-file counts, existing size thresholds, file limits and complete-archive L2 verification. Stream L3 hashing and concurrently drain bounded stderr; kill subprocess groups on timeouts.
+- Add cgroup v2 worker supervision with a default 2048 MiB combined memory budget and 1024 MiB monitored host reserve. Serialize protected tests, fail closed when enforcement is unavailable, and publish final reports only after the supervisor accepts worker completion. Preserve repository locks and SMB cleanup in the supervisor.
+- Retain per-run reports and associated log paths while preserving the latest-result files consumed by status/notifications. Show retained runs in the report screen. Preserve the existing previous report before replacement, including unreadable legacy bytes.
+- Report full dry-run timeouts and metadata failures as failed verification; never substitute an unverified sample for completed file coverage. Document compatibility requirements and explicit protection opt-out in both languages.
+
 ## Pending - Online database engines and metadata housekeeping (#593)
 
 - Support only MariaDB, MySQL and PostgreSQL online exports. Keep MySQL/InnoDB native dumps and reject nontransactional tables. Remove MongoDB, Redis and SQLite from exports, settings and the managed script catalog.
