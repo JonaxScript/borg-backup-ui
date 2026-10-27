@@ -67,6 +67,7 @@
     '/ui/js/pages/help.js',
     '/ui/js/pages/history.js',
     '/ui/js/pages/dashboard.js',
+    '/ui/js/components/resource-monitor.js',
     '/ui/js/pages/jobs.js',
     '/ui/js/pages/job-groups.js',
     '/ui/js/pages/wizard.js',

@@ -121,6 +121,8 @@ function navigate(page) {
   if (pageEl) pageEl.classList.add('active');
   if (navEl)  navEl.classList.add('active');
   state.currentPage = page;
+  if (page === 'dashboard') window.BBUI?.resourceMonitor?.start();
+  else window.BBUI?.resourceMonitor?.stop();
   closeMobileNav();
 
   if (page === 'dashboard') runCoreAction('refreshStatus');

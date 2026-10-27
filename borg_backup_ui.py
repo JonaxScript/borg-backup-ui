@@ -410,6 +410,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         "/api/setup-status",
         "/api/status",
         "/api/system-health",
+        "/api/system-resources",
         "/api/version",
     }
     _ROUTINE_GET_PREFIXES = (
@@ -744,6 +745,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         if m == "GET" and (
             p.startswith("/api/status")
             or p.startswith("/api/system-health")
+            or p == "/api/system-resources"
             or p.startswith("/api/notification-reminders")
             or p.startswith("/api/jobs")
             or p.startswith("/api/job-groups")
@@ -960,6 +962,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/licenses": lambda: self._get_license_file(parsed.query),
                 "/api/status": self._get_status,
                 "/api/system-health": self._get_system_health,
+                "/api/system-resources": self._get_system_resources,
                 "/api/notification-reminders/diagnostics": self._get_notification_reminder_diagnostics,
                 "/api/jobs": self._get_jobs,
                 "/api/job-groups": self._get_job_groups,
@@ -1764,6 +1767,11 @@ class BackupUIHandler(BaseHTTPRequestHandler):
     def _get_system_health(self) -> dict:
         from system_health_api import get_system_health_data
         return get_system_health_data(self.config)
+
+    def _get_system_resources(self) -> dict:
+        """Return shared read-only CPU/RAM measurements for authenticated viewers."""
+        from resource_metrics import get_resource_metrics
+        return get_resource_metrics(self.config)
 
     def _post_runtime_recovery_ack(self) -> dict:
         body = self._read_json_body()

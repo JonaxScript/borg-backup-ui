@@ -3702,5 +3702,32 @@
     "mysqlScope": "MariaDB/MySQL: ausschließlich transaktionale InnoDB-Tabellen, einschließlich Routinen, Triggern und Events. Benutzerkonten und Rechte separat sichern.",
     "housekeeping": "Interne Vorgangs- und Testdaten werden 30 Tage nach bestätigtem Abschluss entfernt. Laufende, ungeklärte und nicht zuordenbare Einträge bleiben erhalten. Dumps und Secrets sind davon ausgenommen.",
     "unsupportedProfiles": "Diese Profile aus einer früheren Testversion werden nicht mehr unterstützt. Profile, Secrets und Sicherungen bleiben erhalten. Entferne ihre Zuordnung aus betroffenen Jobs; neue Sicherungen sind damit nicht möglich."
+  },
+  "resources": {
+    "title": "Server-Auslastung",
+    "live": "Live · alle {seconds} s",
+    "unavailable": "Messwerte nicht verfügbar",
+    "cpu": "CPU · Gesamter Server",
+    "cpuScale": "100 % = alle CPU-Kerne",
+    "ram": "RAM verfügbar",
+    "ramTotal": "von {total} · inkl. freigebbarem Cache",
+    "active": "Aktive Läufe",
+    "idle": "Keine aktiven Backup-, Restore- oder Testläufe",
+    "backup": "Backup",
+    "restore": "Restore",
+    "restoreTest": "Restore-Test",
+    "otherRun": "Lauf",
+    "protectedTest": "Restore-Test · Speicherbegrenzung aktiv",
+    "budget": "RAM-Verbrauch im Verhältnis zum Limit",
+    "reserve": "Konfigurierte Hostreserve: {value}",
+    "accounting": "Test-RAM: gesamte cgroup inkl. Dateicache und Unterprozessen. Die Hostreserve wird überwacht, nicht fest reserviert.",
+    "scope": "Gesamter Server einschließlich VMs und Containern",
+    "showHistory": "Verlauf anzeigen",
+    "hideHistory": "Verlauf ausblenden",
+    "now": "Jetzt",
+    "historyNote": "Letzte 10 Minuten ab dem ersten Dashboard-Aufruf, nur im Arbeitsspeicher. Messung: bei aktiven Läufen jede Sekunde, sonst alle 10 s; Verlauf auf 5 s ausgedünnt. Fehlende Messwerte erscheinen als Lücken. Aktive Läufe umfassen erfasste Backup-, Restore- und Testläufe, keine reinen Browse-Anfragen. Einzelwerte gibt es nur für geschützte Restore-Tests.",
+    "current": "Aktuell",
+    "noMeasurement": "Keine Messung",
+    "inspectHint": "Messpunkt mit Maus oder Antippen auswählen; Pfeiltasten, Pos1 und Ende zum Navigieren."
   }
 }
