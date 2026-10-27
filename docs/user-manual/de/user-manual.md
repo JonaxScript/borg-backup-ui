@@ -868,6 +868,8 @@ Die Detailansicht kann ein- und ausgeklappt werden und zeigt strukturierte Daten
 
 ## 8. Restore Tests
 
+Ein abgebrochener Restore-Test ist ein unvollständiger Testversuch und kein fehlgeschlagener Nachweis. In Jobs und im gespeicherten Status wird der **letzte Testversuch als abgebrochen** mit Datum angezeigt; der vorherige abgeschlossene Test behält seinen Status und sein ursprüngliches Gültigkeitsende. Ein Abbruch verlängert keinen Nachweis und verdeckt keinen vorherigen echten Fehler. Ohne verwertbaren vorherigen Bericht bleibt der Nachweis offen. Bereits gespeicherte Abbrüche werden anhand der vorhandenen Berichtshistorie genauso ausgewertet; die Berichte bleiben erhalten.
+
 ![Restore Tests - Planung](../assets/de/current/restore-tests-plan.png)
 
 Restore Tests prüfen automatisiert, ob eine Wiederherstellung technisch funktioniert. Sie sind ein wichtiger Nachweis, dass Backups nicht nur geschrieben, sondern auch lesbar sind.

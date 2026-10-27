@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List
 import re
+from restore_test_reports import report_cancelled, verification_evidence
 
 
 def restore_test_runtime(config: dict) -> dict:
@@ -192,18 +193,22 @@ def list_restore_test_plan(config: dict) -> dict:
         last_test_date = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else ""
         last_result = str(test_data.get("test_result") or "").strip().lower() if test_data else ""
 
+        evidence, evidence_file = verification_evidence(test_file, test_data)
+        evidence_dt = _extract_test_datetime(evidence, evidence_file) if evidence else None
+        if report_cancelled(test_data):
+            last_result = "cancelled"
         next_due = ""
         is_overdue = False
         cron = str(eff.get("cron") or "")
         if mode == "scheduled":
             due_days = max(1, _safe_int(eff.get("validity_days" if cron else "interval_days"), interval_default))
-            if test_data and last_result != "success":
-                next_due = last_test_date
+            if evidence and evidence.get("test_result") != "success":
+                next_due = evidence_dt.strftime("%Y-%m-%d %H:%M:%S") if evidence_dt else ""
                 is_overdue = True
-            elif dt is None:
+            elif evidence_dt is None:
                 is_overdue = True
             else:
-                due_ts = dt.timestamp() + (due_days * 86400)
+                due_ts = evidence_dt.timestamp() + (due_days * 86400)
                 next_due = datetime.fromtimestamp(due_ts).strftime("%Y-%m-%d %H:%M:%S")
                 if due_ts <= now_ts:
                     is_overdue = True
@@ -346,6 +351,11 @@ def build_restore_verification_map(config: dict, jobs: List[dict]) -> Dict[str, 
     """
     Berechnet den Restore-Nachweisstatus pro Job.
 
+    Explizite Abbrueche behalten den vorherigen Nachweis mit dessen Ablaufdatum.
+    last_test_* beschreibt den letzten Versuch; evidence_test_date und
+    failure_* beschreiben den zugrunde liegenden Nachweis.
+    Fehlende Historie liefert keinen Nachweis, echte Fehler bleiben fehlgeschlagen.
+
     Status:
       - verified
       - stale
@@ -373,6 +383,7 @@ def build_restore_verification_map(config: dict, jobs: List[dict]) -> Dict[str, 
         last_result = ""
         last_level = 0
         last_duration_seconds = 0
+        evidence_test_date = ""
         failure_code = ""
         failure_hint = ""
         failure_category = ""
@@ -390,16 +401,27 @@ def build_restore_verification_map(config: dict, jobs: List[dict]) -> Dict[str, 
             last_result = str(test_data.get("test_result") or "").strip().lower()
             last_level = _safe_int(test_data.get("test_level"), 0)
             last_duration_seconds = _safe_int(test_data.get("test_duration_seconds"), 0)
+            attempt_dt = _extract_test_datetime(test_data, test_file)
+            if attempt_dt is not None:
+                last_test_date = attempt_dt.strftime("%Y-%m-%d %H:%M:%S")
+            if report_cancelled(test_data):
+                last_result = "cancelled"
+            evidence, evidence_file = verification_evidence(test_file, test_data)
+            evidence_result = str(evidence.get("test_result") or "").strip().lower()
+            test_data = evidence
             failure_code = str(test_data.get("failure_code") or "").strip()
             failure_hint = str(test_data.get("failure_hint") or "").strip()
             error_analysis = test_data.get("error_analysis") if isinstance(test_data.get("error_analysis"), dict) else {}
             failure_category = str(error_analysis.get("error_category") or "").strip()
-            dt = _extract_test_datetime(test_data, test_file)
+            dt = _extract_test_datetime(evidence, evidence_file) if evidence else None
             if dt is not None:
-                last_test_date = dt.strftime("%Y-%m-%d %H:%M:%S")
+                evidence_test_date = dt.strftime("%Y-%m-%d %H:%M:%S")
                 age_days = max(0, int((datetime.now() - dt).total_seconds() // 86400))
 
-            if last_result == "success":
+            if not evidence:
+                status = "never"
+                reason = "no_completed_test_report"
+            elif evidence_result == "success":
                 if mode == "manual_only":
                     status = "verified"
                     reason = "manual_success"
@@ -416,9 +438,9 @@ def build_restore_verification_map(config: dict, jobs: List[dict]) -> Dict[str, 
                     else:
                         status = "verified"
                         reason = "within_validity"
-            elif last_result in {"failed", "unavailable"}:
+            elif evidence_result in {"failed", "unavailable"}:
                 status = "failed"
-                reason = f"last_result_{last_result}"
+                reason = f"last_result_{evidence_result}"
             else:
                 status = "failed"
                 reason = "unknown_last_result"
@@ -429,6 +451,7 @@ def build_restore_verification_map(config: dict, jobs: List[dict]) -> Dict[str, 
             "policy": policy,
             "last_test_date": last_test_date,
             "last_test_result": last_result,
+            "evidence_test_date": evidence_test_date,
             "last_test_level": last_level,
             "last_test_duration_seconds": last_duration_seconds,
             "failure_code": failure_code,

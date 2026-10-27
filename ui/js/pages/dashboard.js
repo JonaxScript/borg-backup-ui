@@ -606,9 +606,12 @@ function renderDashboardRestoreVerificationBadge(backup, compact = false) {
   };
   const m = map[status];
   if (!m) return '';
+  const cancelled = backup.restore_verification_last_test_result === 'cancelled';
   const details = [
+    cancelled && backup.restore_verification_evidence_date
+      ? [dashboardT('jobs.lastCompletedTestLabel'), backup.restore_verification_evidence_date] : null,
     backup.restore_verification_last_test_date
-      ? [dashboardT('dashboard.lastTestLabel'), backup.restore_verification_last_test_date]
+      ? [dashboardT(cancelled ? 'jobs.lastTestAttemptLabel' : 'dashboard.lastTestLabel'), cancelled ? `${dashboardT('jobs.statusCancelled')} · ${backup.restore_verification_last_test_date}` : backup.restore_verification_last_test_date]
       : null,
     backup.restore_verification_valid_until
       ? [dashboardT('dashboard.validUntilLabel'), backup.restore_verification_valid_until]

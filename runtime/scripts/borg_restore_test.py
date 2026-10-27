@@ -497,6 +497,7 @@ class RestoreTest:
     # ── Intervall-Prüfung ──────────────────────────────────────────────────────
 
     def _should_test(self, key: str) -> bool:
+        """Check the original evidence interval; explicit cancellations do not reset it."""
         if self.args.force or getattr(self, "_calendar_run", False):
             return True
         tf = self.status_dir / f"{key}.test"
@@ -504,6 +505,8 @@ class RestoreTest:
             return True
         try:
             raw = json.loads(tf.read_text(encoding="utf-8"))
+            from restore_test_reports import verification_evidence
+            raw, tf = verification_evidence(tf, raw)
             last_result = str(raw.get("test_result", "")).strip().lower()
             if last_result != "success":
                 self.log(f"  Latest test status: {last_result or 'unknown'} - a new test is required")

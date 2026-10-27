@@ -215,6 +215,8 @@ Der Restore-Wizard führt durch Job, Archiv, Auswahl, Ziel und Prüfung. Im Ziel
 
 ## 12. Restore Tests
 
+Ein abgebrochener Restore-Test ist ein unvollständiger Testversuch und kein fehlgeschlagener Nachweis. In Jobs und im gespeicherten Status wird der **letzte Testversuch als abgebrochen** mit Datum angezeigt; der vorherige abgeschlossene Test behält seinen Status und sein ursprüngliches Gültigkeitsende. Ein Abbruch verlängert keinen Nachweis und verdeckt keinen vorherigen echten Fehler. Ohne verwertbaren vorherigen Bericht bleibt der Nachweis offen. Bereits gespeicherte Abbrüche werden anhand der vorhandenen Berichtshistorie genauso ausgewertet; die Berichte bleiben erhalten.
+
 Unter **Planung & Policy > Plan bearbeiten** legen Administratoren Kalendertermin,
 Testlevel und getrennte Nachweisgültigkeit fest. **Jetzt testen** startet manuell.
 Die Serverzeitzone gilt; verpasste/übersprungene Termine werden nicht nachgeholt.

@@ -860,6 +860,8 @@ The detail view can be expanded and collapsed. It shows structured data and the 
 
 ## 8. Restore Tests
 
+A cancelled restore test is an incomplete attempt, not failed verification evidence. Jobs and saved status details show the **latest test attempt as cancelled** with its date; the preceding completed test retains its outcome and original validity deadline. Cancellation neither renews evidence nor hides a preceding real failure. Without a usable preceding report, verification remains open. Existing cancellation reports are evaluated using retained report history in the same way; reports are preserved.
+
 ![Restore Tests - Planning](../assets/en/current/restore-tests-plan.png)
 
 Restore Tests automatically verify that a restore is technically possible. They are important evidence that backups are not only written but also readable.

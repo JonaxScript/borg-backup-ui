@@ -869,6 +869,7 @@ function renderJobCard(job) {
   </article>`;
 }
 
+/** Render proof validity separately from the latest cancelled test attempt. */
 function renderJobRestoreVerification(job) {
   const status = String(job.restore_verification_status || '').toLowerCase();
   if (!status) return '';
@@ -881,8 +882,10 @@ function renderJobRestoreVerification(job) {
   };
   const item = map[status];
   if (!item) return '';
+  const cancelled = job.restore_verification_last_test_result === 'cancelled';
   const details = [
-    job.restore_verification_last_test_date ? jobsT('jobs.lastTest', { date: job.restore_verification_last_test_date }) : '',
+    cancelled && job.restore_verification_evidence_date ? jobsT('jobs.lastCompletedTest', {date: job.restore_verification_evidence_date}) : '',
+    job.restore_verification_last_test_date ? jobsT(cancelled ? 'jobs.lastTestCancelled' : 'jobs.lastTest', { date: job.restore_verification_last_test_date }) : '',
     job.restore_verification_valid_until ? jobsT('jobs.validUntil', { date: job.restore_verification_valid_until }) : '',
   ].filter(Boolean);
   const detailText = details.join(' · ');

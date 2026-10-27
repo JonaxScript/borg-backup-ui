@@ -215,6 +215,8 @@ The restore wizard walks through job, archive, selection, target, and review. In
 
 ## 12. Restore Tests
 
+A cancelled restore test is an incomplete attempt, not failed verification evidence. Jobs and saved status details show the **latest test attempt as cancelled** with its date; the preceding completed test retains its outcome and original validity deadline. Cancellation neither renews evidence nor hides a preceding real failure. Without a usable preceding report, verification remains open. Existing cancellation reports are evaluated using retained report history in the same way; reports are preserved.
+
 Under **Planning & Policy > Edit plan**, administrators set calendar execution,
 test level and separate evidence validity. **Test now** starts manually.
 Server timezone applies; missed/skipped slots are not caught up. Skipping does

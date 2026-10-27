@@ -183,6 +183,35 @@ const { chromium } = require('playwright');
   assert.equal(await page.evaluate(()=>document.activeElement.dataset.jobsAction),'toggle-workflow');
   await page.evaluate(()=>{jobsState.jobs[4].running=true;renderJobsGrid(jobsState.jobs);});
   assert.match(await page.locator('#job-card-4 .job-saved-message').innerText(),/Letztes gespeichertes Ergebnis/);
+  // The latest cancelled attempt must not replace a still-valid restore proof.
+  for (const language of ['de','en']) {
+    const proof = await page.evaluate(language => {
+      window.lang=language;
+      const row={...jobsState.jobs[0], restore_verification_status:'verified', restore_verification_last_test_result:'cancelled',
+        restore_verification_last_test_date:'2026-10-27 10:14:22', restore_verification_evidence_date:'2026-10-26 23:10:52',
+        restore_verification_valid_until:'2026-11-25 23:10:52'};
+      Object.assign(demoJobs[0], row);
+      Object.assign(BBUI.core.state.data.backups[0], {
+        restore_verification_status:row.restore_verification_status,
+        restore_verification_last_test_result:row.restore_verification_last_test_result,
+        restore_verification_last_test_date:row.restore_verification_last_test_date,
+        restore_verification_evidence_date:row.restore_verification_evidence_date,
+        restore_verification_valid_until:row.restore_verification_valid_until,
+      });
+      return {card:renderJobRestoreVerification(row),details:renderDashboardRestoreVerificationBadge(row)};
+    },language);
+    await page.evaluate(()=>refreshJobs());
+    assert.match(await page.locator('#job-card-0 .job-restore-proof').innerText(), language==='de'?/[Aa]bgebrochen/:/[Cc]ancelled/);
+    assert.equal(await page.locator('#job-card-0 .job-restore-proof .restore-v-badge.success').count(),1);
+    for (const html of Object.values(proof)) {
+      assert.match(html,/restore-v-badge success/);
+      assert.match(html,language==='de'?/[Aa]bgebrochen/:/[Cc]ancelled/);
+      assert.match(html,/2026-10-26 23:10:52/);
+      assert.match(html,/2026-10-27 10:14:22/);
+      assert.match(html,/2026-11-25 23:10:52/);
+    }
+  }
+  await page.evaluate(()=>{window.lang='de';});
   await capture('management-jobs-de');
   for(const lang of ['de','en'])for(const theme of ['light','dark']) {
     await page.evaluate(({lang,theme})=>{window.lang=lang;document.documentElement.dataset.theme=theme;translate();renderJobsGrid(jobsState.jobs);},{lang,theme});

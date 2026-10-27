@@ -1084,6 +1084,8 @@ def list_jobs(config: dict, latest_statuses: dict) -> List[dict]:
         job["restore_verification_status"] = meta.get("status", "never")
         job["restore_verification_reason"] = meta.get("reason", "")
         job["restore_verification_last_test_date"] = meta.get("last_test_date", "")
+        job["restore_verification_last_test_result"] = meta.get("last_test_result", "")
+        job["restore_verification_evidence_date"] = meta.get("evidence_test_date", "")
         job["restore_verification_valid_until"] = meta.get("valid_until", "")
         job["restore_verification_is_overdue"] = bool(meta.get("is_overdue", False))
         job["restore_verification_failure_code"] = meta.get("failure_code", "")
