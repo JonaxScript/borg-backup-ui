@@ -159,6 +159,8 @@ def list_restore_test_plan(config: dict) -> dict:
 
     The response separates evidence validity from the next cron occurrence;
     it also includes counts by mode and overdue state for the planning UI.
+    verification_evidence_date/valid_until identify the current retained proof;
+    last_test_date/result always describe the latest attempt.
     """
     from jobs_api import list_jobs, resolve_data_root
 
@@ -252,6 +254,8 @@ def list_restore_test_plan(config: dict) -> dict:
             "is_overdue": is_overdue,
             "verification_status": job.get("restore_verification_status") or "never",
             "verification_reason": job.get("restore_verification_reason") or "",
+            "verification_evidence_date": job.get("restore_verification_evidence_date") or "",
+            "verification_valid_until": job.get("restore_verification_valid_until") or "",
             "job_meta_file": str((data_root / "config" / "jobs" / f"{key}.json")),
         })
 

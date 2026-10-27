@@ -115,7 +115,7 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 
 The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run; a new active run keeps its own operating state. Missing status files never imply success.
+Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
 
 ### Job Wizard
 
@@ -217,11 +217,13 @@ The restore wizard walks through job, archive, selection, target, and review. In
 
 A cancelled restore test is an incomplete attempt, not failed verification evidence. Jobs and saved status details show the **latest test attempt as cancelled** with its date; the preceding completed test retains its outcome and original validity deadline. Cancellation neither renews evidence nor hides a preceding real failure. Without a usable preceding report, verification remains open. Existing cancellation reports are evaluated using retained report history in the same way; reports are preserved.
 
-Under **Planning & Policy > Edit plan**, administrators set calendar execution,
+Under **Planning & Policy > ⋯ > Edit plan**, administrators set calendar execution,
 test level and separate evidence validity. **Test now** starts manually.
 Server timezone applies; missed/skipped slots are not caught up. Skipping does
 not renew evidence. Legacy interval tests remain separate under **Settings >
 Restore**. No corresponding overdue reminder is sent without a previous report.
+
+Planning combines the information into four columns, grouped by location with job counts. Empty locations are hidden, and location is not repeated below each job. **Evidence & history** opens the job reports. Successful reports appear as **Restoration evidence**, identifying the archive and cumulative scope: L1, L1 + L2 or L1 + L2 + L3. Validity is separate from the attempt result. After cancellation, previous valid evidence is directly accessible. One **Technical evidence** section combines checks and log diagnostics; **Show check data** opens supporting values with their check; existing reports remain unchanged.
 
 ### Test Levels
 

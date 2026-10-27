@@ -849,22 +849,21 @@
         <button type="button" class="segmented-btn" id="rt-subtab-reports-btn" data-i18n="restoreTests.reportsTab">Prüfberichte</button>
       </div>
       <div class="rt-redesign-layout ui-context-layout">
-        <aside class="rt-job-sidebar ui-context-sidebar" data-i18n-aria-label="restoreTests.backupJobs" aria-label="Backup jobs">
-          <div class="ui-context-sidebar__header"><small data-i18n="restoreTests.selection">Auswahl</small><strong data-i18n="restoreTests.backupJobs">Backup-Jobs</strong></div>
-          <label class="rt-job-search"><span data-i18n="restoreTests.search">Suche</span><input id="rt-sidebar-search" type="search" data-i18n-placeholder="restoreTests.searchPlaceholder" placeholder="Job suchen"></label>
-          <nav id="rt-sidebar-job-list" class="rt-sidebar-job-list"></nav>
+        <aside class="rt-location-sidebar ui-context-sidebar" data-i18n-aria-label="jobs.locations" aria-label="Standorte">
+          <div class="ui-context-sidebar__header"><small data-i18n="jobs.grouping">Gruppierung</small><strong data-i18n="jobs.locations">Standorte</strong></div>
+          <nav id="rt-sidebar-location-list" class="ui-context-nav"></nav>
         </aside>
         <section class="rt-redesign-workspace ui-workspace">
-          <header class="ui-workspace-header"><div class="ui-workspace-header__title"><small id="rt-workspace-kicker" data-i18n="restoreTests.planTab">Planung &amp; Policy</small><h2 id="rt-workspace-title" data-i18n="restoreTests.allJobs">Alle Jobs</h2><span id="rt-workspace-subtitle" class="ui-workspace-header__subtitle" data-i18n="restoreTests.planWorkspaceSubtitle">Intervalle, Testlevel und Fälligkeit steuern</span></div><span id="rt-workspace-count" class="ui-badge"></span></header>
-      <div class="restore-tests-hint" style="margin-bottom:12px">
-        <div class="restore-tests-hint-title">
+          <header class="ui-workspace-header"><div class="ui-workspace-header__title"><small id="rt-workspace-kicker" data-i18n="restoreTests.planTab">Planung &amp; Policy</small><h2 id="rt-workspace-title" data-i18n="restoreTests.allLocations">Alle Standorte</h2><span id="rt-workspace-subtitle" class="ui-workspace-header__subtitle" data-i18n="restoreTests.planWorkspaceSubtitle">Intervalle, Testlevel und Fälligkeit steuern</span></div><span id="rt-workspace-count" class="ui-badge"></span></header>
+      <details class="restore-tests-hint" style="margin-bottom:12px">
+        <summary class="restore-tests-hint-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
             <circle cx="12" cy="12" r="10"/>
             <path d="M12 16v-4"/>
             <path d="M12 8h.01"/>
           </svg>
           <span data-i18n="restoreTests.hintsTitle">Hinweise zu Restore-Tests</span>
-        </div>
+        </summary>
         <p class="restore-tests-hint-text" data-i18n="restoreTests.hintsIntro">
           Restore-Tests können je nach Archivgröße und Dateityp lange dauern.
         </p>
@@ -878,7 +877,7 @@
           Hinweis: Die zentrale Steuerung erfolgt in „Planung &amp; Policy pro Job“. Diese Seite führt
           den fälligen Plan aus und zeigt die Ergebnisse.
         </p>
-      </div>
+      </details>
 
       <div class="card" id="restore-tests-plan" style="margin-bottom:12px">
         <div class="card-header">
@@ -904,7 +903,8 @@
             </select>
             <select id="rt-report-filter-status" class="form-select">
               <option value="all" data-i18n="restoreTests.allStatuses">Alle Status</option>
-              <option value="success" data-i18n="restoreTests.verified">Verifiziert</option>
+              <option value="success" data-i18n="restoreTests.successful">Erfolgreich</option>
+              <option value="cancelled" data-i18n="restoreTests.cancelled">Abgebrochen</option>
               <option value="failed" data-i18n="restoreTests.failed">Fehlgeschlagen</option>
               <option value="unavailable" data-i18n="restoreTests.unavailable">Nicht verfügbar</option>
               <option value="stale" data-i18n="restoreTests.overdue">Überfällig</option>

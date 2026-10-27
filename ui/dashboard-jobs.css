@@ -75,7 +75,8 @@
 
 /* Shared location navigation */
 .dashboard-location-sidebar .ui-context-nav__item,
-.jobs-location-sidebar .ui-context-nav__item {
+.jobs-location-sidebar .ui-context-nav__item,
+.rt-location-sidebar .ui-context-nav__item {
   grid-template-columns: 2rem minmax(0, 1fr) auto;
 }
 
@@ -620,6 +621,8 @@
   font-size: var(--ui-font-size-xs);
 }
 
+/* Let the log viewport scroll instead of setting the grid's minimum width. */
+.group-log-slot { min-width: 0; }
 .group-log-slot:empty { display: none; }
 .group-log-slot .log-panel { margin: 0; }
 .jobs-workspace > .log-panel { margin-top: 0; }
