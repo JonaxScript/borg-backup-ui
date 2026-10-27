@@ -178,10 +178,10 @@ The Dashboard answers the most important operational questions:
 
 The page consists of:
 
-- **Latest backup runs:** The small ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
+- **Latest backup runs:** The location filter applies to the ring, outcome counts and overdue backups. The selected location appears in the card. The small ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
 - **Restore coverage:** Segments show verified evidence relative to all backups. The success ratio of known test plans is shown separately. Overdue, failed and pending evidence, jobs without a plan and unknown restore states remain distinguishable.
 - **Needs attention:** Shows error messages, warnings, skipped-run reasons and overdue backups or restore evidence. **View** expands the full messages directly beneath the compact attention row. Overdue backups and **Show history** also expand beneath their respective information, without a side panel. Open attention details survive refreshes and language changes.
-- **Location sidebar:** Filters the table by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`. Locations without jobs are hidden. **All locations** keeps jobs grouped by location and retains the existing location icons.
+- **Location sidebar:** Filters the table and latest backup runs by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`. Locations without jobs are hidden. **All locations** keeps jobs grouped by location and retains the existing location icons.
 - **Selection card:** Shows the currently selected location and number of backups.
 - **Job table:** Shows each job with its icon and latest archive name, run status, next scheduled run, restore status and repository size. **Details** expands the remaining information. Expanded details survive refreshes and location or language changes.
 - **Refresh:** Reloads dashboard data.
@@ -225,6 +225,8 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 The third compact card shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
+
+Expanded resource history uses the full width below the three cards: CPU and RAM appear side by side, stacking on narrow screens. Restore coverage and server resources remain independent of the location filter.
 
 The RAM bar shows the available share of total RAM; the CPU mini trend remains visible while history is collapsed.
 

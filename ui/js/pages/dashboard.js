@@ -153,7 +153,6 @@ function updateRefreshLabel() {
 }
 
 function renderDashboard(data, systemHealth) {
-  renderSummaryBar(data.backups || []);
   renderDashboardAttention(data.backups || []);
   renderRestoreVerificationSummary(data.backups || []);
   renderDashboardSystemWarning(systemHealth);
@@ -223,7 +222,7 @@ function dashboardSummaryContent(rows, value, total, centerLabel) {
 
 /**
  * Render backup outcomes from job rows rather than the API's overdue-adjusted counters.
- * @param {object[]} backups Current status rows; overdue details expand below the summary.
+ * @param {object[]} backups Rows for the selected location; overdue details use the same scope.
  */
 function renderSummaryBar(backups) {
   const el = document.getElementById('summary-bar');
@@ -239,7 +238,7 @@ function renderSummaryBar(backups) {
   ];
   const focused = document.activeElement?.id === 'dashboard-overdue-toggle';
   el.innerHTML = dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
-    + `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
+    + `<p class="dashboard-summary-context">${escHtml(dashboardSelectedLocation === 'all' ? dashboardT('dashboard.allLocations') : dashboardLocationLabel(dashboardSelectedLocation))} · ${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
     + (summary.overdue ? `<details class="dashboard-summary-overdue"${dashboardOverdueExpanded ? ' open' : ''}>
       <summary id="dashboard-overdue-toggle">${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</summary>
       <ul>${backups.filter(backup => backup.backup_overdue).map(backup => `<li><strong>${escHtml(backup.name || backup.display_name || backup.key)}</strong><p>${escHtml(dashboardT('dashboard.backupOverdueDetails', {date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run)}))}</p></li>`).join('')}</ul>
@@ -350,7 +349,7 @@ function toggleDashboardJobDetails(button) {
 }
 
 /**
- * Rebuild the grouped inventory, retaining disclosures and focus for existing jobs.
+ * Rebuild the grouped inventory and backup summary for the selected location, retaining disclosures and focus.
  * @param {object[]} backups Current status rows; removed jobs lose their expansion state.
  */
 function renderBackupGrid(backups) {
@@ -362,6 +361,7 @@ function renderBackupGrid(backups) {
     dashboardSelectedLocation = 'all';
     renderDashboardLocationSidebar([]);
     updateDashboardSelection([]);
+    renderSummaryBar([]);
     el.innerHTML = `<div class="ui-empty">${escHtml(dashboardT('dashboard.emptyStatus'))}<br>${escHtml(dashboardT('dashboard.emptyQuestion'))}</div>`;
     return;
   }
@@ -382,6 +382,7 @@ function renderBackupGrid(backups) {
 
   renderDashboardLocationSidebar(backups);
   updateDashboardSelection(visible);
+  renderSummaryBar(visible);
 
   if (visible.length === 0) {
     el.innerHTML = `<div class="ui-empty">${escHtml(dashboardT('dashboard.noLocationBackups'))}</div>`;

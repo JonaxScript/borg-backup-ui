@@ -186,10 +186,10 @@ Das Dashboard beantwortet die wichtigsten Betriebsfragen:
 
 Die Seite besteht aus:
 
-- **Letzte Backup-Läufe:** Der kleine Kreis zählt jeweils das letzte Ergebnis pro Job. Erfolgreiche, übersprungene, abgebrochene, unbekannte und fehlerhafte Läufe sowie Warnungen bleiben unterscheidbar. Überfällige Backups stehen zusätzlich unter dem Kreis; sie ändern das letzte Laufergebnis nicht.
+- **Letzte Backup-Läufe:** Der Standortfilter gilt auch für den Kreis, die Ergebniszahlen und die überfälligen Backups. Der gewählte Standort steht in der Karte. Der kleine Kreis zählt jeweils das letzte Ergebnis pro Job. Erfolgreiche, übersprungene, abgebrochene, unbekannte und fehlerhafte Läufe sowie Warnungen bleiben unterscheidbar. Überfällige Backups stehen zusätzlich unter dem Kreis; sie ändern das letzte Laufergebnis nicht.
 - **Restore-Abdeckung:** Die Segmente zeigen verifizierte Nachweise im Verhältnis zu allen Backups. Daneben steht die Erfolgsquote der bekannten Testpläne. Überfällige, fehlgeschlagene und offene Nachweise sowie Jobs ohne Testplan oder mit unbekanntem Restore-Status bleiben separat sichtbar.
 - **Handlungsbedarf:** Zeigt Fehlertexte, Warnungen, Gründe für übersprungene Läufe und überfällige Backups oder Restore-Nachweise. **Ansehen** klappt die vollständigen Meldungen direkt unter der kompakten Hinweiszeile auf. Auch überfällige Backups und **Verlauf anzeigen** öffnen ihre Details unter der jeweiligen Information, ohne seitliches Fenster. Geöffnete Hinweise bleiben bei Aktualisierungen und Sprachwechseln offen.
-- **Standort-Sidebar:** Filtert die Tabelle nach `Alle Standorte`, `Lokal`, `USB`, `SMB` und `Storagebox`. Standorte ohne Jobs werden ausgeblendet. Unter **Alle Standorte** bleiben die Jobs nach Standort gruppiert; die bisherigen Standort-Icons bleiben erhalten.
+- **Standort-Sidebar:** Filtert die Tabelle und die letzten Backup-Läufe nach `Alle Standorte`, `Lokal`, `USB`, `SMB` und `Storagebox`. Standorte ohne Jobs werden ausgeblendet. Unter **Alle Standorte** bleiben die Jobs nach Standort gruppiert; die bisherigen Standort-Icons bleiben erhalten.
 - **Auswahlkarte:** Zeigt den aktuell gewählten Standort und die Anzahl der Backups.
 - **Job-Tabelle:** Zeigt Job mit Icon und letztem Archivnamen, Laufstatus, nächsten geplanten Lauf, Restore-Status und Repository-Größe. **Details** klappt weitere Daten auf. Geöffnete Details bleiben beim Aktualisieren, Standort- und Sprachwechsel erhalten.
 - **Aktualisieren:** Lädt Dashboard-Daten neu.
@@ -233,6 +233,8 @@ Das Widget liest eine vorberechnete Statusdatei auf dem Flash-Laufwerk. Sein Akt
 Die dritte kompakte Karte zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
 
 Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
+
+Der aufgeklappte Server-Verlauf nutzt unter den drei Karten die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Restore-Abdeckung und Server-Auslastung bleiben standortübergreifend.
 
 Der RAM-Balken zeigt den verfügbaren Anteil am gesamten RAM; der CPU-Minitrend bleibt eingeklappt sichtbar.
 

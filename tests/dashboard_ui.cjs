@@ -126,7 +126,7 @@ for (const language of ['de', 'en']) {
 
   test(`${language}: All locations stays grouped and omits locations without jobs`, () => {
     const {context: c, elements} = dashboard(language);
-    const backups = [{key: '1', location: 'local'}, {key: '2', location: 'usb'}, {key: '3', location: 'storagebox'}];
+    const backups = [{key: '1', location: 'local', status: 'error', backup_overdue: true}, {key: '2', location: 'usb', status: 'success'}, {key: '3', location: 'storagebox', status: 'cancelled'}];
     c.renderBackupGrid(backups);
     assert.equal((elements.get('backup-grid').innerHTML.match(/class="dashboard-location-group-row"/g) || []).length, 3);
     assert.doesNotMatch(elements.get('dashboard-location-list').innerHTML, /data-dashboard-location="smb"/);
@@ -134,10 +134,21 @@ for (const language of ['de', 'en']) {
     vm.runInContext("dashboardSelectedLocation = 'usb'; dashboardExpandedJobs.add('2')", c);
     c.renderBackupGrid(backups);
     assert.match(elements.get('backup-grid').innerHTML, /aria-expanded="true"/);
-    c.renderBackupGrid([{key: '1', location: 'local'}]);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>1<\/strong><small>\/1<\/small>/);
+    assert.match(elements.get('summary-bar').innerHTML, /USB/);
+    assert.doesNotMatch(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
+    assert.ok(!elements.get('summary-bar').innerHTML.includes(c.dashboardT('jobs.statusCancelled')));
+    c.renderDashboard({backups}, null);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>1<\/strong><small>\/1<\/small>/);
+
+    c.renderBackupGrid(backups.slice(0, 1));
     assert.equal(vm.runInContext('dashboardSelectedLocation', c), 'all');
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>0<\/strong><small>\/1<\/small>/);
+    assert.match(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
     assert.equal(vm.runInContext('dashboardExpandedJobs.size', c), 0);
     c.renderBackupGrid([]);
     assert.doesNotMatch(elements.get('backup-grid').innerHTML, /dashboard-inventory-row/);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>0<\/strong><small>\/0<\/small>/);
+    assert.doesNotMatch(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
   });
 }

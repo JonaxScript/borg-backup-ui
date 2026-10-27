@@ -67,17 +67,36 @@ const { chromium } = require('playwright');
   await page.evaluate(()=>renderDashboard(BBUI.core.state.data,null));
   assert(await page.locator('.dashboard-summary-overdue ul').isVisible());
   await page.locator('#dashboard-overdue-toggle').click();
+  await page.locator('[data-dashboard-location="usb"]').click();
+  assert.equal(await page.locator('.dashboard-summary-ring strong').innerText(),'4');
+  assert.equal(await page.locator('.dashboard-summary-ring small').innerText(),'/4');
+  assert.match(await page.locator('.dashboard-summary-context').innerText(),/USB/);
+  assert.equal(await page.locator('#dashboard-overdue-toggle').count(),0);
+  await page.evaluate(()=>renderDashboard(BBUI.core.state.data,null));
+  assert.equal(await page.locator('.dashboard-summary-ring small').innerText(),'/4');
+  assert.equal(await page.locator('.dashboard-coverage-track span').count(),14);
+  await page.locator('[data-dashboard-location="all"]').click();
+  assert.equal(await page.locator('.dashboard-summary-ring small').innerText(),'/14');
+  const collapsedHeights=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().height));
   await page.locator('#resource-history-toggle').click();assert(await page.locator('#resource-history').isVisible());
   const relation=await page.evaluate(()=>({history:document.querySelector('#resource-history').getBoundingClientRect().top,values:document.querySelector('#resource-values').getBoundingClientRect().bottom,position:getComputedStyle(document.querySelector('#resource-history')).position}));
   assert(relation.history>=relation.values);assert.equal(relation.position,'static');
+  const expandedCards=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().height));
+  assert(expandedCards.every((height,i)=>height===collapsedHeights[i]),'History must not stretch summary cards');
   await page.locator('.resource-plot-canvas').first().focus();await page.keyboard.press('ArrowLeft');
   assert(await page.locator('.resource-crosshair').first().isVisible());
   await capture('dashboard-inline-history-de');
   for(const language of ['de','en'])for(const theme of ['light','dark'])for(const width of [1920,1280,1024,768,390]){
     await page.setViewportSize({width,height:1080});
     await page.evaluate(({language,theme})=>{lang=language;translate();document.documentElement.dataset.theme=theme;renderDashboard(BBUI.core.state.data,null);window.dispatchEvent(new Event('bbui:language-changed'));},{language,theme});
-    const overflows=await page.locator('.dashboard-summary-pair, .dashboard-summary-pair > section, #dashboard-attention').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1).map(el=>el.id||el.className));
+    const overflows=await page.locator('.dashboard-summary-pair, .dashboard-summary-pair > section, #resource-history, .resource-plot, #dashboard-attention').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1).map(el=>el.id||el.className));
     assert.deepEqual(overflows,[],`${language}/${theme}/${width}`);
+    const history=await page.locator('#resource-history').boundingBox();
+    const overview=await page.locator('.dashboard-summary-pair').boundingBox();
+    assert.equal(history.x,overview.x);assert.equal(history.width,overview.width);
+    const plots=await page.locator('.resource-plot-canvas').evaluateAll(nodes=>nodes.slice(0,2).map(n=>({x:n.getBoundingClientRect().x,y:n.getBoundingClientRect().y})));
+    if(width>640){assert.equal(plots[0].y,plots[1].y);assert(plots[1].x>plots[0].x);}
+    else assert(plots[1].y>plots[0].y);
     assert(await page.locator('#dashboard-attention ul').isVisible());
     if(width===390||width===1920)await capture(`overview-${language}-${theme}-${width}`);
   }
@@ -87,6 +106,6 @@ const { chromium } = require('playwright');
   assert(await page.locator('#resource-tests progress').isVisible());
   await page.evaluate(()=>BBUI.resourceMonitor.stop());
   assert.deepEqual(errors,[]);
-  console.log('PASS: 3 compact cards, 6/14 coverage, native inline detail persistence/focus, real history interactions, active runs and DE/EN light/dark at 390-1920px.');
+  console.log('PASS: 3 compact cards, 6/14 coverage, native inline detail persistence/focus, full-width paired history, location-scoped outcomes, real history interactions, active runs and DE/EN light/dark at 390-1920px.');
   } finally { await browser.close(); }
 })();

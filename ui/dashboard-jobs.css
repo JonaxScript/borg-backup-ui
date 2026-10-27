@@ -794,13 +794,13 @@
 .resource-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--ui-color-border); color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
 .resource-footer button { background: transparent; border: 0; color: var(--ui-color-accent); font: inherit; padding: 4px 0; cursor: pointer; white-space: nowrap; }
 .resource-footer button:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 3px; }
-.resource-history { padding: 0 16px 16px; border-top: 1px solid var(--ui-color-border); }
+.resource-history { min-width: 0; margin-bottom: var(--ui-space-4); padding: 0 16px 16px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .resource-note { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); margin: 10px 0 0; }
 .resource-plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .resource-plots h3 { font-size: var(--ui-font-size-sm); overflow-wrap: anywhere; margin: 14px 0 4px; }
 .resource-plots small, .resource-axis { font-size: var(--ui-font-size-xs); color: var(--ui-color-text-muted); }
 .resource-chart-large { height: 120px; margin-top: 8px; border-bottom: 1px solid var(--ui-color-border); }
-.resource-plot-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.resource-plot-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
 .resource-plot-heading > span { font-size: var(--ui-font-size-xs); color: var(--ui-color-text-muted); white-space: nowrap; }
 .resource-plot-heading strong { font-size: var(--ui-font-size-sm); color: var(--ui-color-text); font-variant-numeric: tabular-nums; }
 .resource-plot-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; margin-top: 8px; }
@@ -832,7 +832,6 @@
 .dashboard-summary-pair .resource-value > strong { font-size: 20px; align-self: flex-start; white-space: normal; line-height: 1.3; }
 .dashboard-summary-pair .resource-value > strong small { font-size: 11px; font-weight: normal; color: var(--ui-color-text-muted); white-space: nowrap; }
 .dashboard-summary-pair .resource-chart { height: 22px; margin: 0; }
-.dashboard-summary-pair .resource-chart-large { height: 120px; }
 .dashboard-summary-pair .resource-footer { border: 0; padding: 6px 16px 12px; gap: 8px; }
 .dashboard-summary-pair .resource-live { font-size: 10px; background: transparent; padding: 0; white-space: normal; text-align: right; }
 .resource-ram-capacity { width: 100%; height: 6px; margin-top: 6px; border: 0; border-radius: 3px; overflow: hidden; appearance: none; background: var(--ui-color-border); accent-color: var(--ui-color-accent); }
@@ -841,6 +840,4 @@
 .resource-ram-capacity::-moz-progress-bar { background: var(--ui-color-accent); }
 .resource-runs { padding: 8px 16px; border-top: 1px solid var(--ui-color-border); font-size: var(--ui-font-size-xs); overflow-wrap: anywhere; }
 .resource-runs[hidden] { display: none; }
-.dashboard-summary-pair .resource-plots { grid-template-columns: minmax(0, 1fr); }
-.dashboard-summary-pair .resource-plot-heading { flex-wrap: wrap; gap: 4px; }
 .dashboard-summary-pair .resource-budget { flex-wrap: wrap; }

@@ -49,7 +49,7 @@ Das Hauptmenü folgt dem Betriebsablauf: **Dashboard**, **Jobs**, **Repositories
 
 ## 3. Dashboard
 
-Drei kompakte Karten zeigen die letzten Backup-Ergebnisse, Restore-Abdeckung und Server-Auslastung. Der kleine Kreis zählt das letzte Ergebnis jedes Jobs. Die Restore-Segmente zeigen verifizierte Nachweise im Verhältnis zu allen Backups; die Erfolgsquote der bekannten Testpläne wird separat genannt. Jobs ohne Testplan und unbekannte Zustände bleiben erkennbar. Überfällige Backups und der Server-Verlauf lassen sich direkt unter der jeweiligen Information aufklappen.
+Drei kompakte Karten zeigen die letzten Backup-Ergebnisse, Restore-Abdeckung und Server-Auslastung. Der kleine Kreis zählt das letzte Ergebnis jedes Jobs. Standortfilter gelten auch für diesen Kreis, die Ergebniszahlen und die überfälligen Backups; der gewählte Standort steht in der Karte. Die Restore-Segmente zeigen verifizierte Nachweise im Verhältnis zu allen Backups; die Erfolgsquote der bekannten Testpläne wird separat genannt. Jobs ohne Testplan und unbekannte Zustände bleiben erkennbar. Überfällige Backups lassen sich direkt unter der Zusammenfassung aufklappen. Der Server-Verlauf nutzt unter den drei Karten die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Restore-Abdeckung und Server-Auslastung bleiben standortübergreifend.
 
 **Handlungsbedarf** zeigt Fehlertexte, Warnungen, übersprungene Läufe und überfällige Backups oder Restore-Nachweise. **Ansehen** klappt die vollständigen Meldungen direkt unter der Hinweiszeile auf. Die Standort-Sidebar behält ihre Icons und filtert nach Lokal, USB, SMB oder Storagebox. Leere Standorte werden ausgeblendet; **Alle Standorte** bleibt nach Standorten gruppiert.
 
