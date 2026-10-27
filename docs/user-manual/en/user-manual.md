@@ -226,7 +226,7 @@ The third compact card shows CPU utilization and available RAM for the **entire 
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
 
-Expanded resource history uses the full width below the three cards: CPU and RAM appear side by side, stacking on narrow screens. Restore coverage and server resources remain independent of the location filter.
+Expanded resource history uses the full width below the three cards: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width below the summary cards, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Restore coverage and server resources remain independent of the location filter.
 
 The RAM bar shows the available share of total RAM; the CPU mini trend remains visible while history is collapsed.
 

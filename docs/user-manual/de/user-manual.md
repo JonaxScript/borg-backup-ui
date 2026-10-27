@@ -234,7 +234,7 @@ Die dritte kompakte Karte zeigt CPU-Auslastung und verfügbaren RAM des **gesamt
 
 Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
 
-Der aufgeklappte Server-Verlauf nutzt unter den drei Karten die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Restore-Abdeckung und Server-Auslastung bleiben standortübergreifend.
+Der aufgeklappte Server-Verlauf nutzt unter den drei Karten die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Laufende Tests erscheinen ebenfalls unter den Übersichtskarten über die volle Inhaltsbreite, mit Jobname, CPU, RAM, Speicherlimit und Hostreserve. Dieser Bereich bleibt auch bei eingeklapptem Verlauf sichtbar und verschwindet, sobald keine aktiven Läufe oder Testmesswerte mehr gemeldet werden. Restore-Abdeckung und Server-Auslastung bleiben standortübergreifend.
 
 Der RAM-Balken zeigt den verfügbaren Anteil am gesamten RAM; der CPU-Minitrend bleibt eingeklappt sichtbar.
 

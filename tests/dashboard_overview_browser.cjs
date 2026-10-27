@@ -100,12 +100,35 @@ const { chromium } = require('playwright');
     assert(await page.locator('#dashboard-attention ul').isVisible());
     if(width===390||width===1920)await capture(`overview-${language}-${theme}-${width}`);
   }
+  assert(await page.locator('#resource-activity').isHidden());
+  await page.locator('#resource-history-toggle').click();
   await page.evaluate(()=>{demoIdle=false;BBUI.resourceMonitor.stop();BBUI.resourceMonitor.start();});
   await page.waitForFunction(()=>!document.getElementById('resource-tests').hidden);
   assert.match(await page.locator('#resource-runs').innerText(),/Appdata/);
   assert(await page.locator('#resource-tests progress').isVisible());
+  for(const language of ['de','en'])for(const theme of ['light','dark'])for(const width of [1920,1280,1024,768,390]){
+    await page.setViewportSize({width,height:1080});
+    await page.evaluate(({language,theme})=>{lang=language;translate();document.documentElement.dataset.theme=theme;renderDashboard(BBUI.core.state.data,null);window.dispatchEvent(new Event('bbui:language-changed'));},{language,theme});
+    assert(await page.locator('#resource-history').isHidden());
+    const activity=await page.locator('#resource-activity').boundingBox();
+    const overview=await page.locator('.dashboard-summary-pair').boundingBox();
+    assert.equal(activity.x,overview.x);assert.equal(activity.width,overview.width);
+    assert(activity.y>=overview.y+overview.height);
+    const resourceCard=await page.locator('#dashboard-resources').boundingBox();
+    assert(resourceCard.height<205,'Active test details must not stretch the summary card');
+    const overflows=await page.locator('#resource-activity, #resource-tests, .resource-test, .resource-budget').evaluateAll(nodes=>nodes.filter(el=>el.scrollWidth>el.clientWidth+1).map(el=>el.id||el.className));
+    assert.deepEqual(overflows,[],`${language}/${theme}/${width} active test`);
+    if(width===1920){
+      const row=await page.locator('.resource-test').evaluate(el=>[...el.children].map(child=>child.getBoundingClientRect()));
+      assert(row.every(child=>child.top<row[0].bottom),'Test identity, CPU, RAM and reserve should share a row');
+    }
+    if(width===1920||width===390)await capture(`active-test-${language}-${theme}-${width}`);
+  }
+  await page.evaluate(()=>{demoIdle=true;BBUI.resourceMonitor.stop();BBUI.resourceMonitor.start();});
+  await page.waitForFunction(()=>document.getElementById('resource-activity').hidden);
+
   await page.evaluate(()=>BBUI.resourceMonitor.stop());
   assert.deepEqual(errors,[]);
-  console.log('PASS: 3 compact cards, 6/14 coverage, native inline detail persistence/focus, full-width paired history, location-scoped outcomes, real history interactions, active runs and DE/EN light/dark at 390-1920px.');
+  console.log('PASS: 3 compact cards, 6/14 coverage, native inline detail persistence/focus, full-width paired history, location-scoped outcomes, real history interactions, full-width active tests and idle cleanup, DE/EN light/dark at 390-1920px.');
   } finally { await browser.close(); }
 })();

@@ -127,7 +127,8 @@
   }
 
   /** Update compact host values and RAM capacity; keep run names and protected-test budgets visible.
-   * History expands in place, retaining its toggle and chart focus across polls. */
+   * Active-run details and history use full-width regions below the summary cards.
+   * History retains its toggle and chart focus across polls. */
   function render() {
     if (!el('resource-values')) return;
     const unavailable = failed || !data?.available || data.stale;
@@ -145,6 +146,7 @@
       <div class="resource-value"><span>${escHtml(t('ram'))}</span><strong>${escHtml(gib(host.memory_available_bytes))}<small> / ${escHtml(gib(host.memory_total_bytes))}</small></strong>
       ${ramRatio === null ? '' : `<progress class="resource-ram-capacity" max="100" value="${ramRatio}" aria-label="${escHtml(t('ramTotal', {total: gib(host.memory_total_bytes)}))}"></progress>`}</div>`;
     el('resource-active').textContent = runs === null ? `${t('active')}: ${t('unavailable')}` : t('activeCount', {count: runs.length});
+    el('resource-activity').hidden = !active && !tests.length;
     el('resource-runs').hidden = !active;
     el('resource-runs').textContent = description || '';
     el('resource-tests').hidden = !tests.length;
