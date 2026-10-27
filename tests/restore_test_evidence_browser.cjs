@@ -26,7 +26,7 @@ const {chromium}=require('playwright');
   const state=BBUI.restoreTestsState;
   state.plan={jobs:['Appdata','All-VMs','Flash','Photos','Sonstiges'].map((name,i)=>({job_key:String(i),key:String(i),name,display_name:name,location:i<3?'local':'storagebox',enabled:true,scheduler_state:i===4?'off':'active',policy:{mode:i===4?'manual_only':'scheduled',level:3,cron:i===4?'':'0 20 1 * *',validity_days:30},last_test_date:i===4?'':'2026-10-27 10:14:22',last_test_result:i===0?'cancelled':i===3?'failed':i===4?'':'success',next_run_at:'2026-11-01 20:00:00',verification_status:i===3?'failed':'verified',verification_evidence_date:'2026-10-26 23:10:52',verification_valid_until:'2026-11-25 23:10:52'}))};
   state.jobs=state.plan.jobs;
-  const success={job_key:'0',job_name:'Appdata',test_date:'2026-10-26 23:10:52',test_level:3,test_result:'success',tested_archive:'appdata-backup-2026-10-26_09-00-37',repository:'/mnt/user/backup/appdata',location:'local',report_id:'RT-DEMO',duration_formatted:'14 Min. 32 Sek.',tested_files_count:1000,tested_folders_count:0,coverage_basis:'1000/416901',test_coverage_percentage:.2,archive_stats:{files_count:416901},archive_stats_formatted:{original:'86.8 GiB'},level3_details:{enabled:true,success_count:5,checksums:['data/file.txt:deadbeef']},steps:['repo_reachable','archive_readable','metadata_check','restore_probe','integrity_check','cleanup'].map(step_id=>({step_id,status:'passed',duration_ms:500}))};
+  const success={job_key:'0',job_name:'Appdata',test_date:'2026-10-26 23:10:52',test_level:3,test_result:'success',tested_archive:'appdata-backup-2026-10-26_09-00-37',repository:'/mnt/user/backup/appdata',location:'local',report_id:'RT-DEMO',log_file:'/mnt/user/borg_backup_ui/logs/Borg-Restore-Test-2026-10-26.log',test_exit_code:0,duration_formatted:'14 Min. 32 Sek.',tested_files_count:1000,tested_folders_count:0,coverage_basis:'1000/416901',test_coverage_percentage:.2,archive_stats:{files_count:416901},archive_stats_formatted:{original:'86.8 GiB'},level3_details:{enabled:true,success_count:5,checksums:['data/file.txt:deadbeef']},steps:['repo_reachable','archive_readable','metadata_check','restore_probe','integrity_check','cleanup'].map(step_id=>({step_id,status:'passed',duration_ms:500,timestamp:step_id==='archive_readable'?'2026-10-26 23:00:00':undefined}))};
   state.data=[{...success,test_date:'2026-10-27 10:14:22',test_result:'failed',failure_code:'RT_CANCELLED',report_id:'RT-CANCEL'},success,{...success,job_key:'3',test_result:'failed',failure_code:'RT_SAMPLE_RESTORE_FAILED',error_analysis:{error_details:'Failure <script>alert(1)</script>\n'+ 'missing-file/'.repeat(30)},report_id:'RT-FAIL'}];
   document.getElementById('restore-tests-plan-content').addEventListener('click',onRestoreTestsPlanClick);
   document.getElementById('restore-tests-content').addEventListener('click',onRestoreTestsContentClick);
@@ -56,6 +56,8 @@ const {chromium}=require('playwright');
   const technical=page.locator('#rtr-1 .rt-technical-evidence');
   assert.equal(await technical.getByText(language==='de'?'Report-ID':'Report ID',{exact:true}).count(),0);
   assert.equal(await technical.getByText(language==='de'?'Ausführung':'Execution',{exact:true}).count(),0);
+  const archiveStep=technical.locator('.rt-step-row').filter({hasText:language==='de'?'Archiv lesbar':'Archive readable'});
+  await archiveStep.locator('.rt-check-evidence > summary').click();
   const hashStep=technical.locator('.rt-step-row').filter({hasText:language==='de'?'Integritätsprüfung':'Integrity check'});
   await hashStep.locator('.rt-check-evidence > summary').click();
   await hashStep.locator('.rt-step-detail-section > summary').click();
@@ -75,6 +77,13 @@ const {chromium}=require('playwright');
   assert(await page.locator('#restore-tests-plan-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`plan overflow ${width}`);
   await page.locator('[data-rt-job-key="0"] [data-rt-plan-action=reports]').click();
   await page.locator('[data-rt-action=evidence]').click();
+  await page.locator('#rtr-1 .rt-technical-evidence').evaluate(el=>{el.open=true;el.querySelectorAll('.rt-check-evidence').forEach(detail=>detail.open=true);});
+  const factGroups=await page.locator('#rtr-1 .rt-technical-evidence .rt-step-details').evaluateAll(groups=>groups.map(group=>({gap:getComputedStyle(group).gap,items:[...group.children].map(item=>({background:getComputedStyle(item).backgroundColor,expected:getComputedStyle(item.closest('.rt-report-card').querySelector('.rt-step-row')).backgroundColor}))})));
+  assert(factGroups.length>1,'diagnostics and check data are rendered');
+  for(const group of factGroups){
+   assert.equal(group.gap,'1px',`thin fact separators in ${theme} at ${width}`);
+   for(const item of group.items)assert.equal(item.background,item.expected,`fact surface matches report in ${theme} at ${width}`);
+  }
   assert(await page.locator('#restore-tests-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`report overflow ${width}`);
   if(width===390)await capture(`restore-proof-mobile-${theme}`);
  }

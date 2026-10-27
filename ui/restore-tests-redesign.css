@@ -108,9 +108,11 @@
 .rt-technical-evidence .rt-step-details {
   display: flex;
   flex-wrap: wrap;
+  gap: 1px;
   margin-top: 0;
+  background: var(--ui-color-border);
 }
-.rt-technical-evidence .rt-step-detail-item { flex: 1 1 14rem; }
+.rt-technical-evidence .rt-step-detail-item { flex: 1 1 14rem; background: var(--ui-color-surface); }
 .rt-technical-step { border: 1px solid var(--ui-color-border); border-top: 0; background: var(--ui-color-surface); }
 .rt-technical-step > summary { padding: var(--ui-space-2) var(--ui-space-3); color: var(--ui-color-text); font-size: var(--ui-font-size-xs); font-weight: var(--ui-font-weight-semibold); cursor: pointer; }
 .rt-technical-step > div { padding: 0 var(--ui-space-3) var(--ui-space-3); }
@@ -237,10 +239,8 @@
 /* One technical disclosure; supporting data stays with its check (#610). */
 .rt-check-evidence { margin-top: var(--ui-space-2); }
 .rt-check-evidence > summary { color: var(--ui-color-accent); font-size: var(--ui-font-size-xs); cursor: pointer; }
-.rt-check-evidence > .rt-step-details { margin-top: var(--ui-space-2); gap: var(--ui-space-2); }
-.rt-check-evidence .rt-step-detail-item { background: var(--ui-color-surface-subtle); }
+.rt-check-evidence > .rt-step-details { margin-top: var(--ui-space-2); }
 .rt-report-diagnostics { padding: var(--ui-space-3) 0; }
-.rt-report-diagnostics .rt-step-details { gap: var(--ui-space-2); }
 .rt-report-diagnostics .rt-step-detail-item { min-width: 0; }
 .rt-report-diagnostics .rt-step-detail-item strong { overflow-wrap: anywhere; }
 .rt-report-card .rt-check-evidence .rt-step-detail-section { margin-top: var(--ui-space-2); }
