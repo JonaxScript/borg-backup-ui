@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.26.1618">
+<!ENTITY version   "2026.10.27.2031">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,39 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.27.2031###
+### Migration and compatibility
+
+- **Test-channel baseline:** Return to the current main implementation after the PR #595 preview. The experimental sequential Docker backup option is no longer included; existing archive files are not removed by the update. (#597)
+
+### Bug Fixes
+
+- Keep the preceding restore verification outcome and its original expiry after a cancelled test. Show the latest cancelled attempt separately in Jobs, saved status details and test planning; retain report history and do not revive older success over a later failure. Existing cancellation reports are handled too. (#609)
+- Handle filesystem access errors when probing a restore-test repository, including USB devices disconnected without unmounting. Record an unavailable result with mount/device guidance instead of a traceback, and leave subsequent checks untested. (#612)
+- Hide previous outcome messages while a job is running, keeping their complete text accessible under Show status. (#613)
+- Keep job card widths stable when opening live logs; long log lines scroll horizontally within the log viewer. (#613)
+
+### Improvements
+
+- Show live host CPU, available RAM and active runs on the dashboard, with a ten-minute resource history and protected restore-test consumption versus its RAM limit. (#602)
+- Use wider resource charts with a subtle fading area and clearer expanded plots, matching the dashboard design preview. (#602)
+- Read current values, labeled scales and timestamped samples directly in expanded resource charts with pointer, touch or keyboard navigation. (#602)
+- Identify running restore tests directly in the job plan and stop them with the red Cancel button. Cancellation stops the selected run, cleans up its processes and resources, and records interrupted verification. Parallel tests remain independent; cancelling an interval batch also stops its remaining tests. (#605)
+- Replace the duplicate dashboard job inventory with a management overview: location-scoped latest outcomes, restore coverage, active runs, actionable problems, 7/30/90-day run statistics, measured repository storage and location totals. Shared repositories count once; missing measurements remain unknown. (#607)
+- Add an independent inline saved-status section to Jobs with storage, check, restore and archive details. Show complete saved failure/warning messages directly in each card while retaining the existing workflow timeline and run details. (#607)
+- Place server metrics directly below the latest-backup summary row, with server history and active restore-test resource details across the full dashboard width, with CPU and RAM side by side on wide screens. (#607)
+
+- Keep dashboard trends and location totals stable during background refresh and hide locations without jobs from the dashboard table and filter. (#607)
+- Hide empty destinations from the Jobs sidebar and return to All locations when the selected destination loses its last job. (#610)
+- Simplify Restore Tests planning to four columns with compact counts, inline result labels, an action menu, and collapsible guidance. Keep start/cancel and schedule editing available. (#610)
+- Present successful reports as scoped restoration evidence with cumulative L1, L1 + L2 and L1 + L2 + L3 checks. Keep test attempts separate from evidence validity and link cancelled attempts to existing valid evidence. Preserve report filters, technical details, and retained reports. (#610)
+- Consolidate technical evidence into one expandable section, attach supporting data to each check and remove the repeated report ID/start/end execution block. Use thin separators and the normal report surface for technical fields. (#610)
+- Combine coverage percentage and its file-count basis in one report row so execution and test scope have a balanced five-row layout. (#610)
+- Group Restore Tests planning by non-empty locations with the shared location icons and job counts, keeping four columns and removing repeated location labels below job names. (#610)
+- Show Edit plan in a floating action menu matching Jobs, with a pencil icon and no row-height jump. (#610)
+- Use occupied locations instead of a duplicate job list in the Restore Tests sidebar. Show configured job icons and colors in planning and report rows. (#610)
+- Fit the dashboard overview into a compact desktop layout with four summary cards, an integrated location filter, expandable attention details and chart explanations, and a compact location table. Small screens and expanded details remain scrollable. (#615)
+
 ###2026.10.26.1618###
 ### Migration and compatibility
 
@@ -66,17 +99,6 @@
 - Automatically remove confirmed completed database operation/test metadata after 30 days. Keep running, unresolved, malformed and unidentifiable records; clean only journal-linked discovery leftovers. Dumps, Secrets and Borg archives are unaffected. (#593)
 - Use the application dialog when leaving unsaved database settings. (#591, #593)
 
-###2026.10.23.1054###
-### Bug Fixes
-
-- **Matching notification previews:** Editable example templates and their previews now match for all five events, including job names in titles. Supplied example labels follow the interface language; saved custom texts and placeholder values remain unchanged. Save applies the displayed templates to notification delivery. (#584)
-- **Unraid and Discord notification layout:** Show the complete notification template with line breaks in Unraid, including its archived view, and when forwarding to Discord. Keep severity values such as normal in the priority field instead of appending them to the message. (#584)
-
-### Improvements
-
-- **Custom notification texts:** Replace the title and message of backup notifications for Unraid, email and Apprise under Settings > Notifications. Placeholders such as {job}, {status} and {error} insert backup details, a preview shows the result, and empty fields keep the default text. Thanks to [JonaxScript](https://github.com/JonaxScript) for contributing this feature. (#582)
-- **Notification text editor:** Use one shared placeholder reference with event-specific example values, insert placeholders at the cursor, and compare equally sized template and preview fields. All five backup events offer example templates containing placeholders; switching events preserves unsaved edits. (#584)
-
 ]]>
 </CHANGES>
 
@@ -102,7 +124,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="ae147cfe556b13e6da78cf7921a1306c"
+EXPECTED_MD5="6dac893486811eaf99a42958bc39c588"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
