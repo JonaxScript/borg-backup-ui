@@ -319,7 +319,9 @@ def test_calendar_overdue_reminder_survives_skip_is_throttled_and_stops_after_su
     assert first["sent"] == 1
     assert calls == ["Borg Backup UI: Restore test overdue"]
     diagnostic = notification_reminder_api.get_notification_reminder_diagnostics(cfg)["restore_test_overdue"]["items"][0]
-    assert diagnostic["next_due_at"] == (last + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+    # Validity is elapsed time; naive calendar addition differs across DST (#614).
+    expected_due = datetime.fromtimestamp(last.timestamp() + timedelta(days=7).total_seconds())
+    assert diagnostic["next_due_at"] == expected_due.strftime("%Y-%m-%d %H:%M:%S")
     assert diagnostic["state"] == "overdue_waiting"
     assert diagnostic["next_run_at"] == restore_tests_api.list_restore_test_plan(cfg)["jobs"][0]["next_run_at"]
     assert diagnostic["next_run_at"] != diagnostic["next_due_at"]
