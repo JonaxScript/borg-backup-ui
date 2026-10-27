@@ -1907,6 +1907,7 @@
     "runSimulationHelp": "Borg liest und prüft die ausgewählten Daten. Es werden keine Dateien ins Ziel geschrieben."
   },
   "restoreTests": {
+    "coverageFileBasis": "{checked} von {total} Dateien",
     "stepResourceGuard": "Speicherschutz",
     "runLogFile": "Laufprotokoll",
     "title": "Restore Tests",

@@ -1030,6 +1030,22 @@ function renderRTLevelEvidence(t, steps) {
   }).join('')}</section>`;
 }
 
+/** Combine recorded coverage and its file-count basis; preserve unrecognized legacy text.
+ * @param {Object} report Stored restore-test report, with optional percentage and basis.
+ * @returns {string} Localized plain text; missing coverage remains unknown.
+ */
+function rtCoverageSummary(report) {
+  const coverage = report.test_coverage_percentage ?? report.coverage_percent;
+  const basis = String(report.coverage_basis ?? '').trim();
+  const counts = basis.match(/^(\d+)\s*\/\s*(\d+)$/);
+  const formatter = new Intl.NumberFormat(restoreTestsLocale());
+  const basisText = counts ? restoreTestsT('coverageFileBasis', {
+    checked: formatter.format(BigInt(counts[1])),
+    total: formatter.format(BigInt(counts[2])),
+  }) : basis;
+  return [coverage != null ? formatCoveragePercent(coverage) : '—', basisText].filter(Boolean).join(' · ');
+}
+
 /** Render an inline report; success is scoped evidence, cancellation is only an attempt. */
 function renderRTReportRow(t, idx, opened = false) {
   const status = rtAttemptStatus(t);
@@ -1038,7 +1054,6 @@ function renderRTReportRow(t, idx, opened = false) {
   const plan = restoreTestsState.plan?.jobs?.find(job => job.job_key === t.job_key);
   const stats = t.archive_stats || {};
   const fmt = t.archive_stats_formatted || {};
-  const coverage = t.test_coverage_percentage ?? t.coverage_percent;
   const validUntil = t.valid_until || t.valid_until_date || (plan?.verification_evidence_date === t.test_date ? plan.verification_valid_until : '');
   const validity = rtEvidenceStale(t) ? 'evidenceExpired' : 'evidencePolicy';
   const archivedProof = (restoreTestsState.data || []).some(r => r.job_key === t.job_key && r.test_date === plan?.verification_evidence_date && r.test_result === 'success' && !rtCancelled(r));
@@ -1066,8 +1081,7 @@ function renderRTReportRow(t, idx, opened = false) {
         [restoreTestsT('archiveFiles'), stats.files_count],
         [restoreTestsT('testedFiles'), t.tested_files_count ?? t.tested_files],
         [restoreTestsT('testedFolders'), t.tested_folders_count],
-        [restoreTestsT('coverage'), coverage != null ? formatCoveragePercent(coverage) : '—'],
-        [restoreTestsT('basis'), t.coverage_basis],
+        [restoreTestsT('coverage'), rtCoverageSummary(t)],
       ])}</div>
       ${renderRTLevelEvidence(t, steps)}
       <p class="rt-proof-scope-note">${escHtml(restoreTestsT(successful ? 'evidenceScopeLimit' : 'attemptScopeLimit'))}</p>

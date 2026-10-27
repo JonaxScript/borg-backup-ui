@@ -1907,6 +1907,7 @@
     "runSimulationHelp": "Borg is reading and checking the selected data. No files are written to the destination."
   },
   "restoreTests": {
+    "coverageFileBasis": "{checked} of {total} files",
     "stepResourceGuard": "Memory protection",
     "runLogFile": "Run log file",
     "title": "Restore tests",
