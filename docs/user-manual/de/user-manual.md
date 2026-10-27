@@ -165,6 +165,10 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 ## 2. Dashboard
 
+![Dashboard](../assets/de/dashboard-guide.png)
+
+**Abbildung 1 – Dashboard mit Beispieldaten:** (1) Aktuelle Kennzahlen, (2) Standortfilter, (3) historische Entwicklung, (4) Standortübersicht mit Wechsel zu Jobs.
+
 Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive Läufe**. Der Standortfilter gilt für diese Kennzahlen, Handlungsbedarf, historische Statistiken und die Standortübersicht. Die erste Karte zählt das letzte gespeicherte Ergebnis pro Job. Restore-Abdeckung zählt gültige Nachweise gegenüber allen Jobs; die Quote innerhalb vorhandener Testpläne steht separat daneben. Fehlende Statusdaten sind kein Erfolg.
 
 **Handlungsbedarf** zeigt vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden separat mit einem Link zu Restore Tests genannt.

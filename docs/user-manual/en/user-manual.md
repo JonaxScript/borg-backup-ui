@@ -157,6 +157,10 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 ## 2. Dashboard
 
+![Dashboard](../assets/en/dashboard-guide.png)
+
+**Figure 1 – Dashboard with example data:** (1) Current metrics, (2) location filter, (3) historical trends, (4) location overview with links to Jobs.
+
 Three cards show **Latest backup runs**, **Restore coverage** and **Active runs**. The location filter applies to these metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
 
 **Needs attention** shows full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed separately with a link to Restore Tests.
