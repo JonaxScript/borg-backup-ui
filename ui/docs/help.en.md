@@ -223,7 +223,7 @@ Server timezone applies; missed/skipped slots are not caught up. Skipping does
 not renew evidence. Legacy interval tests remain separate under **Settings >
 Restore**. No corresponding overdue reminder is sent without a previous report.
 
-Planning combines the information into four columns. **Evidence & history** opens the job reports. Successful reports appear as **Restoration evidence**, identifying the archive and cumulative scope: L1, L1 + L2 or L1 + L2 + L3. Validity is separate from the attempt result. After cancellation, previous valid evidence is directly accessible. Technical details expand below the report; existing reports remain unchanged.
+Planning combines the information into four columns. **Evidence & history** opens the job reports. Successful reports appear as **Restoration evidence**, identifying the archive and cumulative scope: L1, L1 + L2 or L1 + L2 + L3. Validity is separate from the attempt result. After cancellation, previous valid evidence is directly accessible. One **Technical evidence** section combines checks and log diagnostics; **Show check data** opens supporting values with their check; existing reports remain unchanged.
 
 ### Test Levels
 

@@ -1071,13 +1071,7 @@ function renderRTReportRow(t, idx, opened = false) {
       ])}</div>
       ${renderRTLevelEvidence(t, steps)}
       <p class="rt-proof-scope-note">${escHtml(restoreTestsT(successful ? 'evidenceScopeLimit' : 'attemptScopeLimit'))}</p>
-      <details class="rt-technical-evidence"><summary>${escHtml(restoreTestsT('technicalEvidence'))}</summary><div>${rtReportSection(restoreTestsT('execution'), [
-        [restoreTestsT('reportId'), t.report_id || t.test_id, true],
-        [restoreTestsT('runLogFile'), t.log_file, true],
-        [restoreTestsT('start'), t.start_ts || t.started_at],
-        [restoreTestsT('end'), t.end_ts || t.finished_at || t.test_date],
-        [restoreTestsT('errorCode'), t.failure_code],
-      ])}${renderRTStepsTable(steps, t)}${renderRTTechnicalEvidence(t, steps)}</div></details>
+      ${renderRTTechnicalEvidence(t, steps)}
       ${!successful ? '</details>' : ''}
       <footer class="rt-proof-footer">${escHtml(restoreTestsT('evidenceSource'))}</footer>
     </article>
@@ -1090,6 +1084,11 @@ function rtReportSection(title, items) {
   return `<section><header>${escHtml(title)}</header><dl>${rows}</dl></section>`;
 }
 
+/** Render each recorded check once, keeping its evidence alongside the outcome.
+ * @param {Array<object>} steps Recorded checks in execution order.
+ * @param {object} report Source report for file lists, hashes and check metadata.
+ * @returns {string} Escaped check markup, or an empty string without recorded steps.
+ */
 function renderRTStepsTable(steps, report = {}) {
   const rows = Array.isArray(steps) ? steps : [];
   if (!rows.length) return '';
@@ -1099,6 +1098,7 @@ function renderRTStepsTable(steps, report = {}) {
     const st = String(s.status || '').toLowerCase();
     const statusText = st === 'passed' ? 'OK' : (st === 'failed' ? restoreTestsT('failed') : (st === 'not_tested' ? restoreTestsT('notTested') : st));
     const statusClass = st === 'passed' ? 'success' : (st === 'failed' ? 'error' : 'warning');
+    const evidence = renderRTStepDetails(s, report) + rtStepDetailsBlock([[restoreTestsT('errorCode'), s.error_code]]);
     return `<div class="rt-step-row">
       <div class="rt-step-index">${i + 1}</div>
       <div class="rt-step-main">
@@ -1107,6 +1107,7 @@ function renderRTStepsTable(steps, report = {}) {
         </div>
         <div class="rt-step-message">${escHtml(restoreTestStepMessage(s))}</div>
         <div class="rt-step-command">${escHtml(s.command || '—')}</div>
+        ${evidence ? `<details class="rt-check-evidence"><summary>${escHtml(restoreTestsT('checkEvidence'))}</summary>${evidence}</details>` : ''}
       </div>
       <span class="rt-step-status ${statusClass}">${escHtml(statusText || '—')}</span>
       <div class="rt-step-duration">${escHtml(dur)}</div>
@@ -1119,26 +1120,35 @@ function renderRTStepsTable(steps, report = {}) {
   </div>`;
 }
 
+/** Render the single technical disclosure, with diagnostics and per-check evidence.
+ * Legacy reports without matching checks retain their file lists and hashes here.
+ * Report ID and repeated run start/end are intentionally not presented.
+ * @param {object} report Stored report; never modified by this renderer.
+ * @param {Array<object>} steps Recorded checks.
+ * @returns {string} Escaped disclosure markup, or empty when no evidence is available.
+ */
 function renderRTTechnicalEvidence(report, steps) {
-  const stats = report.archive_stats || {};
-  const fmt = report.archive_stats_formatted || {};
-  const l3 = report.level3_details || {};
-  const summary = rtStepDetailsBlock([
-    [restoreTestsT('repository'), report.repository, true],
-    [restoreTestsT('compressedSize'), fmt.compressed],
-    [restoreTestsT('deduplicatedSize'), fmt.deduplicated],
-    [restoreTestsT('archiveFiles'), stats.files_count],
-    [restoreTestsT('sampleSize'), l3.sample_size],
-    [restoreTestsT('reportSchema'), report.report_schema_version],
+  const rows = Array.isArray(steps) ? steps : [];
+  const diagnostics = rtStepDetailsBlock([
+    [restoreTestsT('runLogFile'), report.log_file, true],
     [restoreTestsT('exitCode'), report.test_exit_code],
+    [restoreTestsT('errorCode'), report.failure_code],
   ]);
-  const stepEvidence = (steps || []).map((step) => {
-    const details = renderRTStepDetails(step, report);
-    if (!details && !step.timestamp && !step.error_code) return '';
-    return `<details class="rt-technical-step"><summary>${escHtml(restoreTestsT('stepEvidence', { step: rtStepLabel(String(step.step_id || '')) }))}</summary><div>${step.timestamp ? `<div class="rt-step-facts"><span>${escHtml(restoreTestsT('timestampValue', { value: step.timestamp }))}</span>${step.error_code ? `<span>${escHtml(restoreTestsT('errorCodeValue', { value: step.error_code }))}</span>` : ''}</div>` : ''}${details}</div></details>`;
-  }).join('');
-  if (!summary && !stepEvidence) return '';
-  return `<details class="rt-technical-evidence"><summary>${escHtml(restoreTestsT('technicalEvidence'))}</summary><div>${summary}${stepEvidence}</div></details>`;
+  const remainingEntries = rows.some(step => ['restore_probe', 'sample_restore'].includes(step.step_id))
+    ? '' : rtStepEntriesBlock(Array.isArray(report.tested_entries) ? report.tested_entries : []);
+  const remainingHashes = rows.some(step => ['integrity_check', 'integrity_compare'].includes(step.step_id))
+    ? '' : rtStepChecksumsBlock(report.level3_details || {});
+  const metadata = rows.some(step => step.step_id === 'metadata_check') ? '' : rtStepDetailsBlock([
+    [restoreTestsT('compressedSize'), report.archive_stats_formatted?.compressed],
+    [restoreTestsT('deduplicatedSize'), report.archive_stats_formatted?.deduplicated],
+    [restoreTestsT('reportSchema'), report.report_schema_version],
+  ]);
+  const checks = renderRTStepsTable(rows, report);
+  if (!diagnostics && !metadata && !checks && !remainingEntries && !remainingHashes) return '';
+  return `<details class="rt-technical-evidence"><summary>${escHtml(restoreTestsT('technicalEvidence'))}</summary><div>
+    ${diagnostics ? `<div class="rt-report-diagnostics">${diagnostics}</div>` : ''}
+    ${checks}${metadata}${remainingEntries}${remainingHashes}
+  </div></details>`;
 }
 
 function rtStepLabel(stepId) {
@@ -1216,7 +1226,6 @@ function renderRTStepDetails(step, report) {
   }
   return rtStepDetailsBlock([
     [restoreTestsT('testTime'), step.timestamp],
-    [restoreTestsT('errorCode'), step.error_code],
   ]);
 }
 

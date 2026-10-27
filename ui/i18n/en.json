@@ -2176,7 +2176,8 @@
     "evidenceScopeLimit": "This evidence covers the specified archive and documented checks. Coverage describes the dry run; the L3 sample is shown separately. Application or VM startup and comparison with external reference checksums are not established by this test.",
     "evidenceSource": "Automatically generated from the saved restore-test report.",
     "attemptDetails": "Attempt scope and technical details",
-    "attemptScopeLimit": "These records document this incomplete attempt and do not establish new restoration evidence."
+    "attemptScopeLimit": "These records document this incomplete attempt and do not establish new restoration evidence.",
+    "checkEvidence": "Show check data"
   },
   "settings": {
     "title": "Settings",

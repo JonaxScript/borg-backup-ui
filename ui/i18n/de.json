@@ -2176,7 +2176,8 @@
     "evidenceScopeLimit": "Dieser Nachweis bezieht sich auf das angegebene Archiv und die dokumentierten Prüfungen. Die Abdeckung beschreibt den Probelauf; die L3-Stichprobe wird separat ausgewiesen. Ein Anwendungs- oder VM-Start sowie ein Vergleich mit externen Referenzprüfsummen sind damit nicht nachgewiesen.",
     "evidenceSource": "Automatisch erstellt aus dem gespeicherten Restore-Testbericht.",
     "attemptDetails": "Prüfumfang und technische Details des Versuchs",
-    "attemptScopeLimit": "Die Angaben dokumentieren diesen unvollständigen Testversuch und begründen keinen neuen Wiederherstellungsnachweis."
+    "attemptScopeLimit": "Die Angaben dokumentieren diesen unvollständigen Testversuch und begründen keinen neuen Wiederherstellungsnachweis.",
+    "checkEvidence": "Prüfdaten anzeigen"
   },
   "settings": {
     "title": "Einstellungen",

@@ -233,3 +233,14 @@
   .rt-report-entry .rt-report-sections dd { text-align: left; }
 }
 .rt-attempt-details > summary { padding: var(--ui-space-3); color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); cursor: pointer; }
+
+/* One technical disclosure; supporting data stays with its check (#610). */
+.rt-check-evidence { margin-top: var(--ui-space-2); }
+.rt-check-evidence > summary { color: var(--ui-color-accent); font-size: var(--ui-font-size-xs); cursor: pointer; }
+.rt-check-evidence > .rt-step-details { margin-top: var(--ui-space-2); gap: var(--ui-space-2); }
+.rt-check-evidence .rt-step-detail-item { background: var(--ui-color-surface-subtle); }
+.rt-report-diagnostics { padding: var(--ui-space-3) 0; }
+.rt-report-diagnostics .rt-step-details { gap: var(--ui-space-2); }
+.rt-report-diagnostics .rt-step-detail-item { min-width: 0; }
+.rt-report-diagnostics .rt-step-detail-item strong { overflow-wrap: anywhere; }
+.rt-report-card .rt-check-evidence .rt-step-detail-section { margin-top: var(--ui-space-2); }
