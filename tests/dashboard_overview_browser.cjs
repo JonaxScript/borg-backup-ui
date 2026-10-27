@@ -19,7 +19,7 @@ const { chromium } = require('playwright');
       restore_verification_status: 'verified', total_size: '162.3 GB', last_backup: '2026-10-26T09:00:00Z',
       archive_name: `${name.toLowerCase()}-backup-2026-10-26_09-00-37`}));
     backups[4].status='error'; backups[4].error_message='Required source is missing <script>not executable</script>';
-    for(let i=6;i<14;i++) backups.push({key:String(i),name:`Demo ${i}`,location:i<10?'usb':'storagebox',status:'success',restore_verification_status:'not_required'});
+    for(let i=6;i<14;i++) backups.push({key:String(i),name:`Demo ${i}`,location:i<10?'usb':i<12?'smb':'storagebox',status:'success',restore_verification_status:'not_required'});
     window.BBUI = {components: {i18n: {getLanguage: () => lang, t: (key, params = {}) => {
       const text = key.split('.').reduce((v,k) => v?.[k], dicts[lang]);
       return typeof text === 'string' ? text.replace(/\{(\w+)\}/g, (_,k) => params[k] ?? '') : key;
@@ -66,6 +66,8 @@ const { chromium } = require('playwright');
       if(page==='jobs') {BBUI.resourceMonitor.stop(); refreshJobs();}
     }});
     document.getElementById('jobs-grid').addEventListener('click',onJobsGridClick);
+    BBUI.core.state.lastRefresh = new Date('2026-10-27T19:00:00Z');
+    updateRefreshLabel();
     renderDashboard(data,null); refreshDashboardOverview(); BBUI.resourceMonitor.start();
   });
   const capture=async name=>{if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({animations:'disabled',fullPage:true,path:`${process.env.BBUI_SCREENSHOT_DIR}/${name}.png`});};
@@ -73,14 +75,57 @@ const { chromium } = require('playwright');
   assert.equal(await page.locator('.dashboard-summary-section').count(),3);
   assert.equal(await page.locator('.dashboard-coverage-track .success').count(),6);
   assert.equal(await page.locator('#backup-grid').count(),0);
-  assert.match(await page.locator('#dashboard-attention').innerText(),/<script>not executable<\/script>/);
+  assert.match(await page.locator('#dashboard-attention').textContent(),/<script>not executable<\/script>/);
   assert.equal(await page.locator('#dashboard-attention script').count(),0);
   const cards=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
   assert(cards.every(top=>top===cards[0]));
+  assert.equal(cards.length,4);
+  assert.match(await page.locator('#last-refresh').innerText(), /Aktualisiert:/);
+  await page.locator('.dashboard-tests-link').focus();
+  await page.evaluate(()=>renderDashboard(BBUI.core.state.data,null));
+  assert(await page.locator('.dashboard-tests-link').evaluate(el=>el===document.activeElement));
+  // A populated desktop overview fits without clipping; disclosures remain keyboard accessible.
+  for (const lang of ['de','en']) for (const theme of ['light','dark']) {
+    await page.evaluate(({lang,theme})=>{window.lang=lang;document.documentElement.dataset.theme=theme;translate();updateRefreshLabel();renderDashboard(BBUI.core.state.data,null);},{lang,theme});
+    for (const viewport of [{width:1920,height:1080},{width:1600,height:1000}]) {
+      await page.setViewportSize(viewport);
+      const bounds=await page.locator('#dashboard-locations').boundingBox();
+      assert(bounds.y+bounds.height<=viewport.height, `Location table exceeds ${viewport.width}x${viewport.height}: ${bounds.y+bounds.height}`);
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+      assert(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1));
+    }
+    await capture(`compact-dashboard-${lang}-${theme}`);
+  }
+  await page.setViewportSize({width:1920,height:1080});
+  await page.evaluate(()=>{window.lang='de';document.documentElement.dataset.theme='light';translate();renderDashboard(BBUI.core.state.data,null);});
+  await page.locator('#dashboard-attention-toggle').focus();
+  await page.keyboard.press('Enter');
+  assert(await page.locator('#dashboard-attention li').first().isVisible());
+  await page.locator('#dashboard-rate-info summary').click();
+  assert(await page.locator('#dashboard-rate-info p').isVisible());
+  await page.evaluate(()=>{renderDashboard(BBUI.core.state.data,null);});
+  assert(await page.locator('#dashboard-rate-info p').isVisible());
+  assert(await page.locator('#dashboard-attention li').first().isVisible());
+  await page.locator('#dashboard-rate-info summary').click();
+  await page.locator('#dashboard-attention-toggle').click();
   await capture('management-dashboard-de');
+  await page.evaluate(()=>{BBUI.core.state.data.backups[4].status='success';renderDashboard(BBUI.core.state.data,null);});
+  assert(await page.locator('.dashboard-attention-clear').isVisible());
+  assert.equal(await page.locator('#dashboard-attention details').count(),0);
+  await capture('compact-dashboard-healthy-de');
+  for (const width of [1280,768]) {
+    await page.setViewportSize({width,height:900});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    const positions=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
+    assert.equal(positions[0],positions[1]);
+    assert.equal(positions[2],positions[3]);
+    assert(positions[2]>positions[0]);
+  }
+  await page.setViewportSize({width:1920,height:1080});
+  await page.evaluate(()=>{BBUI.core.state.data.backups[4].status='error';renderDashboard(BBUI.core.state.data,null);});
   // Background refresh must preserve chart geometry, SVG/table identity and focus.
-  assert.deepEqual(await page.locator('#dashboard-location-filter option').evaluateAll(nodes=>nodes.map(n=>n.value)), ['all','local','usb','storagebox']);
-  assert.equal(await page.locator('#dashboard-locations tbody tr').count(), 3);
+  assert.deepEqual(await page.locator('#dashboard-location-filter option').evaluateAll(nodes=>nodes.map(n=>n.value)), ['all','local','usb','smb','storagebox']);
+  assert.equal(await page.locator('#dashboard-locations tbody tr').count(), 4);
   assert.equal(await page.locator('#dashboard-location-filter option[value="all"]').innerText(), 'Alle Standorte');
   const stability = await page.evaluate(async () => {
     const trends = document.getElementById('dashboard-trends');
@@ -165,6 +210,7 @@ const { chromium } = require('playwright');
   await page.locator('#resource-history-toggle').click();
   const plots=await page.locator('#resource-history [data-resource-plot-key="host-cpu"], #resource-history [data-resource-plot-key="host-ram"]').evaluateAll(nodes=>nodes.map(n=>({top:n.getBoundingClientRect().top,left:n.getBoundingClientRect().left})));
   assert.equal(plots.length,2);assert.equal(plots[0].top,plots[1].top);
+  await page.locator('#dashboard-attention-toggle').click();
   await page.locator('#dashboard-attention [data-dashboard-jobs="4"]').click();
   await page.waitForSelector('#job-card-4 .job-saved-status .dashboard-job-details', {timeout:5000}).catch(async error => { console.error(errors, await page.locator('#jobs-message').innerText()); throw error; });
   assert(await page.locator('#job-card-4 .dashboard-job-details').isVisible());

@@ -169,9 +169,11 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 **Abbildung 1 – Dashboard mit Beispieldaten:** (1) Aktuelle Kennzahlen, (2) Standortfilter, (3) historische Entwicklung, (4) Standortübersicht mit Wechsel zu Jobs.
 
-Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive Läufe**. Der Standortfilter gilt für diese Kennzahlen, Handlungsbedarf, historische Statistiken und die Standortübersicht. Die erste Karte zählt das letzte gespeicherte Ergebnis pro Job. Restore-Abdeckung zählt gültige Nachweise gegenüber allen Jobs; die Quote innerhalb vorhandener Testpläne steht separat daneben. Fehlende Statusdaten sind kein Erfolg.
+Vier kompakte Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung**, **Aktive Läufe** und **Server-Auslastung**. Der Standortfilter in der Kopfzeile gilt für die ersten drei Kennzahlen, Handlungsbedarf, historische Statistiken und die Standortübersicht. Die erste Karte zählt das letzte gespeicherte Ergebnis pro Job. Restore-Abdeckung zählt gültige Nachweise gegenüber allen Jobs; die Quote innerhalb vorhandener Testpläne steht separat daneben. Fehlende Statusdaten sind kein Erfolg.
 
-**Handlungsbedarf** zeigt vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden separat mit einem Link zu Restore Tests genannt.
+**Handlungsbedarf** zeigt eine kompakte Statuszeile. Bei Problemen öffnet **Ansehen** vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden in der Karte **Restore-Abdeckung** mit einem Link zu Restore Tests genannt.
+
+Die Info-Symbole an den Diagrammtiteln öffnen Erläuterungen zur Berechnung und Datengrundlage. Sie lassen sich auch per Tastatur bedienen. Auf großen Desktop-Bildschirmen bleibt die normale Übersicht einschließlich Standorttabelle kompakt; geöffnete Details, laufende Tests oder kleinere Bildschirme können Scrollen erfordern.
 
 **Entwicklung** wertet gespeicherte Backup-Läufe über 7, 30 oder 90 Kalendertage einschließlich heute in der Server-Zeitzone aus. Die Erfolgsquote ist erfolgreiche Läufe / (erfolgreiche Läufe + Warnungen + Fehler). Übersprungene, abgebrochene und unbekannte Läufe zählen separat. Das ist eine historische Quote und nicht der Anteil der aktuell erfolgreichen Jobs.
 
@@ -181,7 +183,7 @@ Bei automatischer Aktualisierung bleiben die Diagramme während des Nachladens s
 
 Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
-Die **Server-Auslastung** direkt unter der Kennzahlenreihe mit **Letzte Backup-Läufe** bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
+Die **Server-Auslastung** in der vierten Kennzahlenkarte bleibt standortübergreifend. CPU und RAM stehen kompakt untereinander; der aufklappbare Verlauf darunter nutzt die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
 
 ### 2.6 Unraid-Dashboard-Widget
 
@@ -195,7 +197,7 @@ Das Widget liest eine vorberechnete Statusdatei auf dem Flash-Laufwerk. Sein Akt
 
 ### 2.7 Server-Auslastung
 
-Der Bereich direkt unter den aktuellen Kennzahlen zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
+Die vierte Kennzahlenkarte zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
 
 Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
 
