@@ -49,16 +49,20 @@ for (const language of ['de', 'en']) {
     assert.equal(c.dashboardAttentionItems(backups).filter(i => i.backup.key === 'ok0').length, 1);
   });
 
-  test(`${language}: restore denominator excludes unplanned and unknown jobs`, () => {
+  test(`${language}: restore coverage includes every job and separately counts known plans`, () => {
     const {context: c, elements, t} = dashboard(language);
     c.renderRestoreVerificationSummary([
       ...Array.from({length: 6}, () => ({restore_verification_status: 'verified'})),
       ...Array.from({length: 7}, () => ({restore_verification_status: 'not_required'})),
     ]);
-    assert.match(elements.get('restore-summary-bar').innerHTML, /<strong>6<\/strong><small>\/6<\/small>/);
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreCoverageTotal', {total: 13})));
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restorePlansVerified', {count: 6, total: 6})));
+    assert.equal((elements.get('restore-summary-bar').innerHTML.match(/class="success"/g) || []).length, 6);
+    assert.equal((elements.get('restore-summary-bar').innerHTML.match(/class="neutral"/g) || []).length, 7);
     assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreUnplannedCount', {count: 7})));
     c.renderRestoreVerificationSummary([{restore_verification_status: 'verified'}, {}, {restore_verification_status: 'failed'}, {restore_verification_status: 'stale'}, {restore_verification_status: 'never'}]);
-    assert.match(elements.get('restore-summary-bar').innerHTML, /<strong>1<\/strong><small>\/4<\/small>/);
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreCoverageTotal', {total: 5})));
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restorePlansVerified', {count: 1, total: 4})));
     assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreUnknownCount', {count: 1})));
   });
 
@@ -67,7 +71,7 @@ for (const language of ['de', 'en']) {
     c.renderSummaryBar([]);
     c.renderRestoreVerificationSummary([]);
     for (const id of ['summary-bar', 'restore-summary-bar']) {
-      assert.match(elements.get(id).innerHTML, /<strong>0<\/strong><small>\/0<\/small>/);
+      assert.match(elements.get(id).innerHTML, /<strong>0<\/strong>/);
       assert.doesNotMatch(elements.get(id).innerHTML, /NaN|Infinity|undefined/);
     }
     const counts = c.dashboardBackupSummary([{never_run: true, status: 'success'}, {status: 'future'}, {status: 'cancelled'}]).counts;

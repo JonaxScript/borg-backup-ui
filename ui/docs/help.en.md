@@ -49,9 +49,9 @@ The main menu follows the operating workflow: **Dashboard**, **Jobs**, **Reposit
 
 ## 3. Dashboard
 
-Two rings summarize the latest backup outcomes and restore evidence. Overdue backups appear separately below the first ring without changing the latest run outcome. The restore ring covers jobs with a test plan; jobs without a plan or with unknown status are listed separately below it.
+Three compact cards show the latest backup outcomes, restore coverage and server resources. The small ring counts the latest outcome of each job. Restore segments show verified evidence relative to all backups; the success ratio of known test plans is shown separately. Jobs without a plan and unknown states remain visible. Overdue backups and resource history expand directly beneath the corresponding information.
 
-**Needs attention** shows error messages, warnings, skipped runs and overdue backups or restore evidence. **View** opens the affected job. The location sidebar retains its icons and filters by Local, USB, SMB or Storagebox. Empty locations are hidden; **All locations** keeps jobs grouped by location.
+**Needs attention** shows error messages, warnings, skipped runs and overdue backups or restore evidence. **View** expands the full messages directly beneath the attention row. The location sidebar retains its icons and filters by Local, USB, SMB or Storagebox. Empty locations are hidden; **All locations** keeps jobs grouped by location.
 
 ### Important Columns
 

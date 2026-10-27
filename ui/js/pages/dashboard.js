@@ -20,6 +20,8 @@ function dashboardLocationLabel(location) {
 let dashboardSystemHealth = null;
 let dashboardSelectedLocation = 'all';
 const dashboardExpandedJobs = new Set();
+let dashboardAttentionExpanded = false;
+let dashboardOverdueExpanded = false;
 const DASHBOARD_LOCATION_ORDER = ['local', 'usb', 'smb', 'storagebox'];
 
 async function fetchStatus() {
@@ -194,7 +196,7 @@ function dashboardBackupSummary(backups) {
 }
 
 /**
- * Build a labeled ring and legend from numeric counts, using the current theme.
+ * Build a compact labeled ring and outcome counts using the current theme.
  * @param {object[]} rows Counts, translated labels and fixed semantic color classes.
  * @param {number} value Verified/successful count shown inside the ring.
  * @param {number} total Scope denominator; zero produces an empty neutral ring.
@@ -212,15 +214,16 @@ function dashboardSummaryContent(rows, value, total, centerLabel) {
   const description = rows.map((row) => `${row.count} ${row.label}`).join(' · ');
   return `<div class="dashboard-summary-body">
     <div class="dashboard-summary-ring" style="--dashboard-ring-fill:${fill}" role="img" aria-label="${escHtml(description)}">
-      <div class="dashboard-summary-ring__center"><span><strong>${value}</strong><small>/${total}</small></span><span class="dashboard-summary-ring__label">${escHtml(centerLabel)}</span></div>
+      <div class="dashboard-summary-ring__center"><span><strong>${value}</strong><small>/${total}</small></span></div>
     </div>
-    <dl class="dashboard-summary-legend">${rows.map((row) => `<div class="dashboard-summary-stat ${row.cls}${row.count === 0 ? ' is-zero' : ''}"><dt><span aria-hidden="true"></span>${escHtml(row.label)}</dt><dd>${row.count}</dd></div>`).join('')}</dl>
+    <div class="dashboard-summary-numbers"><div class="dashboard-summary-primary"><strong>${value}</strong><span>${escHtml(centerLabel)}</span></div>
+    <dl class="dashboard-summary-legend">${rows.slice(1).map((row) => `<div class="dashboard-summary-stat ${row.cls}${row.count === 0 ? ' is-zero' : ''}"><dt>${escHtml(row.label)}</dt><dd>${row.count}</dd></div>`).join('')}</dl></div>
   </div>`;
 }
 
 /**
  * Render backup outcomes from job rows rather than the API's overdue-adjusted counters.
- * @param {object[]} backups Current status rows; overdue links open their job details.
+ * @param {object[]} backups Current status rows; overdue details expand below the summary.
  */
 function renderSummaryBar(backups) {
   const el = document.getElementById('summary-bar');
@@ -234,20 +237,20 @@ function renderSummaryBar(backups) {
     ...(summary.counts.cancelled ? [{ cls: 'warning', count: summary.counts.cancelled, label: dashboardT('jobs.statusCancelled') }] : []),
     ...(summary.counts.unknown ? [{ cls: 'unknown', count: summary.counts.unknown, label: dashboardT('dashboard.unknownOrNever') }] : []),
   ];
-  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
-    + dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
-    + `<div class="dashboard-summary-footer${summary.overdue ? ' has-overdue' : ''}">${summary.overdue
-      ? `<button type="button" class="dashboard-summary-overdue" data-dashboard-overdue>${iconWarn()}<span>${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</span></button>`
-      : `<span>${escHtml(dashboardT('dashboard.noOverdueBackups'))}</span>`}</div>`;
-  el.querySelector('[data-dashboard-overdue]')?.addEventListener('click', () => {
-    const first = backups.find((backup) => backup.backup_overdue);
-    if (first) openDashboardJobDetails(first.key);
-  });
+  const focused = document.activeElement?.id === 'dashboard-overdue-toggle';
+  el.innerHTML = dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
+    + `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
+    + (summary.overdue ? `<details class="dashboard-summary-overdue"${dashboardOverdueExpanded ? ' open' : ''}>
+      <summary id="dashboard-overdue-toggle">${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</summary>
+      <ul>${backups.filter(backup => backup.backup_overdue).map(backup => `<li><strong>${escHtml(backup.name || backup.display_name || backup.key)}</strong><p>${escHtml(dashboardT('dashboard.backupOverdueDetails', {date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run)}))}</p></li>`).join('')}</ul>
+    </details>` : '');
+  el.querySelector('details')?.addEventListener('toggle', event => { dashboardOverdueExpanded = event.currentTarget.open; });
+  if (focused) el.querySelector('summary')?.focus({preventScroll: true});
 }
 
 /**
  * Render verification scope explicitly; missing metadata stays unknown, never verified.
- * @param {object[]} backups Current rows; unplanned and unknown states stay outside the ring.
+ * @param {object[]} backups Current rows; coverage includes all jobs, while the plan ratio excludes unplanned/unknown states.
  */
 function renderRestoreVerificationSummary(backups) {
   const el = document.getElementById('restore-summary-bar');
@@ -264,9 +267,14 @@ function renderRestoreVerificationSummary(backups) {
     { cls: 'error', count: counts.failed, label: dashboardT('dashboard.restoreFailed') },
     { cls: 'unknown', count: counts.never, label: dashboardT('dashboard.restoreOpen') },
   ];
-  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.restoreScope', { count: total, total: backups.length }))}</p>`
-    + dashboardSummaryContent(rows, counts.verified, total, dashboardT('dashboard.restoreVerified'))
-    + `<div class="dashboard-summary-footer">${escHtml(dashboardT('dashboard.restoreUnplannedCount', { count: counts.not_required }))}${counts.unknown ? ` · ${escHtml(dashboardT('dashboard.restoreUnknownCount', { count: counts.unknown }))}` : ''}</div>`;
+  const states = {verified: 'success', stale: 'warning', failed: 'error', never: 'unknown', not_required: 'neutral', unknown: 'unknown'};
+  const description = dashboardT('dashboard.restoreCoverageDescription', {count: counts.verified, total: backups.length});
+  el.innerHTML = `<div class="dashboard-restore-coverage">
+    <div class="dashboard-summary-primary"><strong>${counts.verified}</strong><span>${escHtml(dashboardT('dashboard.restoreCoverageTotal', {total: backups.length}))}</span></div>
+    <div class="dashboard-coverage-track" role="img" aria-label="${escHtml(description)}">${Object.entries(counts).map(([state, count]) => `<span class="${states[state]}"></span>`.repeat(count)).join('')}</div>
+    <div class="dashboard-coverage-caption"><span>${escHtml(dashboardT('dashboard.restorePlansVerified', {count: counts.verified, total}))}</span><span>${escHtml(dashboardT('dashboard.restoreUnplannedCount', {count: counts.not_required}))}</span></div>
+    <div class="dashboard-restore-exceptions">${rows.slice(1).filter(row => row.count).map(row => `<span class="${row.cls}">${row.count} ${escHtml(row.label)}</span>`).join(' · ')}${counts.unknown ? `<span>${escHtml(dashboardT('dashboard.restoreUnknownCount', {count: counts.unknown}))}</span>` : ''}</div>
+  </div>`;
 }
 
 /**
@@ -297,7 +305,8 @@ function dashboardAttentionItems(backups) {
 }
 
 /**
- * Render escaped issue descriptions and local links to the affected expandable row.
+ * Render a compact disclosure; escaped issue descriptions expand directly below it.
+ * Preserve its open state and keyboard focus across polling and language changes.
  * @param {object[]} backups Current status rows; an empty result hides the section.
  */
 function renderDashboardAttention(backups) {
@@ -305,12 +314,16 @@ function renderDashboardAttention(backups) {
   if (!el) return;
   const items = dashboardAttentionItems(backups);
   el.hidden = items.length === 0;
-  el.innerHTML = items.length ? `<header class="dashboard-attention-header"><h2>${escHtml(dashboardT('dashboard.attention'))}</h2><span>${escHtml(dashboardT('dashboard.attentionCount', { count: items.length }))}</span></header>
-    <ul>${items.map((item, index) => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button type="button" class="btn btn-secondary dashboard-attention-action" data-dashboard-attention="${index}">${escHtml(dashboardT('dashboard.viewDetails'))}</button></li>`).join('')}</ul>` : '';
-  el.querySelectorAll('[data-dashboard-attention]').forEach((button) => button.addEventListener('click', () => {
-    const item = items[Number(button.dataset.dashboardAttention)];
-    if (item) openDashboardJobDetails(item.backup.key);
-  }));
+  const focused = document.activeElement?.id === 'dashboard-attention-toggle';
+  const first = items[0];
+  el.innerHTML = items.length ? `<details class="dashboard-attention-disclosure ${first.cls}"${dashboardAttentionExpanded ? ' open' : ''}>
+    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${first.cls === 'error' ? iconX() : iconWarn()}</span>
+      <strong>${escHtml(dashboardT('dashboard.attentionCount', {count: items.length}))}</strong>
+      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · ${escHtml(first.label)}</span>
+      <span class="dashboard-attention-action">${escHtml(dashboardT('dashboard.viewDetails'))}<span class="dashboard-details-chevron" aria-hidden="true">›</span></span></summary>
+    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div></li>`).join('')}</ul></details>` : '';
+  el.querySelector('details')?.addEventListener('toggle', event => { dashboardAttentionExpanded = event.currentTarget.open; });
+  if (focused) el.querySelector('summary')?.focus({preventScroll: true});
 }
 
 /**
@@ -320,21 +333,6 @@ function renderDashboardAttention(backups) {
  */
 function dashboardDetailsId(key) {
   return 'dashboard-details-' + Array.from(String(key || '')).map((char) => char.codePointAt(0).toString(16)).join('-');
-}
-
-/**
- * Open an affected job in All locations, preserving other expansions and moving focus locally.
- * @param {string} key Job to reveal from the current cached dashboard data.
- */
-function openDashboardJobDetails(key) {
-  if (!key) return;
-  dashboardSelectedLocation = 'all';
-  dashboardExpandedJobs.add(String(key));
-  renderBackupGrid(window.BBUI.core.state.data?.backups || []);
-  const row = document.getElementById(dashboardDetailsId(key));
-  const toggle = document.getElementById(dashboardDetailsId(key) + '-toggle');
-  toggle?.focus({ preventScroll: true });
-  row?.scrollIntoView({ block: 'center', behavior: 'auto' });
 }
 
 /**

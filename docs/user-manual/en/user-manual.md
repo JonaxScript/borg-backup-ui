@@ -178,9 +178,9 @@ The Dashboard answers the most important operational questions:
 
 The page consists of:
 
-- **Backup runs:** The first ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
-- **Restore evidence:** The second ring shows verified evidence relative to jobs with a restore test plan. Overdue, failed and pending evidence appears alongside it. Jobs without a plan or with unknown restore status are listed separately.
-- **Needs attention:** Shows error messages, warnings, skipped-run reasons and overdue backups or restore evidence. **View** opens details for the affected job.
+- **Latest backup runs:** The small ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
+- **Restore coverage:** Segments show verified evidence relative to all backups. The success ratio of known test plans is shown separately. Overdue, failed and pending evidence, jobs without a plan and unknown restore states remain distinguishable.
+- **Needs attention:** Shows error messages, warnings, skipped-run reasons and overdue backups or restore evidence. **View** expands the full messages directly beneath the compact attention row. Overdue backups and **Show history** also expand beneath their respective information, without a side panel. Open attention details survive refreshes and language changes.
 - **Location sidebar:** Filters the table by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`. Locations without jobs are hidden. **All locations** keeps jobs grouped by location and retains the existing location icons.
 - **Selection card:** Shows the currently selected location and number of backups.
 - **Job table:** Shows each job with its icon and latest archive name, run status, next scheduled run, restore status and repository size. **Details** expands the remaining information. Expanded details survive refreshes and location or language changes.
@@ -222,9 +222,11 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ### 2.7 Server Resources
 
-The card below the two summaries shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
+The third compact card shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
+
+The RAM bar shows the available share of total RAM; the CPU mini trend remains visible while history is collapsed.
 
 The card refreshes every **2 seconds** during active runs and every **10 seconds** otherwise. Requests pause when leaving the dashboard or hiding the browser tab. Shared server sampling continues after the first dashboard visit: once per second during active runs, every ten seconds otherwise. **Show history** opens the last ten minutes; the transferred trend is thinned to approximately five seconds. There is no persistent storage or complete per-run analysis; restarting the UI service clears history.
 

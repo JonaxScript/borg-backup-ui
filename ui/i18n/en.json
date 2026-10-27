@@ -1265,6 +1265,11 @@
     "sourceDatabases": "Database profiles"
   },
   "dashboard": {
+    "latestBackupRuns": "Latest backup runs",
+    "restoreCoverage": "Restore coverage",
+    "restoreCoverageTotal": "of {total} verified",
+    "restoreCoverageDescription": "{count} of {total} backups with verified restore evidence",
+    "restorePlansVerified": "{count}/{total} test plans verified",
     "title": "Dashboard",
     "subtitle": "Backup overview",
     "grouping": "Grouping",
@@ -3715,6 +3720,7 @@
     "unsupportedProfiles": "These profiles from an earlier test version are no longer supported. Profiles, Secrets and backups are preserved. Remove their assignments from affected jobs; they cannot create new backups."
   },
   "resources": {
+    "activeCount": "{count} active runs",
     "title": "Server resources",
     "live": "Live · every {seconds} s",
     "unavailable": "Measurements unavailable",

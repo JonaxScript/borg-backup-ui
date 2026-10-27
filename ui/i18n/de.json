@@ -1265,6 +1265,11 @@
     "sourceDatabases": "Datenbankprofile"
   },
   "dashboard": {
+    "latestBackupRuns": "Letzte Backup-Läufe",
+    "restoreCoverage": "Restore-Abdeckung",
+    "restoreCoverageTotal": "von {total} verifiziert",
+    "restoreCoverageDescription": "{count} von {total} Backups mit verifiziertem Restore-Nachweis",
+    "restorePlansVerified": "{count}/{total} Testpläne verifiziert",
     "title": "Dashboard",
     "subtitle": "Backup-Übersicht",
     "grouping": "Gruppierung",
@@ -3715,6 +3720,7 @@
     "unsupportedProfiles": "Diese Profile aus einer früheren Testversion werden nicht mehr unterstützt. Profile, Secrets und Sicherungen bleiben erhalten. Entferne ihre Zuordnung aus betroffenen Jobs; neue Sicherungen sind damit nicht möglich."
   },
   "resources": {
+    "activeCount": "{count} aktive Läufe",
     "title": "Server-Auslastung",
     "live": "Live · alle {seconds} s",
     "unavailable": "Messwerte nicht verfügbar",
