@@ -988,6 +988,8 @@ explains dry-run and standard output. It is optional for routine operation.
 
 Use **Test now** next to a job to start it manually with its configured test level. Watch the live log and review **Test reports** afterwards. Fixed schedules run automatically through cron. If an existing global interval schedule is active, **Run due interval tests** remains available for its due jobs. Repeated manual starts of the same job open the existing run; repository conflicts are recorded as skipped.
 
+Running tests are marked directly beside the job with **Running** and a red **Cancel** button. After confirmation, the test stops its processes and releases its resources. The button shows **Cancelling…** until cleanup finishes, then **Test now** becomes available again. The log and report explicitly identify the cancellation; it is not successful restore evidence. Status refreshes when opening the page and every ten seconds. Independently started parallel tests continue. Cancelling a global interval run also stops the remaining batch, as explained in the confirmation. The button remains disabled for starting runs or runs started before this update without cancellation control.
+
 ### 8.5 Reports
 
 ![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)

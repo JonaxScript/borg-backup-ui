@@ -770,6 +770,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/job-groups/stop",
             "/api/restore-tests/run",
             "/api/restore-tests/run-job",
+            "/api/restore-tests/cancel",
             "/api/storage/test",
             "/api/storages/test",
             "/api/repositories/info",
@@ -1034,6 +1035,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
             "/api/jobs/cancel": self._post_cancel_job,
             "/api/restore-tests/run": self._post_run_restore_test,
             "/api/restore-tests/run-job": self._post_run_restore_test_job,
+            "/api/restore-tests/cancel": self._post_cancel_restore_test,
             "/api/storage/test": self._post_test_repo,
             "/api/storages": self._post_storage_target,
             "/api/storages/test": self._post_storage_target_test,
@@ -2326,12 +2328,23 @@ class BackupUIHandler(BaseHTTPRequestHandler):
         return list_restore_test_plan(self.config)
 
     def _get_rt_running(self) -> dict:
-        from jobs_api import JobManager
-        states = JobManager.get().get_all_states()
-        runs = [{**state, "run_key": key} for key, state in states.items()
-                if key == "restore_test" or key.startswith("restore_test_")]
-        runs.sort(key=lambda row: (bool(row.get("running")), row.get("start_time", "")), reverse=True)
-        return {**(runs[0] if runs else {"running": False}), "runs": runs}
+        """Return restore-test status and exact per-job cancellation identities."""
+        from restore_tests_api import restore_test_runtime
+        return restore_test_runtime(self.config)
+
+    def _post_cancel_restore_test(self) -> dict:
+        """Request cancellation of the selected active run; stale runs return 409."""
+        from restore_tests_api import cancel_restore_test
+        body = self._read_json_body()
+        job_key = str(body.get("job_key") or "").strip()
+        run_id = str(body.get("run_id") or "").strip()
+        session = self._get_current_session_meta() or {}
+        try:
+            cancel_restore_test(self.config, job_key, run_id,
+                                requested_by=_normalize_username(session.get("username", "")))
+        except (FileNotFoundError, RuntimeError) as exc:
+            raise ApiConflictError(str(exc), "restore_test_cancel_unavailable") from exc
+        return {"cancel_requested": True, "job_key": job_key, "run_id": run_id}
 
     def _restore_test_log_key(self, query: str) -> str:
         requested = (parse_qs(query).get("job") or [""])[0]
@@ -4249,7 +4262,7 @@ btn.addEventListener('click',doRecovery);
         method = str(method or "").upper()
         if path == "/api/jobs/run":
             return "run"
-        if path == "/api/jobs/cancel":
+        if path in {"/api/jobs/cancel", "/api/restore-tests/cancel"}:
             return "cancel"
         if path == "/api/restore-tests/run" or path == "/api/restore-tests/run-job":
             return "restore-test-run"

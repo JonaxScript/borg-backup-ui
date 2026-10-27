@@ -233,9 +233,9 @@ def discover_repos(conf: dict) -> list:
 class RestoreTest:
     """Run policy-aware Borg verification and persist per-job test evidence.
 
-    Construction opens a timestamped log. ``test_repo`` coordinates resource
-    locks and the selected verification level; callers close the log when the
-    run finishes.
+    Construction opens a timestamped log and, for managed supervisors, creates
+    run-specific cancellation control. ``test_repo`` coordinates locks and
+    verification; callers must close the instance to finish control and logging.
     """
     STEP_IDS = [
         "repo_reachable",
@@ -270,6 +270,14 @@ class RestoreTest:
             self.log_path = Path(os.environ["BORG_UI_RESTORE_LOG"])
         self._fh = open(self.log_path, "a", buffering=1, encoding="utf-8")
         self.mail_config = self._load_notification_config()
+        self.control = None
+        run_id = os.environ.get("BORG_UI_RUN_ID", "").strip()
+        if run_id and not getattr(args, "resource_worker", False):
+            from job_control import JobControl, CONTROL_ROOT
+            keys = getattr(args, "job_keys", [])
+            run_key = f"restore_test_{keys[0]}" if len(keys) == 1 else "restore_test"
+            self.control = JobControl(run_key, run_id, root=CONTROL_ROOT)
+            self.control.update_phase("restore_test", cancel_allowed=True)
 
     def log(self, msg: str = "") -> None:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -278,7 +286,33 @@ class RestoreTest:
         self._fh.write(line + "\n")
 
     def close(self) -> None:
-        self._fh.close()
+        """Close the log and mark runner control finished; safe to call repeatedly."""
+        if self._fh.closed:
+            return
+        try:
+            if self.control:
+                self.control.update_phase("finished", cancel_allowed=False, finished=True)
+        finally:
+            self._fh.close()
+
+    def cancel_requested(self) -> bool:
+        """Return whether this supervisor's run has a cancellation marker."""
+        control = getattr(self, "control", None)
+        return bool(control and control.is_cancel_requested())
+
+    def _record_cancelled(self, repo: dict, started: float) -> int:
+        """Persist interrupted evidence (exit 130), mark the batch stopped, and return 130."""
+        self._cancelled = True
+        message = "Restore test cancelled by user; verification did not complete"
+        self.log(message)
+        self._write(repo["job_key"], repo, "failed", int(time.time() - started), 0, 0, 0,
+                    "unknown", "", {}, [], exit_code=130, error_category="cancelled",
+                    error_details=message, failure_code="RT_CANCELLED", failure_hint=message,
+                    steps=[{"step_id": step, "status": "not_tested", "duration_ms": 0,
+                            "message": message} for step in self.STEP_IDS])
+        emit_lifecycle("RESTORE_TEST", "cancelled", job_key=repo["job_key"],
+                       run_id=os.environ.get("BORG_UI_RUN_ID", ""), log_file=str(self.log_path))
+        return 130
 
     # ── Hilfsmethoden ──────────────────────────────────────────────────────────
 
@@ -348,7 +382,8 @@ class RestoreTest:
     def _borg(self, args: list, env: dict, timeout: int | None = None, consume=None) -> subprocess.CompletedProcess:
         """Run Borg with bounded output or a streaming stdout consumer."""
         from restore_test_io import run_borg
-        return run_borg(args, env, self.borg_timeout if timeout is None else timeout, consume)
+        return run_borg(args, env, self.borg_timeout if timeout is None else timeout, consume,
+                        cancel_requested=self.cancel_requested)
 
     def _list_sample(self, path: str, archive: str, env: dict, limit: int, *, first: bool = False):
         """Return Borg's result and a bounded file sample with an exact count."""
@@ -563,8 +598,13 @@ class RestoreTest:
 
         Scheduled calls adopt the job's policy and skip disabled/not-due runs.
         Returns 0 for success, 1 for failure, 2 for skipped, or 3 for an
-        unavailable repository. Busy-lock skips are persisted as test results.
+        unavailable repository, or 130 after cancellation and cleanup. Busy-lock
+        skips and cancelled verification are persisted as test results.
         """
+        from restore_test_resources import ResourceGuardError, check_cancelled
+        started = time.time()
+        if self.cancel_requested():
+            return self._record_cancelled(repo, started)
         from jobs_api import resolve_resource_lock_dir
         from wizard_runner import ResourceLockSet
         from restore_tests_api import _normalize_restore_policy
@@ -599,10 +639,15 @@ class RestoreTest:
                            run_id=os.environ.get("BORG_UI_RUN_ID", ""), status="skipped", reason=reason)
             return 2
         try:
+            check_cancelled(self.cancel_requested)
             if str(self.conf.get("RESTORE_TEST_MEMORY_LIMIT_MIB", "2048")).strip() == "0":
                 self.log("Memory protection explicitly disabled (RESTORE_TEST_MEMORY_LIMIT_MIB=0)")
                 return self._test_repo_locked(repo)
             return self._test_repo_guarded(repo, resolve_resource_lock_dir(config))
+        except ResourceGuardError as exc:
+            if not exc.cancelled:
+                raise
+            return self._record_cancelled(repo, started)
         finally:
             locks.release()
 
@@ -625,7 +670,8 @@ class RestoreTest:
                 command.append("--scheduled")
             env = dict(os.environ, BORG_UI_RESTORE_LOG=str(self.log_path), BORG_UI_RESTORE_RESULT=str(pending),
                        BORG_UI_DATA_ROOT=str(_repository_data_root()))
-            rc = run_guarded(command, env, lock_dir, limit, reserve, self.log)
+            options = {"cancel_requested": self.cancel_requested} if getattr(self, "control", None) else {}
+            rc = run_guarded(command, env, lock_dir, limit, reserve, self.log, **options)
             if not pending.exists():
                 raise ResourceGuardError("RT_WORKER_INTERRUPTED", "Restore-test worker ended without a new report; see the run log")
             data = json.loads(pending.read_text(encoding="utf-8"))
@@ -634,7 +680,8 @@ class RestoreTest:
             self._publish_report(self.status_dir / f"{repo['job_key']}.test", data, repo)
             return rc
         except (ResourceGuardError, ValueError) as exc:
-            self._cancelled = bool(getattr(exc, "cancelled", False))
+            if getattr(exc, "cancelled", False):
+                raise
             code = getattr(exc, "code", "RT_RESOURCE_CONFIG")
             message = str(exc)
             self.log(f"ERROR {code}: {message}")
@@ -654,7 +701,10 @@ class RestoreTest:
             self._cleanup_smb_mount(repo, mounted)
 
     def _test_repo_locked(self, repo: dict) -> int:
-        """0=OK, 1=Fehler, 2=übersprungen, 3=unavailable"""
+        """Verify under an existing lock; propagate cancellation after SMB cleanup.
+
+        Returns 0=success, 1=failure, 2=skipped or 3=unavailable.
+        """
         location = repo["location"]
         path     = repo["path"]
         encryption = str(repo.get("encryption") or "").strip().lower()
@@ -1122,7 +1172,7 @@ class RestoreTest:
         _refresh_unraid_dashboard_widget_cache(self.conf, "restore test result written", self.log)
         if result_str == "success":
             self._notify_event("restore_test_success", repo, "Successful", data["test_duration_seconds"], data["test_coverage"])
-        elif result_str in {"failed", "unavailable"}:
+        elif result_str in {"failed", "unavailable"} and data.get("failure_code") != "RT_CANCELLED":
             detail = data.get("failure_hint") or data["error_analysis"].get("error_details") or data.get("reason") or "Restore test failed"
             self._notify_event("restore_test_failed", repo, "Failed", data["test_duration_seconds"], data["test_coverage"], detail)
 
@@ -1151,60 +1201,96 @@ def main() -> None:
 
     conf  = load_conf()
     tester = RestoreTest(conf, args)
-    if args.resource_worker:
-        try:
-            repos = [repo for repo in discover_repos(conf) if repo["job_key"] in args.job_keys]
-            if len(repos) != 1:
-                tester.log("ERROR: protected worker requires exactly one configured repository")
-                sys.exit(1)
-            sys.exit(tester._test_repo_locked(repos[0]))
-        finally:
-            tester.close()
-    run_id = os.environ.get("BORG_UI_RUN_ID", "").strip()
-    request_id = os.environ.get("BORG_UI_REQUEST_ID", "").strip()
-    source = os.environ.get("BORG_UI_REQUEST_SOURCE", "").strip() or ("schedule" if args.scheduled else "manual")
-    actor = os.environ.get("BORG_UI_REQUEST_ACTOR", "").strip()
-    started_at = time.time()
+    try:
+        if args.resource_worker:
+            try:
+                repos = [repo for repo in discover_repos(conf) if repo["job_key"] in args.job_keys]
+                if len(repos) != 1:
+                    tester.log("ERROR: protected worker requires exactly one configured repository")
+                    sys.exit(1)
+                sys.exit(tester._test_repo_locked(repos[0]))
+            finally:
+                tester.close()
+        run_id = os.environ.get("BORG_UI_RUN_ID", "").strip()
+        request_id = os.environ.get("BORG_UI_REQUEST_ID", "").strip()
+        source = os.environ.get("BORG_UI_REQUEST_SOURCE", "").strip() or ("schedule" if args.scheduled else "manual")
+        actor = os.environ.get("BORG_UI_REQUEST_ACTOR", "").strip()
+        started_at = time.time()
 
-    tester.log(f"{'='*60}")
-    tester.log(f"Borg Restore Test v{VERSION}")
-    tester.log(f"Level: {args.level} | Location: {args.location} | Force: {args.force}")
-    tester.log(f"Log: {tester.log_path}")
-    tester.log(f"{'='*60}")
-    if not request_id:
+        tester.log(f"{'='*60}")
+        tester.log(f"Borg Restore Test v{VERSION}")
+        tester.log(f"Level: {args.level} | Location: {args.location} | Force: {args.force}")
+        tester.log(f"Log: {tester.log_path}")
+        tester.log(f"{'='*60}")
+        if not request_id:
+            emit_lifecycle(
+                "RESTORE_TEST",
+                "requested",
+                source=source,
+                actor=actor,
+                run_id=run_id,
+                level=args.level,
+                location=args.location,
+                selected_jobs=args.job_keys,
+            )
         emit_lifecycle(
             "RESTORE_TEST",
-            "requested",
+            "process_started",
+            request_id=request_id,
             source=source,
             actor=actor,
             run_id=run_id,
+            pid=os.getpid(),
             level=args.level,
             location=args.location,
+            log_file=str(tester.log_path),
             selected_jobs=args.job_keys,
         )
-    emit_lifecycle(
-        "RESTORE_TEST",
-        "process_started",
-        request_id=request_id,
-        source=source,
-        actor=actor,
-        run_id=run_id,
-        pid=os.getpid(),
-        level=args.level,
-        location=args.location,
-        log_file=str(tester.log_path),
-        selected_jobs=args.job_keys,
-    )
 
-    repos = discover_repos(conf)
-    if args.job_keys:
-        wanted = {str(k).strip() for k in args.job_keys if str(k).strip()}
-        repos = [r for r in repos if str(r.get("job_key", "")).strip() in wanted]
-    elif args.location != "all":
-        repos = [r for r in repos if r["location"] == args.location]
+        repos = discover_repos(conf)
+        if args.job_keys:
+            wanted = {str(k).strip() for k in args.job_keys if str(k).strip()}
+            repos = [r for r in repos if str(r.get("job_key", "")).strip() in wanted]
+        elif args.location != "all":
+            repos = [r for r in repos if r["location"] == args.location]
 
-    if not repos:
-        tester.log("No repositories configured; check job metadata, profile settings and backup.conf")
+        if not repos:
+            tester.log("No repositories configured; check job metadata, profile settings and backup.conf")
+            emit_lifecycle(
+                "RESTORE_TEST",
+                "finished",
+                request_id=request_id,
+                source=source,
+                actor=actor,
+                run_id=run_id,
+                status="skipped",
+                exit_code=0,
+                duration_seconds=max(0, int(time.time() - started_at)),
+                log_file=str(tester.log_path),
+                reason="no_repositories",
+            )
+            tester.close()
+            sys.exit(0)
+
+        tester.log(f"Repositories: {len(repos)}")
+        tester.log("")
+
+        ok = fail = skipped = unavail = 0
+        for repo in repos:
+            rc = tester.test_repo(repo)
+            tester.log("")
+            if   rc == 0: ok      += 1
+            elif rc == 1: fail    += 1
+            elif rc == 2: skipped += 1
+            elif rc == 3: unavail += 1
+            if getattr(tester, "_cancelled", False):
+                break
+
+        tester.log(f"{'='*60}")
+        tester.log(f"Summary: {ok} OK | {fail} failed | {unavail} unavailable | {skipped} skipped")
+        cancelled = getattr(tester, "_cancelled", False)
+        exit_code = 130 if cancelled else (1 if fail else (2 if not ok and skipped else 0))
+        status = "cancelled" if cancelled else ("failed" if fail else ("unavailable" if unavail else ("skipped" if not ok and skipped else "success")))
         emit_lifecycle(
             "RESTORE_TEST",
             "finished",
@@ -1212,50 +1298,19 @@ def main() -> None:
             source=source,
             actor=actor,
             run_id=run_id,
-            status="skipped",
-            exit_code=0,
+            status=status,
+            exit_code=exit_code,
             duration_seconds=max(0, int(time.time() - started_at)),
             log_file=str(tester.log_path),
-            reason="no_repositories",
+            ok_count=ok,
+            failed_count=fail,
+            unavailable_count=unavail,
+            skipped_count=skipped,
         )
         tester.close()
-        sys.exit(0)
-
-    tester.log(f"Repositories: {len(repos)}")
-    tester.log("")
-
-    ok = fail = skipped = unavail = 0
-    for repo in repos:
-        rc = tester.test_repo(repo)
-        tester.log("")
-        if   rc == 0: ok      += 1
-        elif rc == 1: fail    += 1
-        elif rc == 2: skipped += 1
-        elif rc == 3: unavail += 1
-        if getattr(tester, "_cancelled", False):
-            break
-
-    tester.log(f"{'='*60}")
-    tester.log(f"Summary: {ok} OK | {fail} failed | {unavail} unavailable | {skipped} skipped")
-    status = "failed" if fail else ("unavailable" if unavail else ("skipped" if not ok and skipped else "success"))
-    emit_lifecycle(
-        "RESTORE_TEST",
-        "finished",
-        request_id=request_id,
-        source=source,
-        actor=actor,
-        run_id=run_id,
-        status=status,
-        exit_code=1 if fail else (2 if not ok and skipped else 0),
-        duration_seconds=max(0, int(time.time() - started_at)),
-        log_file=str(tester.log_path),
-        ok_count=ok,
-        failed_count=fail,
-        unavailable_count=unavail,
-        skipped_count=skipped,
-    )
-    tester.close()
-    sys.exit(1 if fail else (2 if not ok and skipped else 0))
+        sys.exit(exit_code)
+    finally:
+        tester.close()
 
 
 if __name__ == "__main__":

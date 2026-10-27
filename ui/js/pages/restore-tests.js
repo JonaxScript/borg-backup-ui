@@ -13,6 +13,8 @@ window.BBUI.restoreTestsState = window.BBUI.restoreTestsState || {
   jobs: [],
   defaultsInitialized: false,
   rowBusy: {},
+  runningJobs: [],
+  runningRuns: [],
   subtab: 'plan',
   filteredReports: [],
   logState: null,
@@ -56,6 +58,7 @@ function handleRestoreTestAlreadyRunning(payload) {
     return false;
   }
   resumeRestoreTestLiveLog('alreadyRunningOpenLog');
+  refreshRestorePlanOnly();
   return true;
 }
 
@@ -152,7 +155,12 @@ function showRestoreTestScheduleModal() {
   // Schedule icon removed in consolidated UI.
 }
 
-function _openRTStartConfirmModal(summaryText) {
+/** Confirm a restore-test start or cancellation without changing the selected run.
+ * @param {string} summaryText User-facing job/batch summary.
+ * @param {boolean} cancelling Whether to present the cancellation action.
+ * @returns {Promise<boolean>} Whether the user confirmed.
+ */
+function _openRTStartConfirmModal(summaryText, cancelling = false) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirm-modal');
     const titleEl = document.getElementById('modal-title');
@@ -165,22 +173,23 @@ function _openRTStartConfirmModal(summaryText) {
     const passWrap = document.getElementById('modal-passphrase-delete-wrap');
 
     if (!modal || !titleEl || !descEl || !infoEl || !btn || !closeBtn || !cancelBtn) {
-      resolve(window.confirm(restoreTestsT('confirmFallback', { summary: summaryText })));
+      resolve(window.confirm(cancelling ? summaryText : restoreTestsT('confirmFallback', { summary: summaryText })));
       return;
     }
 
     if (inputWrap) inputWrap.classList.add('hidden');
     if (passWrap) passWrap.classList.add('hidden');
-    titleEl.textContent = restoreTestsT('confirmTitle');
-    descEl.textContent = restoreTestsT('confirmDescription');
+    titleEl.textContent = cancelling ? restoreTestsT('cancelTitle') : restoreTestsT('confirmTitle');
+    descEl.textContent = cancelling ? restoreTestsT('cancelDescription') : restoreTestsT('confirmDescription');
     infoEl.innerHTML = '<div class="modal-info-item info"><span class="modal-info-text" id="rt-confirm-summary-text"></span></div>';
     const summaryEl = document.getElementById('rt-confirm-summary-text');
     if (summaryEl) {
       summaryEl.textContent = String(summaryText || '');
       summaryEl.style.whiteSpace = 'pre-line';
     }
-    btn.className = 'btn btn-primary';
+    btn.className = cancelling ? 'btn btn-danger' : 'btn btn-primary';
     btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"/></svg> ${escHtml(restoreTestsT('confirmAction'))}`;
+    if (cancelling) btn.textContent = restoreTestsT('cancelTest');
     btn.disabled = false;
 
     const prevConfirm = btn.onclick;
@@ -284,7 +293,7 @@ function _openRTLogPanel() {
   };
   es.addEventListener('done', (e) => {
     const code = parseInt(e.data);
-    setRTLogStatus(code === 0 ? 'success' : code === 2 ? 'skipped' : 'error', code);
+    setRTLogStatus(code === 0 ? 'success' : code === 130 ? 'cancelled' : code === 2 ? 'skipped' : 'error', code);
     es.close();
     restoreTestsState.activeEventSource = null;
     if (restoreTestsState.logTransportCheckTimer) {
@@ -299,7 +308,6 @@ function _openRTLogPanel() {
       setRTLogStatus('error', -1);
       es.close();
       restoreTestsState.activeEventSource = null;
-      stopRTPolling();
       return;
     }
     handleRTLogTransportError(es);
@@ -358,6 +366,9 @@ function setRTLogStatus(state, exitCode) {
   } else if (state === 'skipped') {
     badge.className = 'badge warning';
     badge.textContent = restoreTestsT('skipped');
+  } else if (state === 'cancelled') {
+    badge.className = 'badge warning';
+    badge.textContent = restoreTestsT('cancelled');
   } else if (state === 'unknown') {
     badge.className = 'badge warning';
     badge.textContent = restoreTestsT('logStatusUnknown');
@@ -395,18 +406,33 @@ function stopRTPolling() {
   }
 }
 
+/** Apply a successful running snapshot, including cancellation identities and state.
+ * @param {Object} snapshot Running API response, including active job IDs.
+ * @returns {boolean} Whether the plan needs repainting. Failed requests must not call this.
+ */
+function updateRTRunningJobs(snapshot) {
+  const keys = snapshot.active_job_keys || (snapshot.runs || [snapshot])
+    .filter(run => run.running && String(run.run_key || '').startsWith('restore_test_'))
+    .map(run => run.run_key.slice('restore_test_'.length));
+  const next = [...new Set(keys)].sort();
+  const runs = snapshot.active_jobs || [];
+  const changed = JSON.stringify(next) !== JSON.stringify(restoreTestsState.runningJobs)
+    || JSON.stringify(runs) !== JSON.stringify(restoreTestsState.runningRuns);
+  restoreTestsState.runningJobs = next;
+  restoreTestsState.runningRuns = runs;
+  return changed;
+}
+
+/** Refresh row status while the page is open, including externally started tests. */
 async function _pollRTRunning() {
   try {
     const res = await fetch('/api/restore-tests/running');
     if (!res.ok) return;
     const state = await res.json();
-    if (state.running && !restoreTestsState.activeEventSource) {
-      showMsg('restore-tests-message', 'warning', restoreTestsT('runningWithoutFinalLog'));
-    }
-    if (!state.running && restoreTestsState.pollingTimer) {
-      stopRTPolling();
-    }
-  } catch (_) {}
+    if (updateRTRunningJobs(state)) renderRestorePlan(restoreTestsState.plan);
+  } catch (_) {
+    // Preserve the last known state until a successful snapshot arrives.
+  }
 }
 
 async function refreshRestoreTests() {
@@ -440,13 +466,15 @@ async function refreshRestoreTests() {
         key: job.job_key,
       }));
     if (runningRes.ok) {
-      const runningState = await runningRes.json().catch(() => ({}));
+      const runningState = await runningRes.json();
+      updateRTRunningJobs(runningState);
       if (runningState.running) {
         restoreTestsState.runKey = runningState.run_key || '';
         resumeRestoreTestLiveLog('runningWithoutFinalLog');
       }
     }
     restoreTestsState.loaded = true;
+    startRTPolling();
     renderRestorePlan(restoreTestsState.plan);
     renderRTReportFilterOptions(restoreTestsState.data);
     renderRestoreTests(restoreTestsState.data);
@@ -516,11 +544,14 @@ function renderRestorePlan(plan) {
     const p = j.policy || {};
     const mode = String(p.mode || 'off');
     const busy = restoreTestsState.rowBusy[j.job_key];
+    const running = restoreTestsState.runningJobs.includes(j.job_key);
+    const run = restoreTestsState.runningRuns.find(item => item.job_key === j.job_key);
+    const cancelling = run?.cancel_requested || busy === 'cancel';
     const state = j.scheduler_state || 'needs_schedule';
     const schedule = p.cron ? rtScheduleLabel(p.cron)
       : (state === 'legacy' ? restoreTestsT('legacySchedule', { days: p.interval_days, cron: j.legacy_cron }) : '—');
-    return `<tr>
-      <td>${escHtml(j.name || j.display_name || j.job_key)}</td>
+    return `<tr class="${running ? 'rt-plan-running' : ''}" data-rt-job-key="${escHtml(j.job_key)}">
+      <td>${escHtml(j.name || j.display_name || j.job_key)}${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
       <td><span class="history-loc-chip ${(j.location || '').toLowerCase()}" title="${escHtml(restoreTestsLocationLabel(j.location || ''))}">${escHtml(String(j.location || '').toLowerCase() === 'usb' ? 'USB' : restoreTestsLocationLabel(j.location || ''))}</span></td>
       <td>${escHtml(restoreTestsT(mode === 'manual_only' ? 'manualOnly' : mode))}</td>
       <td class="rt-plan-schedule">${escHtml(schedule)}</td>
@@ -530,7 +561,7 @@ function renderRestorePlan(plan) {
       <td><span class="badge ${state === 'active' || state === 'legacy' ? 'success' : state === 'off' ? '' : 'warning'}">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</span></td>
       <td><div class="rt-plan-actions">
         <button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button>
-        <button type="button" class="btn btn-primary btn-sm" data-rt-plan-action="run" data-job-key="${escHtml(j.job_key)}" aria-busy="${busy === 'run'}" ${busy || j.enabled === false ? 'disabled' : ''}>${escHtml(restoreTestsT(busy === 'run' ? 'startingTest' : 'testNow'))}</button>
+        <button type="button" class="btn ${running ? 'btn-danger' : 'btn-primary'} btn-sm" data-rt-plan-action="${running ? 'cancel' : 'run'}" data-job-key="${escHtml(j.job_key)}" aria-busy="${!!cancelling || busy === 'run'}" ${busy || (running ? cancelling || !run?.cancel_allowed : j.enabled === false) ? 'disabled' : ''} title="${escHtml(restoreTestsT(running && !run?.cancel_allowed && !cancelling ? 'cancelUnavailable' : running ? 'cancelTest' : 'testNow'))}">${escHtml(restoreTestsT(running ? cancelling ? 'cancelling' : 'cancelTest' : busy === 'run' ? 'startingTest' : 'testNow'))}</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -648,6 +679,7 @@ async function saveRestorePlanPolicy(jobKey) {
 }
 
 async function runRestorePlanJob(jobKey) {
+  if (restoreTestsState.runningJobs.includes(jobKey) || restoreTestsState.rowBusy[jobKey]) return;
   restoreTestsState.runKey = `restore_test_${jobKey}`;
   restoreTestsState.rowBusy[jobKey] = 'run';
   renderRestorePlan(restoreTestsState.plan);
@@ -663,6 +695,7 @@ async function runRestorePlanJob(jobKey) {
       if (handleRestoreTestAlreadyRunning(data)) return;
       throw new Error(apiErrorMessage(data, res.status));
     }
+    updateRTRunningJobs({ active_job_keys: [...restoreTestsState.runningJobs, jobKey], active_jobs: restoreTestsState.runningRuns });
     const jobLabel = restoreTestsState.plan?.jobs?.find(job => job.job_key === jobKey)?.display_name || jobKey;
     showMsg('restore-tests-message', 'success', restoreTestsT('testStarted', { job: jobLabel }));
     restoreTestsState.runKey = data.run_key || '';
@@ -677,9 +710,42 @@ async function runRestorePlanJob(jobKey) {
   }
 }
 
+/** Confirm and cancel the captured run ID, keeping the row active until cleanup finishes.
+ * @param {string} jobKey Job whose active test should stop (including its batch).
+ * @returns {Promise<void>} Reports API errors inline and refreshes run state.
+ */
+async function cancelRestorePlanJob(jobKey) {
+  const run = restoreTestsState.runningRuns.find(item => item.job_key === jobKey);
+  if (!run?.run_id || !run.cancel_allowed || run.cancel_requested || restoreTestsState.rowBusy[jobKey]) return;
+  const name = restoreTestsState.plan?.jobs?.find(job => job.job_key === jobKey)?.display_name || jobKey;
+  const summary = restoreTestsT('cancelConfirm', { job: name })
+    + (run.run_key === 'restore_test' ? '\n' + restoreTestsT('cancelBatch') : '');
+  if (!await _openRTStartConfirmModal(summary, true)) return;
+  restoreTestsState.rowBusy[jobKey] = 'cancel';
+  renderRestorePlan(restoreTestsState.plan);
+  try {
+    const res = await fetch('/api/restore-tests/cancel', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_key: jobKey, run_id: run.run_id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(apiErrorMessage(data, res.status));
+    restoreTestsState.runningRuns.forEach(item => {
+      if (item.run_id === run.run_id) item.cancel_requested = true;
+    });
+    showMsg('restore-tests-message', 'info', restoreTestsT('cancelRequested'));
+  } catch (err) {
+    showMsg('restore-tests-message', 'error', restoreTestsT('cancelFailed', { message: err.message }));
+  } finally {
+    restoreTestsState.rowBusy[jobKey] = false;
+    renderRestorePlan(restoreTestsState.plan);
+    await refreshRestorePlanOnly();
+  }
+}
+
 function onRestoreTestsPlanClick(event) {
   const btn = event.target.closest('[data-rt-plan-action]');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   event.preventDefault();
   event.stopPropagation();
   const action = btn.dataset.rtPlanAction || '';
@@ -687,6 +753,7 @@ function onRestoreTestsPlanClick(event) {
   if (!jobKey) return;
   if (action === 'edit') return editRestorePlan(jobKey);
   if (action === 'run') return runRestorePlanJob(jobKey);
+  if (action === 'cancel') return cancelRestorePlanJob(jobKey);
 }
 
 async function refreshRestorePlanOnly() {
@@ -697,12 +764,13 @@ async function refreshRestorePlanOnly() {
     ]);
     if (planRes.ok) {
       restoreTestsState.plan = await planRes.json();
-      renderRestorePlan(restoreTestsState.plan);
     }
     if (runningRes.ok) {
       const running = await runningRes.json();
-      if (running?.running) startRTPolling();
+      updateRTRunningJobs(running);
     }
+    renderRestorePlan(restoreTestsState.plan);
+    startRTPolling();
   } catch (_) {}
 }
 
@@ -778,6 +846,7 @@ function rtEvidenceStale(test) {
 }
 
 function _rtStatus(t) {
+  if (t.failure_code === 'RT_CANCELLED') return { label: restoreTestsT('cancelled'), className: 'warning' };
   if (t.test_result === 'skipped') return { className: 'warning', label: restoreTestsT('skipped') };
   if (t.test_result === 'success' && rtEvidenceStale(t)) return { className: 'warning', label: restoreTestsT('overdue') };
   if (t.test_result === 'success') return { className: 'success', label: restoreTestsT('verified') };

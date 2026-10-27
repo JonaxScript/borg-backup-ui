@@ -62,14 +62,18 @@ class ArchiveSample:
 
 
 def run_borg(args: list[str], env: dict, timeout: int,
-             consume=None) -> subprocess.CompletedProcess:
+             consume=None, *, cancel_requested=None) -> subprocess.CompletedProcess:
     """Run Borg with bounded capture, or stream stdout bytes to ``consume``.
 
     Drain both pipes concurrently. A timeout kills and reaps the command's
     process group and returns exit 124. Capture overflow or callback errors
     fail the command; stderr retains its final 64 KiB. No output is spooled to
     disk. Child processes use a separate session for reliable timeout cleanup.
+    An optional cancellation predicate raises ResourceGuardError (RT_CANCELLED)
+    after killing/reaping the command group; callers must record interruption.
     """
+    from restore_test_resources import check_cancelled
+    check_cancelled(cancel_requested)
     command = ["borg", *args]
     stdout = bytearray()
     stderr = bytearray()
@@ -84,6 +88,7 @@ def run_borg(args: list[str], env: dict, timeout: int,
                     os.set_blocking(stream.fileno(), False)
                     selector.register(stream, selectors.EVENT_READ)
                 while selector.get_map() or proc.poll() is None:
+                    check_cancelled(cancel_requested)
                     if deadline is not None and time.monotonic() >= deadline:
                         returncode = 124
                         error = f"Borg command timed out after {timeout}s"
