@@ -1,0 +1,145 @@
+// Real-browser coverage for compact planning and cumulative inline evidence (#610).
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+const {chromium}=require('playwright');
+(async()=>{
+ const browser=await chromium.launch({headless:true,...(process.env.BBUI_CHROMIUM?{executablePath:process.env.BBUI_CHROMIUM}:{})});
+ try {
+ const page=await browser.newPage({viewport:{width:1600,height:1100}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let html=fs.readFileSync('ui/index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
+ html=html.replace(/<link[^>]+href="\/([^\"]+)"[^>]*>/g,(all,path)=>path.endsWith('.css')?`<style>${fs.readFileSync(path,'utf8')}</style>`:'');
+ html=html.replace('src="/ui/assets/app-icon.png"',`src="data:image/png;base64,${fs.readFileSync('ui/assets/app-icon.png').toString('base64')}"`);
+ await page.setContent(html);
+ await page.addStyleTag({content:"*, *::before, *::after { transition: none !important; animation: none !important; }"});
+ await page.evaluate(dicts=>{
+  window.lang='de';window.dicts=dicts;window.BBUI={components:{i18n:{getLanguage:()=>lang,t:(key,params={})=>{
+   const text=key.split('.').reduce((v,k)=>v?.[k],dicts[lang]);return typeof text==='string'?text.replace(/\{(\w+)\}/g,(_,k)=>params[k]??''):key;
+  }}}};
+  window.isStaleDate=()=>false;
+  window.translate=()=>document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=BBUI.components.i18n.t(el.dataset.i18n));
+  window.showMsg=()=>{};
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-restore-tests'));
+  document.documentElement.dataset.theme='light';document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='restore-tests'));translate();
+ },Object.fromEntries(['de','en'].map(l=>[l,JSON.parse(fs.readFileSync(`ui/i18n/${l}.json`))])));
+ for(const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/pages/jobs.js','ui/js/pages/restore-tests.js'])await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
+ await page.evaluate(()=>{
+  const state=BBUI.restoreTestsState;
+  state.plan={jobs:['Appdata','All-VMs','Flash','Photos','Sonstiges'].map((name,i)=>({job_key:String(i),key:String(i),name,display_name:name,icon:['appdata','vms','flash','photos','folder'][i],icon_color:['orange','green','blue','purple','gray'][i],location:i<3?'local':i===3?'usb':'storagebox',enabled:true,scheduler_state:i===4?'off':'active',policy:{mode:i===4?'manual_only':'scheduled',level:3,cron:i===4?'':'0 20 1 * *',validity_days:30},last_test_date:i===4?'':'2026-10-27 10:14:22',last_test_result:i===0?'cancelled':i===3?'failed':i===4?'':'success',next_run_at:'2026-11-01 20:00:00',verification_status:i===3?'failed':'verified',verification_evidence_date:'2026-10-26 23:10:52',verification_valid_until:'2026-11-25 23:10:52'}))};
+  state.jobs=state.plan.jobs;
+  const success={job_key:'0',job_name:'Appdata',test_date:'2026-10-26 23:10:52',test_level:3,test_result:'success',tested_archive:'appdata-backup-2026-10-26_09-00-37',repository:'/mnt/user/backup/appdata',location:'local',report_id:'RT-DEMO',log_file:'/mnt/user/borg_backup_ui/logs/Borg-Restore-Test-2026-10-26.log',test_exit_code:0,duration_formatted:'14 Min. 32 Sek.',tested_files_count:1000,tested_folders_count:0,coverage_basis:'1000/416901',test_coverage_percentage:.2,archive_stats:{files_count:416901},archive_stats_formatted:{original:'86.8 GiB'},level3_details:{enabled:true,success_count:5,checksums:['data/file.txt:deadbeef']},steps:['repo_reachable','archive_readable','metadata_check','restore_probe','integrity_check','cleanup'].map(step_id=>({step_id,status:'passed',duration_ms:500,timestamp:step_id==='archive_readable'?'2026-10-26 23:00:00':undefined}))};
+  state.data=[{...success,test_date:'2026-10-27 10:14:22',test_result:'failed',failure_code:'RT_CANCELLED',report_id:'RT-CANCEL'},success,{...success,job_key:'3',location:'usb',test_result:'failed',failure_code:'RT_SAMPLE_RESTORE_FAILED',error_analysis:{error_details:'Failure <script>alert(1)</script>\n'+ 'missing-file/'.repeat(30)},report_id:'RT-FAIL'}];
+  document.getElementById('restore-tests-plan-content').addEventListener('click',onRestoreTestsPlanClick);
+  document.getElementById('restore-tests-content').addEventListener('click',onRestoreTestsContentClick);
+  document.getElementById('rt-subtab-plan-btn').onclick=()=>switchRestoreTestsSubtab('plan');
+  document.getElementById('rt-subtab-reports-btn').onclick=()=>switchRestoreTestsSubtab('reports');
+  window.renderDemo=()=>{document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page==='restore-tests'));renderRestorePlan(state.plan);renderRestoreTestsSidebar();renderRTReportFilterOptions(state.data);renderRestoreTests(state.data);renderRestoreTestsSubtab();updateRestoreTestsWorkspace();};renderDemo();
+ });
+ const capture=async name=>{await page.evaluate(()=>window.scrollTo(0,0));if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({fullPage:true,path:`${process.env.BBUI_SCREENSHOT_DIR}/${name}.png`});};
+ for(const language of ['de','en']){
+  await page.evaluate(l=>{lang=l;translate();BBUI.restoreTestsState.selectedJob='all';BBUI.restoreTestsState.selectedLocation='all';BBUI.restoreTestsState.subtab='plan';renderDemo();},language);
+  assert.equal(await page.locator('#restore-tests-plan-content thead th').count(),4);
+  assert.equal(await page.locator('.restore-tests-hint').getAttribute('open'),null);
+  const groups=page.locator('#restore-tests-plan-content tbody');
+  assert.equal(await groups.count(),3,'only occupied locations are shown');
+  assert.deepEqual(await groups.locator('.rt-plan-location-heading strong').allTextContents(),language==='de'?['Lokal','USB-Laufwerk','Storagebox']:['Local','USB drive','Storage box']);
+  assert.deepEqual(await groups.locator('.rt-plan-location-count').allTextContents(),language==='de'?['3 Jobs','1 Job','1 Job']:['3 jobs','1 job','1 job']);
+  assert.equal(await page.locator('#restore-tests-plan-content [data-rt-job-key] > td:first-child > small').count(),0,'no repeated location in job cells');
+  assert.equal(await groups.locator('.location-nav-glyph[aria-hidden=true] svg').count(),3,'shared location icons accompany the headings');
+  for(const button of await page.locator('[data-rt-sidebar-location]').all())assert(await button.evaluate(el=>{const icon=el.querySelector('.location-nav-glyph').getBoundingClientRect();const count=el.querySelector('.location-nav-count').getBoundingClientRect();return Math.abs((icon.top+icon.bottom)-(count.top+count.bottom))<2;}),'location icon and count share a row');
+  await capture(`restore-plan-${language}`);
+  assert.deepEqual(await page.locator('[data-rt-sidebar-location]').evaluateAll(buttons=>buttons.map(b=>b.dataset.rtSidebarLocation)),['all','local','usb','storagebox']);
+  assert.equal(await page.locator('[data-rt-job-key="0"] .type-icon-color-orange svg').count(),1);
+  assert.equal(await page.locator('[data-rt-job-key="1"] .type-icon-color-green svg').count(),1);
+  assert.notEqual(await page.locator('[data-rt-job-key="0"] .rt-plan-job-icon').innerHTML(),await page.locator('[data-rt-job-key="1"] .rt-plan-job-icon').innerHTML());
+  await page.locator('[data-rt-sidebar-location=usb]').click();
+  assert.equal(await page.locator('#restore-tests-plan-content tbody').count(),1,'selection shows only its own location');
+  assert.equal(await page.locator('#restore-tests-plan-content [data-rt-job-key]').count(),1);
+  await page.locator('#rt-subtab-reports-btn').click();
+  assert.equal(await page.locator('.rt-report-entry').count(),1,'location selection also filters reports');
+  assert.equal(await page.locator('.rt-report-entry > summary .type-icon-color-purple').count(),1);
+  await page.locator('[data-rt-sidebar-location=local]').click();
+  assert.equal(await page.locator('.rt-report-entry').count(),2);
+  await page.locator('#rt-subtab-plan-btn').click();
+  assert.equal(await page.locator('[data-rt-job-key]').count(),3);
+  await page.evaluate(()=>{renderRestorePlan({jobs:[]});});
+  assert.equal(await page.locator('.rt-plan-location-row').count(),0,'empty plan has no location headers');
+  await page.locator('[data-rt-sidebar-location=all]').click();
+  const row=page.locator('[data-rt-job-key="0"]');
+  const rowHeight=await row.evaluate(el=>el.getBoundingClientRect().height);
+  await row.locator('[data-rt-plan-action=menu]').click();
+  await row.locator('.rt-plan-popover:popover-open').waitFor();
+  assert.equal(await row.evaluate(el=>el.getBoundingClientRect().height),rowHeight,'opening actions keeps row height stable');
+  await capture(`restore-plan-menu-${language}`);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.rt-plan-popover:popover-open').count(),0);
+  await row.locator('[data-rt-plan-action=menu]').click();
+  await page.locator('#restore-tests-plan-summary').click();
+  assert.equal(await page.locator('.rt-plan-popover:popover-open').count(),0);
+  await row.locator('[data-rt-plan-action=menu]').click();await row.locator('[data-rt-plan-action=edit]').click();
+  await page.locator('#rt-plan-dialog[open]').waitFor();await page.locator('#rt-plan-dialog [data-close]').first().click();
+  await row.locator('[data-rt-plan-action=reports]').click();
+  assert(await page.locator('#rtr-0[open]').count());
+  assert.equal(await page.locator('#rtr-0 .rt-proof-document').count(),0);
+  await page.locator('#rtr-0 [data-rt-action=evidence]').click();
+  assert.equal(await page.locator('#rtr-1[open] .rt-proof-document').count(),1);
+  assert.equal(await page.locator('#rtr-1 .rt-level-row .rt-attempt-status.success').count(),3);
+  const reportSections=page.locator('#rtr-1 .rt-report-sections > section');
+  for(let section=0;section<2;section++)assert.equal(await reportSections.nth(section).locator('dl > div').count(),5);
+  assert.match(await reportSections.nth(1).locator('dl > div').last().innerText(),language==='de'?/0,2% · 1\.000 von 416\.901 Dateien/:/0\.2% · 1,000 of 416,901 files/);
+  await page.evaluate(()=>renderRestoreTests(BBUI.restoreTestsState.data));
+  assert.equal(await page.locator('#rtr-1[open]').count(),1);
+  assert.equal(await page.locator('#rtr-1 .rt-technical-evidence').count(),1);
+  await page.locator('#rtr-1 .rt-technical-evidence > summary').click();
+  const technical=page.locator('#rtr-1 .rt-technical-evidence');
+  assert.equal(await technical.getByText(language==='de'?'Report-ID':'Report ID',{exact:true}).count(),0);
+  assert.equal(await technical.getByText(language==='de'?'Ausführung':'Execution',{exact:true}).count(),0);
+  const archiveStep=technical.locator('.rt-step-row').filter({hasText:language==='de'?'Archiv lesbar':'Archive readable'});
+  await archiveStep.locator('.rt-check-evidence > summary').click();
+  const hashStep=technical.locator('.rt-step-row').filter({hasText:language==='de'?'Integritätsprüfung':'Integrity check'});
+  await hashStep.locator('.rt-check-evidence > summary').click();
+  await hashStep.locator('.rt-step-detail-section > summary').click();
+  await hashStep.getByText('deadbeef',{exact:true}).waitFor();
+  await capture(`restore-proof-${language}`);
+  await page.evaluate(()=>{BBUI.restoreTestsState.selectedJob='all';renderDemo();});
+  await page.locator('#rtr-2 > summary').click();
+  assert.equal(await page.locator('#rtr-2 script').count(),0);
+  assert.match(await page.locator('#rtr-2').innerText(),/<script>/);
+  await page.evaluate(()=>{document.getElementById('rt-report-filter-status').value='cancelled';renderRestoreTests(BBUI.restoreTestsState.data);});
+  assert.equal(await page.locator('.rt-report-entry').count(),1);
+  await page.evaluate(()=>{document.getElementById('rt-report-filter-status').value='all';renderDemo();});
+ }
+ await page.evaluate(()=>{BBUI.restoreTestsState.selectedLocation='usb';BBUI.restoreTestsState.jobs=BBUI.restoreTestsState.jobs.filter(job=>job.location!=='usb');renderRestoreTestsSidebar();});
+ assert.equal(await page.evaluate(()=>BBUI.restoreTestsState.selectedLocation),'all');
+ assert.equal(await page.locator('[data-rt-sidebar-location=usb]').count(),0);
+ await page.locator('[data-rt-sidebar-location=all]').click();
+ assert.equal(await page.locator('.rt-report-entry').count(),3,'retained reports stay accessible when a location has no jobs');
+ await page.evaluate(()=>{const state=BBUI.restoreTestsState;state.jobs=[...state.plan.jobs,{key:'custom',location:'custom'}];renderRestoreTestsSidebar();});
+ assert.equal(await page.locator('[data-rt-sidebar-location=custom]').count(),1);
+ await page.evaluate(()=>{BBUI.restoreTestsState.jobs=BBUI.restoreTestsState.plan.jobs;renderDemo();});
+ for(const theme of ['light','dark'])for(const width of [1920,1100,768,390]){
+  await page.setViewportSize({width,height:1000});
+  await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;BBUI.restoreTestsState.selectedJob='all';switchRestoreTestsSubtab('plan');renderDemo();},theme);
+  for(const heading of await page.locator('.rt-plan-location-row th').all())assert(await heading.evaluate(el=>el.getBoundingClientRect().width>=el.closest('table').getBoundingClientRect().width-2),`full-width location header ${width}`);
+  if(width===390)await capture(`restore-plan-mobile-${theme}`);
+  await page.locator('[data-rt-job-key="4"] [data-rt-plan-action=menu]').click();
+  const floating=page.locator('.rt-plan-popover:popover-open');
+  await floating.waitFor();
+  assert(await floating.evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;}),`action menu stays visible at ${width}`);
+  await page.keyboard.press('Escape');
+  assert(await page.locator('#restore-tests-plan-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`plan overflow ${width}`);
+  await page.locator('[data-rt-job-key="0"] [data-rt-plan-action=reports]').click();
+  await page.locator('[data-rt-action=evidence]').click();
+  await page.locator('#rtr-1 .rt-technical-evidence').evaluate(el=>{el.open=true;el.querySelectorAll('.rt-check-evidence').forEach(detail=>detail.open=true);});
+  const factGroups=await page.locator('#rtr-1 .rt-technical-evidence .rt-step-details').evaluateAll(groups=>groups.map(group=>({gap:getComputedStyle(group).gap,items:[...group.children].map(item=>({background:getComputedStyle(item).backgroundColor,expected:getComputedStyle(item.closest('.rt-report-card').querySelector('.rt-step-row')).backgroundColor}))})));
+  assert(factGroups.length>1,'diagnostics and check data are rendered');
+  for(const group of factGroups){
+   assert.equal(group.gap,'1px',`thin fact separators in ${theme} at ${width}`);
+   for(const item of group.items)assert.equal(item.background,item.expected,`fact surface matches report in ${theme} at ${width}`);
+  }
+  assert(await page.locator('#restore-tests-content').evaluate(el=>el.scrollWidth<=el.clientWidth+1),`report overflow ${width}`);
+  if(width===390)await capture(`restore-proof-mobile-${theme}`);
+ }
+ assert.deepEqual(errors,[]);console.log('Restore test planning/evidence browser checks passed: DE/EN, desktop/mobile, both themes, editing, report navigation, cancellation and escaping.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

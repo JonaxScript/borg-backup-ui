@@ -173,12 +173,10 @@ def test_wizard_sources_and_target_use_compact_two_column_layout() -> None:
     assert "@media (max-width: 700px)" in css
 
 
-def test_restore_tests_use_quiet_overdue_tile_and_consistent_sidebar_states() -> None:
+def test_restore_tests_use_quiet_overdue_tile_and_technical_evidence() -> None:
     script = _read("ui/js/pages/restore-tests.js")
     css = _read("ui/restore-tests-redesign.css")
-    assert "const configured = !!planJob" in script
-    assert "planJob?.is_overdue ? 'warning' : configured ? 'success' : 'disabled'" in script
-    assert "planSummary.overdue > 0 ? 'has-value' : ''" in script
+    assert "label === 'summaryOverdue' && count ? 'attention' : ''" in script
     assert ".rt-plan-summary .attention { background: var(--ui-color-surface); }" in css
     assert ".rt-plan-summary .attention.has-value b" in css
     assert ".rt-technical-evidence .rt-step-details" in css

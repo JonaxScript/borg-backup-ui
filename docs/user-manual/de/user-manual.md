@@ -246,7 +246,7 @@ Jobs definieren, welche Daten wohin gesichert werden. Ein Job enthält:
 
 Der bestehende Jobverlauf mit seinen benannten Schritten und **Details anzeigen** bleibt erhalten. **Status anzeigen** öffnet unabhängig davon direkt unter der Jobkarte die gespeicherten Speicherwerte, Borg- und Repository-Checks, Restore-Nachweise, Archivnamen, letzten Lauf und letztes erfolgreiches Backup. Die beiden Bereiche können gleichzeitig geöffnet sein und bleiben bei Aktualisierungen geöffnet.
 
-Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf; ein neuer aktiver Lauf behält seinen eigenen Betriebszustand. Fehlende Statusdateien werden nicht als Erfolg gewertet.
+Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf. Während eines neuen aktiven Laufs wird diese Meldung nur unter **Status anzeigen** angezeigt; der Betriebszustand zeigt den aktuellen Lauf. Lange Zeilen im Live-Log lassen sich horizontal scrollen, ohne die Job-Kacheln zu verbreitern. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### 3.3 Job manuell starten
 
@@ -347,7 +347,7 @@ Das planmäßige Herunterfahren einer VM wird als Information gemeldet. Ein fehl
 
 Nach Abschluss der Archiverstellung (`borg create`) werden die vom Job gestoppten Container und VMs sofort wieder gestartet, auch bei Borg-Warnungen. Erst danach laufen Aufbewahrung (`prune`), Speicherbereinigung (`compact`) und eine fällige Repository-Prüfung (`check`). Diese Wartung verlängert die Ausfallzeit der Dienste nicht. Bei Fehlern oder Abbruch der Archiverstellung erfolgt der Neustart weiterhin beim Aufräumen. Schlägt ein Neustart fehl, wird der Neustart auch für die andere Dienstgruppe versucht; der Lauf endet als Fehler und die Wartung wird nicht gestartet.
 
-Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** erscheinen separate Standortüberschriften nur für Standorte mit Jobs. Leere Standorte bleiben in der linken Auswahl mit 0 sichtbar; bei einem ausgewählten Standort entfällt die doppelte Abschnittsüberschrift.
+Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** erscheinen separate Standortüberschriften nur für Standorte mit Jobs. Standorte ohne Jobs werden auch in der linken Auswahl ausgeblendet. Entfällt der letzte Job des gewählten Standorts, wechselt die Ansicht zu **Alle Standorte**. Bei einem ausgewählten Standort entfällt die doppelte Abschnittsüberschrift.
 
 Der Gesamtstatus steht direkt unter **Betriebszustand**.
 
@@ -889,13 +889,17 @@ Die Seite verwaltet:
 
 ### 8.2 Reiter Planung & Policy
 
-Öffnen Sie **Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen.
+Die linke Sidebar filtert beide Reiter nach **Alle Standorte** oder einem belegten Standort und zeigt die jeweilige Jobanzahl. Leere Standorte werden ausgeblendet; verliert der ausgewählte Standort seinen letzten Job, erscheint wieder **Alle Standorte**. Die Jobliste steht rechts; Planzeilen und Prüfberichte zeigen die konfigurierten Job-Symbole und Farben. **Nachweis & Verlauf** öffnet alle Berichte eines Jobs, auch von früheren Standorten. Ein Klick auf einen Standort hebt diese Jobauswahl auf.
+
+Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit den bekannten Standortsymbolen und Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
+
+Öffnen Sie **⋮ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. Das schwebende Menü entspricht der Jobs-Seite und vergrößert die Tabellenzeile nicht; Escape oder ein Klick außerhalb schließt es. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
 
 - **Geplant:** Tägliche, wöchentliche oder monatliche Ausführung mit Uhrzeit. Monatliche Pläne verwenden die Tage 1–28. Es gilt die lokale Zeitzone des Unraid-Servers.
 - **Manuell / Aus:** Deaktiviert die automatische Ausführung. **Jetzt testen** bleibt für aktivierte Backup-Jobs verfügbar.
 - **Nachweis gültig (Tage):** Wie lange ein erfolgreicher geplanter Test als aktuell gilt. Diese Einstellung ist vom Ausführungszeitplan getrennt.
 - **Nächster Test:** Nächster Kalendertermin; ein manueller Test verschiebt ihn nicht.
-- **Automatik:** **Aktiv** bedeutet, dass der gespeicherte Cron-Aufruf tatsächlich eingerichtet ist. Bei **Nicht aktiv** ist die Einrichtung fehlgeschlagen oder der Eintrag fehlt; speichern Sie den Plan erneut.
+- **Testplanung:** Der nächste automatische Termin erscheint nur bei eingerichtetem Cron-Aufruf. **Nicht aktiv** oder **Plan fehlt** weist auf eine fehlende Einrichtung hin; speichern Sie den Plan erneut. **Nachweis fällig** bleibt unabhängig vom nächsten Termin sichtbar.
 
 Beim Speichern wird der Cron-Eintrag erstellt oder aktualisiert. Beim Start werden gespeicherte Zeitpläne ohne doppelte Einträge und unter Beibehaltung fremder Cron-Jobs wieder eingerichtet. Schlägt die Cron-Einrichtung fehl, bleibt die Policy gespeichert und der Fehler wird angezeigt.
 
@@ -982,6 +986,8 @@ Laufende Tests sind im Testplan direkt am Job mit **Läuft** und einem roten But
 
 ### 8.5 Prüfberichte
 
+Ist ein Repository-Pfad nicht erreichbar oder meldet das Dateisystem einen Zugriffsfehler (z. B. nach dem Abziehen eines USB-Laufwerks ohne Aushängen), endet der Versuch als **Nicht verfügbar**. Der Bericht enthält den fehlgeschlagenen Erreichbarkeitsschritt und gegebenenfalls die Betriebssystem-Fehlernummer; weitere Schritte bleiben ungetestet. Prüfen Sie Laufwerksverbindung, Einhängung und Zugriffsrechte vor einem erneuten Test. Daraus entsteht kein neuer Wiederherstellungsnachweis.
+
 ![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
 
 Prüfberichte bleiben pro Lauf erhalten, einschließlich Fehlern vor einem erneuten
@@ -995,21 +1001,13 @@ Historie nicht. Textprotokolle liegen im konfigurierten Logverzeichnis
 (`Borg-Restore-Test--<Zeitstempel>-<PID>.log`), Ablaufmeldungen im Anwendungslog
 `/var/log/borg_backup_ui.log`; sie werden nicht automatisch in den Unraid-Syslog kopiert.
 
-Der Reiter **Prüfberichte** zeigt strukturierte Nachweise abgeschlossener Restore-Tests:
+Der Reiter **Prüfberichte** zeigt die einzelnen Versuche als aufklappbare Zeilen. Details öffnen sich direkt darunter über die gesamte Inhaltsbreite. Filter für Job, Standort, Ergebnis und Zeitraum bleiben verfügbar; **Abgebrochen** ist ein eigener Ergebnisfilter.
 
-- Gesamtstatus
-- Prüfumfang
-- Ausführung
-- Abdeckung
-- einzelne Prüfschritte
-- technische Nachweise
+Ein erfolgreicher Lauf wird als **Wiederherstellungsnachweis** dargestellt. Er nennt das tatsächlich geprüfte Archiv, Repository, Zeitpunkt, Dauer und den dokumentierten Umfang. Die Zeile **Abdeckung** kombiniert den Prozentwert mit seiner Dateibasis (geprüfte Dateien von Dateien im Archiv). Die Teststufen bauen aufeinander auf: **L1**, **L1 + L2** und **L1 + L2 + L3**. Jede Stufe zeigt ihr belegtes Ergebnis; nicht ausgewählte Stufen und fehlende Angaben älterer Berichte werden ausdrücklich gekennzeichnet. L3 weist ausgelesene Stichprobendateien und erfasste SHA-256-Werte aus, ohne einen unabhängigen Sollwertvergleich zu behaupten. Ein einziger Bereich **Technische Nachweise** bündelt Prüfschritte und Logdiagnose. Unter **Prüfdaten anzeigen** beim jeweiligen Schritt stehen die zugehörigen Dateilisten, Prüfsummen und Detailwerte. Der wiederholte Ausführungsblock mit Report-ID, Start und Ende entfällt.
 
-Typische Statuswerte:
+**Erfolgreich**, **Fehlgeschlagen**, **Abgebrochen**, **Übersprungen** und **Nicht verfügbar** beschreiben den Versuch. Die Nachweisfrist wird getrennt davon dargestellt; ein historisch erfolgreicher Test wird durch Fristablauf nicht zu einem fehlgeschlagenen Test. Ein Abbruch erzeugt keinen neuen Nachweis. Bestätigt der Server einen weiterhin gültigen vorherigen Nachweis und liegt dessen Bericht vor, führt **Gültigen Nachweis öffnen** direkt dorthin. Ein vorheriger echter Fehler oder abgelaufener Nachweis wird dadurch nicht verdeckt.
 
-- **Erfolgreich / Verifiziert**
-- **Überfällig**
-- **Fehlgeschlagen**
-- **Nicht verfügbar**
+Der Nachweis bestätigt nur den dokumentierten Archiv- und Prüfumfang, keine vollständige Anwendung oder startfähige VM. Bestehende Berichte werden für die neue Darstellung nicht umgeschrieben.
 
 Bei Restore-Tests ab Level 2 entscheidet die eingestellte Archivgröße über den Dry-Run: Unterhalb des Schwellwerts wird das vollständige Archiv geprüft, ab dem Schwellwert eine Dateistichprobe in Gruppen. Standardmäßig beträgt der Schwellwert 500 GB; 0 deaktiviert die Umschaltung. Die frühere Sonderregel für die Typen `photos` und `vms` entfällt.
 

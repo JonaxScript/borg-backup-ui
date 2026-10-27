@@ -1585,7 +1585,8 @@ body.wizard-modal-open {
   background: var(--bg-inset);
 }
 
-.job-menu-dropdown {
+.job-menu-dropdown,
+.rt-plan-popover {
   position: absolute;
   right: 0;
   top: calc(100% + 4px);

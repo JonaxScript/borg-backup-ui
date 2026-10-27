@@ -16,7 +16,7 @@ function fixture(language = 'en') {
   const messages = [];
   const withRuns = value => ({...value, active_jobs: value.active_jobs || (value.active_job_keys || []).map(job_key => ({job_key, run_id: 'run-' + job_key, run_key: 'restore_test_' + job_key, cancel_allowed: true, cancel_requested: false}))});
   const plan = { jobs: ['alpha', 'beta', 'disabled'].map(job_key => ({
-    job_key, name: job_key, display_name: job_key, location: 'local',
+    job_key, name: job_key, display_name: job_key, location: job_key === 'beta' ? 'usb' : 'local',
     enabled: job_key !== 'disabled', scheduler_state: 'active', policy: { mode: 'scheduled', level: 2 },
   })) };
   const context = vm.createContext({
@@ -25,7 +25,7 @@ function fixture(language = 'en') {
       getLanguage: () => language,
     } } } },
     document: { getElementById: id => elements.get(id) || null },
-    escHtml: text => String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
+    resolveJobIcon: job => job.icon || 'archive', resolveJobIconColor: job => job.icon_color || '',
     setInterval: () => 1, clearInterval() {}, showMsg: (...args) => messages.push(args), apiErrorMessage: () => 'error',
     fetch: async (url, options = {}) => {
       requests.push([url, options.method || 'GET', options.body && JSON.parse(options.body)]);
@@ -48,6 +48,8 @@ function fixture(language = 'en') {
       return { ok: true, json: async () => url.endsWith('/plan') ? plan : { tests: [] } };
     },
   });
+  vm.runInContext(fs.readFileSync('ui/js/utils/format.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('ui/js/pages/dashboard.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('ui/js/pages/restore-tests.js', 'utf8'), context);
   // Isolate the plan from unrelated report/sidebar/log rendering.
   vm.runInContext(`
@@ -87,7 +89,7 @@ test('polling detects scheduled starts, batch transitions and completion without
   await f.context._pollRTRunning();
   assert.match(f.row('alpha'), /btn-danger/);
   assert.match(f.row('beta'), /btn-primary[^>]*aria-busy="false"[^>]*>/);
-  f.state.selectedJob = 'beta';
+  f.state.selectedLocation = 'usb';
   f.setSnapshot({ active_job_keys: ['beta'] });
   await f.context._pollRTRunning();
   assert.equal(f.row('alpha'), undefined);
@@ -192,4 +194,49 @@ for (const language of ['de', 'en']) test(`cancelled attempt is explicit in plan
   f.context.renderRestorePlan(f.plan);
   assert.match(f.row('alpha'), language === 'de' ? /Abgebrochen/ : /Cancelled/);
   assert.match(f.row('alpha'), /2026-10-27 10:14:22/);
+});
+
+for (const language of ['de', 'en']) test(`evidence distinguishes attempts and cumulative levels (${language})`, () => {
+  const f = fixture(language);
+  f.context.isStaleDate = () => false;
+  const t = {job_key:'alpha', test_result:'success', test_date:'2026-10-26 12:00:00', test_level:3,
+    tested_archive:'archive<script>alert(1)</script>', steps:[
+      ...['repo_reachable','archive_readable','metadata_check','restore_probe','integrity_check'].map(step_id=>({step_id,status:'passed'}))
+    ], level3_details:{enabled:true,success_count:10}};
+  let levels = f.context.renderRTLevelEvidence(t, t.steps);
+  assert.equal((levels.match(/rt-attempt-status success/g)||[]).length, 3);
+  levels = f.context.renderRTLevelEvidence({...t,test_level:2}, t.steps);
+  assert.equal((levels.match(/rt-attempt-status success/g)||[]).length, 2);
+  assert.equal((levels.match(/rt-attempt-status neutral/g)||[]).length, 1);
+  levels = f.context.renderRTLevelEvidence({...t,test_level:1}, t.steps);
+  assert.equal((levels.match(/rt-attempt-status success/g)||[]).length, 1);
+  levels = f.context.renderRTLevelEvidence(t, []);
+  assert.doesNotMatch(levels, /rt-attempt-status success/);
+  assert.equal(f.context.rtReportIdentity({...t,time_ago:'just now'}), f.context.rtReportIdentity({...t,time_ago:'1 minute ago'}));
+  const html = f.context.renderRTReportRow(t,0);
+  assert.match(html, /rt-proof-document/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /&lt;script&gt;/);
+  const cancel = {...t,test_result:'failed',failure_code:'RT_CANCELLED'};
+  assert.equal(f.context.rtAttemptStatus(cancel).className, 'neutral');
+  assert.doesNotMatch(f.context.renderRTReportRow(cancel,1), /rt-proof-document/);
+  assert.equal(f.context.rtAttemptStatus({...t,test_date:'2001-01-01 12:00:00'}).className, 'success');
+  assert.equal(f.context.rtAttemptStatus({test_date:'2026-10-26'}).className, 'neutral');
+});
+
+test('cancelled report links only to server-confirmed retained evidence, never an older success behind failure', () => {
+  const f=fixture(); f.context.isStaleDate=()=>false;
+  const success={job_key:'alpha',test_result:'success',test_date:'2026-10-25 12:00:00'};
+  const cancelled={job_key:'alpha',test_result:'cancelled',test_date:'2026-10-27 12:00:00'};
+  f.state.data=[success,cancelled];
+  Object.assign(f.plan.jobs[0],{verification_status:'verified',verification_evidence_date:success.test_date});
+  assert.match(f.context.renderRTReportRow(cancelled,0),/data-rt-action="evidence"/);
+  f.plan.jobs[0].verification_status='failed';
+  assert.doesNotMatch(f.context.renderRTReportRow(cancelled,0),/data-rt-action="evidence"/);
+  f.plan.jobs[0].verification_status='stale';
+  assert.doesNotMatch(f.context.renderRTReportRow(cancelled,0),/data-rt-action="evidence"/);
+  f.plan.jobs[0].verification_status='verified';
+  assert.doesNotMatch(f.context.renderRTReportRow({...cancelled,test_date:'2026-10-01 12:00:00'},0),/data-rt-action="evidence"/);
+  f.state.data=[cancelled];
+  assert.doesNotMatch(f.context.renderRTReportRow(cancelled,0),/data-rt-action="evidence"/);
 });

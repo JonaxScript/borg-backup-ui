@@ -115,7 +115,7 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 
 Der bestehende Jobverlauf mit seinen benannten Schritten und **Details anzeigen** bleibt erhalten. **Status anzeigen** öffnet unabhängig davon direkt unter der Jobkarte die gespeicherten Speicherwerte, Borg- und Repository-Checks, Restore-Nachweise, Archivnamen, letzten Lauf und letztes erfolgreiches Backup. Die beiden Bereiche können gleichzeitig geöffnet sein und bleiben bei Aktualisierungen geöffnet.
 
-Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf; ein neuer aktiver Lauf behält seinen eigenen Betriebszustand. Fehlende Statusdateien werden nicht als Erfolg gewertet.
+Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf. Während eines neuen aktiven Laufs wird diese Meldung nur unter **Status anzeigen** angezeigt; der Betriebszustand zeigt den aktuellen Lauf. Lange Zeilen im Live-Log lassen sich horizontal scrollen, ohne die Job-Kacheln zu verbreitern. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### Job-Wizard
 
@@ -217,12 +217,14 @@ Der Restore-Wizard führt durch Job, Archiv, Auswahl, Ziel und Prüfung. Im Ziel
 
 Ein abgebrochener Restore-Test ist ein unvollständiger Testversuch und kein fehlgeschlagener Nachweis. In Jobs und im gespeicherten Status wird der **letzte Testversuch als abgebrochen** mit Datum angezeigt; der vorherige abgeschlossene Test behält seinen Status und sein ursprüngliches Gültigkeitsende. Ein Abbruch verlängert keinen Nachweis und verdeckt keinen vorherigen echten Fehler. Ohne verwertbaren vorherigen Bericht bleibt der Nachweis offen. Bereits gespeicherte Abbrüche werden anhand der vorhandenen Berichtshistorie genauso ausgewertet; die Berichte bleiben erhalten.
 
-Unter **Planung & Policy > Plan bearbeiten** legen Administratoren Kalendertermin,
+Unter **Planung & Policy > ⋯ > Plan bearbeiten** legen Administratoren Kalendertermin,
 Testlevel und getrennte Nachweisgültigkeit fest. **Jetzt testen** startet manuell.
 Die Serverzeitzone gilt; verpasste/übersprungene Termine werden nicht nachgeholt.
 Ein Skip erneuert keinen Nachweis. Legacy-Intervalltests bleiben getrennt unter
 **Einstellungen > Restore**. Ohne bisherigen Bericht gibt es keinen entsprechenden
 Überfälligkeits-Reminder.
+
+Die Planung bündelt die Informationen in vier Spalten, gegliedert nach Standort mit Jobanzahl. Leere Standorte werden ausgeblendet; die Standortangabe unter jedem Job entfällt. **Nachweis & Verlauf** öffnet die Berichte des Jobs. Erfolgreiche Berichte erscheinen als **Wiederherstellungsnachweis** mit Archiv und aufbauendem Prüfumfang L1, L1 + L2 oder L1 + L2 + L3. Die Gültigkeit wird getrennt vom Ergebnis des Versuchs ausgewiesen. Bei einem Abbruch ist ein weiterhin gültiger vorheriger Nachweis direkt erreichbar. Ein Bereich **Technische Nachweise** bündelt Prüfschritte und Logdiagnose; **Prüfdaten anzeigen** öffnet die zugehörigen Werte direkt beim Schritt; vorhandene Berichte bleiben unverändert.
 
 ### Testlevel
 

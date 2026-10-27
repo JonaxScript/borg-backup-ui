@@ -227,8 +227,56 @@ const { chromium } = require('playwright');
   assert(await page.locator('#job-card-0 .job-workflow-details').isVisible());
   assert(await page.locator('#job-card-0 .dashboard-job-details').isVisible());
   assert.equal(await page.evaluate(()=>document.activeElement.dataset.jobsAction),'toggle-workflow');
-  await page.evaluate(()=>{jobsState.jobs[4].running=true;renderJobsGrid(jobsState.jobs);});
-  assert.match(await page.locator('#job-card-4 .job-saved-message').innerText(),/Letztes gespeichertes Ergebnis/);
+  // Previous errors stay in the saved-status disclosure while a new run is active (#613).
+  for (const language of ['de', 'en']) {
+    await page.evaluate(language=>{window.lang=language; jobsState.jobs[4].running=true; jobStatusOpen.delete('4'); renderJobsGrid(jobsState.jobs);}, language);
+    assert.equal(await page.locator('#job-card-4 > .job-saved-message').count(),0);
+    const savedError=page.locator('#job-card-4 .job-saved-status .job-saved-message');
+    assert(await savedError.isHidden());
+    await page.locator('#job-card-4 [data-jobs-action="toggle-status"]').click();
+    assert(await savedError.isVisible());
+    assert.match(await savedError.innerText(),/Missing path:/);
+    assert.match(await savedError.innerText(),/<script>not executable<\/script>/);
+    await page.evaluate(()=>renderJobsGrid(jobsState.jobs));
+    assert(await savedError.isVisible());
+    assert.equal(await page.locator('#jobs-grid script').count(),0);
+    await page.evaluate(()=>{jobsState.jobs[4].running=false;renderJobsGrid(jobsState.jobs);});
+    assert.match(await page.locator('#job-card-4 > .job-saved-message').innerText(),/Missing path:/);
+  }
+  await page.evaluate(()=>{window.lang='de';});
+  // Real log-panel placement must not resize any location's cards (#613).
+  await page.evaluate(()=>{window.EventSource=class { addEventListener() {} close() {} }; jobsState.selectedLocation='all'; renderJobsGrid(jobsState.jobs);});
+  for (const width of [1920, 1280, 768, 390]) {
+    await page.setViewportSize({width,height:1080});
+    const dimensions=await page.evaluate(async ()=>{
+      const settle=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      closeLogPanel();
+      await settle();
+      const widths=()=>Array.from(document.querySelectorAll('.jobs-redesign-row'),el=>el.getBoundingClientRect().width);
+      const before=widths();
+      openLogPanel('6');
+      if (document.getElementById('log-panel').parentElement.id!=='log-slot-usb') throw new Error('Log must be inside its location group');
+      const output=document.getElementById('log-output');
+      output.textContent='[INFO] /mnt/disks/'+'long-path-'.repeat(400)+'\nshort line';
+      await settle();
+      const after=widths();
+      output.scrollLeft=200;
+      const scrolls=output.scrollWidth>output.clientWidth && output.scrollLeft>0;
+      const withinWorkspace=document.getElementById('log-panel').getBoundingClientRect().right<=document.querySelector('.jobs-workspace').getBoundingClientRect().right+1;
+      renderJobsGrid(jobsState.jobs);
+      await settle();
+      const refreshed=widths();
+      closeLogPanel();
+      await settle();
+      return {before,after,refreshed,closed:widths(),scrolls,withinWorkspace};
+    });
+    assert.deepEqual(dimensions.after,dimensions.before,`Log changed card widths at ${width}px`);
+    assert.deepEqual(dimensions.refreshed,dimensions.before,`Refresh changed card widths at ${width}px`);
+    assert.deepEqual(dimensions.closed,dimensions.before);
+    assert(dimensions.scrolls,`Long log line must scroll at ${width}px`);
+    assert(dimensions.withinWorkspace,`Log exceeds workspace at ${width}px`);
+  }
+  await page.setViewportSize({width:1920,height:1080});
   // The latest cancelled attempt must not replace a still-valid restore proof.
   for (const language of ['de','en']) {
     const proof = await page.evaluate(language => {

@@ -238,7 +238,7 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run; a new active run keeps its own operating state. Missing status files never imply success.
+Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
 
 ### 3.3 Start a Job Manually
 
@@ -339,7 +339,7 @@ A planned VM shutdown is reported as informational. A failed shutdown or restart
 
 Once archive creation (`borg create`) finishes, containers and VMs stopped by the job are restarted immediately, including when Borg reports warnings. Retention (`prune`), space reclamation (`compact`), and any due repository check (`check`) run afterwards and do not extend service downtime. If archive creation fails or is cancelled, cleanup still restarts the stopped workloads. If a restart fails, recovery is still attempted for the other workload type; the run ends as an error and maintenance does not start.
 
-Each job has its own bordered card with spacing. **All locations** shows separate headings only for destinations with jobs. Empty destinations remain in the sidebar with a count of 0; selecting one location avoids a duplicate section heading.
+Each job has its own bordered card with spacing. **All locations** shows separate headings only for destinations with jobs. Destinations without jobs are also hidden in the sidebar. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
 
 The overall result appears directly below **Operating status**.
 
@@ -881,13 +881,17 @@ The page manages:
 
 ### 8.2 Planning & Policy Tab
 
-Choose **Edit plan** for a job to configure its policy, test level and evidence validity.
+The left sidebar filters both tabs by **All locations** or an occupied location and shows job counts. Empty locations are hidden; if the selected location loses its final job, the view returns to **All locations**. Jobs appear on the right, with their configured icons and colors in planning and report rows. **Evidence & history** opens all reports for a job, including former locations. Clicking a location clears that job selection.
+
+The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location headings with the shared location icons and job counts group the table. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
+
+Choose **⋮ > Edit plan** for a job to configure its policy, test level and evidence validity. The floating menu matches the Jobs page without increasing the table row height; Escape or a click outside closes it. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
 
 - **Scheduled:** Choose a daily, weekly or monthly time. Monthly plans use days 1–28. Times use the Unraid server's local timezone.
 - **Manual / Off:** Disable automatic execution. **Test now** remains available for enabled backup jobs.
 - **Evidence valid (days):** How long a successful scheduled test remains current. This is separate from the execution schedule.
 - **Next test:** The next calendar start; a manual test does not shift it.
-- **Automatic:** **Active** means the saved trigger is actually installed in cron. **Inactive** means installation failed or the entry is missing; save the plan again to retry.
+- **Test planning:** The next automatic execution is shown only for an installed cron trigger. **Inactive** or **No schedule** indicates missing setup; save the plan again to retry. **Evidence due** remains visible independently of the next execution.
 
 Saving creates or updates the cron entry. Startup reapplies the saved schedules without duplicating entries or replacing unrelated cron jobs. If cron installation fails, the saved policy is retained and the error is displayed.
 
@@ -971,6 +975,8 @@ Running tests are marked directly beside the job with **Running** and a red **Ca
 
 ### 8.5 Reports
 
+If a repository path is unreachable or the filesystem reports an access error (for example, after removing a USB drive without unmounting), the attempt ends as **Unavailable**. The report records the failed reachability step and, where available, the OS error number; subsequent checks remain untested. Check the drive connection, mount and access permissions before retrying. This creates no new restoration evidence.
+
 ![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)
 
 Reports are retained per run, including failures before a retry. Details identify
@@ -983,21 +989,13 @@ remove that history. Text logs live in the configured log directory as
 `Borg-Restore-Test--<timestamp>-<PID>.log`. Lifecycle events go to the application
 log `/var/log/borg_backup_ui.log`, not automatically to Unraid syslog.
 
-The **Reports** tab shows structured evidence for completed restore tests:
+The **Test reports** tab shows individual attempts as expandable rows. Details open directly below across the content width. Job, location, result and date filters remain available; **Cancelled** is a separate result filter.
 
-- overall status
-- verification scope
-- execution
-- coverage
-- individual check steps
-- technical evidence
+A successful run is presented as **Restoration evidence**, identifying the actual archive, repository, timestamp, duration and documented scope. The **Coverage** row combines the percentage with its file-count basis (checked files out of archive files). Levels are cumulative: **L1**, **L1 + L2** and **L1 + L2 + L3**. Each level displays its recorded result; excluded levels and missing legacy report details are explicitly identified. L3 identifies sample files read and SHA-256 hashes recorded without claiming an independent expected-hash comparison. A single **Technical evidence** section combines checks and log diagnostics. **Show check data** below each check reveals its file lists, hashes and detail values. The repeated execution block with report ID, start and end is omitted.
 
-Typical status values:
+**Successful**, **Failed**, **Cancelled**, **Skipped** and **Unavailable** describe the attempt. Evidence validity is shown separately; expiry does not change a historically successful test into a failed test. Cancellation creates no new evidence. When the server confirms that previous evidence remains valid and its report is available, **Open valid evidence** opens that report directly. An intervening real failure or expired evidence is not hidden.
 
-- **Successful / Verified**
-- **Overdue**
-- **Failed**
-- **Not available**
+Evidence establishes only the documented archive and test scope, not full application recovery or VM startup. Existing reports are not rewritten for the new presentation.
 
 For restore tests at level 2 or above, the configured archive size selects the dry-run mode: below the threshold, the full archive is checked; at or above it, a file sample is checked in groups. The default threshold is 500 GB; 0 disables switching. The former special rule for the `photos` and `vms` types is removed.
 
