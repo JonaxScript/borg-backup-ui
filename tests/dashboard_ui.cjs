@@ -19,6 +19,7 @@ function dashboard(language = 'de') {
     window: {addEventListener() {}, BBUI: {components: {i18n: {t, getLanguage: () => language}}, core: {state: {}, getSchedulesData: () => ({})}}},
     document: {getElementById: id => elements.get(id), activeElement: null, querySelector: () => null},
     escHtml: value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    patchJobMarkup: (target, html) => { target.innerHTML = html; },
     locationIcon: location => `<svg data-location-icon="${location}"></svg>`,
     resolveJobIcon: job => job.icon || 'archive',
     resolveJobIconColor: job => job.icon_color || '',
@@ -49,16 +50,20 @@ for (const language of ['de', 'en']) {
     assert.equal(c.dashboardAttentionItems(backups).filter(i => i.backup.key === 'ok0').length, 1);
   });
 
-  test(`${language}: restore denominator excludes unplanned and unknown jobs`, () => {
+  test(`${language}: restore coverage includes every job and separately counts known plans`, () => {
     const {context: c, elements, t} = dashboard(language);
     c.renderRestoreVerificationSummary([
       ...Array.from({length: 6}, () => ({restore_verification_status: 'verified'})),
       ...Array.from({length: 7}, () => ({restore_verification_status: 'not_required'})),
     ]);
-    assert.match(elements.get('restore-summary-bar').innerHTML, /<strong>6<\/strong><small>\/6<\/small>/);
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreCoverageTotal', {total: 13})));
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restorePlansVerified', {count: 6, total: 6})));
+    assert.equal((elements.get('restore-summary-bar').innerHTML.match(/class="success"/g) || []).length, 6);
+    assert.equal((elements.get('restore-summary-bar').innerHTML.match(/class="neutral"/g) || []).length, 7);
     assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreUnplannedCount', {count: 7})));
     c.renderRestoreVerificationSummary([{restore_verification_status: 'verified'}, {}, {restore_verification_status: 'failed'}, {restore_verification_status: 'stale'}, {restore_verification_status: 'never'}]);
-    assert.match(elements.get('restore-summary-bar').innerHTML, /<strong>1<\/strong><small>\/4<\/small>/);
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreCoverageTotal', {total: 5})));
+    assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restorePlansVerified', {count: 1, total: 4})));
     assert.ok(elements.get('restore-summary-bar').innerHTML.includes(t('dashboard.restoreUnknownCount', {count: 1})));
   });
 
@@ -67,7 +72,7 @@ for (const language of ['de', 'en']) {
     c.renderSummaryBar([]);
     c.renderRestoreVerificationSummary([]);
     for (const id of ['summary-bar', 'restore-summary-bar']) {
-      assert.match(elements.get(id).innerHTML, /<strong>0<\/strong><small>\/0<\/small>/);
+      assert.match(elements.get(id).innerHTML, /<strong>0<\/strong>/);
       assert.doesNotMatch(elements.get(id).innerHTML, /NaN|Infinity|undefined/);
     }
     const counts = c.dashboardBackupSummary([{never_run: true, status: 'success'}, {status: 'future'}, {status: 'cancelled'}]).counts;
@@ -122,7 +127,7 @@ for (const language of ['de', 'en']) {
 
   test(`${language}: All locations stays grouped and omits locations without jobs`, () => {
     const {context: c, elements} = dashboard(language);
-    const backups = [{key: '1', location: 'local'}, {key: '2', location: 'usb'}, {key: '3', location: 'storagebox'}];
+    const backups = [{key: '1', location: 'local', status: 'error', backup_overdue: true}, {key: '2', location: 'usb', status: 'success'}, {key: '3', location: 'storagebox', status: 'cancelled'}];
     c.renderBackupGrid(backups);
     assert.equal((elements.get('backup-grid').innerHTML.match(/class="dashboard-location-group-row"/g) || []).length, 3);
     assert.doesNotMatch(elements.get('dashboard-location-list').innerHTML, /data-dashboard-location="smb"/);
@@ -130,10 +135,51 @@ for (const language of ['de', 'en']) {
     vm.runInContext("dashboardSelectedLocation = 'usb'; dashboardExpandedJobs.add('2')", c);
     c.renderBackupGrid(backups);
     assert.match(elements.get('backup-grid').innerHTML, /aria-expanded="true"/);
-    c.renderBackupGrid([{key: '1', location: 'local'}]);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>1<\/strong><small>\/1<\/small>/);
+    assert.match(elements.get('summary-bar').innerHTML, /USB/);
+    assert.doesNotMatch(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
+    assert.ok(!elements.get('summary-bar').innerHTML.includes(c.dashboardT('jobs.statusCancelled')));
+    c.renderDashboard({backups}, null);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>1<\/strong><small>\/1<\/small>/);
+
+    c.renderBackupGrid(backups.slice(0, 1));
     assert.equal(vm.runInContext('dashboardSelectedLocation', c), 'all');
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>0<\/strong><small>\/1<\/small>/);
+    assert.match(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
     assert.equal(vm.runInContext('dashboardExpandedJobs.size', c), 0);
     c.renderBackupGrid([]);
     assert.doesNotMatch(elements.get('backup-grid').innerHTML, /dashboard-inventory-row/);
+    assert.match(elements.get('summary-bar').innerHTML, /<strong>0<\/strong><small>\/0<\/small>/);
+    assert.doesNotMatch(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
   });
 }
+
+test('management history discards obsolete responses and clears statistics on failure', async () => {
+  const {context: c, elements} = dashboard('en');
+  elements.set('dashboard-trends', {innerHTML: ''});
+  const pending = [];
+  c.fetch = () => new Promise(resolve => pending.push(resolve));
+  const first = c.refreshDashboardOverview();
+  vm.runInContext('dashboardPeriod = 7', c);
+  const second = c.refreshDashboardOverview();
+  const payload = days => ({days, location:'all', from:'2026-10-21', to:'2026-10-27', counts:{success:0,warning:0,error:0,skipped:0,cancelled:0,unknown:0},daily:[{date:'2026-10-27',success:0,warning:0,error:0,skipped:0,cancelled:0,unknown:0,measured_repositories:0,repository_bytes:null}], repository_count:0, unassigned_jobs:0, run_count:0, success_rate:null});
+  pending[1]({ok:true, json:async()=>payload(7)}); await second;
+  pending[0]({ok:true, json:async()=>payload(30)}); await first;
+  assert.equal(vm.runInContext('dashboardOverview.days', c),7);
+  assert.match(elements.get('dashboard-trends').innerHTML,/No complete measurement/);
+  assert.doesNotMatch(elements.get('dashboard-trends').innerHTML,/NaN|Infinity/);
+  const previous = elements.get('dashboard-trends').innerHTML;
+  const background = c.refreshDashboardOverview();
+  assert.equal(elements.get('dashboard-trends').innerHTML, previous, 'Same-scope refresh retains the chart while pending');
+  pending[2]({ok:true, json:async()=>payload(7)}); await background;
+  vm.runInContext("dashboardSelectedLocation = 'usb'", c);
+  const changedScope = c.refreshDashboardOverview();
+  assert.match(elements.get('dashboard-trends').innerHTML, /Loading/);
+  assert.doesNotMatch(elements.get('dashboard-trends').innerHTML, /management-trends-grid/);
+  pending[3]({ok:true, json:async()=>({...payload(7), location:'usb'})}); await changedScope;
+  assert.equal(vm.runInContext('dashboardOverview.location', c), 'usb');
+  c.fetch = async () => ({ok:false});
+  await c.refreshDashboardOverview();
+  assert.equal(vm.runInContext('dashboardOverview', c),null);
+  assert.match(elements.get('dashboard-trends').innerHTML,/could not be loaded/);
+});

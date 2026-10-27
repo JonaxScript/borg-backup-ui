@@ -126,7 +126,9 @@
     return t(({backup: 'backup', restore: 'restore', restore_test: 'restoreTest'})[name] || 'otherRun');
   }
 
-  /** Update only the resource card; retain the focused history toggle across polls. */
+  /** Update compact host values and RAM capacity; keep run names and protected-test budgets visible.
+   * Active-run details and history use full-width regions below the summary cards.
+   * History retains its toggle and chart focus across polls. */
   function render() {
     if (!el('resource-values')) return;
     const unavailable = failed || !data?.available || data.stale;
@@ -138,12 +140,16 @@
     el('resource-live').textContent = unavailable ? t('unavailable') : t('live', {seconds: active ? 2 : 10});
     el('resource-live').classList.toggle('is-unavailable', unavailable);
     const description = runs?.map(run => `${jobName(run.job_key)} · ${operation(run.operation)}`).join(', ');
-    const cell = (label, value, detail, spark) => `<div class="resource-value"><span>${escHtml(label)}</span><strong>${escHtml(value)}</strong><small>${escHtml(detail)}</small>${spark}</div>`;
-    el('resource-values').innerHTML =
-      cell(t('cpu'), percent(host.cpu_percent), t('cpuScale'), chart(history, s => s.host.cpu_percent, 100, t('cpu'))) +
-      cell(t('ram'), gib(host.memory_available_bytes), t('ramTotal', {total: gib(host.memory_total_bytes)}),
-        chart(history, s => s.host.memory_available_bytes, host.memory_total_bytes, t('ram'))) +
-      cell(t('active'), runs === null ? '—' : String(runs.length), description || (runs === null ? t('unavailable') : t('idle')), '');
+    const ramRatio = valid(host.memory_available_bytes) && valid(host.memory_total_bytes) && host.memory_total_bytes > 0
+      ? Math.max(0, Math.min(100, 100 * host.memory_available_bytes / host.memory_total_bytes)) : null;
+    el('resource-values').innerHTML = `<div class="resource-value"><span title="${escHtml(t('cpuScale'))}">${escHtml(t('cpu'))}</span><strong>${escHtml(percent(host.cpu_percent))}</strong>${chart(history, s => s.host.cpu_percent, 100, t('cpu'))}</div>
+      <div class="resource-value"><span>${escHtml(t('ram'))}</span><strong>${escHtml(gib(host.memory_available_bytes))}<small> / ${escHtml(gib(host.memory_total_bytes))}</small></strong>
+      ${ramRatio === null ? '' : `<progress class="resource-ram-capacity" max="100" value="${ramRatio}" aria-label="${escHtml(t('ramTotal', {total: gib(host.memory_total_bytes)}))}"></progress>`}</div>`;
+    if (typeof renderDashboardActiveRuns === 'function') renderDashboardActiveRuns(runs);
+    el('resource-active').textContent = runs === null ? `${t('active')}: ${t('unavailable')}` : t('activeCount', {count: runs.length});
+    el('resource-activity').hidden = !active && !tests.length;
+    el('resource-runs').hidden = !active;
+    el('resource-runs').textContent = description || '';
     el('resource-tests').hidden = !tests.length;
     el('resource-tests').innerHTML = tests.map(test => {
       const ratio = valid(test.memory_bytes) && test.memory_limit_bytes > 0 ? Math.min(100, 100 * test.memory_bytes / test.memory_limit_bytes) : null;

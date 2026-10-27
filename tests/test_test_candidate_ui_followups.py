@@ -190,7 +190,7 @@ def test_dashboard_and_jobs_preserve_readable_content() -> None:
     dashboard = _read("ui/js/pages/dashboard.js")
     jobs = _read("ui/js/pages/jobs.js")
     german = _read("ui/i18n/de.json")
-    assert 'id="backup-grid" class="dashboard-table-wrap ui-table-wrap"' in _read("ui/index.html")
+    assert 'id="dashboard-locations" class="ui-table-wrap"' in _read("ui/index.html")
     assert "overflow-x: auto" in _read("ui/design-system.css")
     assert 'class="dashboard-details-row"' in dashboard
     assert "renderDashboardLocationGroups(visible)" in dashboard

@@ -556,7 +556,7 @@ function renderRestorePlan(plan) {
       <td>${escHtml(restoreTestsT(mode === 'manual_only' ? 'manualOnly' : mode))}</td>
       <td class="rt-plan-schedule">${escHtml(schedule)}</td>
       <td>L${Number(p.level || 2)}</td>
-      <td>${escHtml(j.last_test_date || '—')}</td>
+      <td>${escHtml(j.last_test_date || '—')}${j.last_test_result === 'cancelled' ? `<br><span class="badge warning">${escHtml(restoreTestsT('cancelled'))}</span>` : ''}</td>
       <td>${escHtml(j.next_run_at || '—')}</td>
       <td><span class="badge ${state === 'active' || state === 'legacy' ? 'success' : state === 'off' ? '' : 'warning'}">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</span></td>
       <td><div class="rt-plan-actions">

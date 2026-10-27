@@ -10,6 +10,7 @@ function dashboardT(key, params = {}) {
 
 function dashboardLocationLabel(location) {
   return {
+    all: dashboardT('dashboard.allLocations'),
     local: dashboardT('jobs.locationLocal'),
     usb: dashboardT('jobs.locationUsb'),
     smb: dashboardT('jobs.locationSmb'),
@@ -20,6 +21,8 @@ function dashboardLocationLabel(location) {
 let dashboardSystemHealth = null;
 let dashboardSelectedLocation = 'all';
 const dashboardExpandedJobs = new Set();
+let dashboardAttentionExpanded = false;
+let dashboardOverdueExpanded = false;
 const DASHBOARD_LOCATION_ORDER = ['local', 'usb', 'smb', 'storagebox'];
 
 async function fetchStatus() {
@@ -102,6 +105,9 @@ async function refreshStatus() {
     for (const b of (statusData.backups || [])) {
       const job = jobMap[String(b.key || '').toLowerCase()];
       if (!job) continue;
+      b.restore_verification_status ??= job.restore_verification_status;
+      b.restore_verification_last_test ??= job.restore_verification_last_test;
+      b.restore_verification_valid_until ??= job.restore_verification_valid_until;
       b.enabled = job.enabled !== false;
       b.display_name = job.display_name || job.name || b.display_name || '';
       b.group_name = job.group_name || b.group_name || "";
@@ -117,6 +123,7 @@ async function refreshStatus() {
     coreState.lastRefresh = new Date();
     dashboardSystemHealth = systemHealth;
     renderDashboard(coreState.data, dashboardSystemHealth);
+    refreshDashboardOverview();
     try {
       const setupStatus = await window.BBUI.core.fetchSetupStatus(false);
       window.BBUI?.setupWizard?.renderDashboardPanel?.(setupStatus);
@@ -151,11 +158,8 @@ function updateRefreshLabel() {
 }
 
 function renderDashboard(data, systemHealth) {
-  renderSummaryBar(data.backups || []);
-  renderDashboardAttention(data.backups || []);
-  renderRestoreVerificationSummary(data.backups || []);
+  renderManagementDashboard(data.backups || []);
   renderDashboardSystemWarning(systemHealth);
-  renderBackupGrid(data.backups);
 }
 
 function renderDashboardSystemWarning(data) {
@@ -194,7 +198,7 @@ function dashboardBackupSummary(backups) {
 }
 
 /**
- * Build a labeled ring and legend from numeric counts, using the current theme.
+ * Build a compact labeled ring and outcome counts using the current theme.
  * @param {object[]} rows Counts, translated labels and fixed semantic color classes.
  * @param {number} value Verified/successful count shown inside the ring.
  * @param {number} total Scope denominator; zero produces an empty neutral ring.
@@ -212,15 +216,16 @@ function dashboardSummaryContent(rows, value, total, centerLabel) {
   const description = rows.map((row) => `${row.count} ${row.label}`).join(' · ');
   return `<div class="dashboard-summary-body">
     <div class="dashboard-summary-ring" style="--dashboard-ring-fill:${fill}" role="img" aria-label="${escHtml(description)}">
-      <div class="dashboard-summary-ring__center"><span><strong>${value}</strong><small>/${total}</small></span><span class="dashboard-summary-ring__label">${escHtml(centerLabel)}</span></div>
+      <div class="dashboard-summary-ring__center"><span><strong>${value}</strong><small>/${total}</small></span></div>
     </div>
-    <dl class="dashboard-summary-legend">${rows.map((row) => `<div class="dashboard-summary-stat ${row.cls}${row.count === 0 ? ' is-zero' : ''}"><dt><span aria-hidden="true"></span>${escHtml(row.label)}</dt><dd>${row.count}</dd></div>`).join('')}</dl>
+    <div class="dashboard-summary-numbers"><div class="dashboard-summary-primary"><strong>${value}</strong><span>${escHtml(centerLabel)}</span></div>
+    <dl class="dashboard-summary-legend">${rows.slice(1).map((row) => `<div class="dashboard-summary-stat ${row.cls}${row.count === 0 ? ' is-zero' : ''}"><dt>${escHtml(row.label)}</dt><dd>${row.count}</dd></div>`).join('')}</dl></div>
   </div>`;
 }
 
 /**
  * Render backup outcomes from job rows rather than the API's overdue-adjusted counters.
- * @param {object[]} backups Current status rows; overdue links open their job details.
+ * @param {object[]} backups Rows for the selected location; overdue details use the same scope.
  */
 function renderSummaryBar(backups) {
   const el = document.getElementById('summary-bar');
@@ -234,20 +239,20 @@ function renderSummaryBar(backups) {
     ...(summary.counts.cancelled ? [{ cls: 'warning', count: summary.counts.cancelled, label: dashboardT('jobs.statusCancelled') }] : []),
     ...(summary.counts.unknown ? [{ cls: 'unknown', count: summary.counts.unknown, label: dashboardT('dashboard.unknownOrNever') }] : []),
   ];
-  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
-    + dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
-    + `<div class="dashboard-summary-footer${summary.overdue ? ' has-overdue' : ''}">${summary.overdue
-      ? `<button type="button" class="dashboard-summary-overdue" data-dashboard-overdue>${iconWarn()}<span>${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</span></button>`
-      : `<span>${escHtml(dashboardT('dashboard.noOverdueBackups'))}</span>`}</div>`;
-  el.querySelector('[data-dashboard-overdue]')?.addEventListener('click', () => {
-    const first = backups.find((backup) => backup.backup_overdue);
-    if (first) openDashboardJobDetails(first.key);
-  });
+  const focused = document.activeElement?.id === 'dashboard-overdue-toggle';
+  el.innerHTML = dashboardSummaryContent(rows, summary.counts.success, summary.total, dashboardT('dashboard.successful'))
+    + `<p class="dashboard-summary-context">${escHtml(dashboardSelectedLocation === 'all' ? dashboardT('dashboard.allLocations') : dashboardLocationLabel(dashboardSelectedLocation))} · ${escHtml(dashboardT('dashboard.latestOutcomes', { count: summary.total }))}</p>`
+    + (summary.overdue ? `<details class="dashboard-summary-overdue"${dashboardOverdueExpanded ? ' open' : ''}>
+      <summary id="dashboard-overdue-toggle">${escHtml(dashboardT(summary.overdue === 1 ? 'dashboard.overdueCountOne' : 'dashboard.overdueCountMany', { count: summary.overdue }))}</summary>
+      <ul>${backups.filter(backup => backup.backup_overdue).map(backup => `<li><strong>${escHtml(backup.name || backup.display_name || backup.key)}</strong><p>${escHtml(dashboardT('dashboard.backupOverdueDetails', {date: dashboardAbsoluteTimestamp(backup.backup_overdue_after || backup.backup_overdue_expected_run)}))}</p></li>`).join('')}</ul>
+    </details>` : '');
+  el.querySelector('details')?.addEventListener('toggle', event => { dashboardOverdueExpanded = event.currentTarget.open; });
+  if (focused) el.querySelector('summary')?.focus({preventScroll: true});
 }
 
 /**
  * Render verification scope explicitly; missing metadata stays unknown, never verified.
- * @param {object[]} backups Current rows; unplanned and unknown states stay outside the ring.
+ * @param {object[]} backups Current rows; coverage includes all jobs, while the plan ratio excludes unplanned/unknown states.
  */
 function renderRestoreVerificationSummary(backups) {
   const el = document.getElementById('restore-summary-bar');
@@ -264,9 +269,14 @@ function renderRestoreVerificationSummary(backups) {
     { cls: 'error', count: counts.failed, label: dashboardT('dashboard.restoreFailed') },
     { cls: 'unknown', count: counts.never, label: dashboardT('dashboard.restoreOpen') },
   ];
-  el.innerHTML = `<p class="dashboard-summary-context">${escHtml(dashboardT('dashboard.restoreScope', { count: total, total: backups.length }))}</p>`
-    + dashboardSummaryContent(rows, counts.verified, total, dashboardT('dashboard.restoreVerified'))
-    + `<div class="dashboard-summary-footer">${escHtml(dashboardT('dashboard.restoreUnplannedCount', { count: counts.not_required }))}${counts.unknown ? ` · ${escHtml(dashboardT('dashboard.restoreUnknownCount', { count: counts.unknown }))}` : ''}</div>`;
+  const states = {verified: 'success', stale: 'warning', failed: 'error', never: 'unknown', not_required: 'neutral', unknown: 'unknown'};
+  const description = dashboardT('dashboard.restoreCoverageDescription', {count: counts.verified, total: backups.length});
+  el.innerHTML = `<div class="dashboard-restore-coverage">
+    <div class="dashboard-summary-primary"><strong>${counts.verified}</strong><span>${escHtml(dashboardT('dashboard.restoreCoverageTotal', {total: backups.length}))}</span></div>
+    <div class="dashboard-coverage-track" role="img" aria-label="${escHtml(description)}">${Object.entries(counts).map(([state, count]) => `<span class="${states[state]}"></span>`.repeat(count)).join('')}</div>
+    <div class="dashboard-coverage-caption"><span>${escHtml(dashboardT('dashboard.restorePlansVerified', {count: counts.verified, total}))}</span><span>${escHtml(dashboardT('dashboard.restoreUnplannedCount', {count: counts.not_required}))}</span></div>
+    <div class="dashboard-restore-exceptions">${rows.slice(1).filter(row => row.count).map(row => `<span class="${row.cls}">${row.count} ${escHtml(row.label)}</span>`).join(' · ')}${counts.unknown ? `<span>${escHtml(dashboardT('dashboard.restoreUnknownCount', {count: counts.unknown}))}</span>` : ''}</div>
+  </div>`;
 }
 
 /**
@@ -297,7 +307,8 @@ function dashboardAttentionItems(backups) {
 }
 
 /**
- * Render escaped issue descriptions and local links to the affected expandable row.
+ * Render a compact disclosure; escaped issue descriptions expand directly below it.
+ * Preserve its open state and keyboard focus across polling and language changes.
  * @param {object[]} backups Current status rows; an empty result hides the section.
  */
 function renderDashboardAttention(backups) {
@@ -305,12 +316,16 @@ function renderDashboardAttention(backups) {
   if (!el) return;
   const items = dashboardAttentionItems(backups);
   el.hidden = items.length === 0;
-  el.innerHTML = items.length ? `<header class="dashboard-attention-header"><h2>${escHtml(dashboardT('dashboard.attention'))}</h2><span>${escHtml(dashboardT('dashboard.attentionCount', { count: items.length }))}</span></header>
-    <ul>${items.map((item, index) => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button type="button" class="btn btn-secondary dashboard-attention-action" data-dashboard-attention="${index}">${escHtml(dashboardT('dashboard.viewDetails'))}</button></li>`).join('')}</ul>` : '';
-  el.querySelectorAll('[data-dashboard-attention]').forEach((button) => button.addEventListener('click', () => {
-    const item = items[Number(button.dataset.dashboardAttention)];
-    if (item) openDashboardJobDetails(item.backup.key);
-  }));
+  const focused = document.activeElement?.id === 'dashboard-attention-toggle';
+  const first = items[0];
+  el.innerHTML = items.length ? `<details class="dashboard-attention-disclosure ${first.cls}"${dashboardAttentionExpanded ? ' open' : ''}>
+    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${first.cls === 'error' ? iconX() : iconWarn()}</span>
+      <strong>${escHtml(dashboardT('dashboard.attentionCount', {count: items.length}))}</strong>
+      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · ${escHtml(first.label)}</span>
+      <span class="dashboard-attention-action">${escHtml(dashboardT('dashboard.viewDetails'))}<span class="dashboard-details-chevron" aria-hidden="true">›</span></span></summary>
+    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div></li>`).join('')}</ul></details>` : '';
+  el.querySelector('details')?.addEventListener('toggle', event => { dashboardAttentionExpanded = event.currentTarget.open; });
+  if (focused) el.querySelector('summary')?.focus({preventScroll: true});
 }
 
 /**
@@ -320,21 +335,6 @@ function renderDashboardAttention(backups) {
  */
 function dashboardDetailsId(key) {
   return 'dashboard-details-' + Array.from(String(key || '')).map((char) => char.codePointAt(0).toString(16)).join('-');
-}
-
-/**
- * Open an affected job in All locations, preserving other expansions and moving focus locally.
- * @param {string} key Job to reveal from the current cached dashboard data.
- */
-function openDashboardJobDetails(key) {
-  if (!key) return;
-  dashboardSelectedLocation = 'all';
-  dashboardExpandedJobs.add(String(key));
-  renderBackupGrid(window.BBUI.core.state.data?.backups || []);
-  const row = document.getElementById(dashboardDetailsId(key));
-  const toggle = document.getElementById(dashboardDetailsId(key) + '-toggle');
-  toggle?.focus({ preventScroll: true });
-  row?.scrollIntoView({ block: 'center', behavior: 'auto' });
 }
 
 /**
@@ -352,7 +352,7 @@ function toggleDashboardJobDetails(button) {
 }
 
 /**
- * Rebuild the grouped inventory, retaining disclosures and focus for existing jobs.
+ * Rebuild the grouped inventory and backup summary for the selected location, retaining disclosures and focus.
  * @param {object[]} backups Current status rows; removed jobs lose their expansion state.
  */
 function renderBackupGrid(backups) {
@@ -364,6 +364,7 @@ function renderBackupGrid(backups) {
     dashboardSelectedLocation = 'all';
     renderDashboardLocationSidebar([]);
     updateDashboardSelection([]);
+    renderSummaryBar([]);
     el.innerHTML = `<div class="ui-empty">${escHtml(dashboardT('dashboard.emptyStatus'))}<br>${escHtml(dashboardT('dashboard.emptyQuestion'))}</div>`;
     return;
   }
@@ -384,6 +385,7 @@ function renderBackupGrid(backups) {
 
   renderDashboardLocationSidebar(backups);
   updateDashboardSelection(visible);
+  renderSummaryBar(visible);
 
   if (visible.length === 0) {
     el.innerHTML = `<div class="ui-empty">${escHtml(dashboardT('dashboard.noLocationBackups'))}</div>`;
@@ -604,9 +606,12 @@ function renderDashboardRestoreVerificationBadge(backup, compact = false) {
   };
   const m = map[status];
   if (!m) return '';
+  const cancelled = backup.restore_verification_last_test_result === 'cancelled';
   const details = [
+    cancelled && backup.restore_verification_evidence_date
+      ? [dashboardT('jobs.lastCompletedTestLabel'), backup.restore_verification_evidence_date] : null,
     backup.restore_verification_last_test_date
-      ? [dashboardT('dashboard.lastTestLabel'), backup.restore_verification_last_test_date]
+      ? [dashboardT(cancelled ? 'jobs.lastTestAttemptLabel' : 'dashboard.lastTestLabel'), cancelled ? `${dashboardT('jobs.statusCancelled')} · ${backup.restore_verification_last_test_date}` : backup.restore_verification_last_test_date]
       : null,
     backup.restore_verification_valid_until
       ? [dashboardT('dashboard.validUntilLabel'), backup.restore_verification_valid_until]
@@ -832,3 +837,163 @@ window.addEventListener?.('bbui:language-changed', () => {
   updateRefreshLabel();
   window.BBUI?.core?.updateDataDirWarning?.();
 });
+
+let dashboardPeriod = 30;
+let dashboardOverview = null;
+let dashboardOverviewRequest = 0;
+let dashboardOverviewFailed = false;
+let dashboardLiveRuns = null;
+
+/**
+ * Render location-scoped facts, omitting empty locations and resetting removed selections.
+ * Host resource measurements retain global scope; existing chart/table nodes are reconciled.
+ */
+function renderManagementDashboard(backups) {
+  const locations = DASHBOARD_LOCATION_ORDER.filter(location => backups.some(b => dashboardLocationKey(b) === location));
+  if (dashboardSelectedLocation !== 'all' && !locations.includes(dashboardSelectedLocation)) dashboardSelectedLocation = 'all';
+  const focused = document.activeElement;
+  const focusData = focused?.dataset?.dashboardJobs !== undefined ? {...focused.dataset} : null;
+  const rows = backups.filter(b => dashboardSelectedLocation === 'all' || dashboardLocationKey(b) === dashboardSelectedLocation);
+  renderSummaryBar(rows);
+  renderRestoreVerificationSummary(rows);
+  renderManagementAttention(rows);
+  renderManagementLocations(rows);
+  renderDashboardActiveRuns(dashboardLiveRuns);
+  renderDashboardTrends();
+  if (focusData) Array.from(document.querySelectorAll('[data-dashboard-jobs]')).find(button => button.dataset.dashboardJobs === focusData.dashboardJobs && button.dataset.location === focusData.location)?.focus({preventScroll:true});
+  const filter = document.getElementById('dashboard-location-filter');
+  if (filter) {
+    patchJobMarkup(filter, ['all', ...locations].map(location => `<option id="dashboard-filter-${location}" value="${location}">${escHtml(dashboardLocationLabel(location))}</option>`).join(''));
+    filter.value = dashboardSelectedLocation;
+    filter.onchange = () => {
+      dashboardSelectedLocation = filter.value;
+      renderDashboard(window.BBUI.core.state.data, dashboardSystemHealth);
+      refreshDashboardOverview();
+    };
+  }
+  const period = document.getElementById('dashboard-period');
+  if (period) {
+    period.value = String(dashboardPeriod);
+    period.onchange = () => { dashboardPeriod = Number(period.value); refreshDashboardOverview(); };
+  }
+  const page = document.getElementById('page-dashboard');
+  if (page) page.onclick = event => {
+    const button = event.target.closest('[data-dashboard-jobs]');
+    if (button) openJobsStatus(button.dataset.dashboardJobs, button.dataset.location || dashboardSelectedLocation);
+    const navigation = event.target.closest('[data-dashboard-page]');
+    if (navigation) window.BBUI.core.navigate(navigation.dataset.dashboardPage);
+  };
+}
+
+/** Render actionable saved outcomes with a direct link to the matching job status. */
+function renderManagementAttention(rows) {
+  const el = document.getElementById('dashboard-attention');
+  if (!el) return;
+  const items = dashboardAttentionItems(rows);
+  const unplanned = rows.filter(b => b.restore_verification_status === 'not_required').length;
+  el.hidden = false;
+  el.innerHTML = `<header class="management-heading"><h2>${escHtml(dashboardT('management.attention'))}</h2><span>${items.length}</span></header>
+    ${items.length ? `<ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button class="btn btn-secondary btn-sm" data-dashboard-jobs="${escHtml(item.backup.key)}" data-location="${escHtml(dashboardLocationKey(item.backup))}">${escHtml(dashboardT('management.openJob'))}</button></li>`).join('')}</ul>` : `<p class="management-note">${escHtml(dashboardT('management.noProblems'))}</p>`}
+    ${unplanned ? `<div class="management-unplanned"><span>${escHtml(dashboardT('dashboard.restoreUnplannedCount', {count: unplanned}))}</span><button class="btn btn-secondary btn-sm" data-dashboard-page="restore-tests">${escHtml(dashboardT('management.openTests'))}</button></div>` : ''}`;
+}
+
+/** Reconcile current totals for populated locations, preserving rows and focused actions. */
+function renderManagementLocations(rows) {
+  const el = document.getElementById('dashboard-locations');
+  if (!el) return;
+  const locations = (dashboardSelectedLocation === 'all' ? DASHBOARD_LOCATION_ORDER : [dashboardSelectedLocation])
+    .filter(location => rows.some(b => dashboardLocationKey(b) === location));
+  patchJobMarkup(el, `<table class="ui-table management-locations"><thead><tr>${['dashboard.locations','management.jobs','dashboard.successful','management.problems','dashboard.restoreCoverage','management.actions'].map(k => `<th>${escHtml(dashboardT(k))}</th>`).join('')}</tr></thead><tbody>${locations.map(location => {
+    const jobs = rows.filter(b => dashboardLocationKey(b) === location);
+    const summary = dashboardBackupSummary(jobs);
+    const problems = new Set(dashboardAttentionItems(jobs).map(item => item.backup.key)).size;
+    const verified = jobs.filter(b => b.restore_verification_status === 'verified').length;
+    return `<tr id="dashboard-location-${location}"><td><span class="management-location-name"><span class="location-nav-glyph ${location}">${dashboardLocationGlyph(location)}</span>${escHtml(dashboardLocationLabel(location))}</span></td><td>${jobs.length}</td><td>${summary.counts.success}/${jobs.length}</td><td>${problems}</td><td>${verified}/${jobs.length}</td><td><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-location="${location}">${escHtml(dashboardT('management.openJobs'))}</button></td></tr>`;
+  }).join('')}</tbody></table>`);
+}
+
+/** Receive live telemetry, retaining unknown/unavailable rather than claiming zero runs. */
+function renderDashboardActiveRuns(runs) {
+  dashboardLiveRuns = runs;
+  const el = document.getElementById('dashboard-active-runs');
+  if (!el) return;
+  const backups = window.BBUI.core.state.data?.backups || [];
+  const visible = runs?.filter(run => dashboardSelectedLocation === 'all' || backups.some(b => b.key === run.job_key && dashboardLocationKey(b) === dashboardSelectedLocation));
+  el.innerHTML = `<div class="dashboard-summary-primary"><strong>${visible?.length ?? '—'}</strong><span>${escHtml(dashboardT(runs === null ? 'resources.unavailable' : 'management.activeRuns'))}</span></div>
+    <div class="management-active-list">${visible?.length ? visible.map(run => {
+      const job = backups.find(b => b.key === run.job_key);
+      const test = run.operation === 'restore_test';
+      return `<button class="dashboard-details-toggle" ${test ? 'data-dashboard-page="restore-tests"' : run.operation === 'backup' ? `data-dashboard-jobs="${escHtml(run.job_key || '')}"` : 'data-dashboard-page="restore"'}>${escHtml(job?.name || job?.display_name || run.job_key || '—')} · ${escHtml(dashboardT(test ? 'management.restoreTest' : run.operation === 'backup' ? 'management.backup' : 'management.restore'))}</button>`;
+    }).join('') : `<span>${escHtml(dashboardT(runs === null ? 'management.liveUnknown' : 'management.noActive'))}</span>`}</div>`;
+}
+
+/**
+ * Refresh saved-report aggregates without clearing the currently matching chart.
+ * New scopes show loading; failed requests clear stale data; superseded responses are ignored.
+ */
+async function refreshDashboardOverview() {
+  const request = ++dashboardOverviewRequest;
+  dashboardOverviewFailed = false;
+  renderDashboardTrends();
+  try {
+    const response = await fetch(`/api/reports/overview?days=${dashboardPeriod}&location=${encodeURIComponent(dashboardSelectedLocation)}`);
+    if (!response.ok) throw new Error('Overview unavailable');
+    const data = await response.json();
+    if (request !== dashboardOverviewRequest) return;
+    dashboardOverview = data;
+  } catch (_) {
+    if (request !== dashboardOverviewRequest) return;
+    dashboardOverview = null;
+    dashboardOverviewFailed = true;
+  }
+  renderDashboardTrends();
+}
+
+/** Format real byte measurements for the current locale; absent data remains unknown. */
+function dashboardMetricBytes(bytes) {
+  if (bytes == null) return '—';
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+  let unit = 0;
+  while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++; }
+  return `${new Intl.NumberFormat(window.BBUI.components.i18n.getLanguage(), {maximumFractionDigits: 1}).format(bytes)} ${units[unit]}`;
+}
+
+/** Reconcile daily outcomes and measured storage in place, retaining labels and data gaps. */
+function renderDashboardTrends() {
+  const el = document.getElementById('dashboard-trends');
+  if (!el) return;
+  const data = dashboardOverview;
+  if (!data || data.location !== dashboardSelectedLocation || data.days !== dashboardPeriod) {
+    patchJobMarkup(el, `<p class="management-note">${escHtml(dashboardT(dashboardOverviewFailed ? 'management.historyUnavailable' : 'dashboard.loading'))}</p>`);
+    return;
+  }
+  const outcomes = ['success','warning','error','skipped','cancelled','unknown'];
+  const labels = {success:'dashboard.successful',warning:'dashboard.warnings',error:'dashboard.errors',skipped:'dashboard.skipped',cancelled:'jobs.statusCancelled',unknown:'dashboard.unknown'};
+  const maxRuns = Math.max(1, ...data.daily.map(p => outcomes.reduce((n,k) => n + p[k], 0)));
+  const last = data.daily.at(-1);
+  const complete = p => p.measured_repositories === data.repository_count && data.repository_count > 0 && !data.unassigned_jobs;
+  const valid = data.daily.filter(complete);
+  const maxBytes = Math.max(1, ...valid.map(p => p.repository_bytes));
+  const minBytes = Math.min(...valid.map(p => p.repository_bytes));
+  const singlePoint = valid.length === 1 ? data.daily.findIndex(complete) : -1;
+  let previous = false;
+  const path = data.daily.map((p,i) => {
+    if (!complete(p)) { previous = false; return ''; }
+    const x = 8 + i * 584 / Math.max(1, data.daily.length - 1);
+    const y = 142 - p.repository_bytes / maxBytes * 126;
+    const segment = `${previous ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
+    previous = true;
+    return segment;
+  }).join(' ');
+  const rate = data.success_rate == null ? '—' : `${new Intl.NumberFormat(window.BBUI.components.i18n.getLanguage(), {maximumFractionDigits:1}).format(data.success_rate)} %`;
+  const range = `${data.from} – ${data.to}`;
+  patchJobMarkup(el, `<div class="management-trends-grid"><section><h3>${escHtml(dashboardT('management.runHistory'))}</h3><div class="management-metric"><strong>${rate}</strong><span>${escHtml(dashboardT('management.successRate'))}</span></div>
+    <p class="management-note">${escHtml(dashboardT('management.runCount', {count:data.run_count}))} · ${escHtml(range)}</p>
+    <div class="management-bars" role="img" aria-label="${escHtml(dashboardT('management.runCount', {count:data.run_count}))}">${data.daily.map(p => `<div class="management-bar" id="dashboard-day-${escHtml(p.date)}" title="${escHtml(p.date + ': ' + outcomes.map(k => `${p[k]} ${dashboardT(labels[k])}`).join(' · '))}">${outcomes.map(k => `<span class="${k}" style="height:${p[k]/maxRuns*100}%"></span>`).join('')}</div>`).join('')}</div>
+    <div class="management-axis"><span>${escHtml(data.from)}</span><span>${escHtml(data.to)}</span></div>
+    <div class="management-legend">${outcomes.map(k => `<span class="${k}"><i></i>${data.counts[k]} ${escHtml(dashboardT(labels[k]))}</span>`).join('')}</div><p class="management-note">${escHtml(dashboardT('management.rateHint'))}</p></section>
+    <section><h3>${escHtml(dashboardT('management.repositoryTrend'))}</h3><div class="management-metric"><strong>${escHtml(complete(last) ? dashboardMetricBytes(last.repository_bytes) : '—')}</strong><span>${escHtml(dashboardT('management.measuredRepositories', {count:last.measured_repositories,total:data.repository_count}))}</span></div>
+    <p class="management-note">${escHtml(dashboardT('management.lastMeasurement'))}: ${escHtml(data.repository_last_sample ? dashboardAbsoluteTimestamp(data.repository_last_sample) : '—')}</p>
+    ${valid.length ? `<svg class="management-storage-chart" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="${escHtml(dashboardT('management.storageRange', {min:dashboardMetricBytes(minBytes),max:dashboardMetricBytes(maxBytes)}))}"><path d="M8 142H592" class="management-chart-axis"/><path d="${path}" class="management-chart-line"/>${singlePoint >= 0 ? `<circle cx="${8 + singlePoint * 584 / Math.max(1, data.daily.length - 1)}" cy="${142 - valid[0].repository_bytes / maxBytes * 126}" r="3" fill="currentColor"/>` : ''}</svg>` : `<div class="management-no-chart">${escHtml(dashboardT('management.noMeasurements'))}</div>`}
+    <div class="management-axis"><span>${escHtml(data.from)}</span><span>${escHtml(data.to)}</span></div><p class="management-note">${escHtml(dashboardT('management.repositoryHint'))}</p></section></div>`);
+}

@@ -14,15 +14,15 @@ def test_dashboard_jobs_styles_load_after_design_foundation() -> None:
     assert '<link rel="stylesheet" href="/ui/dashboard-jobs.css">' in html
 
 
-def test_dashboard_keeps_location_inventory_contract() -> None:
+def test_dashboard_management_replaces_duplicate_inventory() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/dashboard.js")
 
     for element_id in (
-        "dashboard-location-list",
-        "dashboard-selection-title",
-        "dashboard-selection-count",
-        "backup-grid",
+        "dashboard-location-filter",
+        "dashboard-locations",
+        "dashboard-trends",
+        "dashboard-active-runs",
     ):
         assert f'id="{element_id}"' in html
 
@@ -149,7 +149,7 @@ def test_dashboard_circular_summaries_and_disclosures_use_theme_and_accessible_c
     script = _read("ui/js/pages/dashboard.js")
     html = _read("ui/index.html")
 
-    assert html.count('class="dashboard-summary-section"') == 2
+    assert html.count('class="dashboard-summary-section"') == 3
     assert 'id="dashboard-attention"' in html
     for state in ("success", "warning", "error", "neutral"):
         assert f"--dashboard-ring-{state}: var(--ui-state-{state}-fg)" in css
@@ -234,9 +234,9 @@ def test_dashboard_labels_relative_time_and_duration_separately() -> None:
     assert '"notScheduled": "Not scheduled"' in english
     assert '"scheduleDisabled": "Schedule disabled"' in english
     assert "Nächster Lauf" in help_de
-    assert "next scheduled run" in help_en.lower()
-    assert "Wann läuft ein geplanter Job das nächste Mal?" in manual_de
-    assert "When will a scheduled job run next?" in manual_en
+    assert "**Next run**" in help_en
+    assert "**Status anzeigen**" in manual_de
+    assert "**Show status**" in manual_en
 
 
 def test_dashboard_displays_overdue_alongside_last_run_outcome() -> None:

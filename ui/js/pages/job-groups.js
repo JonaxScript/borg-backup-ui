@@ -544,5 +544,5 @@
     state.editor = null; state.signature = ''; render();
     return true;
   }
-  window.BBUI.jobGroups = { state, load, render, membership, schedules, parseSchedule, canLeave };
+  window.BBUI.jobGroups = { state, view, load, render, membership, schedules, parseSchedule, canLeave };
 })();

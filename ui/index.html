@@ -213,14 +213,22 @@
           </button>
         </div>
       </div>
+      <div class="management-toolbar"><label for="dashboard-location-filter" data-i18n="dashboard.locations">Standorte</label>
+        <select id="dashboard-location-filter"><option value="all" data-i18n="dashboard.allLocations">Alle Standorte</option><option value="local" data-i18n="jobs.locationLocal">Lokal</option><option value="usb" data-i18n="jobs.locationUsb">USB</option><option value="smb" data-i18n="jobs.locationSmb">SMB</option><option value="storagebox" data-i18n="jobs.locationStoragebox">Storagebox (SSH)</option></select>
+        <span data-i18n="management.scopeHint">Kennzahlen für die gewählten Standorte</span>
+      </div>
       <div class="dashboard-summary-pair">
         <section class="dashboard-summary-section">
-          <div class="dashboard-summary-title" data-i18n="dashboard.backupRuns">Backup-Läufe</div>
+          <div class="dashboard-summary-title" data-i18n="dashboard.latestBackupRuns">Letzte Backup-Läufe</div>
           <div id="summary-bar" class="dashboard-summary-content"></div>
         </section>
         <section class="dashboard-summary-section">
-          <div class="dashboard-summary-title" data-i18n="dashboard.restoreProof">Restore-Nachweis</div>
+          <div class="dashboard-summary-title" data-i18n="dashboard.restoreCoverage">Restore-Abdeckung</div>
           <div id="restore-summary-bar" class="dashboard-summary-content"></div>
+        </section>
+        <section class="dashboard-summary-section">
+          <div class="dashboard-summary-title" data-i18n="management.activeRuns">Aktive Läufe</div>
+          <div id="dashboard-active-runs" class="dashboard-summary-content"></div>
         </section>
       </div>
       <section id="dashboard-resources" class="dashboard-resources" aria-labelledby="resource-title">
@@ -229,43 +237,32 @@
           <span id="resource-live" class="resource-live"></span>
         </header>
         <div id="resource-values" class="resource-values"></div>
-        <div id="resource-tests" class="resource-tests" hidden></div>
         <div class="resource-footer">
-          <span data-i18n="resources.scope">Gesamter Server einschließlich VMs und Containern</span>
+          <span id="resource-active"></span>
           <button type="button" id="resource-history-toggle" aria-expanded="false" aria-controls="resource-history" data-i18n="resources.showHistory">Verlauf anzeigen</button>
         </div>
-        <div id="resource-history" class="resource-history" hidden></div>
       </section>
+      <section id="resource-activity" class="resource-activity" aria-labelledby="resource-title" hidden>
+        <div id="resource-runs" class="resource-runs" hidden></div>
+        <div id="resource-tests" class="resource-tests" hidden></div>
+      </section>
+      <div id="resource-history" class="resource-history" role="region" aria-labelledby="resource-title" hidden></div>
       <section id="dashboard-attention" class="dashboard-attention" hidden></section>
       <div id="dashboard-data-dir-warning" class="status-message hidden"></div>
       <div id="dashboard-system-warning" class="status-message hidden"></div>
       <div id="dashboard-setup-actions" class="setup-action-panel hidden"></div>
       <div id="status-message" class="status-message hidden"></div>
-      <div class="dashboard-location-layout ui-context-layout">
-        <aside class="dashboard-location-sidebar ui-context-sidebar" aria-label="Standorte" data-i18n-aria-label="dashboard.locations">
-          <div class="ui-context-sidebar__header">
-            <small data-i18n="dashboard.grouping">Gruppierung</small>
-            <strong data-i18n="dashboard.locations">Standorte</strong>
-          </div>
-          <nav id="dashboard-location-list" class="ui-context-nav"></nav>
-        </aside>
-        <section class="dashboard-workspace ui-workspace">
-          <header class="ui-workspace-header">
-            <div class="ui-workspace-header__title">
-              <small data-i18n="dashboard.selection">Auswahl</small>
-              <h2 id="dashboard-selection-title" data-i18n="dashboard.allLocations">Alle Standorte</h2>
-              <span class="ui-workspace-header__subtitle" data-i18n="dashboard.inventorySubtitle">Lauf-, Restore- und Speicherdaten</span>
-            </div>
-            <span class="ui-badge" id="dashboard-selection-count"></span>
-          </header>
-          <div id="backup-grid" class="dashboard-table-wrap ui-table-wrap">
-            <div class="loading-spinner">
-              <div class="spinner"></div>
-              <span data-i18n="dashboard.loading">Lade Backup-Status...</span>
-            </div>
-          </div>
-        </section>
-      </div>
+      <section class="management-panel" aria-labelledby="dashboard-trend-title">
+        <header class="management-heading"><h2 id="dashboard-trend-title" data-i18n="management.trends">Entwicklung</h2>
+          <label><span data-i18n="management.period">Zeitraum</span> <select id="dashboard-period"><option value="7" data-i18n="management.days7">7 Tage</option><option value="30" selected data-i18n="management.days30">30 Tage</option><option value="90" data-i18n="management.days90">90 Tage</option></select></label>
+        </header>
+        <div id="dashboard-trends" aria-live="polite"></div>
+      </section>
+      <section class="management-panel" aria-labelledby="dashboard-locations-title">
+        <header class="management-heading"><h2 id="dashboard-locations-title" data-i18n="dashboard.locations">Standorte</h2><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-i18n="management.openJobs">Jobs öffnen</button></header>
+        <div id="dashboard-locations" class="ui-table-wrap"></div>
+      </section>
+
     </div>
 
     <!-- Jobs Page -->

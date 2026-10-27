@@ -184,3 +184,12 @@ test('cancelled reports are labelled explicitly and older runners cannot receive
   assert.equal(f.requests.filter(([, method]) => method === 'POST').length,0);
   assert.equal(f.context._rtStatus({test_result:'failed',failure_code:'RT_CANCELLED'}).label,'Cancelled');
 });
+
+for (const language of ['de', 'en']) test(`cancelled attempt is explicit in planning (${language})`, () => {
+  const f = fixture(language);
+  f.plan.jobs[0].last_test_date = '2026-10-27 10:14:22';
+  f.plan.jobs[0].last_test_result = 'cancelled';
+  f.context.renderRestorePlan(f.plan);
+  assert.match(f.row('alpha'), language === 'de' ? /Abgebrochen/ : /Cancelled/);
+  assert.match(f.row('alpha'), /2026-10-27 10:14:22/);
+});
