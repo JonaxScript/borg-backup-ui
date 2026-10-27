@@ -202,6 +202,9 @@
           <h1 data-i18n="dashboard.title">Dashboard</h1>
           <p class="page-subtitle" data-i18n="dashboard.subtitle">Backup-Übersicht</p>
         </div>
+        <div class="management-toolbar dashboard-location-control"><label for="dashboard-location-filter" data-i18n="dashboard.locations">Standorte</label>
+          <select id="dashboard-location-filter"><option value="all" data-i18n="dashboard.allLocations">Alle Standorte</option><option value="local" data-i18n="jobs.locationLocal">Lokal</option><option value="usb" data-i18n="jobs.locationUsb">USB</option><option value="smb" data-i18n="jobs.locationSmb">SMB</option><option value="storagebox" data-i18n="jobs.locationStoragebox">Storagebox (SSH)</option></select>
+        </div>
         <div class="header-actions">
           <span id="last-refresh" class="refresh-label"></span>
           <button class="btn btn-secondary" id="refresh-btn">
@@ -212,10 +215,6 @@
             <span data-i18n="dashboard.refresh">Aktualisieren</span>
           </button>
         </div>
-      </div>
-      <div class="management-toolbar"><label for="dashboard-location-filter" data-i18n="dashboard.locations">Standorte</label>
-        <select id="dashboard-location-filter"><option value="all" data-i18n="dashboard.allLocations">Alle Standorte</option><option value="local" data-i18n="jobs.locationLocal">Lokal</option><option value="usb" data-i18n="jobs.locationUsb">USB</option><option value="smb" data-i18n="jobs.locationSmb">SMB</option><option value="storagebox" data-i18n="jobs.locationStoragebox">Storagebox (SSH)</option></select>
-        <span data-i18n="management.scopeHint">Kennzahlen für die gewählten Standorte</span>
       </div>
       <div class="dashboard-summary-pair">
         <section class="dashboard-summary-section">
@@ -230,18 +229,18 @@
           <div class="dashboard-summary-title" data-i18n="management.activeRuns">Aktive Läufe</div>
           <div id="dashboard-active-runs" class="dashboard-summary-content"></div>
         </section>
+        <section id="dashboard-resources" class="dashboard-resources" aria-labelledby="resource-title">
+          <header class="resource-header">
+            <h2 id="resource-title" data-i18n="resources.title">Server-Auslastung</h2>
+            <span id="resource-live" class="resource-live"></span>
+          </header>
+          <div id="resource-values" class="resource-values"></div>
+          <div class="resource-footer">
+            <span id="resource-active"></span>
+            <button type="button" id="resource-history-toggle" aria-expanded="false" aria-controls="resource-history" data-i18n="resources.showHistory">Verlauf anzeigen</button>
+          </div>
+        </section>
       </div>
-      <section id="dashboard-resources" class="dashboard-resources" aria-labelledby="resource-title">
-        <header class="resource-header">
-          <h2 id="resource-title" data-i18n="resources.title">Server-Auslastung</h2>
-          <span id="resource-live" class="resource-live"></span>
-        </header>
-        <div id="resource-values" class="resource-values"></div>
-        <div class="resource-footer">
-          <span id="resource-active"></span>
-          <button type="button" id="resource-history-toggle" aria-expanded="false" aria-controls="resource-history" data-i18n="resources.showHistory">Verlauf anzeigen</button>
-        </div>
-      </section>
       <section id="resource-activity" class="resource-activity" aria-labelledby="resource-title" hidden>
         <div id="resource-runs" class="resource-runs" hidden></div>
         <div id="resource-tests" class="resource-tests" hidden></div>

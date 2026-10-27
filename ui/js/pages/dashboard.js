@@ -251,7 +251,8 @@ function renderSummaryBar(backups) {
 }
 
 /**
- * Render verification scope explicitly; missing metadata stays unknown, never verified.
+ * Render verification scope explicitly and retain focus on the test-plan link during refresh.
+ * Missing metadata stays unknown, never verified.
  * @param {object[]} backups Current rows; coverage includes all jobs, while the plan ratio excludes unplanned/unknown states.
  */
 function renderRestoreVerificationSummary(backups) {
@@ -271,12 +272,13 @@ function renderRestoreVerificationSummary(backups) {
   ];
   const states = {verified: 'success', stale: 'warning', failed: 'error', never: 'unknown', not_required: 'neutral', unknown: 'unknown'};
   const description = dashboardT('dashboard.restoreCoverageDescription', {count: counts.verified, total: backups.length});
-  el.innerHTML = `<div class="dashboard-restore-coverage">
+  patchJobMarkup(el, `<div class="dashboard-restore-coverage">
     <div class="dashboard-summary-primary"><strong>${counts.verified}</strong><span>${escHtml(dashboardT('dashboard.restoreCoverageTotal', {total: backups.length}))}</span></div>
     <div class="dashboard-coverage-track" role="img" aria-label="${escHtml(description)}">${Object.entries(counts).map(([state, count]) => `<span class="${states[state]}"></span>`.repeat(count)).join('')}</div>
     <div class="dashboard-coverage-caption"><span>${escHtml(dashboardT('dashboard.restorePlansVerified', {count: counts.verified, total}))}</span><span>${escHtml(dashboardT('dashboard.restoreUnplannedCount', {count: counts.not_required}))}</span></div>
     <div class="dashboard-restore-exceptions">${rows.slice(1).filter(row => row.count).map(row => `<span class="${row.cls}">${row.count} ${escHtml(row.label)}</span>`).join(' · ')}${counts.unknown ? `<span>${escHtml(dashboardT('dashboard.restoreUnknownCount', {count: counts.unknown}))}</span>` : ''}</div>
-  </div>`;
+    <button type="button" class="dashboard-details-toggle dashboard-tests-link" data-dashboard-page="restore-tests">${escHtml(dashboardT('management.openTests'))} <span aria-hidden="true">→</span></button>
+  </div>`);
 }
 
 /**
@@ -885,16 +887,25 @@ function renderManagementDashboard(backups) {
   };
 }
 
-/** Render actionable saved outcomes with a direct link to the matching job status. */
+/**
+ * Render a compact attention strip; expand full saved messages and job links on demand.
+ * Preserve the disclosure state and focused controls during background refreshes.
+ * @param {object[]} rows Status rows scoped to the selected location.
+ */
 function renderManagementAttention(rows) {
   const el = document.getElementById('dashboard-attention');
   if (!el) return;
   const items = dashboardAttentionItems(rows);
-  const unplanned = rows.filter(b => b.restore_verification_status === 'not_required').length;
+  const first = items[0];
   el.hidden = false;
-  el.innerHTML = `<header class="management-heading"><h2>${escHtml(dashboardT('management.attention'))}</h2><span>${items.length}</span></header>
-    ${items.length ? `<ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button class="btn btn-secondary btn-sm" data-dashboard-jobs="${escHtml(item.backup.key)}" data-location="${escHtml(dashboardLocationKey(item.backup))}">${escHtml(dashboardT('management.openJob'))}</button></li>`).join('')}</ul>` : `<p class="management-note">${escHtml(dashboardT('management.noProblems'))}</p>`}
-    ${unplanned ? `<div class="management-unplanned"><span>${escHtml(dashboardT('dashboard.restoreUnplannedCount', {count: unplanned}))}</span><button class="btn btn-secondary btn-sm" data-dashboard-page="restore-tests">${escHtml(dashboardT('management.openTests'))}</button></div>` : ''}`;
+  const open = el.querySelector('details')?.open || false;
+  patchJobMarkup(el, items.length ? `<details class="dashboard-attention-disclosure ${first.cls}"${open ? ' open' : ''}>
+    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${first.cls === 'error' ? iconX() : iconWarn()}</span>
+      <strong>${escHtml(dashboardT('management.attention'))} · ${items.length}</strong>
+      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · ${escHtml(first.label)}</span>
+      <span class="dashboard-attention-action">${escHtml(dashboardT('dashboard.viewDetails'))}<span class="dashboard-details-chevron" aria-hidden="true">›</span></span></summary>
+    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button class="btn btn-secondary btn-sm" data-dashboard-jobs="${escHtml(item.backup.key)}" data-location="${escHtml(dashboardLocationKey(item.backup))}">${escHtml(dashboardT('management.openJob'))}</button></li>`).join('')}</ul></details>`
+    : `<div class="dashboard-attention-clear"><span class="dashboard-attention-icon" aria-hidden="true">${iconCheck()}</span><strong>${escHtml(dashboardT('management.attention'))}</strong><span>${escHtml(dashboardT('management.noProblems'))}</span></div>`);
 }
 
 /** Reconcile current totals for populated locations, preserving rows and focused actions. */
@@ -908,7 +919,7 @@ function renderManagementLocations(rows) {
     const summary = dashboardBackupSummary(jobs);
     const problems = new Set(dashboardAttentionItems(jobs).map(item => item.backup.key)).size;
     const verified = jobs.filter(b => b.restore_verification_status === 'verified').length;
-    return `<tr id="dashboard-location-${location}"><td><span class="management-location-name"><span class="location-nav-glyph ${location}">${dashboardLocationGlyph(location)}</span>${escHtml(dashboardLocationLabel(location))}</span></td><td>${jobs.length}</td><td>${summary.counts.success}/${jobs.length}</td><td>${problems}</td><td>${verified}/${jobs.length}</td><td><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-location="${location}">${escHtml(dashboardT('management.openJobs'))}</button></td></tr>`;
+    return `<tr id="dashboard-location-${location}"><td><span class="management-location-name"><span class="location-nav-glyph ${location}">${dashboardLocationGlyph(location)}</span>${escHtml(dashboardLocationLabel(location))}</span></td><td>${jobs.length}</td><td>${summary.counts.success}/${jobs.length}</td><td>${problems}</td><td><span class="management-location-coverage"><progress max="${jobs.length}" value="${verified}" aria-label="${escHtml(dashboardT('dashboard.restoreCoverageDescription', {count: verified, total: jobs.length}))}"></progress><span>${verified}/${jobs.length}</span></span></td><td><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-location="${location}">${escHtml(dashboardT('management.openJobs'))}</button></td></tr>`;
   }).join('')}</tbody></table>`);
 }
 
@@ -958,6 +969,18 @@ function dashboardMetricBytes(bytes) {
   return `${new Intl.NumberFormat(window.BBUI.components.i18n.getLanguage(), {maximumFractionDigits: 1}).format(bytes)} ${units[unit]}`;
 }
 
+/**
+ * Render keyboard/touch-accessible chart guidance, retaining its disclosure on refresh.
+ * @param {string} id Stable disclosure ID.
+ * @param {string} titleKey Translation key for the chart title.
+ * @param {string} hintKey Translation key for the calculation or measurement explanation.
+ * @returns {string} Escaped disclosure markup; opening it expands normal document flow.
+ */
+function dashboardChartHeading(id, titleKey, hintKey) {
+  const open = document.getElementById(id)?.open || false;
+  return `<details id="${id}" class="management-chart-info"${open ? ' open' : ''}><summary aria-label="${escHtml(dashboardT(titleKey))} · ${escHtml(dashboardT('dashboard.viewDetails'))}"><h3>${escHtml(dashboardT(titleKey))}</h3><span aria-hidden="true">ⓘ</span></summary><p class="management-note">${escHtml(dashboardT(hintKey))}</p></details>`;
+}
+
 /** Reconcile daily outcomes and measured storage in place, retaining labels and data gaps. */
 function renderDashboardTrends() {
   const el = document.getElementById('dashboard-trends');
@@ -987,13 +1010,13 @@ function renderDashboardTrends() {
   }).join(' ');
   const rate = data.success_rate == null ? '—' : `${new Intl.NumberFormat(window.BBUI.components.i18n.getLanguage(), {maximumFractionDigits:1}).format(data.success_rate)} %`;
   const range = `${data.from} – ${data.to}`;
-  patchJobMarkup(el, `<div class="management-trends-grid"><section><h3>${escHtml(dashboardT('management.runHistory'))}</h3><div class="management-metric"><strong>${rate}</strong><span>${escHtml(dashboardT('management.successRate'))}</span></div>
+  patchJobMarkup(el, `<div class="management-trends-grid"><section>${dashboardChartHeading('dashboard-rate-info', 'management.runHistory', 'management.rateHint')}<div class="management-metric"><strong>${rate}</strong><span>${escHtml(dashboardT('management.successRate'))}</span></div>
     <p class="management-note">${escHtml(dashboardT('management.runCount', {count:data.run_count}))} · ${escHtml(range)}</p>
     <div class="management-bars" role="img" aria-label="${escHtml(dashboardT('management.runCount', {count:data.run_count}))}">${data.daily.map(p => `<div class="management-bar" id="dashboard-day-${escHtml(p.date)}" title="${escHtml(p.date + ': ' + outcomes.map(k => `${p[k]} ${dashboardT(labels[k])}`).join(' · '))}">${outcomes.map(k => `<span class="${k}" style="height:${p[k]/maxRuns*100}%"></span>`).join('')}</div>`).join('')}</div>
     <div class="management-axis"><span>${escHtml(data.from)}</span><span>${escHtml(data.to)}</span></div>
-    <div class="management-legend">${outcomes.map(k => `<span class="${k}"><i></i>${data.counts[k]} ${escHtml(dashboardT(labels[k]))}</span>`).join('')}</div><p class="management-note">${escHtml(dashboardT('management.rateHint'))}</p></section>
-    <section><h3>${escHtml(dashboardT('management.repositoryTrend'))}</h3><div class="management-metric"><strong>${escHtml(complete(last) ? dashboardMetricBytes(last.repository_bytes) : '—')}</strong><span>${escHtml(dashboardT('management.measuredRepositories', {count:last.measured_repositories,total:data.repository_count}))}</span></div>
+    <div class="management-legend">${outcomes.map(k => `<span class="${k}"><i></i>${data.counts[k]} ${escHtml(dashboardT(labels[k]))}</span>`).join('')}</div></section>
+    <section>${dashboardChartHeading('dashboard-storage-info', 'management.repositoryTrend', 'management.repositoryHint')}<div class="management-metric"><strong>${escHtml(complete(last) ? dashboardMetricBytes(last.repository_bytes) : '—')}</strong><span>${escHtml(dashboardT('management.measuredRepositories', {count:last.measured_repositories,total:data.repository_count}))}</span></div>
     <p class="management-note">${escHtml(dashboardT('management.lastMeasurement'))}: ${escHtml(data.repository_last_sample ? dashboardAbsoluteTimestamp(data.repository_last_sample) : '—')}</p>
     ${valid.length ? `<svg class="management-storage-chart" viewBox="0 0 600 150" preserveAspectRatio="none" role="img" aria-label="${escHtml(dashboardT('management.storageRange', {min:dashboardMetricBytes(minBytes),max:dashboardMetricBytes(maxBytes)}))}"><path d="M8 142H592" class="management-chart-axis"/><path d="${path}" class="management-chart-line"/>${singlePoint >= 0 ? `<circle cx="${8 + singlePoint * 584 / Math.max(1, data.daily.length - 1)}" cy="${142 - valid[0].repository_bytes / maxBytes * 126}" r="3" fill="currentColor"/>` : ''}</svg>` : `<div class="management-no-chart">${escHtml(dashboardT('management.noMeasurements'))}</div>`}
-    <div class="management-axis"><span>${escHtml(data.from)}</span><span>${escHtml(data.to)}</span></div><p class="management-note">${escHtml(dashboardT('management.repositoryHint'))}</p></section></div>`);
+    <div class="management-axis"><span>${escHtml(data.from)}</span><span>${escHtml(data.to)}</span></div></section></div>`);
 }

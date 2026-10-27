@@ -161,9 +161,11 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 **Figure 1 – Dashboard with example data:** (1) Current metrics, (2) location filter, (3) historical trends, (4) location overview with links to Jobs.
 
-Three cards show **Latest backup runs**, **Restore coverage** and **Active runs**. The location filter applies to these metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
+Four compact cards show **Latest backup runs**, **Restore coverage**, **Active runs** and **Server resources**. The location filter in the header applies to the first three metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
 
-**Needs attention** shows full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed separately with a link to Restore Tests.
+**Needs attention** shows a compact status strip. When problems exist, **View** expands full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed in the **Restore coverage** card with a link to Restore Tests.
+
+Info icons beside chart titles expand explanations of calculations and data sources and support keyboard access. The normal overview including the location table stays compact on large desktop screens; expanded details, running tests or smaller screens can require scrolling.
 
 **Trends** evaluates saved backup runs over 7, 30 or 90 calendar days including today in the server timezone. Success rate is successful runs / (successful runs + warnings + failures). Skipped, cancelled and unknown runs are counted separately. This historical rate differs from the share of jobs whose current outcome is successful.
 
@@ -173,7 +175,7 @@ During automatic refresh, charts remain visible while new data loads. Trends and
 
 The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
 
-**Server resources** directly below the summary row containing **Latest backup runs** remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
+**Server resources** in the fourth summary card remain global. CPU and RAM are stacked compactly; expandable history below the cards uses the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
 ### 2.6 Unraid Dashboard Widget
 
@@ -187,7 +189,7 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ### 2.7 Server Resources
 
-The section directly below the current summary metrics shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
+The fourth summary card shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
 
