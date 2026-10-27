@@ -887,7 +887,7 @@ Die Seite verwaltet:
 
 ### 8.2 Reiter Planung & Policy
 
-Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Der Standort steht beim Jobnamen; Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
+Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
 
 Öffnen Sie **⋯ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
 

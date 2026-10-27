@@ -224,7 +224,7 @@ Ein Skip erneuert keinen Nachweis. Legacy-Intervalltests bleiben getrennt unter
 **Einstellungen > Restore**. Ohne bisherigen Bericht gibt es keinen entsprechenden
 Überfälligkeits-Reminder.
 
-Die Planung bündelt die Informationen in vier Spalten. **Nachweis & Verlauf** öffnet die Berichte des Jobs. Erfolgreiche Berichte erscheinen als **Wiederherstellungsnachweis** mit Archiv und aufbauendem Prüfumfang L1, L1 + L2 oder L1 + L2 + L3. Die Gültigkeit wird getrennt vom Ergebnis des Versuchs ausgewiesen. Bei einem Abbruch ist ein weiterhin gültiger vorheriger Nachweis direkt erreichbar. Ein Bereich **Technische Nachweise** bündelt Prüfschritte und Logdiagnose; **Prüfdaten anzeigen** öffnet die zugehörigen Werte direkt beim Schritt; vorhandene Berichte bleiben unverändert.
+Die Planung bündelt die Informationen in vier Spalten, gegliedert nach Standort mit Jobanzahl. Leere Standorte werden ausgeblendet; die Standortangabe unter jedem Job entfällt. **Nachweis & Verlauf** öffnet die Berichte des Jobs. Erfolgreiche Berichte erscheinen als **Wiederherstellungsnachweis** mit Archiv und aufbauendem Prüfumfang L1, L1 + L2 oder L1 + L2 + L3. Die Gültigkeit wird getrennt vom Ergebnis des Versuchs ausgewiesen. Bei einem Abbruch ist ein weiterhin gültiger vorheriger Nachweis direkt erreichbar. Ein Bereich **Technische Nachweise** bündelt Prüfschritte und Logdiagnose; **Prüfdaten anzeigen** öffnet die zugehörigen Werte direkt beim Schritt; vorhandene Berichte bleiben unverändert.
 
 ### Testlevel
 

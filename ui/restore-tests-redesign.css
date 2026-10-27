@@ -158,10 +158,10 @@
 #restore-tests-plan-content > .history-table { min-width: 0; table-layout: fixed; }
 #restore-tests-plan-content > .history-table th,
 #restore-tests-plan-content > .history-table td { white-space: normal; overflow-wrap: anywhere; padding: var(--ui-space-3); vertical-align: top; }
-#restore-tests-plan-content > .history-table th:nth-child(1) { width: 21%; }
-#restore-tests-plan-content > .history-table th:nth-child(2) { width: 30%; }
-#restore-tests-plan-content > .history-table th:nth-child(3) { width: 28%; }
-#restore-tests-plan-content > .history-table th:nth-child(4) { width: 21%; }
+#restore-tests-plan-content > .history-table thead th:nth-child(1) { width: 21%; }
+#restore-tests-plan-content > .history-table thead th:nth-child(2) { width: 30%; }
+#restore-tests-plan-content > .history-table thead th:nth-child(3) { width: 28%; }
+#restore-tests-plan-content > .history-table thead th:nth-child(4) { width: 21%; }
 #restore-tests-plan-content td > strong,
 #restore-tests-plan-content td > small { display: block; }
 #restore-tests-plan-content td > small { margin-top: var(--ui-space-1); font-size: var(--ui-font-size-xs); color: var(--ui-color-text-subtle); }
@@ -244,3 +244,12 @@
 .rt-report-diagnostics .rt-step-detail-item { min-width: 0; }
 .rt-report-diagnostics .rt-step-detail-item strong { overflow-wrap: anywhere; }
 .rt-report-card .rt-check-evidence .rt-step-detail-section { margin-top: var(--ui-space-2); }
+
+/* Location headers span the existing four columns, including the mobile layout. */
+#restore-tests-plan-content .rt-plan-location-row th { background: var(--ui-color-surface-subtle); color: var(--ui-color-text); font-size: var(--ui-font-size-sm); text-transform: none; letter-spacing: normal; }
+.rt-plan-location-heading { display: flex; align-items: baseline; gap: var(--ui-space-2); }
+.rt-plan-location-heading > span { color: var(--ui-color-text-subtle); font-weight: 400; }
+@media (max-width: 767px) {
+  #restore-tests-plan-content .rt-plan-location-row { display: block; }
+  #restore-tests-plan-content .rt-plan-location-row th { display: block; width: auto; }
+}

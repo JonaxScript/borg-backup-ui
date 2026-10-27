@@ -511,6 +511,10 @@ function renderRestoreTestsSubtab() {
   if (reportsBtn) reportsBtn.classList.toggle('active', isReports);
 }
 
+/** Render the selected jobs in non-empty location groups with per-job actions.
+ * @param {Object|null} plan Restore-test plan response; unavailable data shows an error.
+ * @returns {void} Replaces the planning summary and table without changing job state.
+ */
 function renderRestorePlan(plan) {
   const summaryEl = document.getElementById('restore-tests-plan-summary');
   const contentEl = document.getElementById('restore-tests-plan-content');
@@ -541,7 +545,13 @@ function renderRestorePlan(plan) {
   summaryEl.innerHTML = `<div class="rt-plan-summary rt-compact-summary">${[['summaryTotal', planSummary.total], ['summaryScheduled', planSummary.scheduled], ['summaryManual', planSummary.manual], ['summaryOff', planSummary.off], ['summaryOverdue', planSummary.overdue]].map(([label, count]) => `<span class="${label === 'summaryOverdue' && count ? 'attention' : ''}"><b>${count}</b> ${escHtml(restoreTestsT(label))}</span>`).join('')}</div>`;
   const legacyRun = document.getElementById('rt-run-btn');
   if (legacyRun) legacyRun.classList.toggle('hidden', !plan.jobs.some(job => job.scheduler_state === 'legacy'));
-  const rows = sortedJobs.map((j) => {
+  const groups = new Map();
+  for (const job of sortedJobs) {
+    const location = String(job.location || '').toLowerCase();
+    if (!groups.has(location)) groups.set(location, []);
+    groups.get(location).push(job);
+  }
+  const rows = [...groups].map(([location, jobs], index) => `<tbody aria-labelledby="rt-plan-location-${index}"><tr class="rt-plan-location-row"><th scope="rowgroup" colspan="4" id="rt-plan-location-${index}"><span class="rt-plan-location-heading"><strong>${escHtml(restoreTestsLocationLabel(location))}</strong><span>${escHtml(restoreTestsJobCount(jobs.length))}</span></span></th></tr>${jobs.map((j) => {
     const p = j.policy || {};
     const mode = String(p.mode || 'off');
     const busy = restoreTestsState.rowBusy[j.job_key];
@@ -555,7 +565,7 @@ function renderRestorePlan(plan) {
     const activeSchedule = ['active', 'legacy'].includes(state);
     const planning = mode === 'scheduled' ? schedule : restoreTestsT(mode === 'manual_only' ? 'manualOnly' : 'off');
     return `<tr class="${running ? 'rt-plan-running' : ''}" data-rt-job-key="${escHtml(j.job_key)}">
-      <td data-label="${escHtml(restoreTestsT('job'))}"><strong>${escHtml(j.name || j.display_name || j.job_key)}</strong><small>${escHtml(restoreTestsLocationLabel(j.location))}</small>${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
+      <td data-label="${escHtml(restoreTestsT('job'))}"><strong>${escHtml(j.name || j.display_name || j.job_key)}</strong>${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('testPlanning'))}" class="rt-plan-schedule"><strong>${escHtml(planning)} · L${Number(p.level || 2)}</strong><small>${escHtml(activeSchedule && j.next_run_at ? `${restoreTestsT('nextTest')}: ${j.next_run_at}` : restoreTestsT('noAutomaticTest'))}</small>${mode === 'scheduled' && !activeSchedule ? `<small class="rt-text-warning">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</small>` : ''}${j.is_overdue ? `<small class="rt-text-warning">${escHtml(restoreTestsT('evidenceDue'))}</small>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('lastTest'))}"><span class="rt-attempt-status ${result.className}">${restoreTestsStatusIcon(result.className)}${escHtml(result.label)}</span><small>${escHtml(j.last_test_date || '—')}</small>${j.last_test_date ? `<button type="button" class="rt-text-button" data-rt-plan-action="reports" data-job-key="${escHtml(j.job_key)}">${escHtml(restoreTestsT('evidenceAndHistory'))} →</button>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('actions'))}"><div class="rt-plan-actions">
@@ -563,8 +573,8 @@ function renderRestorePlan(plan) {
         <details class="rt-plan-menu"><summary aria-label="${escHtml(restoreTestsT('actions'))}">⋯</summary><button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button></details>
       </div></td>
     </tr>`;
-  }).join('');
-  contentEl.innerHTML = `<table class="history-table"><thead><tr>${['job', 'testPlanning', 'lastTest', 'actions'].map(key => `<th>${escHtml(restoreTestsT(key))}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="4">${escHtml(restoreTestsT('noJobs'))}</td></tr>`}</tbody></table>`;
+  }).join('')}</tbody>`).join('');
+  contentEl.innerHTML = `<table class="history-table"><thead><tr>${['job', 'testPlanning', 'lastTest', 'actions'].map(key => `<th>${escHtml(restoreTestsT(key))}</th>`).join('')}</tr></thead>${rows || `<tbody><tr><td colspan="4">${escHtml(restoreTestsT('noJobs'))}</td></tr></tbody>`}</table>`;
 }
 
 function rtScheduleLabel(cron) {
