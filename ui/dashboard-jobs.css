@@ -621,6 +621,8 @@
   font-size: var(--ui-font-size-xs);
 }
 
+/* Let the log viewport scroll instead of setting the grid's minimum width. */
+.group-log-slot { min-width: 0; }
 .group-log-slot:empty { display: none; }
 .group-log-slot .log-panel { margin: 0; }
 .jobs-workspace > .log-panel { margin-top: 0; }

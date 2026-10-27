@@ -866,7 +866,7 @@ function renderJobCard(job) {
             </div>
           </div>
     </div>
-    ${renderJobSavedMessage(job)}
+    ${isRunning ? '' : renderJobSavedMessage(job)}
     <div class="job-workflow" id="job-workflow-${escHtml(job.key)}">${renderBorgRun(job)}</div>
     <div class="job-saved-status" id="job-status-${escHtml(job.key)}">${renderJobSavedStatus(job)}</div>
   </article>`;
@@ -1823,7 +1823,7 @@ function hideJobsMessage() {
   hideEl('jobs-message');
 }
 
-/** Show the complete saved outcome, escaped and explicitly separate from a live run. */
+/** Render the complete escaped saved outcome; the caller chooses banner or disclosure. */
 function renderJobSavedMessage(job) {
   if (!job.saved_status) return '';
   const message = dashboardRunMessage(job.saved_status);
@@ -1831,14 +1831,14 @@ function renderJobSavedMessage(job) {
   return `<div class="job-saved-message ${message.cls}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(message.text)}</p></div>`;
 }
 
-/** Independent saved-status disclosure; workflow expansion and live state are unchanged. */
+/** Disclose saved facts and, during a new run, its previous outcome message. */
 function renderJobSavedStatus(job) {
   if (job.is_utility) return '';
   const open = jobStatusOpen.has(job.key);
   const id = 'job-status-details-' + dashboardDetailsId(job.key);
   const facts = {...job, ...(job.saved_status || {})};
   return `<div class="job-status-toolbar"><span>${escHtml(jobsT('management.savedStatus'))}</span><button class="dashboard-details-toggle" data-jobs-action="toggle-status" data-job-key="${escHtml(job.key)}" aria-expanded="${open}" aria-controls="${id}">${escHtml(jobsT(open ? 'management.hideStatus' : 'management.showStatus'))} ${open ? '⌃' : '⌄'}</button></div>
-    <div id="${id}"${open ? '' : ' hidden'}>${job.saved_status ? '' : `<p class="job-status-empty">${escHtml(jobsT('jobs.neverRun'))}</p>`}${renderDashboardJobDetails(facts)}${facts.backup_overdue ? `<p class="job-status-empty">${escHtml(jobsT('dashboard.backupOverdue'))}</p>` : ''}</div>`;
+    <div id="${id}"${open ? '' : ' hidden'}>${job.running ? renderJobSavedMessage(job) : ''}${job.saved_status ? '' : `<p class="job-status-empty">${escHtml(jobsT('jobs.neverRun'))}</p>`}${renderDashboardJobDetails(facts)}${facts.backup_overdue ? `<p class="job-status-empty">${escHtml(jobsT('dashboard.backupOverdue'))}</p>` : ''}</div>`;
 }
 
 /** Navigate from a dashboard aggregate or problem to Jobs without running any action. */

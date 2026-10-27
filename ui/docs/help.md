@@ -115,7 +115,7 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 
 Der bestehende Jobverlauf mit seinen benannten Schritten und **Details anzeigen** bleibt erhalten. **Status anzeigen** öffnet unabhängig davon direkt unter der Jobkarte die gespeicherten Speicherwerte, Borg- und Repository-Checks, Restore-Nachweise, Archivnamen, letzten Lauf und letztes erfolgreiches Backup. Die beiden Bereiche können gleichzeitig geöffnet sein und bleiben bei Aktualisierungen geöffnet.
 
-Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf; ein neuer aktiver Lauf behält seinen eigenen Betriebszustand. Fehlende Statusdateien werden nicht als Erfolg gewertet.
+Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf. Während eines neuen aktiven Laufs wird diese Meldung nur unter **Status anzeigen** angezeigt; der Betriebszustand zeigt den aktuellen Lauf. Lange Zeilen im Live-Log lassen sich horizontal scrollen, ohne die Job-Kacheln zu verbreitern. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### Job-Wizard
 

@@ -115,7 +115,7 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 
 The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run; a new active run keeps its own operating state. Missing status files never imply success.
+Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
 
 ### Job Wizard
 
