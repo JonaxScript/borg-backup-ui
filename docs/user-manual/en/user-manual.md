@@ -879,9 +879,9 @@ The page manages:
 
 ### 8.2 Planning & Policy Tab
 
-The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location headings with job counts group the table. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
+The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location headings with the shared location icons and job counts group the table. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
 
-Choose **⋯ > Edit plan** for a job to configure its policy, test level and evidence validity. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
+Choose **⋮ > Edit plan** for a job to configure its policy, test level and evidence validity. The floating menu matches the Jobs page without increasing the table row height; Escape or a click outside closes it. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
 
 - **Scheduled:** Choose a daily, weekly or monthly time. Monthly plans use days 1–28. Times use the Unraid server's local timezone.
 - **Manual / Off:** Disable automatic execution. **Test now** remains available for enabled backup jobs.

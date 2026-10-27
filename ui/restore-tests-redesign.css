@@ -169,11 +169,8 @@
 .rt-text-button { display: inline-block; border: 0; padding: var(--ui-space-1) 0; background: transparent; color: var(--ui-color-accent); font: inherit; font-size: var(--ui-font-size-xs); text-align: left; cursor: pointer; }
 .rt-plan-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-1); align-items: start; }
 .rt-plan-actions > .btn { width: auto; min-width: 6rem; white-space: normal; }
-.rt-plan-menu { min-width: 1.75rem; }
-.rt-plan-menu summary { display: grid; place-items: center; min-height: 2rem; padding: 0 var(--ui-space-2); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-sm); cursor: pointer; list-style: none; }
-.rt-plan-menu summary::-webkit-details-marker { display: none; }
-.rt-plan-menu[open] { width: 100%; }
-.rt-plan-menu[open] summary { width: fit-content; margin-bottom: var(--ui-space-1); }
+.rt-plan-menu { flex: 0 0 auto; }
+.rt-plan-popover { position: fixed; inset: auto; margin: 0; padding: 0; max-width: calc(100vw - 16px); }
 .rt-compact-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ui-space-2) var(--ui-space-4); padding: var(--ui-space-3); font-size: var(--ui-font-size-xs); color: var(--ui-color-text-subtle); }
 .rt-compact-summary b { margin: 0; font-size: inherit; color: var(--ui-color-text); }
 .rt-compact-summary .attention { color: var(--ui-state-warning-fg); }
@@ -247,8 +244,8 @@
 
 /* Location headers span the existing four columns, including the mobile layout. */
 #restore-tests-plan-content .rt-plan-location-row th { background: var(--ui-color-surface-subtle); color: var(--ui-color-text); font-size: var(--ui-font-size-sm); text-transform: none; letter-spacing: normal; }
-.rt-plan-location-heading { display: flex; align-items: baseline; gap: var(--ui-space-2); }
-.rt-plan-location-heading > span { color: var(--ui-color-text-subtle); font-weight: 400; }
+.rt-plan-location-heading { display: flex; align-items: center; gap: var(--ui-space-2); }
+.rt-plan-location-heading > .rt-plan-location-count { color: var(--ui-color-text-subtle); font-weight: 400; }
 @media (max-width: 767px) {
   #restore-tests-plan-content .rt-plan-location-row { display: block; }
   #restore-tests-plan-content .rt-plan-location-row th { display: block; width: auto; }

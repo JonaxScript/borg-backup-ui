@@ -551,7 +551,7 @@ function renderRestorePlan(plan) {
     if (!groups.has(location)) groups.set(location, []);
     groups.get(location).push(job);
   }
-  const rows = [...groups].map(([location, jobs], index) => `<tbody aria-labelledby="rt-plan-location-${index}"><tr class="rt-plan-location-row"><th scope="rowgroup" colspan="4" id="rt-plan-location-${index}"><span class="rt-plan-location-heading"><strong>${escHtml(restoreTestsLocationLabel(location))}</strong><span>${escHtml(restoreTestsJobCount(jobs.length))}</span></span></th></tr>${jobs.map((j) => {
+  const rows = [...groups].map(([location, jobs], index) => `<tbody aria-labelledby="rt-plan-location-${index}"><tr class="rt-plan-location-row"><th scope="rowgroup" colspan="4" id="rt-plan-location-${index}"><span class="rt-plan-location-heading"><span class="location-nav-glyph ${escHtml(location)}" aria-hidden="true">${locationIcon(location)}</span><strong>${escHtml(restoreTestsLocationLabel(location))}</strong><span class="rt-plan-location-count">${escHtml(restoreTestsJobCount(jobs.length))}</span></span></th></tr>${jobs.map((j) => {
     const p = j.policy || {};
     const mode = String(p.mode || 'off');
     const busy = restoreTestsState.rowBusy[j.job_key];
@@ -570,7 +570,7 @@ function renderRestorePlan(plan) {
       <td data-label="${escHtml(restoreTestsT('lastTest'))}"><span class="rt-attempt-status ${result.className}">${restoreTestsStatusIcon(result.className)}${escHtml(result.label)}</span><small>${escHtml(j.last_test_date || '—')}</small>${j.last_test_date ? `<button type="button" class="rt-text-button" data-rt-plan-action="reports" data-job-key="${escHtml(j.job_key)}">${escHtml(restoreTestsT('evidenceAndHistory'))} →</button>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('actions'))}"><div class="rt-plan-actions">
         <button type="button" class="btn ${running ? 'btn-danger' : 'btn-primary'} btn-sm" data-rt-plan-action="${running ? 'cancel' : 'run'}" data-job-key="${escHtml(j.job_key)}" aria-busy="${!!cancelling || busy === 'run'}" ${busy || (running ? cancelling || !run?.cancel_allowed : j.enabled === false) ? 'disabled' : ''} title="${escHtml(restoreTestsT(running && !run?.cancel_allowed && !cancelling ? 'cancelUnavailable' : running ? 'cancelTest' : 'testNow'))}">${escHtml(restoreTestsT(running ? cancelling ? 'cancelling' : 'cancelTest' : busy === 'run' ? 'startingTest' : 'testNow'))}</button>
-        <details class="rt-plan-menu"><summary aria-label="${escHtml(restoreTestsT('actions'))}">⋯</summary><button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button></details>
+        <div class="rt-plan-menu"><button type="button" class="job-menu-btn" data-rt-plan-action="menu" data-job-key="${escHtml(j.job_key)}" popovertarget="rt-plan-menu-${escHtml(j.job_key)}" aria-expanded="false" aria-label="${escHtml(restoreTestsT('actions'))}"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></button><div id="rt-plan-menu-${escHtml(j.job_key)}" class="rt-plan-popover" popover="auto"><button type="button" class="job-menu-item" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>${escHtml(restoreTestsT('editPlan'))}</button></div></div>
       </div></td>
     </tr>`;
   }).join('')}</tbody>`).join('');
@@ -752,6 +752,33 @@ async function cancelRestorePlanJob(jobKey) {
   }
 }
 
+/** Toggle the plan action popover beside its button without resizing table rows.
+ * @param {HTMLButtonElement} button Trigger whose popovertarget identifies the panel.
+ * @returns {void} Clamps the panel to the viewport and closes it on scroll/resize.
+ */
+function toggleRTPlanMenu(button) {
+  const menu = document.getElementById(button.getAttribute('popovertarget'));
+  if (!menu) return;
+  if (menu.matches(':popover-open')) { menu.hidePopover(); return; }
+  menu.showPopover();
+  button.setAttribute('aria-expanded', 'true');
+  const trigger = button.getBoundingClientRect();
+  const panel = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(trigger.right - panel.width, window.innerWidth - panel.width - 8))}px`;
+  const below = trigger.bottom + 4;
+  menu.style.top = `${Math.max(8, below + panel.height <= window.innerHeight - 8 ? below : trigger.top - panel.height - 4)}px`;
+  const listeners = new AbortController();
+  const close = () => { if (menu.matches(':popover-open')) menu.hidePopover(); };
+  window.addEventListener('resize', close, {signal: listeners.signal});
+  document.addEventListener('scroll', close, {capture: true, signal: listeners.signal});
+  menu.addEventListener('toggle', event => {
+    if (event.newState === 'closed') {
+      button.setAttribute('aria-expanded', 'false');
+      listeners.abort();
+    }
+  }, {signal: listeners.signal});
+}
+
 function onRestoreTestsPlanClick(event) {
   const btn = event.target.closest('[data-rt-plan-action]');
   if (!btn || btn.disabled) return;
@@ -760,6 +787,8 @@ function onRestoreTestsPlanClick(event) {
   const action = btn.dataset.rtPlanAction || '';
   const jobKey = btn.dataset.jobKey || '';
   if (!jobKey) return;
+  if (action === 'menu') return toggleRTPlanMenu(btn);
+  btn.closest('.rt-plan-popover')?.hidePopover();
   if (action === 'reports') return openRTRJobReports(jobKey);
   if (action === 'edit') return editRestorePlan(jobKey);
   if (action === 'run') return runRestorePlanJob(jobKey);

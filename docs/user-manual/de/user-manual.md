@@ -887,9 +887,9 @@ Die Seite verwaltet:
 
 ### 8.2 Reiter Planung & Policy
 
-Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
+Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit den bekannten Standortsymbolen und Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
 
-Öffnen Sie **⋯ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
+Öffnen Sie **⋮ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. Das schwebende Menü entspricht der Jobs-Seite und vergrößert die Tabellenzeile nicht; Escape oder ein Klick außerhalb schließt es. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
 
 - **Geplant:** Tägliche, wöchentliche oder monatliche Ausführung mit Uhrzeit. Monatliche Pläne verwenden die Tage 1–28. Es gilt die lokale Zeitzone des Unraid-Servers.
 - **Manuell / Aus:** Deaktiviert die automatische Ausführung. **Jetzt testen** bleibt für aktivierte Backup-Jobs verfügbar.

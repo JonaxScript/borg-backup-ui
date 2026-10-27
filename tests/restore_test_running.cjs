@@ -25,7 +25,6 @@ function fixture(language = 'en') {
       getLanguage: () => language,
     } } } },
     document: { getElementById: id => elements.get(id) || null },
-    escHtml: text => String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
     setInterval: () => 1, clearInterval() {}, showMsg: (...args) => messages.push(args), apiErrorMessage: () => 'error',
     fetch: async (url, options = {}) => {
       requests.push([url, options.method || 'GET', options.body && JSON.parse(options.body)]);
@@ -48,6 +47,7 @@ function fixture(language = 'en') {
       return { ok: true, json: async () => url.endsWith('/plan') ? plan : { tests: [] } };
     },
   });
+  vm.runInContext(fs.readFileSync('ui/js/utils/format.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('ui/js/pages/restore-tests.js', 'utf8'), context);
   // Isolate the plan from unrelated report/sidebar/log rendering.
   vm.runInContext(`
@@ -214,7 +214,7 @@ for (const language of ['de', 'en']) test(`evidence distinguishes attempts and c
   const html = f.context.renderRTReportRow(t,0);
   assert.match(html, /rt-proof-document/);
   assert.doesNotMatch(html, /<script>/);
-  assert.match(html, /&lt;script>/);
+  assert.match(html, /&lt;script&gt;/);
   const cancel = {...t,test_result:'failed',failure_code:'RT_CANCELLED'};
   assert.equal(f.context.rtAttemptStatus(cancel).className, 'neutral');
   assert.doesNotMatch(f.context.renderRTReportRow(cancel,1), /rt-proof-document/);
