@@ -16,7 +16,7 @@ function fixture(language = 'en') {
   const messages = [];
   const withRuns = value => ({...value, active_jobs: value.active_jobs || (value.active_job_keys || []).map(job_key => ({job_key, run_id: 'run-' + job_key, run_key: 'restore_test_' + job_key, cancel_allowed: true, cancel_requested: false}))});
   const plan = { jobs: ['alpha', 'beta', 'disabled'].map(job_key => ({
-    job_key, name: job_key, display_name: job_key, location: 'local',
+    job_key, name: job_key, display_name: job_key, location: job_key === 'beta' ? 'usb' : 'local',
     enabled: job_key !== 'disabled', scheduler_state: 'active', policy: { mode: 'scheduled', level: 2 },
   })) };
   const context = vm.createContext({
@@ -25,6 +25,7 @@ function fixture(language = 'en') {
       getLanguage: () => language,
     } } } },
     document: { getElementById: id => elements.get(id) || null },
+    resolveJobIcon: job => job.icon || 'archive', resolveJobIconColor: job => job.icon_color || '',
     setInterval: () => 1, clearInterval() {}, showMsg: (...args) => messages.push(args), apiErrorMessage: () => 'error',
     fetch: async (url, options = {}) => {
       requests.push([url, options.method || 'GET', options.body && JSON.parse(options.body)]);
@@ -48,6 +49,7 @@ function fixture(language = 'en') {
     },
   });
   vm.runInContext(fs.readFileSync('ui/js/utils/format.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('ui/js/pages/dashboard.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('ui/js/pages/restore-tests.js', 'utf8'), context);
   // Isolate the plan from unrelated report/sidebar/log rendering.
   vm.runInContext(`
@@ -87,7 +89,7 @@ test('polling detects scheduled starts, batch transitions and completion without
   await f.context._pollRTRunning();
   assert.match(f.row('alpha'), /btn-danger/);
   assert.match(f.row('beta'), /btn-primary[^>]*aria-busy="false"[^>]*>/);
-  f.state.selectedJob = 'beta';
+  f.state.selectedLocation = 'usb';
   f.setSnapshot({ active_job_keys: ['beta'] });
   await f.context._pollRTRunning();
   assert.equal(f.row('alpha'), undefined);

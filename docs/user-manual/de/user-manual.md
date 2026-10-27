@@ -887,6 +887,8 @@ Die Seite verwaltet:
 
 ### 8.2 Reiter Planung & Policy
 
+Die linke Sidebar filtert beide Reiter nach **Alle Standorte** oder einem belegten Standort und zeigt die jeweilige Jobanzahl. Leere Standorte werden ausgeblendet; verliert der ausgewählte Standort seinen letzten Job, erscheint wieder **Alle Standorte**. Die Jobliste steht rechts; Planzeilen und Prüfberichte zeigen die konfigurierten Job-Symbole und Farben. **Nachweis & Verlauf** öffnet alle Berichte eines Jobs, auch von früheren Standorten. Ein Klick auf einen Standort hebt diese Jobauswahl auf.
+
 Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit den bekannten Standortsymbolen und Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
 
 Öffnen Sie **⋮ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. Das schwebende Menü entspricht der Jobs-Seite und vergrößert die Tabellenzeile nicht; Escape oder ein Klick außerhalb schließt es. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.

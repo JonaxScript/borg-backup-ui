@@ -20,6 +20,7 @@ window.BBUI.restoreTestsState = window.BBUI.restoreTestsState || {
   logState: null,
   logExitCode: null,
   selectedJob: 'all',
+  selectedLocation: 'all',
 };
 const restoreTestsState = window.BBUI.restoreTestsState;
 
@@ -80,37 +81,44 @@ function restoreTestsJobIcon(job) {
   const icon = resolveJobIcon(job);
   const color = resolveJobIconColor(job);
   const colorClass = color ? ` type-icon-color-${color}` : '';
-  return `<span class="type-icon rt-sidebar-job-icon${colorClass}">${typeIcon(icon)}</span>`;
+  return `<span class="type-icon rt-plan-job-icon${colorClass}" aria-hidden="true">${typeIcon(icon)}</span>`;
 }
 
-/** Render the job/location navigation for restore-test planning. */
-function renderRestoreTestsSidebar() {
-  const list = document.getElementById('rt-sidebar-job-list');
-  if (!list) return;
-  const query = String(document.getElementById('rt-sidebar-search')?.value || '').trim().toLowerCase();
-  const jobs = (restoreTestsState.jobs || []).filter((job) => `${job.display_name || ''} ${job.name || ''} ${job.key || ''} ${job.location || ''}`.toLowerCase().includes(query));
-  if (!jobs.length) {
-    list.innerHTML = `<div class="ui-empty rt-sidebar-empty">${escHtml(restoreTestsT('noMatchingJobs'))}</div>`;
-    return;
-  }
-  const planByKey = new Map((restoreTestsState.plan?.jobs || []).map((job) => [String(job.job_key), job]));
-  const allActive = restoreTestsState.selectedJob === 'all';
-  const allEntry = `<button class="rt-sidebar-job is-all ${allActive ? 'is-active' : ''}" data-rt-sidebar-job="all" ${allActive ? 'aria-current="page"' : ''}><span class="location-nav-glyph all">${locationIcon('all')}</span><span><strong>${escHtml(restoreTestsT('allJobs'))}</strong><small>${escHtml(restoreTestsT('overview'))}</small></span><span class="ui-badge">${jobs.length}</span></button>`;
+/** Return occupied locations in the same order as Jobs, including custom targets. */
+function restoreTestsLocations() {
+  const occupied = new Set((restoreTestsState.jobs || []).map(job => String(job.location || '').toLowerCase()));
   const order = ['local', 'usb', 'smb', 'storagebox'];
-  const groups = order.map((location) => {
-    const locationJobs = jobs.filter((job) => String(job.location || '').toLowerCase() === location);
-    if (!locationJobs.length) return '';
-    return `<section class="rt-sidebar-group"><header>${escHtml(restoreTestsLocationLabel(location))}<span>${locationJobs.length}</span></header>${locationJobs.map((job) => {
-      const planJob = planByKey.get(String(job.key));
-      const configured = !!planJob && planJob.enabled !== false && String(planJob.policy?.mode || 'off') !== 'off';
-      const stateClass = planJob?.is_overdue ? 'warning' : configured ? 'success' : 'disabled';
-      const active = restoreTestsState.selectedJob === String(job.key);
-      return `<button class="rt-sidebar-job ${active ? 'is-active' : ''}" data-rt-sidebar-job="${escHtml(job.key)}" ${active ? 'aria-current="page"' : ''}>${restoreTestsJobIcon(job)}<span><strong>${escHtml(job.name || job.display_name || job.key)}</strong><small>${escHtml(job.archive_prefix || '')}</small></span><span class="rt-sidebar-state ${stateClass}"></span></button>`;
-    }).join('')}</section>`;
+  return [...order.filter(location => occupied.has(location)), ...[...occupied].filter(location => !order.includes(location)).sort()];
+}
+
+/** Return to all locations if the selected target no longer contains a job. */
+function normalizeRestoreTestsLocation() {
+  if (restoreTestsState.selectedLocation !== 'all' && !restoreTestsLocations().includes(restoreTestsState.selectedLocation)) {
+    restoreTestsState.selectedLocation = 'all';
+    restoreTestsState.selectedJob = 'all';
+  }
+}
+
+/** Render occupied location filters for both planning and reports; clicks clear job drilldowns. */
+function renderRestoreTestsSidebar() {
+  const list = document.getElementById('rt-sidebar-location-list');
+  if (!list) return;
+  normalizeRestoreTestsLocation();
+  const jobs = restoreTestsState.jobs || [];
+  list.innerHTML = ['all', ...restoreTestsLocations()].map(location => {
+    const count = location === 'all' ? jobs.length : jobs.filter(job => String(job.location || '').toLowerCase() === location).length;
+    const active = restoreTestsState.selectedLocation === location;
+    const label = location === 'all' ? restoreTestsT('allLocations') : restoreTestsLocationLabel(location);
+    return `<button type="button" class="ui-context-nav__item ${active ? 'is-active' : ''}" data-rt-sidebar-location="${escHtml(location)}" ${active ? 'aria-current="page"' : ''}><span class="location-nav-glyph ${escHtml(location)}" aria-hidden="true">${locationIcon(location)}</span><span class="location-nav-copy"><strong>${escHtml(label)}</strong><small>${escHtml(location === 'all' ? restoreTestsT('overview') : restoreTestsJobCount(count))}</small></span><span class="ui-badge location-nav-count">${count}</span></button>`;
   }).join('');
-  list.innerHTML = allEntry + groups;
-  list.querySelectorAll('[data-rt-sidebar-job]').forEach((button) => button.addEventListener('click', () => {
-    restoreTestsState.selectedJob = button.dataset.rtSidebarJob || 'all';
+  list.querySelectorAll('[data-rt-sidebar-location]').forEach(button => button.addEventListener('click', () => {
+    restoreTestsState.selectedLocation = button.dataset.rtSidebarLocation;
+    restoreTestsState.selectedJob = 'all';
+    // A new location selection replaces the previous report location/text scope.
+    const reportLocation = document.getElementById('rt-report-filter-location');
+    if (reportLocation) reportLocation.value = 'all';
+    const reportJob = document.getElementById('rt-report-filter-job');
+    if (reportJob) reportJob.value = '';
     renderRestoreTestsSidebar();
     renderRestorePlan(restoreTestsState.plan);
     renderRestoreTests(restoreTestsState.data || []);
@@ -118,15 +126,17 @@ function renderRestoreTestsSidebar() {
   }));
 }
 
+/** Describe the selected location, or the job whose report history is open. */
 function updateRestoreTestsWorkspace() {
-  const selected = restoreTestsState.selectedJob;
-  const selectedJob = (restoreTestsState.jobs || []).find((job) => String(job.key) === selected);
-  const visibleCount = selected === 'all' ? (restoreTestsState.jobs || []).length : (selectedJob ? 1 : 0);
+  const location = restoreTestsState.selectedLocation;
+  const selectedJob = restoreTestsState.subtab === 'reports'
+    ? (restoreTestsState.jobs || []).find(job => String(job.key) === restoreTestsState.selectedJob) : null;
+  const visibleCount = selectedJob ? 1 : (restoreTestsState.jobs || []).filter(job => location === 'all' || String(job.location || '').toLowerCase() === location).length;
   const title = document.getElementById('rt-workspace-title');
   const count = document.getElementById('rt-workspace-count');
   const kicker = document.getElementById('rt-workspace-kicker');
   const subtitle = document.getElementById('rt-workspace-subtitle');
-  if (title) title.textContent = selectedJob?.display_name || selectedJob?.name || (selected === 'all' ? restoreTestsT('allJobs') : selected);
+  if (title) title.textContent = selectedJob?.display_name || selectedJob?.name || (location === 'all' ? restoreTestsT('allLocations') : restoreTestsLocationLabel(location));
   if (count) count.textContent = restoreTestsJobCount(visibleCount);
   if (kicker) kicker.textContent = restoreTestsT(restoreTestsState.subtab === 'reports' ? 'reportsTab' : 'planTab');
   if (subtitle) subtitle.textContent = restoreTestsT(restoreTestsState.subtab === 'reports' ? 'reportsWorkspaceSubtitle' : 'planWorkspaceSubtitle');
@@ -466,6 +476,7 @@ async function refreshRestoreTests() {
         ...job,
         key: job.job_key,
       }));
+    normalizeRestoreTestsLocation();
     if (runningRes.ok) {
       const runningState = await runningRes.json();
       updateRTRunningJobs(runningState);
@@ -493,6 +504,10 @@ async function refreshRestoreTests() {
 
 function switchRestoreTestsSubtab(tab) {
   restoreTestsState.subtab = tab === 'reports' ? 'reports' : 'plan';
+  if (restoreTestsState.subtab === 'plan') {
+    restoreTestsState.selectedJob = 'all';
+    renderRestoreTests(restoreTestsState.data || []);
+  }
   renderRestoreTestsSubtab();
   updateRestoreTestsWorkspace();
 }
@@ -525,7 +540,7 @@ function renderRestorePlan(plan) {
     return;
   }
   const locOrder = { local: 1, usb: 2, smb: 3, storagebox: 4, custom: 5 };
-  const sortedJobs = [...plan.jobs].filter((job) => restoreTestsState.selectedJob === 'all' || String(job.job_key) === restoreTestsState.selectedJob).sort((a, b) => {
+  const sortedJobs = [...plan.jobs].filter((job) => !job.is_utility && (restoreTestsState.selectedLocation === 'all' || String(job.location || '').toLowerCase() === restoreTestsState.selectedLocation)).sort((a, b) => {
     const la = String(a?.location || '').toLowerCase();
     const lb = String(b?.location || '').toLowerCase();
     const oa = locOrder[la] || 99;
@@ -565,7 +580,7 @@ function renderRestorePlan(plan) {
     const activeSchedule = ['active', 'legacy'].includes(state);
     const planning = mode === 'scheduled' ? schedule : restoreTestsT(mode === 'manual_only' ? 'manualOnly' : 'off');
     return `<tr class="${running ? 'rt-plan-running' : ''}" data-rt-job-key="${escHtml(j.job_key)}">
-      <td data-label="${escHtml(restoreTestsT('job'))}"><strong>${escHtml(j.name || j.display_name || j.job_key)}</strong>${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
+      <td data-label="${escHtml(restoreTestsT('job'))}"><div class="rt-plan-job-identity">${restoreTestsJobIcon(j)}<div><strong>${escHtml(j.name || j.display_name || j.job_key)}</strong>${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</div></div></td>
       <td data-label="${escHtml(restoreTestsT('testPlanning'))}" class="rt-plan-schedule"><strong>${escHtml(planning)} · L${Number(p.level || 2)}</strong><small>${escHtml(activeSchedule && j.next_run_at ? `${restoreTestsT('nextTest')}: ${j.next_run_at}` : restoreTestsT('noAutomaticTest'))}</small>${mode === 'scheduled' && !activeSchedule ? `<small class="rt-text-warning">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</small>` : ''}${j.is_overdue ? `<small class="rt-text-warning">${escHtml(restoreTestsT('evidenceDue'))}</small>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('lastTest'))}"><span class="rt-attempt-status ${result.className}">${restoreTestsStatusIcon(result.className)}${escHtml(result.label)}</span><small>${escHtml(j.last_test_date || '—')}</small>${j.last_test_date ? `<button type="button" class="rt-text-button" data-rt-plan-action="reports" data-job-key="${escHtml(j.job_key)}">${escHtml(restoreTestsT('evidenceAndHistory'))} →</button>` : ''}</td>
       <td data-label="${escHtml(restoreTestsT('actions'))}"><div class="rt-plan-actions">
@@ -803,6 +818,11 @@ async function refreshRestorePlanOnly() {
     ]);
     if (planRes.ok) {
       restoreTestsState.plan = await planRes.json();
+      restoreTestsState.jobs = (restoreTestsState.plan?.jobs || []).filter(job => !job.is_utility).map(job => ({...job, key: job.job_key}));
+      normalizeRestoreTestsLocation();
+      renderRestoreTestsSidebar();
+      renderRestoreTests(restoreTestsState.data || []);
+      updateRestoreTestsWorkspace();
     }
     if (runningRes.ok) {
       const running = await runningRes.json();
@@ -901,6 +921,7 @@ function _getFilteredRTReports(tests) {
   const filtered = [...tests].filter((t) => {
     const key = String(t.job_key || t.type || '').toLowerCase();
     if (restoreTestsState.selectedJob !== 'all' && key !== String(restoreTestsState.selectedJob).toLowerCase()) return false;
+    if (restoreTestsState.selectedLocation !== 'all' && String(t.location || '').toLowerCase() !== restoreTestsState.selectedLocation) return false;
     if (jobNeedle && !`${key} ${restoreTestJobName(t).toLowerCase()}`.includes(jobNeedle)) return false;
     if (location !== 'all' && String(t.location || '').toLowerCase() !== location) return false;
     const stale = t.test_result === 'success' && rtEvidenceStale(t);
@@ -1029,6 +1050,8 @@ function rtReportIdentity(t) {
 /** Open a job's reports without stale filters; optionally expand its evidence by date. */
 function openRTRJobReports(jobKey, evidenceDate = '') {
   restoreTestsState.selectedJob = jobKey;
+  // A job may have reports from former locations; its history must include those too.
+  restoreTestsState.selectedLocation = 'all';
   for (const id of ['job', 'location', 'status', 'range']) {
     const el = document.getElementById(`rt-report-filter-${id}`);
     if (el) el.value = id === 'job' ? '' : 'all';
@@ -1102,7 +1125,7 @@ function renderRTReportRow(t, idx, opened = false) {
   const errorText = !successful && !rtCancelled(t) && t.test_result !== 'skipped' ? restoreTestFailureMessage(t) : '';
   const detailText = t.error_analysis?.error_details || t.failure_hint || '';
   return `<details id="rtr-${idx}" class="rt-report-entry" data-report-identity="${escHtml(rtReportIdentity(t))}" ${opened ? 'open' : ''}>
-    <summary><span class="rt-report-list-job"><strong>${escHtml(restoreTestJobName(t))}</strong><small>${escHtml(t.test_date || '—')} · ${escHtml(restoreTestsLocationLabel(t.location))}</small></span><span class="rt-attempt-status ${status.className}">${restoreTestsStatusIcon(status.className)}${escHtml(status.label)}</span></summary>
+    <summary>${restoreTestsJobIcon(plan || {})}<span class="rt-report-list-job"><strong>${escHtml(restoreTestJobName(t))}</strong><small>${escHtml(t.test_date || '—')} · ${escHtml(restoreTestsLocationLabel(t.location))}</small></span><span class="rt-attempt-status ${status.className}">${restoreTestsStatusIcon(status.className)}${escHtml(status.label)}</span></summary>
     <article class="rt-report-card ${successful ? 'rt-proof-document' : 'rt-attempt-document'}">
       <header class="rt-report-card-head rt-report-hero"><div><div class="rt-report-kicker">Borg Backup UI · ${escHtml(restoreTestsT('report'))}</div><h3 class="rt-report-title">${escHtml(restoreTestsT(successful ? 'restorationEvidence' : 'attemptReport'))}</h3><div class="rt-report-subtitle">${escHtml(restoreTestJobName(t))}</div></div><div class="rt-report-result ${status.className}"><span class="rt-report-result-mark">${restoreTestsStatusIcon(status.className)}</span><strong>${escHtml(status.label)}</strong></div></header>
       <div class="rt-report-verdict"><strong>${escHtml(restoreTestsT(successful ? 'scopePassed' : rtCancelled(t) ? 'cancelledNoEvidence' : 'noNewEvidence'))}</strong>${successful ? `<small>${escHtml(validUntil ? restoreTestsT('proofValidUntil', {date: validUntil}) : restoreTestsT(validity))}${validUntil && rtEvidenceStale(t) ? ` · ${escHtml(restoreTestsT('evidenceExpired'))}` : ''}</small>` : ''}</div>

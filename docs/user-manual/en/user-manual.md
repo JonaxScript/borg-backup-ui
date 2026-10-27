@@ -879,6 +879,8 @@ The page manages:
 
 ### 8.2 Planning & Policy Tab
 
+The left sidebar filters both tabs by **All locations** or an occupied location and shows job counts. Empty locations are hidden; if the selected location loses its final job, the view returns to **All locations**. Jobs appear on the right, with their configured icons and colors in planning and report rows. **Evidence & history** opens all reports for a job, including former locations. Clicking a location clears that job selection.
+
 The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location headings with the shared location icons and job counts group the table. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
 
 Choose **⋮ > Edit plan** for a job to configure its policy, test level and evidence validity. The floating menu matches the Jobs page without increasing the table row height; Escape or a click outside closes it. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.

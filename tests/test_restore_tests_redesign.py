@@ -17,13 +17,13 @@ def test_restore_tests_keeps_sidebar_modes_and_actions() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/restore-tests.js")
     for element_id in (
-        "rt-subtab-plan-btn", "rt-subtab-reports-btn", "rt-sidebar-search",
-        "rt-sidebar-job-list", "restore-tests-plan", "restore-tests-reports",
+        "rt-subtab-plan-btn", "rt-subtab-reports-btn",
+        "rt-sidebar-location-list", "restore-tests-plan", "restore-tests-reports",
         "rt-run-btn", "rt-log-panel", "rt-log-output",
     ):
         assert f'id="{element_id}"' in html
     for contract in (
-        "data-rt-sidebar-job", 'data-rt-plan-action="edit"',
+        "data-rt-sidebar-location", 'data-rt-plan-action="edit"',
         '''data-rt-plan-action="${running ? 'cancel' : 'run'}"''', "/api/restore-tests/policy",
         "/api/restore-tests/run-job", "/api/restore-tests/log/stream",
         "renderRTReportRow", "rtStepChecksumsBlock", "rtStepEntriesBlock",
@@ -31,7 +31,7 @@ def test_restore_tests_keeps_sidebar_modes_and_actions() -> None:
         assert contract in script
 
 
-def test_restore_tests_sidebar_uses_configured_job_icons() -> None:
+def test_restore_tests_rows_use_configured_job_icons() -> None:
     script = _read("ui/js/pages/restore-tests.js")
     assert "resolveJobIcon(job)" in script
     assert "resolveJobIconColor(job)" in script
@@ -45,7 +45,7 @@ def test_restore_tests_layout_is_responsive_and_prioritizes_summaries() -> None:
     assert ".rt-redesign-layout { grid-template-columns: minmax(0, 1fr); }" in css
     assert "@media (max-width: 767px)" in css
     assert ".rt-plan-summary" in css
-    assert ".rt-sidebar-job-list" in css
+    assert "#rt-sidebar-location-list" in css
     assert "overflow-x: auto" in css
     assert "#restore-tests-summary" in css
 

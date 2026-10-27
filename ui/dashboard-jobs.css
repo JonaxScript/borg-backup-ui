@@ -75,7 +75,8 @@
 
 /* Shared location navigation */
 .dashboard-location-sidebar .ui-context-nav__item,
-.jobs-location-sidebar .ui-context-nav__item {
+.jobs-location-sidebar .ui-context-nav__item,
+.rt-location-sidebar .ui-context-nav__item {
   grid-template-columns: 2rem minmax(0, 1fr) auto;
 }
 
