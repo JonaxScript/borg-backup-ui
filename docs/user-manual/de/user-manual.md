@@ -177,6 +177,8 @@ Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive 
 
 **Repository-Speicher** verwendet tatsächliche Größen aus gespeicherten Berichten, je gemeinsam genutztem Repository einmal. Der letzte Messwert wird bis zur nächsten Messung fortgeführt. Fehlende Größen werden nicht durch deduplizierte Archivgrößen ersetzt; unvollständige Messreihen bleiben als Lücken sichtbar. Die Zuordnung folgt der aktuellen Job-Konfiguration, da ältere Berichte keine Repository-ID enthalten. Nach einer Änderung der Repository-Zuordnung sind ältere Werte deshalb nur eingeschränkt vergleichbar. Der letzte Messzeitpunkt steht an der Grafik. Gelöschte Jobs sind nicht Teil dieser Übersicht.
 
+Bei automatischer Aktualisierung bleiben die Diagramme während des Nachladens sichtbar. Entwicklung und Standorttabelle aktualisieren sich direkt, ohne ihre Elemente neu aufzubauen. Standorte ohne zugeordnete Jobs werden im Dashboard-Filter und in der Tabelle ausgeblendet. Entfällt der ausgewählte Standort, wechselt die Ansicht zu allen Standorten.
+
 Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
 Die **Server-Auslastung** am Seitenende bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.

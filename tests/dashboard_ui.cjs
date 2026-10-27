@@ -19,6 +19,7 @@ function dashboard(language = 'de') {
     window: {addEventListener() {}, BBUI: {components: {i18n: {t, getLanguage: () => language}}, core: {state: {}, getSchedulesData: () => ({})}}},
     document: {getElementById: id => elements.get(id), activeElement: null, querySelector: () => null},
     escHtml: value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+    patchJobMarkup: (target, html) => { target.innerHTML = html; },
     locationIcon: location => `<svg data-location-icon="${location}"></svg>`,
     resolveJobIcon: job => job.icon || 'archive',
     resolveJobIconColor: job => job.icon_color || '',
@@ -167,6 +168,16 @@ test('management history discards obsolete responses and clears statistics on fa
   assert.equal(vm.runInContext('dashboardOverview.days', c),7);
   assert.match(elements.get('dashboard-trends').innerHTML,/No complete measurement/);
   assert.doesNotMatch(elements.get('dashboard-trends').innerHTML,/NaN|Infinity/);
+  const previous = elements.get('dashboard-trends').innerHTML;
+  const background = c.refreshDashboardOverview();
+  assert.equal(elements.get('dashboard-trends').innerHTML, previous, 'Same-scope refresh retains the chart while pending');
+  pending[2]({ok:true, json:async()=>payload(7)}); await background;
+  vm.runInContext("dashboardSelectedLocation = 'usb'", c);
+  const changedScope = c.refreshDashboardOverview();
+  assert.match(elements.get('dashboard-trends').innerHTML, /Loading/);
+  assert.doesNotMatch(elements.get('dashboard-trends').innerHTML, /management-trends-grid/);
+  pending[3]({ok:true, json:async()=>({...payload(7), location:'usb'})}); await changedScope;
+  assert.equal(vm.runInContext('dashboardOverview.location', c), 'usb');
   c.fetch = async () => ({ok:false});
   await c.refreshDashboardOverview();
   assert.equal(vm.runInContext('dashboardOverview', c),null);

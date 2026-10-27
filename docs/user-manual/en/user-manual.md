@@ -169,6 +169,8 @@ Three cards show **Latest backup runs**, **Restore coverage** and **Active runs*
 
 **Repository storage** uses actual sizes from saved reports, counting each shared repository once. The last sample is carried forward until the next measurement. Missing sizes are never replaced by deduplicated archive sizes; incomplete series remain gaps. Assignment follows the current job configuration because older reports contain no repository ID. After changing a repository assignment, older values therefore have limited comparability. The chart shows the latest sample time. Deleted jobs are excluded from this overview.
 
+During automatic refresh, charts remain visible while new data loads. Trends and the location table update in place. Locations without assigned jobs are omitted from the dashboard filter and table. If the selected location becomes empty, the view returns to all locations.
+
 The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
 
 **Server resources** at the bottom remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.

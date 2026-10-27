@@ -78,6 +78,74 @@ const { chromium } = require('playwright');
   const cards=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
   assert(cards.every(top=>top===cards[0]));
   await capture('management-dashboard-de');
+  // Background refresh must preserve chart geometry, SVG/table identity and focus.
+  assert.deepEqual(await page.locator('#dashboard-location-filter option').evaluateAll(nodes=>nodes.map(n=>n.value)), ['all','local','usb','storagebox']);
+  assert.equal(await page.locator('#dashboard-locations tbody tr').count(), 3);
+  assert.equal(await page.locator('#dashboard-location-filter option[value="all"]').innerText(), 'Alle Standorte');
+  const stability = await page.evaluate(async () => {
+    const trends = document.getElementById('dashboard-trends');
+    const locations = document.getElementById('dashboard-locations');
+    const bars = trends.querySelector('.management-bars');
+    const svg = trends.querySelector('svg');
+    const line = svg.querySelector('.management-chart-line');
+    const row = document.getElementById('dashboard-location-local');
+    const action = row.querySelector('button');
+    action.focus({preventScroll:true});
+    const height = trends.getBoundingClientRect().height;
+    const savedFetch = window.fetch;
+    let mutations=0;
+    const observer = new MutationObserver(records=>{mutations+=records.length;});
+    for (const node of [trends,locations]) observer.observe(node,{childList:true,subtree:true,attributes:true,characterData:true});
+    const unchanged = [];
+    for (let i=0; i<3; i++) {
+      window.fetch = () => new Promise(resolve=>{window.releaseOverview=resolve;});
+      renderDashboard(BBUI.core.state.data,null);
+      const refresh = refreshDashboardOverview();
+      unchanged.push(bars === trends.querySelector('.management-bars') && height === trends.getBoundingClientRect().height);
+      releaseOverview({ok:true,json:async()=>structuredClone(dashboardOverview)});
+      await refresh;
+      unchanged.push(svg === trends.querySelector('svg') && row === document.getElementById('dashboard-location-local') && action === document.activeElement);
+    }
+    const writes = mutations + observer.takeRecords().length;
+    observer.disconnect();
+    // New values update existing text/paths instead of rebuilding the view.
+    const overview = structuredClone(dashboardOverview);
+    const originalStatus = BBUI.core.state.data.backups[0].status;
+    BBUI.core.state.data.backups[0].status='error';
+    renderDashboard(BBUI.core.state.data,null);
+    dashboardOverview.success_rate=75;
+    dashboardOverview.daily[0].repository_bytes=100*1024**3;
+    const previousPath=line.getAttribute('d');
+    renderDashboardTrends();
+    const changed = svg === trends.querySelector('svg') && line === svg.querySelector('.management-chart-line') && previousPath !== line.getAttribute('d') && row.cells[2].textContent === '4/6' && trends.querySelector('strong').textContent === '75 %';
+    BBUI.core.state.data.backups[0].status=originalStatus;
+    dashboardOverview=overview;
+    window.fetch=savedFetch;
+    renderDashboard(BBUI.core.state.data,null);
+    return {unchanged,writes,changed};
+  });
+  assert(stability.unchanged.every(Boolean));
+  assert.equal(stability.writes,0);
+  assert(stability.changed);
+  // Removing the selected location resets the filter; unaffected rows survive removals.
+  const emptyLocations = await page.evaluate(() => {
+    const data=BBUI.core.state.data;
+    const backups=data.backups;
+    const storagebox=document.getElementById('dashboard-location-storagebox');
+    data.backups=backups.filter(b=>b.location!=='usb');
+    renderDashboard(data,null);
+    const preserved=storagebox===document.getElementById('dashboard-location-storagebox');
+    dashboardSelectedLocation='usb';
+    renderDashboard(data,null);
+    const reset=dashboardSelectedLocation==='all' && document.getElementById('dashboard-location-filter').value==='all' && !document.querySelector('#dashboard-location-filter option[value="usb"]');
+    data.backups=[];
+    renderDashboard(data,null);
+    const empty=document.querySelectorAll('#dashboard-locations tbody tr').length===0 && document.querySelectorAll('#dashboard-location-filter option').length===1;
+    data.backups=backups;
+    renderDashboard(data,null);
+    return {preserved,reset,empty};
+  });
+  assert.deepEqual(emptyLocations,{preserved:true,reset:true,empty:true});
   await page.locator('#dashboard-location-filter').selectOption('usb');
   await page.waitForFunction(()=>dashboardOverview?.location==='usb');
   assert.equal(await page.locator('.dashboard-summary-ring strong').innerText(),'4');
@@ -123,10 +191,11 @@ const { chromium } = require('playwright');
     await capture(`management-jobs-${lang}-${theme}-mobile`);
     await page.evaluate(()=>{BBUI.core.navigate('dashboard');renderDashboard(BBUI.core.state.data,null);});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    assert.equal(await page.locator('#dashboard-location-filter option[value="all"]').innerText(), lang==='de'?'Alle Standorte':'All locations');
     await capture(`management-dashboard-${lang}-${theme}-mobile`);
     await page.evaluate(()=>BBUI.core.navigate('jobs'));
   }
   assert.deepEqual(errors,[]);
-  console.log('Management dashboard / Jobs browser checks passed (DE/EN, desktop/mobile, light/dark, independent disclosures, full errors, live tests).');
+  console.log('Management dashboard / Jobs browser checks passed (DE/EN, desktop/mobile, light/dark, independent disclosures, full errors, live tests, stable refresh, empty locations).');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});

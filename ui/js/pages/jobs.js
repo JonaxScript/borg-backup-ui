@@ -493,11 +493,11 @@ function renderJobOperation(job, now = Date.now() / 1000) {
 }
 
 /**
- * Reconcile generated job markup in place, preserving animations and focused controls.
+ * Reconcile generated job/dashboard markup in place, preserving animations and focused controls.
  * Keys are local element IDs or step IDs; unchanged attributes are never rewritten.
- * Only trusted render-function markup is accepted. Event delegation remains on the grid.
- * @param {Element} target Existing job view container.
- * @param {string} html Escaped markup produced by the job renderers.
+ * Only trusted render-function markup is accepted. Container event delegation is retained.
+ * @param {Element} target Existing view container.
+ * @param {string} html Escaped markup produced by the view renderers.
  */
 function patchJobMarkup(target, html) {
   const template = document.createElement('template');
