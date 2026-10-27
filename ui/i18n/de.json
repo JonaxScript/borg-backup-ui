@@ -2089,7 +2089,7 @@
       "RT_ARCHIVE_MISSING": "Im Repository wurde kein Archiv gefunden.",
       "RT_SAMPLE_RESTORE_FAILED": "Die Restore-Stichprobe ist fehlgeschlagen.",
       "RT_SMB_MOUNT_FAILED": "Die SMB-Freigabe konnte nicht eingehängt werden.",
-      "RT_REPO_UNAVAILABLE": "Das Repository ist nicht erreichbar.",
+      "RT_REPO_UNAVAILABLE": "Das Repository ist nicht erreichbar. Laufwerksverbindung, Einhängung und Zugriffsrechte prüfen und den Test erneut starten. Es wurde kein neuer Testnachweis erstellt.",
       "RT_METADATA_CHECK_FAILED": "Die Archivmetadaten konnten nicht geprüft werden.",
       "RT_MEMORY_LIMIT": "Der Restore-Test hat sein RAM-Limit erreicht und wurde abgebrochen. Das Archiv wurde nicht vollständig verifiziert.",
       "RT_HOST_MEMORY_LOW": "Für den Restore-Test ist zu wenig verfügbarer Host-RAM vorhanden. Andere Last reduzieren oder den Test später ausführen.",

@@ -971,6 +971,8 @@ Running tests are marked directly beside the job with **Running** and a red **Ca
 
 ### 8.5 Reports
 
+If a repository path is unreachable or the filesystem reports an access error (for example, after removing a USB drive without unmounting), the attempt ends as **Unavailable**. The report records the failed reachability step and, where available, the OS error number; subsequent checks remain untested. Check the drive connection, mount and access permissions before retrying. This creates no new restoration evidence.
+
 ![Restore Tests - Reports](../assets/en/current/restore-tests-reports.png)
 
 Reports are retained per run, including failures before a retry. Details identify

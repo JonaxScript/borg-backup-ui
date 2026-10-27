@@ -982,6 +982,8 @@ Laufende Tests sind im Testplan direkt am Job mit **Läuft** und einem roten But
 
 ### 8.5 Prüfberichte
 
+Ist ein Repository-Pfad nicht erreichbar oder meldet das Dateisystem einen Zugriffsfehler (z. B. nach dem Abziehen eines USB-Laufwerks ohne Aushängen), endet der Versuch als **Nicht verfügbar**. Der Bericht enthält den fehlgeschlagenen Erreichbarkeitsschritt und gegebenenfalls die Betriebssystem-Fehlernummer; weitere Schritte bleiben ungetestet. Prüfen Sie Laufwerksverbindung, Einhängung und Zugriffsrechte vor einem erneuten Test. Daraus entsteht kein neuer Wiederherstellungsnachweis.
+
 ![Restore Tests - Prüfberichte](../assets/de/current/restore-tests-reports.png)
 
 Prüfberichte bleiben pro Lauf erhalten, einschließlich Fehlern vor einem erneuten

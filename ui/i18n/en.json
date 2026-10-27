@@ -2089,7 +2089,7 @@
       "RT_ARCHIVE_MISSING": "No archive was found in the repository.",
       "RT_SAMPLE_RESTORE_FAILED": "The restore sample failed.",
       "RT_SMB_MOUNT_FAILED": "The SMB share could not be mounted.",
-      "RT_REPO_UNAVAILABLE": "The repository is unreachable.",
+      "RT_REPO_UNAVAILABLE": "The repository is unreachable. Check the drive connection, mount and access permissions, then retry the test. No new verification evidence was created.",
       "RT_METADATA_CHECK_FAILED": "The archive metadata could not be checked.",
       "RT_MEMORY_LIMIT": "The restore test reached its RAM limit and was stopped. The archive was not fully verified.",
       "RT_HOST_MEMORY_LOW": "Insufficient available host RAM for the restore test. Reduce other workloads or run the test later.",

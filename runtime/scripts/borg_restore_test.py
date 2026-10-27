@@ -26,6 +26,7 @@ import json
 import os
 import random
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -706,7 +707,8 @@ class RestoreTest:
     def _test_repo_locked(self, repo: dict) -> int:
         """Verify under an existing lock; propagate cancellation after SMB cleanup.
 
-        Returns 0=success, 1=failure, 2=skipped or 3=unavailable.
+        Returns 0=success, 1=failure, 2=skipped or 3=unavailable. Local path
+        access errors are reported as unavailable before Borg or secrets are read.
         """
         location = repo["location"]
         path     = repo["path"]
@@ -743,22 +745,39 @@ class RestoreTest:
                                 exit_code=3, reason=f"SMB mount failed: {smb_err}",
                                 steps=steps, failure_code="RT_SMB_MOUNT_FAILED", failure_hint=smb_err)
                     return 3
-            if not path.startswith("ssh://") and not Path(path).is_dir():
+            repository_available = True
+            unavailable_reason = "Repository is not mounted or reachable"
+            access_error = ""
+            if not path.startswith("ssh://"):
+                try:
+                    repository_available = stat.S_ISDIR(Path(path).stat().st_mode)
+                except OSError as exc:
+                    repository_available = False
+                    # Use OS diagnostics only, not exception text that may contain paths/secrets.
+                    access_error = (f"errno {exc.errno}: {os.strerror(exc.errno)}"
+                                    if exc.errno is not None else type(exc).__name__)
+                    unavailable_reason = (
+                        f"Repository path access failed ({access_error}). "
+                        "Check the drive connection, mount and access permissions before retrying."
+                    )
+            if not repository_available:
                 steps.append({
                     "step_id": "repo_reachable",
                     "status": "failed",
                     "duration_ms": 0,
-                    "message": "Repository unreachable",
+                    "message": unavailable_reason,
                     "command": "",
                     "error_code": "RT_REPO_UNAVAILABLE",
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 })
                 self._mark_not_tested(steps, "repo_reachable")
-                self.log(f"  SKIP Repository unavailable: {path}")
+                self.log(f"  SKIP Repository unavailable: {path}; {unavailable_reason}")
                 self._write(key, repo, "unavailable", 0, 0, 0, 0, "unknown", "", {}, [],
-                            exit_code=3, reason="Repository is not mounted or reachable",
+                            exit_code=3, reason=unavailable_reason,
                             steps=steps, failure_code="RT_REPO_UNAVAILABLE",
-                            failure_hint="Repository is not mounted or reachable")
+                            failure_hint=unavailable_reason,
+                            error_category="repository_unavailable",
+                            error_details=unavailable_reason, error_output=access_error)
                 return 3
 
             passphrase = None
