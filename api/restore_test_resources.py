@@ -167,14 +167,22 @@ class MemoryGroup:
             raise
 
 
+def check_cancelled(cancel_requested=None) -> None:
+    """Raise a marked ResourceGuardError when the optional predicate requests cancellation."""
+    if cancel_requested is not None and cancel_requested():
+        raise ResourceGuardError("RT_CANCELLED", "Restore test cancelled by user", cancelled=True)
+
+
 def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
-                reserve_mib: int, log) -> int:
+                reserve_mib: int, log, *, cancel_requested=None) -> int:
     """Serialize protected tests and supervise a separately executed worker.
 
     Limit applies to worker and children together; the small supervisor remains
     outside so it can report OOM failures. Reserve is checked before launch and
     polled during execution; it is not a kernel-enforced reservation for others.
     Unsupported enforcement, insufficient memory and OOM raise ResourceGuardError.
+    The optional cancellation predicate is checked while queued and running;
+    cancellation kills/reaps the worker group before releasing the queue lock.
     """
     limit, reserve = limit_mib * 1024**2, reserve_mib * 1024**2
     if limit_mib < 256 or reserve_mib < 256:
@@ -188,11 +196,17 @@ def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
     try:
         lock_dir.mkdir(parents=True, exist_ok=True)
         with (lock_dir / "restore-test-memory.lock").open("a") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                log("Waiting for the other memory-limited restore test to finish")
-                fcntl.flock(lock, fcntl.LOCK_EX)
+            waiting = False
+            while True:
+                check_cancelled(cancel_requested)
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if not waiting:
+                        log("Waiting for the other memory-limited restore test to finish")
+                        waiting = True
+                    time.sleep(0.1)
             try:
                 if available_memory() < limit + reserve:
                     raise ResourceGuardError("RT_HOST_MEMORY_LOW",
@@ -202,11 +216,13 @@ def run_guarded(command: list[str], env: dict, lock_dir: Path, limit_mib: int,
                 launch = [sys.executable, str(Path(__file__).resolve()), str(group.path), *command]
                 proc = subprocess.Popen(launch, env=env)
                 while proc.poll() is None:
+                    check_cancelled(cancel_requested)
                     group.check_alive()
                     if available_memory() < reserve:
                         group.kill()
                         raise ResourceGuardError("RT_HOST_MEMORY_LOW", "Restore test stopped because available host RAM fell below the reserve")
                     time.sleep(0.1)
+                check_cancelled(cancel_requested)
                 events = group.events()
                 log(f"Final memory counters: oom={events.get('oom', 0)}, oom_kill={events.get('oom_kill', 0)}")
                 if events.get("oom", 0):

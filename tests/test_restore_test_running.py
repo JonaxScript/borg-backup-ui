@@ -42,7 +42,7 @@ def test_running_job_ids_combine_managed_runs_and_current_batch_locks(monkeypatc
     states.clear()
     assert handler._get_rt_running()['active_job_keys'] == ['batch-current', 'first']
     locks.clear()
-    assert handler._get_rt_running() == {'running': False, 'runs': [], 'active_job_keys': []}
+    assert handler._get_rt_running() == {'running': False, 'runs': [], 'active_job_keys': [], 'active_jobs': []}
 
 
 def test_restore_test_plan_running_transitions():

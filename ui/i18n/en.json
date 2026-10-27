@@ -2087,7 +2087,8 @@
       "RT_RESOURCE_CONFIG": "Invalid RAM limit or host reserve. Both require at least 256 MiB; only the limit accepts 0 to explicitly disable protection.",
       "RT_WORKER_INTERRUPTED": "The restore test was interrupted or did not produce a complete report.",
       "RT_UNKNOWN": "The restore test failed for an unknown reason.",
-      "RT_REPO_BUSY": "Repository busy: the test was skipped. Previous verification evidence is preserved."
+      "RT_REPO_BUSY": "Repository busy: the test was skipped. Previous verification evidence is preserved.",
+      "RT_CANCELLED": "The restore test was cancelled. Recoverability was not fully verified."
     },
     "editPlan": "Edit plan",
     "schedule": "Schedule",
@@ -2127,7 +2128,17 @@
     "validationValidity": "Please enter a whole number of at least 1 day.",
     "scheduleHelp": "Schedules use the Unraid server’s local time. Missed or skipped runs are not automatically retried. Test now remains available.",
     "validityHelp": "Evidence validity determines how long a successful restore test is considered current. It does not change the schedule.",
-    "conflictHelp": "A backup and a restore test cannot use the same repository at the same time. The later operation is skipped and its reason is logged."
+    "conflictHelp": "A backup and a restore test cannot use the same repository at the same time. The later operation is skipped and its reason is logged.",
+    "cancelTest": "Cancel",
+    "cancelTitle": "Cancel restore test",
+    "cancelDescription": "The active test will stop. Its status remains active until cleanup finishes.",
+    "cancelConfirm": "Cancel the restore test for \"{job}\"?",
+    "cancelBatch": "This job belongs to an interval batch. The remaining tests in this batch will not start.",
+    "cancelling": "Cancelling…",
+    "cancelled": "Cancelled",
+    "cancelRequested": "Cancellation requested. The test is stopping and cleaning up its resources.",
+    "cancelFailed": "Cancellation failed: {message}",
+    "cancelUnavailable": "Cancellation control is not yet available for this run."
   },
   "settings": {
     "title": "Settings",

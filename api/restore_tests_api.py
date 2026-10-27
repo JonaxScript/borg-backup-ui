@@ -1,5 +1,5 @@
 """
-api/restore_tests_api.py – Restore-Test-Ergebnisse aus .test-Dateien lesen
+Restore-test reports, policies and run-specific cooperative cancellation.
 """
 import json
 import hashlib
@@ -7,6 +7,68 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List
 import re
+
+
+def restore_test_runtime(config: dict) -> dict:
+    """Return managed runs and per-job cancellation identities without side effects.
+
+    Locks identify the current job of a batch and survive UI restarts. Managed
+    single-job runs cover startup. Cancellation requires a runner-owned control
+    record; older runners remain visible but are not advertised as cancellable.
+    """
+    from jobs_api import JobManager, active_resource_locks, _control_state_for_run
+    from job_control import read_control_state
+
+    states = JobManager.get().get_all_states()
+    runs = [{**state, "run_key": key} for key, state in states.items()
+            if key == "restore_test" or key.startswith("restore_test_")]
+    runs.sort(key=lambda row: (bool(row.get("running")), row.get("start_time", "")), reverse=True)
+    active = []
+    for lock in active_resource_locks(config):
+        if lock["operation"] != "restore_test":
+            continue
+        run_id = lock.get("run_id", "")
+        try:
+            control = read_control_state(run_id) if run_id else {}
+        except ValueError:
+            control = {}
+        run_key = control.get("job_key", "")
+        if run_key != "restore_test" and run_key != f"restore_test_{lock['job_key']}":
+            run_key = ""
+        active.append({"job_key": lock["job_key"], "run_key": run_key, "run_id": run_id,
+                       "cancel_allowed": bool(run_key and control.get("cancel_allowed") and not control.get("finished")),
+                       "cancel_requested": bool(control.get("cancel_requested"))})
+    for run in runs:
+        if not run.get("running") or not run["run_key"].startswith("restore_test_"):
+            continue
+        job_key = run["run_key"][len("restore_test_"):]
+        if any(row["job_key"] == job_key and row["run_id"] == run.get("run_id", "") for row in active):
+            continue
+        control = _control_state_for_run(run.get("run_id", ""))
+        active.append({"job_key": job_key, "run_key": run["run_key"], "run_id": run.get("run_id", ""),
+                       "cancel_allowed": bool(control.get("cancel_allowed")),
+                       "cancel_requested": bool(control.get("cancel_requested"))})
+    active = list({(row["job_key"], row["run_id"]): row for row in active}.values())
+    return {**(runs[0] if runs else {"running": False}), "runs": runs,
+            "active_job_keys": sorted({row["job_key"] for row in active}), "active_jobs": active}
+
+
+def cancel_restore_test(config: dict, job_key: str, run_id: str, requested_by: str = "") -> dict:
+    """Request cooperative cancellation of the exact active restore-test run.
+
+    A batch cancellation stops its remaining jobs too. Rejects missing, stale or
+    non-cancellable identities with FileNotFoundError/ValueError/RuntimeError.
+    Writes only the existing run's cancellation marker; never signals a PID.
+    """
+    from job_control import request_cancel
+
+    if not job_key or not run_id:
+        raise ValueError("job_key and run_id are required")
+    active = next((row for row in restore_test_runtime(config)["active_jobs"]
+                   if row["job_key"] == job_key and row["run_id"] == run_id), None)
+    if not active or not active["run_key"]:
+        raise FileNotFoundError("The selected restore-test run is no longer available for cancellation")
+    return request_cancel(active["run_key"], run_id, requested_by=requested_by)
 
 
 def resolve_restore_test_dir(config: dict) -> Path:

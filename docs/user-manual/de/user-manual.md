@@ -999,7 +999,7 @@ erläutert Dry-Run und Standardausgabe. Für die normale Bedienung ist sie nicht
 
 Mit **Jetzt testen** neben einem Job starten Sie den Test manuell mit seinem konfigurierten Testlevel. Verfolgen Sie das Live-Protokoll und prüfen Sie anschließend die **Prüfberichte**. Feste Zeitpläne werden automatisch über Cron ausgeführt. Bei einem aktiven bisherigen globalen Intervallplan steht zusätzlich **Fällige Intervalltests ausführen** zur Verfügung. Wiederholte manuelle Starts desselben Jobs öffnen den vorhandenen Lauf; Repository-Konflikte werden als übersprungen protokolliert.
 
-Laufende Tests sind im Testplan direkt am Job mit **Läuft** und einem roten, vorübergehend deaktivierten Startbutton erkennbar. Die Anzeige wird beim Öffnen und alle zehn Sekunden aktualisiert. Nach Testende steht **Jetzt testen** wieder zur Verfügung. Bei parallelen Tests werden alle betroffenen Jobs markiert; bei globalen Intervallläufen der aktuell geprüfte Job.
+Laufende Tests sind im Testplan direkt am Job mit **Läuft** und einem roten Button **Abbrechen** erkennbar. Nach Bestätigung beendet der Test seine Prozesse und gibt seine Ressourcen frei. Währenddessen zeigt der Button **Wird abgebrochen…**; anschließend steht **Jetzt testen** wieder zur Verfügung. Das Protokoll und der Prüfbericht kennzeichnen den Abbruch ausdrücklich; er ist kein erfolgreicher Restore-Nachweis. Die Anzeige wird beim Öffnen und alle zehn Sekunden aktualisiert. Andere parallel gestartete Tests laufen weiter. Bei einem globalen Intervalllauf beendet **Abbrechen** auch die verbleibende Testserie; darauf weist die Bestätigung hin. Für noch startende oder vor diesem Update gestartete Läufe ohne Abbruchsteuerung bleibt der Button vorübergehend deaktiviert.
 
 ### 8.5 Prüfberichte
 

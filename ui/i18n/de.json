@@ -2087,7 +2087,8 @@
       "RT_RESOURCE_CONFIG": "RAM-Limit oder Hostreserve sind ungültig. Beide benötigen mindestens 256 MiB; nur das Limit erlaubt 0 zum ausdrücklichen Abschalten.",
       "RT_WORKER_INTERRUPTED": "Der Restore-Test wurde unterbrochen oder hat keinen vollständigen Prüfbericht geliefert.",
       "RT_UNKNOWN": "Der Restore-Test ist aus einem unbekannten Grund fehlgeschlagen.",
-      "RT_REPO_BUSY": "Repository belegt: Der Test wurde übersprungen. Der vorherige Testnachweis bleibt erhalten."
+      "RT_REPO_BUSY": "Repository belegt: Der Test wurde übersprungen. Der vorherige Testnachweis bleibt erhalten.",
+      "RT_CANCELLED": "Der Restore-Test wurde abgebrochen. Die Wiederherstellbarkeit wurde nicht vollständig geprüft."
     },
     "editPlan": "Plan bearbeiten",
     "schedule": "Zeitplan",
@@ -2127,7 +2128,17 @@
     "validationValidity": "Bitte eine ganze Zahl von mindestens 1 Tag eingeben.",
     "scheduleHelp": "Der Zeitplan verwendet die lokale Uhrzeit des Unraid-Servers. Verpasste oder übersprungene Termine werden nicht automatisch nachgeholt. Jetzt testen bleibt jederzeit möglich.",
     "validityHelp": "Die Nachweisgültigkeit bestimmt, wie lange ein erfolgreicher Restore-Test als aktuell gilt. Sie verändert den Zeitplan nicht.",
-    "conflictHelp": "Backup und Restore-Test können nicht gleichzeitig dasselbe Repository verwenden. Der später gestartete Vorgang wird übersprungen und mit Begründung protokolliert."
+    "conflictHelp": "Backup und Restore-Test können nicht gleichzeitig dasselbe Repository verwenden. Der später gestartete Vorgang wird übersprungen und mit Begründung protokolliert.",
+    "cancelTest": "Abbrechen",
+    "cancelTitle": "Restore-Test abbrechen",
+    "cancelDescription": "Der aktive Test wird beendet. Die Anzeige bleibt bis zum Abschluss der Aufräumarbeiten aktiv.",
+    "cancelConfirm": "Restore-Test für „{job}“ abbrechen?",
+    "cancelBatch": "Dieser Job gehört zu einem Intervalllauf. Auch die verbleibenden Tests dieses Laufs werden nicht mehr gestartet.",
+    "cancelling": "Wird abgebrochen…",
+    "cancelled": "Abgebrochen",
+    "cancelRequested": "Abbruch angefordert. Der Test wird beendet und räumt seine Ressourcen auf.",
+    "cancelFailed": "Abbruch fehlgeschlagen: {message}",
+    "cancelUnavailable": "Für diesen Lauf ist noch keine Abbruchsteuerung verfügbar."
   },
   "settings": {
     "title": "Einstellungen",
