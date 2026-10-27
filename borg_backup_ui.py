@@ -1005,6 +1005,7 @@ class BackupUIHandler(BaseHTTPRequestHandler):
                 "/api/restore/history/detail": lambda: self._get_restore_history_detail(parsed.query),
                 "/api/reports/jobs": self._get_report_jobs,
                 "/api/reports/data": lambda: self._get_report_data(parsed.query),
+                "/api/reports/overview": lambda: self._get_report_overview(parsed.query),
                 "/api/history/log": lambda: self._get_log_file(parsed.query),
                 "/api/jobs/log/window": lambda: self._get_activity_log(parsed.query),
                 "/api/wizard/job": lambda: self._get_wizard_job(parsed.query),
@@ -2427,6 +2428,14 @@ class BackupUIHandler(BaseHTTPRequestHandler):
     def _get_report_jobs(self) -> dict:
         from reports_api import get_report_jobs
         return {"jobs": get_report_jobs(self.config)}
+
+    def _get_report_overview(self, qs_str: str) -> dict:
+        """Return bounded dashboard aggregates; invalid filters raise ValueError."""
+        from dashboard_overview import get_dashboard_overview
+        from urllib.parse import parse_qs
+        qs = parse_qs(qs_str)
+        return get_dashboard_overview(self.config, int((qs.get("days") or ["30"])[0]),
+                                      (qs.get("location") or ["all"])[0])
 
     def _get_report_data(self, qs_str: str) -> dict:
         from reports_api import get_report_data
@@ -4286,6 +4295,8 @@ btn.addEventListener('click',doRecovery);
             return "restore-history"
         if path == "/api/restore/history/detail":
             return "restore-history-detail"
+        if path == "/api/reports/overview":
+            return "report-overview"
         if path == "/api/reports/data":
             return "report-data"
         if path == "/api/reports/jobs":

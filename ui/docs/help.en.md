@@ -49,19 +49,17 @@ The main menu follows the operating workflow: **Dashboard**, **Jobs**, **Reposit
 
 ## 3. Dashboard
 
-Three compact cards show the latest backup outcomes, restore coverage and server resources. The small ring counts the latest outcome of each job. The location filter also applies to this ring, outcome counts and overdue backups; the selected location appears in the card. Restore segments show verified evidence relative to all backups; the success ratio of known test plans is shown separately. Jobs without a plan and unknown states remain visible. Overdue backups expand directly below the summary. Resource history uses the full width below the three cards: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width below the summary cards, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Restore coverage and server resources remain independent of the location filter.
+Three cards show **Latest backup runs**, **Restore coverage** and **Active runs**. The location filter applies to these metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
 
-**Needs attention** shows error messages, warnings, skipped runs and overdue backups or restore evidence. **View** expands the full messages directly beneath the attention row. The location sidebar retains its icons and filters by Local, USB, SMB or Storagebox. Empty locations are hidden; **All locations** keeps jobs grouped by location.
+**Needs attention** shows full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed separately with a link to Restore Tests.
 
-### Important Columns
+**Trends** evaluates saved backup runs over 7, 30 or 90 calendar days including today in the server timezone. Success rate is successful runs / (successful runs + warnings + failures). Skipped, cancelled and unknown runs are counted separately. This historical rate differs from the share of jobs whose current outcome is successful.
 
-- **Backup:** Job icon with its configured color, job name and latest archive name.
-- **Run status:** Latest result, relative time and duration, plus available error text.
-- **Next run:** Next scheduled run, including group schedules, with a separate overdue indicator.
-- **Restore:** Evidence status and validity.
-- **Repository:** Repository size and **Details** to expand. Details contain source, compressed and deduplicated sizes, growth, the Borg check in the latest run, the stored repository check, restore dates and the full archive name. There is no additional check plan. Expanded details survive refreshes and location or language changes.
+**Repository storage** uses actual sizes from saved reports, counting each shared repository once. The last sample is carried forward until the next measurement. Missing sizes are never replaced by deduplicated archive sizes; incomplete series remain gaps. Assignment follows the current job configuration because older reports contain no repository ID. After changing a repository assignment, older values therefore have limited comparability. The chart shows the latest sample time. Deleted jobs are excluded from this overview.
 
-> [!NOTE] The dashboard displays the latest stored status data. Open **History**, **Reports**, or **Repositories** for technical details.
+The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
+
+**Server resources** at the bottom remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
 ## 4. Storage Targets and Profiles
 
@@ -112,6 +110,12 @@ Select **Import Existing Repository** and then choose a directory within the sto
 ## 6. Backup Jobs
 
 A job connects sources to exactly one existing repository. Encryption belongs to the repository; compression and retention belong to the job.
+
+**Next run** shows the scheduled time. The last run time and duration remain separate values.
+
+The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
+
+Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run; a new active run keeps its own operating state. Missing status files never imply success.
 
 ### Job Wizard
 

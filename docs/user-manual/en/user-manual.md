@@ -157,58 +157,17 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 ## 2. Dashboard
 
-![Current dashboard with demo backup and restore status](../assets/en/dashboard-guide.png)
+Three cards show **Latest backup runs**, **Restore coverage** and **Active runs**. The location filter applies to these metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
 
-**Figure 1 - Dashboard:** (1) Overall backup-run and restore-evidence status, (2) location filter, (3) detailed table for the filtered jobs.
+**Needs attention** shows full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed separately with a link to Restore Tests.
 
-The Dashboard is the central overview of backup state, restore evidence, storage growth, and repository checks.
+**Trends** evaluates saved backup runs over 7, 30 or 90 calendar days including today in the server timezone. Success rate is successful runs / (successful runs + warnings + failures). Skipped, cancelled and unknown runs are counted separately. This historical rate differs from the share of jobs whose current outcome is successful.
 
-### 2.1 Purpose of the Page
+**Repository storage** uses actual sizes from saved reports, counting each shared repository once. The last sample is carried forward until the next measurement. Missing sizes are never replaced by deduplicated archive sizes; incomplete series remain gaps. Assignment follows the current job configuration because older reports contain no repository ID. After changing a repository assignment, older values therefore have limited comparability. The chart shows the latest sample time. Deleted jobs are excluded from this overview.
 
-The Dashboard answers the most important operational questions:
+The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
 
-- Which jobs exist?
-- Which backups were successful, skipped, completed with warnings, or failed?
-- When will a scheduled job run next?
-- Which restore tests are verified, overdue, failed, open, or not scheduled?
-- Which storage and repository data was last recorded?
-- Which jobs need attention?
-
-### 2.2 Areas and Indicators
-
-The page consists of:
-
-- **Latest backup runs:** The location filter applies to the ring, outcome counts and overdue backups. The selected location appears in the card. The small ring counts the latest outcome per job. Successful, skipped, cancelled, unknown, failed and warning outcomes remain distinct. Overdue backups appear separately below the ring; they do not change the latest run outcome.
-- **Restore coverage:** Segments show verified evidence relative to all backups. The success ratio of known test plans is shown separately. Overdue, failed and pending evidence, jobs without a plan and unknown restore states remain distinguishable.
-- **Needs attention:** Shows error messages, warnings, skipped-run reasons and overdue backups or restore evidence. **View** expands the full messages directly beneath the compact attention row. Overdue backups and **Show history** also expand beneath their respective information, without a side panel. Open attention details survive refreshes and language changes.
-- **Location sidebar:** Filters the table and latest backup runs by `All locations`, `Local`, `USB`, `SMB`, and `Storagebox`. Locations without jobs are hidden. **All locations** keeps jobs grouped by location and retains the existing location icons.
-- **Selection card:** Shows the currently selected location and number of backups.
-- **Job table:** Shows each job with its icon and latest archive name, run status, next scheduled run, restore status and repository size. **Details** expands the remaining information. Expanded details survive refreshes and location or language changes.
-- **Refresh:** Reloads dashboard data.
-
-### 2.3 Important Columns
-
-- **Backup:** Job name, configured icon and color, and latest archive name. The full archive name is also available in the details.
-- **Run status:** Latest result, relative time and duration, plus available error or warning text.
-- **Next run:** Next scheduled run, including group schedules; overdue backups are marked separately.
-- **Restore:** Current evidence status and validity, when available.
-- **Repository:** Last recorded repository size and the **Details** control.
-- **Expanded details:** Deduplicated size, source, compressed size, repository size, growth, the Borg check in the latest run and the stored repository check, plus restore dates and archive name. No additional check plan is created; the display uses existing run data. Missing information remains unknown.
-
-### 2.4 Typical Actions
-
-1. Open **Dashboard**.
-2. Check the summaries at the top.
-3. Select a location on the left if you only want to see local, USB, SMB, or Storagebox jobs.
-4. Read the run status and restore status for each job.
-5. Open **Details** for storage values, Borg checks, restore dates and the full archive name.
-6. Click **Refresh** if you expect new data immediately after a run.
-
-### 2.5 Notes and Best Practices
-
-> **Tip:** Use the Dashboard as the daily control point. If all backup and restore counters look plausible, detailed pages only need to be opened when something stands out.
-
-> **Note:** The Dashboard shows the most recently known status data. If a repository is not reachable or a status file is missing, the table may show stale or incomplete values. In that case, check **History**, **Repositories**, and the logs.
+**Server resources** at the bottom remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
 ### 2.6 Unraid Dashboard Widget
 
@@ -222,11 +181,11 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ### 2.7 Server Resources
 
-The third compact card shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
+The section at the bottom shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
 
-Expanded resource history uses the full width below the three cards: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width below the summary cards, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Restore coverage and server resources remain independent of the location filter.
+Expanded resource history uses the full width at the bottom: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width at the bottom, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Server resources remain independent of the location filter.
 
 The RAM bar shows the available share of total RAM; the CPU mini trend remains visible while history is collapsed.
 
@@ -266,6 +225,12 @@ Jobs define which data is backed up and where it is stored. A job contains:
 - **Refresh:** Reloads job list and status.
 - **Live log:** During a running job, output can be followed in the browser.
 - **Cancel job:** Requests a controlled cancellation of the running job.
+
+**Next run** shows the scheduled time. The last run time and duration remain separate values.
+
+The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
+
+Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run; a new active run keeps its own operating state. Missing status files never imply success.
 
 ### 3.3 Start a Job Manually
 

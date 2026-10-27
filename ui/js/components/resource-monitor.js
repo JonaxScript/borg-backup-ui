@@ -145,6 +145,7 @@
     el('resource-values').innerHTML = `<div class="resource-value"><span title="${escHtml(t('cpuScale'))}">${escHtml(t('cpu'))}</span><strong>${escHtml(percent(host.cpu_percent))}</strong>${chart(history, s => s.host.cpu_percent, 100, t('cpu'))}</div>
       <div class="resource-value"><span>${escHtml(t('ram'))}</span><strong>${escHtml(gib(host.memory_available_bytes))}<small> / ${escHtml(gib(host.memory_total_bytes))}</small></strong>
       ${ramRatio === null ? '' : `<progress class="resource-ram-capacity" max="100" value="${ramRatio}" aria-label="${escHtml(t('ramTotal', {total: gib(host.memory_total_bytes)}))}"></progress>`}</div>`;
+    if (typeof renderDashboardActiveRuns === 'function') renderDashboardActiveRuns(runs);
     el('resource-active').textContent = runs === null ? `${t('active')}: ${t('unavailable')}` : t('activeCount', {count: runs.length});
     el('resource-activity').hidden = !active && !tests.length;
     el('resource-runs').hidden = !active;

@@ -165,58 +165,17 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 ## 2. Dashboard
 
-![Aktuelles Dashboard mit Demo-Backup und Restore-Status](../assets/de/dashboard-guide.png)
+Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive Läufe**. Der Standortfilter gilt für diese Kennzahlen, Handlungsbedarf, historische Statistiken und die Standortübersicht. Die erste Karte zählt das letzte gespeicherte Ergebnis pro Job. Restore-Abdeckung zählt gültige Nachweise gegenüber allen Jobs; die Quote innerhalb vorhandener Testpläne steht separat daneben. Fehlende Statusdaten sind kein Erfolg.
 
-**Abbildung 1 - Dashboard:** (1) Gesamtstatus für Backup-Läufe und Restore-Nachweise, (2) Standortfilter, (3) Detailtabelle der gefilterten Jobs.
+**Handlungsbedarf** zeigt vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden separat mit einem Link zu Restore Tests genannt.
 
-Das Dashboard ist die zentrale Übersicht über Backup-Zustand, Restore-Nachweise, Speicherentwicklung und Repository-Prüfungen.
+**Entwicklung** wertet gespeicherte Backup-Läufe über 7, 30 oder 90 Kalendertage einschließlich heute in der Server-Zeitzone aus. Die Erfolgsquote ist erfolgreiche Läufe / (erfolgreiche Läufe + Warnungen + Fehler). Übersprungene, abgebrochene und unbekannte Läufe zählen separat. Das ist eine historische Quote und nicht der Anteil der aktuell erfolgreichen Jobs.
 
-### 2.1 Zweck der Seite
+**Repository-Speicher** verwendet tatsächliche Größen aus gespeicherten Berichten, je gemeinsam genutztem Repository einmal. Der letzte Messwert wird bis zur nächsten Messung fortgeführt. Fehlende Größen werden nicht durch deduplizierte Archivgrößen ersetzt; unvollständige Messreihen bleiben als Lücken sichtbar. Die Zuordnung folgt der aktuellen Job-Konfiguration, da ältere Berichte keine Repository-ID enthalten. Nach einer Änderung der Repository-Zuordnung sind ältere Werte deshalb nur eingeschränkt vergleichbar. Der letzte Messzeitpunkt steht an der Grafik. Gelöschte Jobs sind nicht Teil dieser Übersicht.
 
-Das Dashboard beantwortet die wichtigsten Betriebsfragen:
+Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
-- Welche Jobs existieren?
-- Welche Backups waren erfolgreich, übersprungen, mit Warnung oder fehlerhaft?
-- Wann läuft ein geplanter Job das nächste Mal?
-- Welche Restore-Tests sind verifiziert, überfällig, fehlgeschlagen oder nicht geplant?
-- Welche Speicher- und Repository-Daten sind zuletzt bekannt?
-- Welche Jobs benötigen Aufmerksamkeit?
-
-### 2.2 Bereiche und Anzeigen
-
-Die Seite besteht aus:
-
-- **Letzte Backup-Läufe:** Der Standortfilter gilt auch für den Kreis, die Ergebniszahlen und die überfälligen Backups. Der gewählte Standort steht in der Karte. Der kleine Kreis zählt jeweils das letzte Ergebnis pro Job. Erfolgreiche, übersprungene, abgebrochene, unbekannte und fehlerhafte Läufe sowie Warnungen bleiben unterscheidbar. Überfällige Backups stehen zusätzlich unter dem Kreis; sie ändern das letzte Laufergebnis nicht.
-- **Restore-Abdeckung:** Die Segmente zeigen verifizierte Nachweise im Verhältnis zu allen Backups. Daneben steht die Erfolgsquote der bekannten Testpläne. Überfällige, fehlgeschlagene und offene Nachweise sowie Jobs ohne Testplan oder mit unbekanntem Restore-Status bleiben separat sichtbar.
-- **Handlungsbedarf:** Zeigt Fehlertexte, Warnungen, Gründe für übersprungene Läufe und überfällige Backups oder Restore-Nachweise. **Ansehen** klappt die vollständigen Meldungen direkt unter der kompakten Hinweiszeile auf. Auch überfällige Backups und **Verlauf anzeigen** öffnen ihre Details unter der jeweiligen Information, ohne seitliches Fenster. Geöffnete Hinweise bleiben bei Aktualisierungen und Sprachwechseln offen.
-- **Standort-Sidebar:** Filtert die Tabelle und die letzten Backup-Läufe nach `Alle Standorte`, `Lokal`, `USB`, `SMB` und `Storagebox`. Standorte ohne Jobs werden ausgeblendet. Unter **Alle Standorte** bleiben die Jobs nach Standort gruppiert; die bisherigen Standort-Icons bleiben erhalten.
-- **Auswahlkarte:** Zeigt den aktuell gewählten Standort und die Anzahl der Backups.
-- **Job-Tabelle:** Zeigt Job mit Icon und letztem Archivnamen, Laufstatus, nächsten geplanten Lauf, Restore-Status und Repository-Größe. **Details** klappt weitere Daten auf. Geöffnete Details bleiben beim Aktualisieren, Standort- und Sprachwechsel erhalten.
-- **Aktualisieren:** Lädt Dashboard-Daten neu.
-
-### 2.3 Wichtige Spalten
-
-- **Backup:** Name, konfiguriertes Icon samt Farbe und letzter Archivname. Den vollständigen Archivnamen finden Sie auch in den Details.
-- **Laufstatus:** Ergebnis, relativer Zeitpunkt und Dauer des letzten Laufs sowie vorhandene Fehler- oder Warntexte.
-- **Nächster Lauf:** Nächster geplanter Lauf einschließlich Gruppenzeitplänen; ein überfälliges Backup wird zusätzlich markiert.
-- **Restore:** Aktueller Nachweisstatus und Gültigkeit, sofern vorhanden.
-- **Repository:** Zuletzt bekannte Repository-Größe und Schalter **Details**.
-- **Aufgeklappte Details:** Deduplizierte Größe, Quelle, komprimierte Größe, Repository-Größe, Wachstum, Borg-Check im letzten Lauf und gespeicherter Repository-Check sowie Restore-Daten und Archivname. Es wird kein zusätzlicher Checkplan angelegt; die Anzeige verwendet vorhandene Laufdaten. Fehlende Daten bleiben unbekannt.
-
-### 2.4 Typische Aktionen
-
-1. Öffnen Sie **Dashboard**.
-2. Prüfen Sie oben die Zusammenfassungen.
-3. Wählen Sie links einen Standort, wenn Sie nur lokale, USB-, SMB- oder Storagebox-Jobs sehen möchten.
-4. Lesen Sie pro Job den Laufstatus und Restore-Status.
-5. Öffnen Sie **Details** für Speicherwerte, Borg-Checks, Restore-Daten und den vollständigen Archivnamen.
-6. Klicken Sie auf **Aktualisieren**, wenn Sie unmittelbar nach einem Lauf neue Daten erwarten.
-
-### 2.5 Hinweise und Best Practices
-
-> **Tipp:** Nutzen Sie das Dashboard als täglichen Kontrollpunkt. Wenn alle Backup- und Restore-Zähler plausibel sind, können Detailseiten gezielt nur bei Auffälligkeiten geöffnet werden.
-
-> **Hinweis:** Das Dashboard zeigt die zuletzt bekannten Statusdaten. Wenn ein Repository nicht erreichbar ist oder ein Statusfile fehlt, kann die Tabelle veraltete oder unvollständige Werte anzeigen. Prüfen Sie in diesem Fall **History**, **Repositories** und die Logs.
+Die **Server-Auslastung** am Seitenende bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
 
 ### 2.6 Unraid-Dashboard-Widget
 
@@ -230,11 +189,11 @@ Das Widget liest eine vorberechnete Statusdatei auf dem Flash-Laufwerk. Sein Akt
 
 ### 2.7 Server-Auslastung
 
-Die dritte kompakte Karte zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
+Der Bereich am Seitenende zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
 
 Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
 
-Der aufgeklappte Server-Verlauf nutzt unter den drei Karten die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Laufende Tests erscheinen ebenfalls unter den Übersichtskarten über die volle Inhaltsbreite, mit Jobname, CPU, RAM, Speicherlimit und Hostreserve. Dieser Bereich bleibt auch bei eingeklapptem Verlauf sichtbar und verschwindet, sobald keine aktiven Läufe oder Testmesswerte mehr gemeldet werden. Restore-Abdeckung und Server-Auslastung bleiben standortübergreifend.
+Der aufgeklappte Server-Verlauf nutzt am Seitenende die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Laufende Tests erscheinen ebenfalls am Seitenende über die volle Inhaltsbreite, mit Jobname, CPU, RAM, Speicherlimit und Hostreserve. Dieser Bereich bleibt auch bei eingeklapptem Verlauf sichtbar und verschwindet, sobald keine aktiven Läufe oder Testmesswerte mehr gemeldet werden. Die Server-Auslastung bleibt standortübergreifend.
 
 Der RAM-Balken zeigt den verfügbaren Anteil am gesamten RAM; der CPU-Minitrend bleibt eingeklappt sichtbar.
 
@@ -274,6 +233,12 @@ Jobs definieren, welche Daten wohin gesichert werden. Ein Job enthält:
 - **Aktualisieren:** Lädt Jobliste und Status neu.
 - **Live-Log:** Während eines laufenden Jobs kann die Ausgabe im Browser verfolgt werden.
 - **Job abbrechen:** Fordert einen kontrollierten Abbruch des laufenden Jobs an.
+
+**Nächster Lauf** zeigt den geplanten Termin. Zeitpunkt und Dauer des letzten Laufs bleiben getrennte Angaben.
+
+Der bestehende Jobverlauf mit seinen benannten Schritten und **Details anzeigen** bleibt erhalten. **Status anzeigen** öffnet unabhängig davon direkt unter der Jobkarte die gespeicherten Speicherwerte, Borg- und Repository-Checks, Restore-Nachweise, Archivnamen, letzten Lauf und letztes erfolgreiches Backup. Die beiden Bereiche können gleichzeitig geöffnet sein und bleiben bei Aktualisierungen geöffnet.
+
+Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf; ein neuer aktiver Lauf behält seinen eigenen Betriebszustand. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### 3.3 Job manuell starten
 

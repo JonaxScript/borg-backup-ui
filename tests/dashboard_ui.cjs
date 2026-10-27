@@ -152,3 +152,23 @@ for (const language of ['de', 'en']) {
     assert.doesNotMatch(elements.get('summary-bar').innerHTML, /dashboard-summary-overdue/);
   });
 }
+
+test('management history discards obsolete responses and clears statistics on failure', async () => {
+  const {context: c, elements} = dashboard('en');
+  elements.set('dashboard-trends', {innerHTML: ''});
+  const pending = [];
+  c.fetch = () => new Promise(resolve => pending.push(resolve));
+  const first = c.refreshDashboardOverview();
+  vm.runInContext('dashboardPeriod = 7', c);
+  const second = c.refreshDashboardOverview();
+  const payload = days => ({days, location:'all', from:'2026-10-21', to:'2026-10-27', counts:{success:0,warning:0,error:0,skipped:0,cancelled:0,unknown:0},daily:[{date:'2026-10-27',success:0,warning:0,error:0,skipped:0,cancelled:0,unknown:0,measured_repositories:0,repository_bytes:null}], repository_count:0, unassigned_jobs:0, run_count:0, success_rate:null});
+  pending[1]({ok:true, json:async()=>payload(7)}); await second;
+  pending[0]({ok:true, json:async()=>payload(30)}); await first;
+  assert.equal(vm.runInContext('dashboardOverview.days', c),7);
+  assert.match(elements.get('dashboard-trends').innerHTML,/No complete measurement/);
+  assert.doesNotMatch(elements.get('dashboard-trends').innerHTML,/NaN|Infinity/);
+  c.fetch = async () => ({ok:false});
+  await c.refreshDashboardOverview();
+  assert.equal(vm.runInContext('dashboardOverview', c),null);
+  assert.match(elements.get('dashboard-trends').innerHTML,/could not be loaded/);
+});

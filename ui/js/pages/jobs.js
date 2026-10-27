@@ -176,6 +176,7 @@ async function refreshJobs() {
     jobsState.jobs = (jobsData.jobs || []).map(j => ({
       ...j,
       ...statusMap[j.key] ? {
+        saved_status: { ...statusMap[j.key], ...Object.fromEntries(Object.entries(j).filter(([key]) => key.startsWith('restore_verification_'))) },
         last_status:    statusMap[j.key].status,
         last_time_ago:  statusMap[j.key].time_ago,
         last_timestamp: statusMap[j.key].timestamp,
@@ -444,6 +445,8 @@ function renderJobBackupFooter(job, now) {
 }
 
 const jobWorkflowOpen = new Set();
+const jobStatusOpen = new Set();
+let jobStatusTarget = null;
 
 /** Render the permanently named timeline and optional details below the full job row. */
 function renderBorgRun(job, now = Date.now() / 1000) {
@@ -600,6 +603,15 @@ function renderJobsGrid(jobs) {
       const locationJobs = visible.filter((job) => jobsLocationKey(job) === location);
       return locationJobs.length ? renderJobsLocationGroup(location, locationJobs) : '';
     }).join(''));
+  }
+
+  if (jobStatusTarget) {
+    const card = document.getElementById(`job-card-${jobStatusTarget}`);
+    if (card) {
+      card.scrollIntoView({block: 'center'});
+      card.querySelector('[data-jobs-action="toggle-status"]')?.focus({preventScroll: true});
+      jobStatusTarget = null;
+    }
   }
 
   if (rescuedSlotId) {
@@ -851,7 +863,9 @@ function renderJobCard(job) {
             </div>
           </div>
     </div>
+    ${renderJobSavedMessage(job)}
     <div class="job-workflow" id="job-workflow-${escHtml(job.key)}">${renderBorgRun(job)}</div>
+    <div class="job-saved-status" id="job-status-${escHtml(job.key)}">${renderJobSavedStatus(job)}</div>
   </article>`;
 }
 
@@ -937,6 +951,16 @@ function onJobsGridClick(event) {
   const action = btn.dataset.jobsAction || '';
   const jobKey = btn.dataset.jobKey || '';
 
+  if (action === 'toggle-status') {
+    jobStatusOpen.has(jobKey) ? jobStatusOpen.delete(jobKey) : jobStatusOpen.add(jobKey);
+    const job = jobsState.jobs.find(item => item.key === jobKey);
+    const target = document.getElementById(`job-status-${jobKey}`);
+    if (job && target) {
+      patchJobMarkup(target, renderJobSavedStatus(job));
+      target.querySelector('[data-jobs-action="toggle-status"]')?.focus({preventScroll:true});
+    }
+    return;
+  }
   if (action === 'toggle-workflow') {
     jobWorkflowOpen.has(jobKey) ? jobWorkflowOpen.delete(jobKey) : jobWorkflowOpen.add(jobKey);
     const job = jobsState.jobs.find(item => item.key === jobKey);
@@ -1791,4 +1815,33 @@ function showJobsEmpty(html) {
 
 function hideJobsMessage() {
   hideEl('jobs-message');
+}
+
+/** Show the complete saved outcome, escaped and explicitly separate from a live run. */
+function renderJobSavedMessage(job) {
+  if (!job.saved_status) return '';
+  const message = dashboardRunMessage(job.saved_status);
+  if (!message.cls || !message.text) return '';
+  return `<div class="job-saved-message ${message.cls}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(message.text)}</p></div>`;
+}
+
+/** Independent saved-status disclosure; workflow expansion and live state are unchanged. */
+function renderJobSavedStatus(job) {
+  if (job.is_utility) return '';
+  const open = jobStatusOpen.has(job.key);
+  const id = 'job-status-details-' + dashboardDetailsId(job.key);
+  const facts = {...job, ...(job.saved_status || {})};
+  return `<div class="job-status-toolbar"><span>${escHtml(jobsT('management.savedStatus'))}</span><button class="dashboard-details-toggle" data-jobs-action="toggle-status" data-job-key="${escHtml(job.key)}" aria-expanded="${open}" aria-controls="${id}">${escHtml(jobsT(open ? 'management.hideStatus' : 'management.showStatus'))} ${open ? '⌃' : '⌄'}</button></div>
+    <div id="${id}"${open ? '' : ' hidden'}>${job.saved_status ? '' : `<p class="job-status-empty">${escHtml(jobsT('jobs.neverRun'))}</p>`}${renderDashboardJobDetails(facts)}${facts.backup_overdue ? `<p class="job-status-empty">${escHtml(jobsT('dashboard.backupOverdue'))}</p>` : ''}</div>`;
+}
+
+/** Navigate from a dashboard aggregate or problem to Jobs without running any action. */
+async function openJobsStatus(key = '', location = 'all') {
+  jobsState.selectedLocation = JOBS_LOCATION_ORDER.includes(location) ? location : 'all';
+  if (window.BBUI.jobGroups?.view) {
+    await window.BBUI.jobGroups.view('jobs');
+    if (window.BBUI.jobGroups.state.view !== 'jobs') return;
+  }
+  if (key) { jobStatusOpen.add(key); jobStatusTarget = key; }
+  window.BBUI.core.navigate('jobs');
 }
