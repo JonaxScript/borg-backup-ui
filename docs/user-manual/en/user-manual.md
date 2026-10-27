@@ -173,7 +173,7 @@ During automatic refresh, charts remain visible while new data loads. Trends and
 
 The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
 
-**Server resources** at the bottom remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
+**Server resources** directly below the summary row containing **Latest backup runs** remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
 ### 2.6 Unraid Dashboard Widget
 
@@ -187,11 +187,11 @@ Skipped runs have their own **Skipped** counter. A separate overdue condition st
 
 ### 2.7 Server Resources
 
-The section at the bottom shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
+The section directly below the current summary metrics shows CPU utilization and available RAM for the **entire Unraid host**, including VMs, containers and Borg. 100% CPU means all logical CPU cores combined; I/O wait is not counted as CPU work. Available RAM uses Linux `MemAvailable`, including reclaimable cache, rather than only completely unused memory.
 
 Active runs count backups, restores and restore tests tracked by resource locks, once per run. Browsing requests do not count as runs, but their load is included in host measurements. A protected restore test additionally shows its shared cgroup consumption: CPU, RAM including file cache and child processes, and the actual enforced RAM limit. Waiting tests and tests with protection disabled never inherit another test's measurements. Missing measurements show a dash instead of zero.
 
-Expanded resource history uses the full width at the bottom: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width at the bottom, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Server resources remain independent of the location filter.
+Expanded resource history uses the full width below the server metrics: CPU and RAM appear side by side, stacking on narrow screens. Active tests also appear across the full width below the server metrics, with job name, CPU, RAM, memory limit and host reserve. This area stays visible with history collapsed and disappears when no active runs or test metrics are reported. Server resources remain independent of the location filter.
 
 The RAM bar shows the available share of total RAM; the CPU mini trend remains visible while history is collapsed.
 

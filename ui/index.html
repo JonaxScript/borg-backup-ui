@@ -231,21 +231,6 @@
           <div id="dashboard-active-runs" class="dashboard-summary-content"></div>
         </section>
       </div>
-      <section id="dashboard-attention" class="dashboard-attention" hidden></section>
-      <div id="dashboard-data-dir-warning" class="status-message hidden"></div>
-      <div id="dashboard-system-warning" class="status-message hidden"></div>
-      <div id="dashboard-setup-actions" class="setup-action-panel hidden"></div>
-      <div id="status-message" class="status-message hidden"></div>
-      <section class="management-panel" aria-labelledby="dashboard-trend-title">
-        <header class="management-heading"><h2 id="dashboard-trend-title" data-i18n="management.trends">Entwicklung</h2>
-          <label><span data-i18n="management.period">Zeitraum</span> <select id="dashboard-period"><option value="7" data-i18n="management.days7">7 Tage</option><option value="30" selected data-i18n="management.days30">30 Tage</option><option value="90" data-i18n="management.days90">90 Tage</option></select></label>
-        </header>
-        <div id="dashboard-trends" aria-live="polite"></div>
-      </section>
-      <section class="management-panel" aria-labelledby="dashboard-locations-title">
-        <header class="management-heading"><h2 id="dashboard-locations-title" data-i18n="dashboard.locations">Standorte</h2><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-i18n="management.openJobs">Jobs öffnen</button></header>
-        <div id="dashboard-locations" class="ui-table-wrap"></div>
-      </section>
       <section id="dashboard-resources" class="dashboard-resources" aria-labelledby="resource-title">
         <header class="resource-header">
           <h2 id="resource-title" data-i18n="resources.title">Server-Auslastung</h2>
@@ -262,6 +247,21 @@
         <div id="resource-tests" class="resource-tests" hidden></div>
       </section>
       <div id="resource-history" class="resource-history" role="region" aria-labelledby="resource-title" hidden></div>
+      <section id="dashboard-attention" class="dashboard-attention" hidden></section>
+      <div id="dashboard-data-dir-warning" class="status-message hidden"></div>
+      <div id="dashboard-system-warning" class="status-message hidden"></div>
+      <div id="dashboard-setup-actions" class="setup-action-panel hidden"></div>
+      <div id="status-message" class="status-message hidden"></div>
+      <section class="management-panel" aria-labelledby="dashboard-trend-title">
+        <header class="management-heading"><h2 id="dashboard-trend-title" data-i18n="management.trends">Entwicklung</h2>
+          <label><span data-i18n="management.period">Zeitraum</span> <select id="dashboard-period"><option value="7" data-i18n="management.days7">7 Tage</option><option value="30" selected data-i18n="management.days30">30 Tage</option><option value="90" data-i18n="management.days90">90 Tage</option></select></label>
+        </header>
+        <div id="dashboard-trends" aria-live="polite"></div>
+      </section>
+      <section class="management-panel" aria-labelledby="dashboard-locations-title">
+        <header class="management-heading"><h2 id="dashboard-locations-title" data-i18n="dashboard.locations">Standorte</h2><button class="btn btn-secondary btn-sm" data-dashboard-jobs="" data-i18n="management.openJobs">Jobs öffnen</button></header>
+        <div id="dashboard-locations" class="ui-table-wrap"></div>
+      </section>
 
     </div>
 

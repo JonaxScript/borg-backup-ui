@@ -59,7 +59,7 @@ Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive 
 
 Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
-Die **Server-Auslastung** am Seitenende bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
+Die **Server-Auslastung** direkt unter der Kennzahlenreihe mit **Letzte Backup-Läufe** bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
 
 ## 4. Speicherziele und Profile
 

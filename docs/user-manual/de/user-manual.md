@@ -181,7 +181,7 @@ Bei automatischer Aktualisierung bleiben die Diagramme während des Nachladens s
 
 Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
-Die **Server-Auslastung** am Seitenende bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
+Die **Server-Auslastung** direkt unter der Kennzahlenreihe mit **Letzte Backup-Läufe** bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
 
 ### 2.6 Unraid-Dashboard-Widget
 
@@ -195,11 +195,11 @@ Das Widget liest eine vorberechnete Statusdatei auf dem Flash-Laufwerk. Sein Akt
 
 ### 2.7 Server-Auslastung
 
-Der Bereich am Seitenende zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
+Der Bereich direkt unter den aktuellen Kennzahlen zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
 
 Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
 
-Der aufgeklappte Server-Verlauf nutzt am Seitenende die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Laufende Tests erscheinen ebenfalls am Seitenende über die volle Inhaltsbreite, mit Jobname, CPU, RAM, Speicherlimit und Hostreserve. Dieser Bereich bleibt auch bei eingeklapptem Verlauf sichtbar und verschwindet, sobald keine aktiven Läufe oder Testmesswerte mehr gemeldet werden. Die Server-Auslastung bleibt standortübergreifend.
+Der aufgeklappte Server-Verlauf nutzt unterhalb der Server-Metriken die volle Breite: CPU und RAM stehen nebeneinander, auf schmalen Bildschirmen untereinander. Laufende Tests erscheinen ebenfalls unterhalb der Server-Metriken über die volle Inhaltsbreite, mit Jobname, CPU, RAM, Speicherlimit und Hostreserve. Dieser Bereich bleibt auch bei eingeklapptem Verlauf sichtbar und verschwindet, sobald keine aktiven Läufe oder Testmesswerte mehr gemeldet werden. Die Server-Auslastung bleibt standortübergreifend.
 
 Der RAM-Balken zeigt den verfügbaren Anteil am gesamten RAM; der CPU-Minitrend bleibt eingeklappt sichtbar.
 

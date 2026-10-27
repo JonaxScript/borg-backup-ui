@@ -59,7 +59,7 @@ Three cards show **Latest backup runs**, **Restore coverage** and **Active runs*
 
 The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
 
-**Server resources** at the bottom remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
+**Server resources** directly below the summary row containing **Latest backup runs** remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
 ## 4. Storage Targets and Profiles
 
