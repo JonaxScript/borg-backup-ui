@@ -879,13 +879,15 @@ The page manages:
 
 ### 8.2 Planning & Policy Tab
 
-Choose **Edit plan** for a job to configure its policy, test level and evidence validity.
+The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location is shown with the job name; schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
+
+Choose **⋯ > Edit plan** for a job to configure its policy, test level and evidence validity. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
 
 - **Scheduled:** Choose a daily, weekly or monthly time. Monthly plans use days 1–28. Times use the Unraid server's local timezone.
 - **Manual / Off:** Disable automatic execution. **Test now** remains available for enabled backup jobs.
 - **Evidence valid (days):** How long a successful scheduled test remains current. This is separate from the execution schedule.
 - **Next test:** The next calendar start; a manual test does not shift it.
-- **Automatic:** **Active** means the saved trigger is actually installed in cron. **Inactive** means installation failed or the entry is missing; save the plan again to retry.
+- **Test planning:** The next automatic execution is shown only for an installed cron trigger. **Inactive** or **No schedule** indicates missing setup; save the plan again to retry. **Evidence due** remains visible independently of the next execution.
 
 Saving creates or updates the cron entry. Startup reapplies the saved schedules without duplicating entries or replacing unrelated cron jobs. If cron installation fails, the saved policy is retained and the error is displayed.
 
@@ -981,21 +983,13 @@ remove that history. Text logs live in the configured log directory as
 `Borg-Restore-Test--<timestamp>-<PID>.log`. Lifecycle events go to the application
 log `/var/log/borg_backup_ui.log`, not automatically to Unraid syslog.
 
-The **Reports** tab shows structured evidence for completed restore tests:
+The **Test reports** tab shows individual attempts as expandable rows. Details open directly below across the content width. Job, location, result and date filters remain available; **Cancelled** is a separate result filter.
 
-- overall status
-- verification scope
-- execution
-- coverage
-- individual check steps
-- technical evidence
+A successful run is presented as **Restoration evidence**, identifying the actual archive, repository, timestamp, duration and documented scope. Levels are cumulative: **L1**, **L1 + L2** and **L1 + L2 + L3**. Each level displays its recorded result; excluded levels and missing legacy report details are explicitly identified. L3 identifies sample files read and SHA-256 hashes recorded without claiming an independent expected-hash comparison. Technical steps, file lists, hashes and the log file remain available in expandable details.
 
-Typical status values:
+**Successful**, **Failed**, **Cancelled**, **Skipped** and **Unavailable** describe the attempt. Evidence validity is shown separately; expiry does not change a historically successful test into a failed test. Cancellation creates no new evidence. When the server confirms that previous evidence remains valid and its report is available, **Open valid evidence** opens that report directly. An intervening real failure or expired evidence is not hidden.
 
-- **Successful / Verified**
-- **Overdue**
-- **Failed**
-- **Not available**
+Evidence establishes only the documented archive and test scope, not full application recovery or VM startup. Existing reports are not rewritten for the new presentation.
 
 For restore tests at level 2 or above, the configured archive size selects the dry-run mode: below the threshold, the full archive is checked; at or above it, a file sample is checked in groups. The default threshold is 500 GB; 0 disables switching. The former special rule for the `photos` and `vms` types is removed.
 

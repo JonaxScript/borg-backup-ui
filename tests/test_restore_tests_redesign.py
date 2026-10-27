@@ -58,9 +58,9 @@ def test_verification_report_matches_approved_detail_hierarchy() -> None:
         "rt-steps-heading", "rt-technical-evidence", "renderRTTechnicalEvidence",
     ):
         assert contract in script or contract in css
-    assert "const successful = t.test_result === 'success'" in script
+    assert "const successful = t.test_result === 'success' && !rtCancelled(t)" in script
     assert "function restoreTestsStatusIcon(status)" in script
-    assert "restoreTestsStatusIcon(successful ? 'success' : 'error')" in script
+    assert "restoreTestsStatusIcon(status.className)" in script
     assert "successful ? '&#10003;' : '!'" not in script
     assert ".rt-report-result-mark svg" in css
     assert ".rt-report-result.error .rt-report-result-mark { color: var(--ui-state-error-fg); }" in css

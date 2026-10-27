@@ -887,13 +887,15 @@ Die Seite verwaltet:
 
 ### 8.2 Reiter Planung & Policy
 
-Öffnen Sie **Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen.
+Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Der Standort steht beim Jobnamen; Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
+
+Öffnen Sie **⋯ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
 
 - **Geplant:** Tägliche, wöchentliche oder monatliche Ausführung mit Uhrzeit. Monatliche Pläne verwenden die Tage 1–28. Es gilt die lokale Zeitzone des Unraid-Servers.
 - **Manuell / Aus:** Deaktiviert die automatische Ausführung. **Jetzt testen** bleibt für aktivierte Backup-Jobs verfügbar.
 - **Nachweis gültig (Tage):** Wie lange ein erfolgreicher geplanter Test als aktuell gilt. Diese Einstellung ist vom Ausführungszeitplan getrennt.
 - **Nächster Test:** Nächster Kalendertermin; ein manueller Test verschiebt ihn nicht.
-- **Automatik:** **Aktiv** bedeutet, dass der gespeicherte Cron-Aufruf tatsächlich eingerichtet ist. Bei **Nicht aktiv** ist die Einrichtung fehlgeschlagen oder der Eintrag fehlt; speichern Sie den Plan erneut.
+- **Testplanung:** Der nächste automatische Termin erscheint nur bei eingerichtetem Cron-Aufruf. **Nicht aktiv** oder **Plan fehlt** weist auf eine fehlende Einrichtung hin; speichern Sie den Plan erneut. **Nachweis fällig** bleibt unabhängig vom nächsten Termin sichtbar.
 
 Beim Speichern wird der Cron-Eintrag erstellt oder aktualisiert. Beim Start werden gespeicherte Zeitpläne ohne doppelte Einträge und unter Beibehaltung fremder Cron-Jobs wieder eingerichtet. Schlägt die Cron-Einrichtung fehl, bleibt die Policy gespeichert und der Fehler wird angezeigt.
 
@@ -993,21 +995,13 @@ Historie nicht. Textprotokolle liegen im konfigurierten Logverzeichnis
 (`Borg-Restore-Test--<Zeitstempel>-<PID>.log`), Ablaufmeldungen im Anwendungslog
 `/var/log/borg_backup_ui.log`; sie werden nicht automatisch in den Unraid-Syslog kopiert.
 
-Der Reiter **Prüfberichte** zeigt strukturierte Nachweise abgeschlossener Restore-Tests:
+Der Reiter **Prüfberichte** zeigt die einzelnen Versuche als aufklappbare Zeilen. Details öffnen sich direkt darunter über die gesamte Inhaltsbreite. Filter für Job, Standort, Ergebnis und Zeitraum bleiben verfügbar; **Abgebrochen** ist ein eigener Ergebnisfilter.
 
-- Gesamtstatus
-- Prüfumfang
-- Ausführung
-- Abdeckung
-- einzelne Prüfschritte
-- technische Nachweise
+Ein erfolgreicher Lauf wird als **Wiederherstellungsnachweis** dargestellt. Er nennt das tatsächlich geprüfte Archiv, Repository, Zeitpunkt, Dauer und den dokumentierten Umfang. Die Teststufen bauen aufeinander auf: **L1**, **L1 + L2** und **L1 + L2 + L3**. Jede Stufe zeigt ihr belegtes Ergebnis; nicht ausgewählte Stufen und fehlende Angaben älterer Berichte werden ausdrücklich gekennzeichnet. L3 weist ausgelesene Stichprobendateien und erfasste SHA-256-Werte aus, ohne einen unabhängigen Sollwertvergleich zu behaupten. Technische Prüfschritte, Dateilisten, Prüfsummen und die Logdatei bleiben einklappbar verfügbar.
 
-Typische Statuswerte:
+**Erfolgreich**, **Fehlgeschlagen**, **Abgebrochen**, **Übersprungen** und **Nicht verfügbar** beschreiben den Versuch. Die Nachweisfrist wird getrennt davon dargestellt; ein historisch erfolgreicher Test wird durch Fristablauf nicht zu einem fehlgeschlagenen Test. Ein Abbruch erzeugt keinen neuen Nachweis. Bestätigt der Server einen weiterhin gültigen vorherigen Nachweis und liegt dessen Bericht vor, führt **Gültigen Nachweis öffnen** direkt dorthin. Ein vorheriger echter Fehler oder abgelaufener Nachweis wird dadurch nicht verdeckt.
 
-- **Erfolgreich / Verifiziert**
-- **Überfällig**
-- **Fehlgeschlagen**
-- **Nicht verfügbar**
+Der Nachweis bestätigt nur den dokumentierten Archiv- und Prüfumfang, keine vollständige Anwendung oder startfähige VM. Bestehende Berichte werden für die neue Darstellung nicht umgeschrieben.
 
 Bei Restore-Tests ab Level 2 entscheidet die eingestellte Archivgröße über den Dry-Run: Unterhalb des Schwellwerts wird das vollständige Archiv geprüft, ab dem Schwellwert eine Dateistichprobe in Gruppen. Standardmäßig beträgt der Schwellwert 500 GB; 0 deaktiviert die Umschaltung. Die frühere Sonderregel für die Typen `photos` und `vms` entfällt.
 

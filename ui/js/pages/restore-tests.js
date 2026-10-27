@@ -31,6 +31,7 @@ function restoreTestsStatusIcon(status) {
   const icons = {
     success: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.5 2.2 2.2 4.8-5.4"/>',
     warning: '<path d="M10.3 4.4a2 2 0 0 1 3.4 0l7.4 12.8a2 2 0 0 1-1.7 3H4.6a2 2 0 0 1-1.7-3z"/><path d="M12 8.8v4.8"/><path d="M12 17h.01"/>',
+    neutral: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
     error: '<circle cx="12" cy="12" r="8.5"/><path d="m9 9 6 6"/><path d="m15 9-6 6"/>',
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${icons[status] || icons.warning}</svg>`;
@@ -537,7 +538,7 @@ function renderRestorePlan(plan) {
     off: sortedJobs.filter((job) => String(job.policy?.mode || 'off') === 'off').length,
     overdue: sortedJobs.filter((job) => job.is_overdue).length,
   };
-  summaryEl.innerHTML = `<section class="rt-plan-summary"><header><div><strong>${escHtml(restoreTestsT('summaryTitle'))}</strong><small>${escHtml(restoreTestsT('summarySubtitle'))}</small></div></header><div><span><small>${escHtml(restoreTestsT('summaryTotal'))}</small><b>${planSummary.total}</b></span><span class="planned"><small>${escHtml(restoreTestsT('summaryScheduled'))}</small><b>${planSummary.scheduled}</b></span><span><small>${escHtml(restoreTestsT('summaryManual'))}</small><b>${planSummary.manual}</b></span><span><small>${escHtml(restoreTestsT('summaryOff'))}</small><b>${planSummary.off}</b></span><span class="attention ${planSummary.overdue > 0 ? 'has-value' : ''}"><small>${escHtml(restoreTestsT('summaryOverdue'))}</small><b>${planSummary.overdue}</b></span></div></section>`;
+  summaryEl.innerHTML = `<div class="rt-plan-summary rt-compact-summary">${[['summaryTotal', planSummary.total], ['summaryScheduled', planSummary.scheduled], ['summaryManual', planSummary.manual], ['summaryOff', planSummary.off], ['summaryOverdue', planSummary.overdue]].map(([label, count]) => `<span class="${label === 'summaryOverdue' && count ? 'attention' : ''}"><b>${count}</b> ${escHtml(restoreTestsT(label))}</span>`).join('')}</div>`;
   const legacyRun = document.getElementById('rt-run-btn');
   if (legacyRun) legacyRun.classList.toggle('hidden', !plan.jobs.some(job => job.scheduler_state === 'legacy'));
   const rows = sortedJobs.map((j) => {
@@ -550,22 +551,20 @@ function renderRestorePlan(plan) {
     const state = j.scheduler_state || 'needs_schedule';
     const schedule = p.cron ? rtScheduleLabel(p.cron)
       : (state === 'legacy' ? restoreTestsT('legacySchedule', { days: p.interval_days, cron: j.legacy_cron }) : '—');
+    const result = rtAttemptStatus({ test_result: j.last_test_result, test_date: j.last_test_date });
+    const activeSchedule = ['active', 'legacy'].includes(state);
+    const planning = mode === 'scheduled' ? schedule : restoreTestsT(mode === 'manual_only' ? 'manualOnly' : 'off');
     return `<tr class="${running ? 'rt-plan-running' : ''}" data-rt-job-key="${escHtml(j.job_key)}">
-      <td>${escHtml(j.name || j.display_name || j.job_key)}${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
-      <td><span class="history-loc-chip ${(j.location || '').toLowerCase()}" title="${escHtml(restoreTestsLocationLabel(j.location || ''))}">${escHtml(String(j.location || '').toLowerCase() === 'usb' ? 'USB' : restoreTestsLocationLabel(j.location || ''))}</span></td>
-      <td>${escHtml(restoreTestsT(mode === 'manual_only' ? 'manualOnly' : mode))}</td>
-      <td class="rt-plan-schedule">${escHtml(schedule)}</td>
-      <td>L${Number(p.level || 2)}</td>
-      <td>${escHtml(j.last_test_date || '—')}${j.last_test_result === 'cancelled' ? `<br><span class="badge warning">${escHtml(restoreTestsT('cancelled'))}</span>` : ''}</td>
-      <td>${escHtml(j.next_run_at || '—')}</td>
-      <td><span class="badge ${state === 'active' || state === 'legacy' ? 'success' : state === 'off' ? '' : 'warning'}">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</span></td>
-      <td><div class="rt-plan-actions">
-        <button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button>
+      <td data-label="${escHtml(restoreTestsT('job'))}"><strong>${escHtml(j.name || j.display_name || j.job_key)}</strong><small>${escHtml(restoreTestsLocationLabel(j.location))}</small>${running ? `<span class="rt-plan-running-label"><span class="running-dot" aria-hidden="true"></span>${escHtml(restoreTestsT('running'))}</span>` : ''}</td>
+      <td data-label="${escHtml(restoreTestsT('testPlanning'))}" class="rt-plan-schedule"><strong>${escHtml(planning)} · L${Number(p.level || 2)}</strong><small>${escHtml(activeSchedule && j.next_run_at ? `${restoreTestsT('nextTest')}: ${j.next_run_at}` : restoreTestsT('noAutomaticTest'))}</small>${mode === 'scheduled' && !activeSchedule ? `<small class="rt-text-warning">${escHtml(restoreTestsT(`schedulerStates.${state}`))}</small>` : ''}${j.is_overdue ? `<small class="rt-text-warning">${escHtml(restoreTestsT('evidenceDue'))}</small>` : ''}</td>
+      <td data-label="${escHtml(restoreTestsT('lastTest'))}"><span class="rt-attempt-status ${result.className}">${restoreTestsStatusIcon(result.className)}${escHtml(result.label)}</span><small>${escHtml(j.last_test_date || '—')}</small>${j.last_test_date ? `<button type="button" class="rt-text-button" data-rt-plan-action="reports" data-job-key="${escHtml(j.job_key)}">${escHtml(restoreTestsT('evidenceAndHistory'))} →</button>` : ''}</td>
+      <td data-label="${escHtml(restoreTestsT('actions'))}"><div class="rt-plan-actions">
         <button type="button" class="btn ${running ? 'btn-danger' : 'btn-primary'} btn-sm" data-rt-plan-action="${running ? 'cancel' : 'run'}" data-job-key="${escHtml(j.job_key)}" aria-busy="${!!cancelling || busy === 'run'}" ${busy || (running ? cancelling || !run?.cancel_allowed : j.enabled === false) ? 'disabled' : ''} title="${escHtml(restoreTestsT(running && !run?.cancel_allowed && !cancelling ? 'cancelUnavailable' : running ? 'cancelTest' : 'testNow'))}">${escHtml(restoreTestsT(running ? cancelling ? 'cancelling' : 'cancelTest' : busy === 'run' ? 'startingTest' : 'testNow'))}</button>
+        <details class="rt-plan-menu"><summary aria-label="${escHtml(restoreTestsT('actions'))}">⋯</summary><button type="button" class="btn btn-secondary btn-sm" data-rt-plan-action="edit" data-job-key="${escHtml(j.job_key)}" ${busy ? 'disabled' : ''}>${escHtml(restoreTestsT('editPlan'))}</button></details>
       </div></td>
     </tr>`;
   }).join('');
-  contentEl.innerHTML = `<table class="history-table"><thead><tr>${['job', 'location', 'policy', 'schedule', 'level', 'lastTest', 'nextTest', 'scheduler', 'actions'].map(key => `<th>${escHtml(restoreTestsT(key))}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="9">${escHtml(restoreTestsT('noJobs'))}</td></tr>`}</tbody></table>`;
+  contentEl.innerHTML = `<table class="history-table"><thead><tr>${['job', 'testPlanning', 'lastTest', 'actions'].map(key => `<th>${escHtml(restoreTestsT(key))}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="4">${escHtml(restoreTestsT('noJobs'))}</td></tr>`}</tbody></table>`;
 }
 
 function rtScheduleLabel(cron) {
@@ -751,6 +750,7 @@ function onRestoreTestsPlanClick(event) {
   const action = btn.dataset.rtPlanAction || '';
   const jobKey = btn.dataset.jobKey || '';
   if (!jobKey) return;
+  if (action === 'reports') return openRTRJobReports(jobKey);
   if (action === 'edit') return editRestorePlan(jobKey);
   if (action === 'run') return runRestorePlanJob(jobKey);
   if (action === 'cancel') return cancelRestorePlanJob(jobKey);
@@ -810,29 +810,18 @@ function renderRestoreTests(tests) {
   if (!summaryEl || !contentEl) return;
   const list = Array.isArray(tests) ? tests : [];
   const filtered = _getFilteredRTReports(list);
-  const stale = filtered.filter(t => t.test_result === 'success' && rtEvidenceStale(t)).length;
-  const ok = filtered.filter(t => t.test_result === 'success' && !rtEvidenceStale(t)).length;
-  const failed = filtered.filter(t => t.test_result === 'failed').length;
-  const unavail = filtered.filter(t => t.test_result === 'unavailable').length;
-  summaryEl.innerHTML = `
-    <div class="stat-tile total"><div><div class="stat-value">${filtered.length}</div><div class="stat-label">${escHtml(restoreTestsT('reports'))}</div></div></div>
-    <div class="stat-tile success"><div><div class="stat-value">${ok}</div><div class="stat-label">${escHtml(restoreTestsT('verified'))}</div></div></div>
-    <div class="stat-tile error"><div><div class="stat-value">${failed}</div><div class="stat-label">${escHtml(restoreTestsT('failed'))}</div></div></div>
-    <div class="stat-tile neutral"><div><div class="stat-value">${unavail}</div><div class="stat-label">${escHtml(restoreTestsT('unavailable'))}</div></div></div>
-    <div class="stat-tile warning"><div><div class="stat-value">${stale}</div><div class="stat-label">${escHtml(restoreTestsT('overdue'))}</div></div></div>
-  `;
+  const ok = filtered.filter(t => rtAttemptStatus(t).className === 'success').length;
+  const failed = filtered.filter(t => rtAttemptStatus(t).className === 'error').length;
+  const cancelled = filtered.filter(rtCancelled).length;
+  summaryEl.innerHTML = `<div class="rt-compact-summary"><span><b>${filtered.length}</b> ${escHtml(restoreTestsT('reports'))}</span><span><b>${ok}</b> ${escHtml(restoreTestsT('successful'))}</span><span><b>${failed}</b> ${escHtml(restoreTestsT('failed'))}</span><span><b>${cancelled}</b> ${escHtml(restoreTestsT('cancelled'))}</span></div>`;
   summaryEl.classList.remove('hidden');
 
   if (!filtered.length) {
     contentEl.innerHTML = `<div class="status-message empty-state">${escHtml(restoreTestsT('noFilteredReports'))}</div>`;
     return;
   }
-  const rows = filtered.map((t, i) => renderRTReportRow(t, i)).join('');
-  contentEl.innerHTML = `
-    <table class="history-table restore-tests-table">
-      <thead><tr><th></th><th>${escHtml(restoreTestsT('dateTime'))}</th><th>${escHtml(restoreTestsT('type'))}</th><th>${escHtml(restoreTestsT('job'))}</th><th>${escHtml(restoreTestsT('location'))}</th><th>${escHtml(restoreTestsT('duration'))}</th><th>${escHtml(restoreTestsT('originalSize'))}</th><th>${escHtml(restoreTestsT('coverage'))}</th><th>${escHtml(restoreTestsT('status'))}</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  const opened = new Set(Array.from(contentEl.querySelectorAll('details.rt-report-entry[open]')).map(el => el.dataset.reportIdentity));
+  contentEl.innerHTML = filtered.map((t, i) => renderRTReportRow(t, i, opened.has(rtReportIdentity(t)))).join('');
   restoreTestsState.filteredReports = filtered;
 }
 
@@ -873,14 +862,15 @@ function _getFilteredRTReports(tests) {
   const filtered = [...tests].filter((t) => {
     const key = String(t.job_key || t.type || '').toLowerCase();
     if (restoreTestsState.selectedJob !== 'all' && key !== String(restoreTestsState.selectedJob).toLowerCase()) return false;
-    if (jobNeedle && !key.includes(jobNeedle)) return false;
+    if (jobNeedle && !`${key} ${restoreTestJobName(t).toLowerCase()}`.includes(jobNeedle)) return false;
     if (location !== 'all' && String(t.location || '').toLowerCase() !== location) return false;
     const stale = t.test_result === 'success' && rtEvidenceStale(t);
-    if (status === 'success' && !(t.test_result === 'success' && !stale)) return false;
-    if (status === 'failed' && t.test_result !== 'failed') return false;
+    if (status === 'success' && rtAttemptStatus(t).className !== 'success') return false;
+    if (status === 'failed' && rtAttemptStatus(t).className !== 'error') return false;
+    if (status === 'cancelled' && !rtCancelled(t)) return false;
     if (status === 'unavailable' && t.test_result !== 'unavailable') return false;
     if (status === 'stale' && !stale) return false;
-    if (problemOnly && !(t.test_result === 'failed' || t.test_result === 'unavailable' || t.test_result === 'skipped' || stale)) return false;
+    if (problemOnly && !(rtAttemptStatus(t).className === 'error' || t.test_result === 'unavailable' || t.test_result === 'skipped' || stale)) return false;
     if (range !== 'all' && rangeDays > 0) {
       const ts = _rtTs(t);
       if (!ts) return false;
@@ -938,6 +928,7 @@ function onRestoreTestsContentClick(event) {
   const el = event.target.closest('[data-rt-action]');
   if (!el) return;
   const action = el.dataset.rtAction || '';
+  if (action === 'evidence') return openRTRJobReports(el.dataset.jobKey, el.dataset.evidenceDate);
   if (action === 'toggle-detail') {
     const rowId = el.dataset.rowId || '';
     const detailId = el.dataset.detailId || '';
@@ -974,83 +965,123 @@ function toggleRTDetailById(rowId, detailId) {
   chev?.classList.toggle('open', !open);
 }
 
-function renderRTReportRow(t, idx) {
-  const rowId = `rtr-${idx}`;
-  const detailId = `rtd-${idx}`;
-  const status = _rtStatus(t);
-  const cov = Number(t.test_coverage_percentage || 0);
-  const covTxt = formatCoveragePercent(cov);
-  const stats = t.archive_stats_formatted || {};
-  const detailError = ['failed', 'unavailable', 'skipped'].includes(t.test_result)
-    ? restoreTestFailureMessage(t)
-    : '';
-  const dt = String(t.test_date || '—');
-  const reportId = t.report_id || t.test_id;
-  const archive = t.tested_archive || t.archive_name;
-  const location = restoreTestsLocationLabel(t.location || '');
+/** Classify a test attempt independently of evidence age or scheduling policy. */
+function rtAttemptStatus(t) {
+  if (rtCancelled(t)) return { label: restoreTestsT('cancelled'), className: 'neutral' };
+  const keys = {success: ['successful', 'success'], failed: ['failed', 'error'], unavailable: ['unavailable', 'warning'], skipped: ['skipped', 'neutral']};
+  const [key, className] = keys[t.test_result] || [t.test_date ? 'resultUnknown' : 'neverTested', 'neutral'];
+  return {label: restoreTestsT(key), className};
+}
+
+/** Recognize both retained legacy cancellation reports and explicit cancelled results. */
+function rtCancelled(t) {
+  return t.failure_code === 'RT_CANCELLED' || t.test_result === 'cancelled';
+}
+
+/** Use report content as identity: legacy IDs can be missing or shared across attempts. */
+function rtReportIdentity(t) {
+  const {time_ago, ...persisted} = t;
+  const value = JSON.stringify(persisted);
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+  return `${t.report_id || t.test_id || ''}:${t.job_key || ''}:${t.test_date || ''}:${hash >>> 0}`;
+}
+
+/** Open a job's reports without stale filters; optionally expand its evidence by date. */
+function openRTRJobReports(jobKey, evidenceDate = '') {
+  restoreTestsState.selectedJob = jobKey;
+  for (const id of ['job', 'location', 'status', 'range']) {
+    const el = document.getElementById(`rt-report-filter-${id}`);
+    if (el) el.value = id === 'job' ? '' : 'all';
+  }
+  const problems = document.getElementById('rt-report-filter-problem');
+  if (problems) problems.checked = false;
+  switchRestoreTestsSubtab('reports');
+  renderRestoreTestsSidebar();
+  renderRestorePlan(restoreTestsState.plan);
+  renderRestoreTests(restoreTestsState.data || []);
+  const index = restoreTestsState.filteredReports.findIndex(t => !evidenceDate || (t.test_date === evidenceDate && t.test_result === 'success' && !rtCancelled(t)));
+  document.querySelectorAll('#restore-tests-content > details[open]').forEach(entry => { entry.open = false; });
+  const entry = document.getElementById(`rtr-${index}`);
+  if (entry) { entry.open = true; entry.querySelector('summary')?.focus(); }
+}
+
+/** Describe the recorded cumulative scope without inventing a restore or checksum comparison. */
+function renderRTLevelEvidence(t, steps) {
+  const level = Number(t.test_level);
+  const groups = [
+    {level: 1, ids: ['repo_reachable', 'archive_readable', 'metadata_check']},
+    {level: 2, ids: ['restore_probe', 'sample_restore']},
+    {level: 3, ids: ['integrity_check', 'integrity_compare']},
+  ];
+  return `<section class="rt-level-evidence"><h3>${escHtml(restoreTestsT('cumulativeScope'))}</h3>${groups.map(group => {
+    const included = Number.isFinite(level) && level >= group.level;
+    const relevant = steps.filter(s => group.ids.includes(s.step_id));
+    let label = 'notInScope';
+    let status = 'neutral';
+    if (included) {
+      if (relevant.some(s => s.status === 'failed')) { label = 'failed'; status = 'error'; }
+      else if (relevant.length && relevant.every(s => s.status === 'passed') && (group.level !== 1 || group.ids.every(id => relevant.some(s => s.step_id === id))) && (group.level !== 3 || (t.level3_details?.enabled === true && Number(t.level3_details.success_count) > 0 && !Number(t.level3_details.failed_count)))) { label = 'successful'; status = 'success'; }
+      else label = 'scopeNotDocumented';
+    }
+    const l3 = t.level3_details || {};
+    const count = Number(l3.success_count);
+    return `<div class="rt-level-row"><span class="rt-level-tag">L${group.level}</span><div><strong>${escHtml(restoreTestsT(`scopeL${group.level}`))}</strong><small>${escHtml(restoreTestsT(`scopeL${group.level}Detail`))}</small>${included && group.level === 3 && l3.enabled === true && Number.isFinite(count) ? `<small>${escHtml(restoreTestsT('sampleReadCount', {count}))}</small>` : ''}</div><span class="rt-attempt-status ${status}">${restoreTestsStatusIcon(status)}${escHtml(restoreTestsT(label))}</span></div>`;
+  }).join('')}</section>`;
+}
+
+/** Render an inline report; success is scoped evidence, cancellation is only an attempt. */
+function renderRTReportRow(t, idx, opened = false) {
+  const status = rtAttemptStatus(t);
+  const successful = t.test_result === 'success' && !rtCancelled(t);
   const steps = Array.isArray(t.steps) ? t.steps : [];
-  const passedSteps = steps.filter((step) => String(step.status || '').toLowerCase() === 'passed').length;
-  const successful = t.test_result === 'success';
-  const allStepsPassed = steps.length > 0 && passedSteps === steps.length;
-  const validUntil = t.valid_until || t.valid_until_date;
-  const archiveStats = t.archive_stats || {};
-  const testedFiles = t.tested_files_count ?? t.tested_files;
-  const testedFolders = t.tested_folders_count;
-  return `
-    <tr id="${rowId}" class="history-row history-restore-row" data-rt-action="toggle-detail" data-row-id="${rowId}" data-detail-id="${detailId}">
-      <td><svg class="history-chevron" id="rtchev-${idx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg></td>
-      <td style="white-space:nowrap;color:var(--text-primary)">${escHtml(dt)}</td>
-      <td><span class="history-type-badge">RESTORE TEST</span></td>
-      <td style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">${escHtml(restoreTestJobName(t))}</td>
-      <td><span class="history-loc-chip ${(t.location || '').toLowerCase()}">${escHtml(restoreTestsLocationLabel(t.location || ''))}</span></td>
-      <td>${escHtml(t.duration_formatted || '—')}</td>
-      <td>${escHtml(stats.original || '—')}</td>
-      <td>${escHtml(covTxt)}</td>
-      <td><span class="history-status-badge ${status.className}">${escHtml(status.className === 'success' ? restoreTestsT('successful') : status.label)}</span></td>
-    </tr>
-    <tr id="${detailId}" class="history-detail-row" style="display:none">
-      <td colspan="9">
-        <div class="rt-report-card">
-          <div class="rt-report-card-head rt-report-hero">
-            <div>
-              <div class="rt-report-kicker">${escHtml(restoreTestsT('report'))}</div>
-              <div class="rt-report-title">${escHtml(restoreTestJobName(t))}</div>
-              <div class="rt-report-subtitle">${escHtml(archive || restoreTestsT('noArchive'))}</div>
-            </div>
-            <div class="rt-report-result ${successful ? 'success' : 'error'}">
-              <span class="rt-report-result-mark">${restoreTestsStatusIcon(successful ? 'success' : 'error')}</span>
-              <span><strong>${escHtml(restoreTestsT(successful ? 'restorabilityVerified' : 'verificationFailed'))}</strong>${validUntil ? `<small>${escHtml(restoreTestsT('proofValidUntil', { date: validUntil }))}</small>` : ''}</span>
-            </div>
-          </div>
-          ${detailError ? `<div class="rt-report-alert">${escHtml(restoreTestsT('errorValue', { message: detailError }))}</div>` : ''}
-          <div class="rt-report-verdict">
-            <span><strong>${escHtml(restoreTestsT('overallResult', { status: status.label }))}</strong><small>${escHtml(restoreTestsT(allStepsPassed ? 'allStepsPassed' : 'stepsNeedAttention', { count: steps.length }))}</small></span>
-            <span class="history-status-badge ${status.className}">${escHtml(covTxt)} ${escHtml(restoreTestsT('coverage'))}</span>
-          </div>
-          <div class="rt-report-sections">
-            ${rtReportSection(restoreTestsT('execution'), [
-              [restoreTestsT('reportId'), reportId, true],
-              [restoreTestsT('runLogFile'), t.log_file, true],
-              [restoreTestsT('site'), location],
-              [restoreTestsT('level'), t.test_level != null ? `L${t.test_level}` : null],
-              [restoreTestsT('start'), t.start_ts || t.started_at],
-              [restoreTestsT('end'), t.end_ts || t.finished_at || t.test_date],
-              [restoreTestsT('duration'), t.duration_formatted || '—'],
-            ])}
-            ${rtReportSection(restoreTestsT('testScope'), [
-              [restoreTestsT('originalSize'), stats.original || '—'],
-              [restoreTestsT('archiveFiles'), archiveStats.files_count],
-              [restoreTestsT('testedFiles'), testedFiles],
-              [restoreTestsT('testedFolders'), testedFolders],
-              [restoreTestsT('coverage'), `${covTxt}${t.coverage_basis ? ` (${t.coverage_basis})` : ''}`],
-              [restoreTestsT('errorCode'), t.failure_code || '—'],
-            ])}
-          </div>
-          ${renderRTStepsTable(steps, t)}
-          ${renderRTTechnicalEvidence(t, steps)}
-        </div>
-      </td>
-    </tr>`;
+  const plan = restoreTestsState.plan?.jobs?.find(job => job.job_key === t.job_key);
+  const stats = t.archive_stats || {};
+  const fmt = t.archive_stats_formatted || {};
+  const coverage = t.test_coverage_percentage ?? t.coverage_percent;
+  const validUntil = t.valid_until || t.valid_until_date || (plan?.verification_evidence_date === t.test_date ? plan.verification_valid_until : '');
+  const validity = rtEvidenceStale(t) ? 'evidenceExpired' : 'evidencePolicy';
+  const archivedProof = (restoreTestsState.data || []).some(r => r.job_key === t.job_key && r.test_date === plan?.verification_evidence_date && r.test_result === 'success' && !rtCancelled(r));
+  const previous = rtCancelled(t) && plan?.verification_status === 'verified' && archivedProof
+    && _rtTs({test_date: plan.verification_evidence_date}) > 0
+    && _rtTs({test_date: plan.verification_evidence_date}) <= _rtTs(t);
+  const errorText = !successful && !rtCancelled(t) && t.test_result !== 'skipped' ? restoreTestFailureMessage(t) : '';
+  const detailText = t.error_analysis?.error_details || t.failure_hint || '';
+  return `<details id="rtr-${idx}" class="rt-report-entry" data-report-identity="${escHtml(rtReportIdentity(t))}" ${opened ? 'open' : ''}>
+    <summary><span class="rt-report-list-job"><strong>${escHtml(restoreTestJobName(t))}</strong><small>${escHtml(t.test_date || '—')} · ${escHtml(restoreTestsLocationLabel(t.location))}</small></span><span class="rt-attempt-status ${status.className}">${restoreTestsStatusIcon(status.className)}${escHtml(status.label)}</span></summary>
+    <article class="rt-report-card ${successful ? 'rt-proof-document' : 'rt-attempt-document'}">
+      <header class="rt-report-card-head rt-report-hero"><div><div class="rt-report-kicker">Borg Backup UI · ${escHtml(restoreTestsT('report'))}</div><h3 class="rt-report-title">${escHtml(restoreTestsT(successful ? 'restorationEvidence' : 'attemptReport'))}</h3><div class="rt-report-subtitle">${escHtml(restoreTestJobName(t))}</div></div><div class="rt-report-result ${status.className}"><span class="rt-report-result-mark">${restoreTestsStatusIcon(status.className)}</span><strong>${escHtml(status.label)}</strong></div></header>
+      <div class="rt-report-verdict"><strong>${escHtml(restoreTestsT(successful ? 'scopePassed' : rtCancelled(t) ? 'cancelledNoEvidence' : 'noNewEvidence'))}</strong>${successful ? `<small>${escHtml(validUntil ? restoreTestsT('proofValidUntil', {date: validUntil}) : restoreTestsT(validity))}${validUntil && rtEvidenceStale(t) ? ` · ${escHtml(restoreTestsT('evidenceExpired'))}` : ''}</small>` : ''}</div>
+      ${previous ? `<div class="rt-previous-proof"><span>${escHtml(restoreTestsT('previousEvidenceValid', {date: plan.verification_evidence_date}))}</span><button type="button" class="rt-text-button" data-rt-action="evidence" data-job-key="${escHtml(t.job_key)}" data-evidence-date="${escHtml(plan.verification_evidence_date)}">${escHtml(restoreTestsT('openEvidence'))} →</button></div>` : ''}
+      ${errorText ? `<div class="rt-report-alert">${escHtml(errorText)}${detailText ? `<p>${escHtml(detailText)}</p>` : ''}</div>` : ''}
+      ${!successful ? `<details class="rt-attempt-details"><summary>${escHtml(restoreTestsT('attemptDetails'))}</summary>` : ''}
+      <div class="rt-report-sections">${rtReportSection(restoreTestsT('execution'), [
+        [restoreTestsT('archive'), t.tested_archive || t.archive_name || restoreTestsT('noArchive'), true],
+        [restoreTestsT('repository'), t.repository, true],
+        [restoreTestsT('testTime'), t.test_date],
+        [restoreTestsT('duration'), t.duration_formatted || '—'],
+        [restoreTestsT('level'), t.test_level != null ? `L${t.test_level}` : '—'],
+      ])}${rtReportSection(restoreTestsT('testScope'), [
+        [restoreTestsT('originalSize'), fmt.original || '—'],
+        [restoreTestsT('archiveFiles'), stats.files_count],
+        [restoreTestsT('testedFiles'), t.tested_files_count ?? t.tested_files],
+        [restoreTestsT('testedFolders'), t.tested_folders_count],
+        [restoreTestsT('coverage'), coverage != null ? formatCoveragePercent(coverage) : '—'],
+        [restoreTestsT('basis'), t.coverage_basis],
+      ])}</div>
+      ${renderRTLevelEvidence(t, steps)}
+      <p class="rt-proof-scope-note">${escHtml(restoreTestsT(successful ? 'evidenceScopeLimit' : 'attemptScopeLimit'))}</p>
+      <details class="rt-technical-evidence"><summary>${escHtml(restoreTestsT('technicalEvidence'))}</summary><div>${rtReportSection(restoreTestsT('execution'), [
+        [restoreTestsT('reportId'), t.report_id || t.test_id, true],
+        [restoreTestsT('runLogFile'), t.log_file, true],
+        [restoreTestsT('start'), t.start_ts || t.started_at],
+        [restoreTestsT('end'), t.end_ts || t.finished_at || t.test_date],
+        [restoreTestsT('errorCode'), t.failure_code],
+      ])}${renderRTStepsTable(steps, t)}${renderRTTechnicalEvidence(t, steps)}</div></details>
+      ${!successful ? '</details>' : ''}
+      <footer class="rt-proof-footer">${escHtml(restoreTestsT('evidenceSource'))}</footer>
+    </article>
+  </details>`;
 }
 
 function rtReportSection(title, items) {

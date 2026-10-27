@@ -131,6 +131,9 @@ def test_plan_and_runner_keep_original_due_date_after_cancel(reports, tmp_path, 
     assert after['verification_status'] == 'verified'
     assert not after['is_overdue']
     assert after['next_due_at'] == before['next_due_at']
+    assert after['verification_evidence_date'] == before['last_test_date']
+    assert after['verification_valid_until'] == before['verification_valid_until']
+    assert after['verification_valid_until']
     runner = _load_restore_runner()
     tester = object.__new__(runner.RestoreTest)
     tester.args = SimpleNamespace(force=False)
