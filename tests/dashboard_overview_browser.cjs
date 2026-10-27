@@ -66,6 +66,8 @@ const { chromium } = require('playwright');
       if(page==='jobs') {BBUI.resourceMonitor.stop(); refreshJobs();}
     }});
     document.getElementById('jobs-grid').addEventListener('click',onJobsGridClick);
+    BBUI.core.state.lastRefresh = new Date('2026-10-27T19:00:00Z');
+    updateRefreshLabel();
     renderDashboard(data,null); refreshDashboardOverview(); BBUI.resourceMonitor.start();
   });
   const capture=async name=>{if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({animations:'disabled',fullPage:true,path:`${process.env.BBUI_SCREENSHOT_DIR}/${name}.png`});};
@@ -78,12 +80,13 @@ const { chromium } = require('playwright');
   const cards=await page.locator('.dashboard-summary-pair > section').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
   assert(cards.every(top=>top===cards[0]));
   assert.equal(cards.length,4);
+  assert.match(await page.locator('#last-refresh').innerText(), /Aktualisiert:/);
   await page.locator('.dashboard-tests-link').focus();
   await page.evaluate(()=>renderDashboard(BBUI.core.state.data,null));
   assert(await page.locator('.dashboard-tests-link').evaluate(el=>el===document.activeElement));
   // A populated desktop overview fits without clipping; disclosures remain keyboard accessible.
   for (const lang of ['de','en']) for (const theme of ['light','dark']) {
-    await page.evaluate(({lang,theme})=>{window.lang=lang;document.documentElement.dataset.theme=theme;translate();renderDashboard(BBUI.core.state.data,null);},{lang,theme});
+    await page.evaluate(({lang,theme})=>{window.lang=lang;document.documentElement.dataset.theme=theme;translate();updateRefreshLabel();renderDashboard(BBUI.core.state.data,null);},{lang,theme});
     for (const viewport of [{width:1920,height:1080},{width:1600,height:1000}]) {
       await page.setViewportSize(viewport);
       const bounds=await page.locator('#dashboard-locations').boundingBox();
