@@ -3702,5 +3702,32 @@
     "mysqlScope": "MariaDB/MySQL: transactional InnoDB tables only; includes routines, triggers and events. Accounts and grants are separate.",
     "housekeeping": "Internal operation and test records are removed 30 days after confirmed completion. Running, unresolved and unidentifiable records are retained. This does not remove dumps or Secrets.",
     "unsupportedProfiles": "These profiles from an earlier test version are no longer supported. Profiles, Secrets and backups are preserved. Remove their assignments from affected jobs; they cannot create new backups."
+  },
+  "resources": {
+    "title": "Server resources",
+    "live": "Live · every {seconds} s",
+    "unavailable": "Measurements unavailable",
+    "cpu": "CPU · Entire server",
+    "cpuScale": "100% = all CPU cores",
+    "ram": "Available RAM",
+    "ramTotal": "of {total} · includes reclaimable cache",
+    "active": "Active runs",
+    "idle": "No active backup, restore or test runs",
+    "backup": "Backup",
+    "restore": "Restore",
+    "restoreTest": "Restore test",
+    "otherRun": "Run",
+    "protectedTest": "Restore test · Memory limit active",
+    "budget": "RAM usage relative to limit",
+    "reserve": "Configured host reserve: {value}",
+    "accounting": "Test RAM: entire cgroup including file cache and child processes. The host reserve is monitored, not preallocated.",
+    "scope": "Entire server including VMs and containers",
+    "showHistory": "Show history",
+    "hideHistory": "Hide history",
+    "now": "Now",
+    "historyNote": "Last 10 minutes since the first dashboard visit, held only in RAM. Sampling: every second during active runs, every 10 s otherwise; trend thinned to 5 s. Missing measurements appear as gaps. Active runs include tracked backup, restore and test runs, not browsing requests. Individual measurements are available only for protected restore tests.",
+    "current": "Current",
+    "noMeasurement": "No measurement",
+    "inspectHint": "Select a sample with the pointer or touch; navigate with arrow keys, Home and End."
   }
 }

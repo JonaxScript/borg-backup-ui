@@ -228,6 +228,18 @@ Das Widget liest eine vorberechnete Statusdatei auf dem Flash-Laufwerk. Sein Akt
 
 > **Hinweis:** Dieses native Unraid-Widget ist von der optionalen **Homepage**-Integration unter **Einstellungen > Allgemein** zu unterscheiden. Homepage verwendet einen eigenen, eingeschränkten Token.
 
+### 2.7 Server-Auslastung
+
+Die Karte unter den beiden Zusammenfassungen zeigt CPU-Auslastung und verfügbaren RAM des **gesamten Unraid-Hosts**, einschließlich VMs, Containern und Borg. 100 % CPU entspricht allen logischen CPU-Kernen zusammen; I/O-Wartezeit wird nicht als CPU-Arbeit gezählt. Verfügbarer RAM ist Linux `MemAvailable`, einschließlich freigebbarem Cache, nicht nur völlig ungenutzter Speicher.
+
+Aktive Läufe zählen die über Ressourcensperren erfassten Backups, Restores und Restore-Tests, pro Lauf einmal. Reine Browse-Anfragen zählen nicht als Lauf; ihre Last ist dennoch in den Hostwerten enthalten. Für einen geschützten Restore-Test erscheint zusätzlich dessen gemeinsame cgroup-Auslastung: CPU, RAM einschließlich Dateicache und Unterprozessen sowie das tatsächlich gesetzte RAM-Limit. Wartende Tests oder Tests mit ausgeschaltetem Schutz erhalten keine fremden Messwerte. Fehlende Messwerte erscheinen als Strich, nicht als Null.
+
+Die Karte aktualisiert sich bei aktiven Läufen alle **2 Sekunden**, sonst alle **10 Sekunden**. Beim Verlassen des Dashboards oder Wechsel in einen versteckten Browser-Tab pausieren diese Anfragen. Die gemeinsame Messung auf dem Server läuft ab dem ersten Dashboard-Aufruf weiter: einmal pro Sekunde bei aktiven Läufen, sonst alle zehn Sekunden. **Verlauf anzeigen** öffnet die letzten zehn Minuten; für die Übertragung wird der Verlauf auf etwa fünf Sekunden ausgedünnt. Es gibt keine dauerhafte Speicherung oder vollständige Auswertung einzelner Läufe; beim Neustart des UI-Dienstes beginnt der Verlauf neu.
+
+Die großen Graphen zeigen den aktuellen Wert und beschriftete Skalen in Prozent bzw. GiB. Zeigen oder tippen Sie in den Verlauf, um einen Messpunkt mit Uhrzeit abzulesen. Per Tab fokussieren Sie den Graphen; Pfeiltasten wechseln zwischen Messpunkten, Pos1/Ende springen zum ersten/letzten Punkt. Die Uhrzeit folgt der Browser-Zeitzone. Fehlende Messwerte werden ausdrücklich angezeigt, nicht durch Null ersetzt.
+
+Die Anzeige setzt keine neuen Limits. Die Speicherbegrenzung schützt derzeit nur Restore-Tests. Die konfigurierte Hostreserve ist eine überwachte Abbruchschwelle, keine fest reservierte RAM-Menge. Backups und Browse & Restore können ebenfalls RAM benötigen; insbesondere große Archivindizes im Browser sind derzeit nicht durch diesen Schutz begrenzt.
+
 ## 3. Jobs
 
 ![Job-Seite mit Standortfilter, Neuer-Job-Aktion und Jobliste](../assets/de/jobs-guide.png)

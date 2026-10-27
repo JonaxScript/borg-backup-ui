@@ -275,6 +275,7 @@
       }
     });
     document.getElementById('auth-logout-btn')?.addEventListener('click', async () => {
+      window.BBUI?.resourceMonitor?.stop();
       try {
         await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       } catch (_) {

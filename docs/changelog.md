@@ -1,5 +1,15 @@
 # Changelog
 
+## Pending - Dashboard resource monitoring (#602)
+
+- Label expanded charts with current values, five unit-aware Y-axis ticks and timestamped sample readouts. Support pointer/touch and keyboard inspection, preserve keyboard focus across live refresh, and keep missing values distinct from zero.
+
+- Match the approved graph styling with wider sparklines, a fading area below each contiguous segment, rounded line joins and subtle expanded-chart guides. Preserve fixed scales, real sample coordinates and missing-data gaps.
+
+- Add shared, read-only host CPU/MemAvailable sampling and protected restore-test cgroup CPU/RAM measurements, matching groups to live lock owners. Keep ten minutes in memory and thin transferred trends; never invoke Borg or alter limits.
+- Add a bilingual, responsive dashboard card with independent 2-second active / 10-second idle polling, visibility cancellation, explicit unavailable states and expandable history.
+- Document host CPU normalization, cache accounting, monitored reserve semantics, and that backup/Browse & Restore are outside restore-test memory enforcement. Browser memory follow-up: #603.
+
 ## Pending - Bounded restore-test memory and retained evidence (#599)
 
 - Retain the cgroup with an acknowledged idle keeper until final memory counters have been read. This closes the confirmed race with Unraid removing empty cgroups immediately after worker exit. Only the keeper is OOM-exempt; worker/Borg remain eligible, and keeper startup failure or unexpected exit fails closed. Pipe EOF ends the keeper if the supervisor dies. Log final OOM counters and cover readiness, EOF, failure cleanup and an empty-group reaper; real kernel tests remain opt-in.
