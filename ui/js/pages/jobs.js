@@ -570,6 +570,7 @@ function renderJobsGrid(jobs) {
   }
 
   if (!jobs || jobs.length === 0) {
+    jobsState.selectedLocation = 'all';
     if (jobsNewBtn) jobsNewBtn.classList.add('hidden');
     renderJobsLocationSidebar([]);
     updateJobsSelection([]);
@@ -581,6 +582,7 @@ function renderJobsGrid(jobs) {
   }
   if (jobsNewBtn) jobsNewBtn.classList.remove('hidden');
 
+  if (jobsState.selectedLocation !== 'all' && !jobs.some(job => jobsLocationKey(job) === jobsState.selectedLocation)) jobsState.selectedLocation = 'all';
   const visible = jobs
     .filter((job) => jobsState.selectedLocation === 'all' || jobsLocationKey(job) === jobsState.selectedLocation)
     .sort((a, b) => {
@@ -652,10 +654,11 @@ function jobsCount(count) {
   return jobsT(count === 1 ? 'jobs.jobCountOne' : 'jobs.jobCountMany', { count });
 }
 
+/** Show only populated destinations; All locations remains available for an empty list. */
 function renderJobsLocationSidebar(jobs) {
   const el = document.getElementById('jobs-location-list');
   if (!el) return;
-  const locations = ['all', ...JOBS_LOCATION_ORDER.filter((location) => location !== 'utility' || jobs.some((job) => job.is_utility))];
+  const locations = ['all', ...JOBS_LOCATION_ORDER.filter(location => jobs.some(job => jobsLocationKey(job) === location))];
   el.innerHTML = locations.map((location) => {
     const count = location === 'all' ? jobs.length : jobs.filter((job) => jobsLocationKey(job) === location).length;
     const label = location === 'all' ? jobsT('jobs.allLocations') : jobsLocationName(location);

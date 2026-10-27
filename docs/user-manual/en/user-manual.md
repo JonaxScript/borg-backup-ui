@@ -337,7 +337,7 @@ A planned VM shutdown is reported as informational. A failed shutdown or restart
 
 Once archive creation (`borg create`) finishes, containers and VMs stopped by the job are restarted immediately, including when Borg reports warnings. Retention (`prune`), space reclamation (`compact`), and any due repository check (`check`) run afterwards and do not extend service downtime. If archive creation fails or is cancelled, cleanup still restarts the stopped workloads. If a restart fails, recovery is still attempted for the other workload type; the run ends as an error and maintenance does not start.
 
-Each job has its own bordered card with spacing. **All locations** shows separate headings only for destinations with jobs. Empty destinations remain in the sidebar with a count of 0; selecting one location avoids a duplicate section heading.
+Each job has its own bordered card with spacing. **All locations** shows separate headings only for destinations with jobs. Destinations without jobs are also hidden in the sidebar. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
 
 The overall result appears directly below **Operating status**.
 

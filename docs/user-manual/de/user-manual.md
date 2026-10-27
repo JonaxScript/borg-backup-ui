@@ -345,7 +345,7 @@ Das planmäßige Herunterfahren einer VM wird als Information gemeldet. Ein fehl
 
 Nach Abschluss der Archiverstellung (`borg create`) werden die vom Job gestoppten Container und VMs sofort wieder gestartet, auch bei Borg-Warnungen. Erst danach laufen Aufbewahrung (`prune`), Speicherbereinigung (`compact`) und eine fällige Repository-Prüfung (`check`). Diese Wartung verlängert die Ausfallzeit der Dienste nicht. Bei Fehlern oder Abbruch der Archiverstellung erfolgt der Neustart weiterhin beim Aufräumen. Schlägt ein Neustart fehl, wird der Neustart auch für die andere Dienstgruppe versucht; der Lauf endet als Fehler und die Wartung wird nicht gestartet.
 
-Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** erscheinen separate Standortüberschriften nur für Standorte mit Jobs. Leere Standorte bleiben in der linken Auswahl mit 0 sichtbar; bei einem ausgewählten Standort entfällt die doppelte Abschnittsüberschrift.
+Jeder Job hat eine eigene Karte mit Rahmen und Abstand. In **Alle Standorte** erscheinen separate Standortüberschriften nur für Standorte mit Jobs. Standorte ohne Jobs werden auch in der linken Auswahl ausgeblendet. Entfällt der letzte Job des gewählten Standorts, wechselt die Ansicht zu **Alle Standorte**. Bei einem ausgewählten Standort entfällt die doppelte Abschnittsüberschrift.
 
 Der Gesamtstatus steht direkt unter **Betriebszustand**.
 
