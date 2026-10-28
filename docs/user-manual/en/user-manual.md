@@ -550,7 +550,7 @@ After loss of the coordinating service process, the group run is marked **Interr
 
 ## 4. Repositories
 
-The **Repositories** page displays registered Borg repositories as separate cards, including repositories without a linked backup job. The storage-target bar filters by the exact target. **Details** opens the workspace inside a card; its tabs share the height of their largest content so the following cards do not jump when switching tabs. **Add repository** creates or imports a repository on a storage target already configured under **Settings**.
+The **Repositories** page displays registered Borg repositories as separate cards, including repositories without a linked backup job. The storage-target bar filters by the exact target. The left chevron opens the workspace inside a card; its tabs share the height of their largest content so the following cards do not jump when switching tabs. **Add repository** creates or imports a repository on a storage target already configured under **Settings**.
 
 Local storage targets are created under **Settings > Local Profiles**. A
 concrete directory below `/mnt`, such as `/mnt/backup` or `/mnt/disks/USB-A`,
@@ -563,14 +563,16 @@ The page separates storage targets, Borg repositories, and backup jobs. A storag
 
 ### 4.2 Areas and Functions
 
-- **Repository cards:** Show display name, repository directory, storage target, status, cached size, archive count, and every linked job.
+- **Repository cards:** Show display name, repository directory, storage target, status, cached size, archive count, and every linked job. Dividers separate storage targets. Consistent linked-job icons are reused; mixed or unassigned repositories use their repository type. A missing Borg key export is visible on the collapsed card.
 - **Search:** Filters cards by name, path, job, or storage target.
 - **Storage-target bar:** Shows all targets with subtly outlined repository counts. Multiple local targets remain separately selectable.
 - **Overview:** Shows Borg statistics, maintenance state, and human-readable repository, storage target, job, encryption, and path details.
-- **Archives:** Loads the newest up to 100 archives directly from Borg and displays five entries per page. The total count remains visible; a limited list states how many archives were loaded. Archive name, technical ID, and start time remain available.
-- **Maintenance:** Provides Check, Verify Data, Prune, and Compact with fixed **Start** buttons. Results include timestamp, duration, check scope, and recorded deleted archive names for Prune. Compact shows the reclaimed space reported by Borg, including `0 B`; historical results without that amount say "reclaimed space not recorded". Long result lists can be expanded. Further starts are disabled while maintenance runs. Existing confirmation dialogs remain in place.
+- **Archives:** Loads the newest up to 100 archives directly from Borg and displays five entries per page. The total count remains visible; a limited list states how many archives were loaded. The list shows archive name and creation time. The technical archive ID remains internal for safe identification.
+- **Maintenance:** Provides Check, Verify Data, Prune, and Compact with fixed **Start** buttons. Results include timestamp, duration, check scope, and recorded deleted archive names for Prune. Compact shows the reclaimed space reported by Borg, including `0 B`; historical results without that amount say "reclaimed space not recorded". New runs retain up to 20 masked output lines as expandable execution details, including successful runs. Missing details for historical runs are explicitly identified. Further starts are disabled while maintenance runs. Existing confirmation dialogs remain in place.
 - **Management:** Shows current job links, Borg key export/import, and separates non-destructive removal from the UI from permanent repository deletion.
 - **Add repository:** Opens a wizard for selecting an existing storage target and creating or importing a repository.
+
+The USB/SMB mount indicator reads only the local kernel mount table when the page loads or refreshes. "Mounted" does not confirm repository access. "Not mounted" is neutral, for example when pre/post scripts power a target on and off; actions remain available. Other targets, especially SSH, remain unchecked. No drives are automatically mounted and no servers contacted. Cached metrics are labeled separately and do not prove current reachability. Failed maintenance or info queries are labeled as the result of the respective last action.
 
 Automatic Borg-statistics refresh is disabled by default so repositories and disks are not contacted unexpectedly. It can be enabled deliberately under **Settings > Repositories**, where its interval is configurable; the default refresh interval is 24 hours and a failed access attempt is retried after one hour by default. Results are cached in `repositories.json`. Opening the Repositories page displays that cache and does not wait for every local and remote repository to refresh. **Refresh info** starts the query manually for the selected repository.
 

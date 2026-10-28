@@ -51,8 +51,8 @@ def test_storage_repositories_use_configured_job_icons() -> None:
     assert "fetch('/api/jobs')" in script
     assert "function storageJobForRepository(repo)" in script
     assert "function storageRepositoryTitle(repo, job)" in script
-    assert "resolveJobIcon(job || repo)" in script
-    assert "resolveJobIconColor(job || repo)" in script
+    assert "resolveJobIcon(source)" in script
+    assert "resolveJobIconColor(source)" in script
     assert ".storage-repository-icon-large" in css
     assert "justify-content: center" in css
     title_helper = script.split("function storageRepositoryTitle(repo, job)", 1)[1].split(
@@ -63,7 +63,7 @@ def test_storage_repositories_use_configured_job_icons() -> None:
     repository_row = script.split("function renderStorageRepositoryCard(repo)", 1)[1].split(
         "function storageRepositoryKey", 1
     )[0]
-    assert "storageRepositoryIcon(repo, null)" in repository_row
+    assert "storageRepositoryIcon(repo, job)" in repository_row
     assert "storageRepositoryTitle(repo, null)" in repository_row
     assert "storageRepositoryName(repo)" in repository_row
     assert "storageRepositoryStatus(repo)" in repository_row

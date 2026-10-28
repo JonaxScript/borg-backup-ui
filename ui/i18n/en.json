@@ -671,7 +671,17 @@
     "nextPage": "Next",
     "archivePage": "{start}–{end} of {count} loaded archives",
     "archiveListLimited": "The newest {count} of {total} archives are loaded.",
-    "repositoryInfoUnknown": "Info not loaded"
+    "repositoryInfoUnknown": "Info not loaded",
+    "repositoryCachedData": "Cached data",
+    "repositoryNotMounted": "Not mounted",
+    "repositoryMountedReadOnly": "Mounted · read-only",
+    "repositoryMounted": "Mounted · access unchecked",
+    "repositoryReachabilityUnknown": "Reachability unchecked",
+    "repositoryExecutionDetails": "Execution details",
+    "repositoryDetailsNotRecorded": "No further details were recorded for this run.",
+    "repositoryLastMaintenanceFailed": "Last maintenance failed",
+    "repositoryLastMaintenanceWarning": "Last maintenance had warnings",
+    "repositoryLastInfoFailed": "Last info query failed"
   },
   "jobs": {
     "createRunning": "Creating archive (borg create)",

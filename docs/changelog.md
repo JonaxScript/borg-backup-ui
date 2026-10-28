@@ -2,6 +2,10 @@
 
 ## Pending - Repository management cards (#621)
 
+- Follow up on user testing: group cards by target, restore job/type icons and left disclosures, surface key-export warnings, and remove visible archive IDs while retaining guarded archive identity.
+- Observe USB/SMB mounts from the kernel table without probing targets; treat unmounted targets as neutral and keep cached metrics separate from reachability.
+- Retain bounded masked success output, enable verbose Check/Compact output, and parse zero-byte reclamation.
+
 - Replace the repository picker/sidebar with registry-backed cards and exact storage-target filters; retain unassigned and shared repositories.
 - Share intrinsic panel height across all four detail tabs, keep inactive panels inert, paginate loaded archives, and preserve action routing and safety confirmations.
 - Use subtle status symbols and normal-weight result text; expose maintenance scope and distinguish missing Compact amounts from reported zero.

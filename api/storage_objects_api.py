@@ -24,6 +24,47 @@ from storage_profiles_api import normalize_ssh_mode
 SCHEMA_VERSION = 1
 
 
+def observe_storage_mount_states(storages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return storage copies with USB/SMB mount observations, never target probes.
+
+    Read the kernel mount table once without stat, network access or automounting.
+    A mounted filesystem does not prove the repository exists or is accessible.
+    Unreadable/ambiguous mount information and other transports remain unknown.
+    These transient observations are not persisted in the inventory.
+    """
+    from runtime.lib.usb_storage import _containing_mount, _read_mounts
+    from runtime.lib.status import required_storage_mount
+
+    try:
+        mounts = _read_mounts()
+    except OSError:
+        mounts = None
+    result = []
+    for storage in storages:
+        state = "unknown"
+        location = storage.get("location") or storage.get("storage_type")
+        raw_path = str(storage.get("mount_path") or storage.get("base_path") or "")
+        if mounts is not None and location in {"usb", "smb"} and Path(raw_path).is_absolute():
+            path = Path(os.path.normpath(raw_path))
+            try:
+                mount = _containing_mount(path, mounts)
+                required = required_storage_mount(path)
+                valid = mount is not None and mount.path not in {
+                    Path("/"), Path("/mnt"), Path("/mnt/disks"), Path("/mnt/remotes"),
+                } and mount.filesystem not in {
+                    "rootfs", "ramfs", "tmpfs", "devtmpfs", "overlay", "proc", "sysfs", "devpts",
+                }
+                if required is not None and mount is not None:
+                    valid = valid and (mount.path == required or required in mount.path.parents)
+                if location == "smb" and mount is not None:
+                    valid = valid and mount.filesystem in {"cifs", "smb3", "smbfs"}
+                state = ("read_only" if mount.read_only else "mounted") if valid else "not_mounted"
+            except OSError:
+                state = "unknown"
+        result.append({**storage, "mount_state": state})
+    return result
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 

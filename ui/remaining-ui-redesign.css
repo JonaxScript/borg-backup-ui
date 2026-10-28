@@ -1705,3 +1705,22 @@
 }
 /* Global button transitions must not delay hiding controls on a tab switch. */
 .storage-repository-panels > .storage-repository-tab-content:not(.is-active) * { transition: none !important; }
+/* Match the Jobs grouping and left-hand disclosure without implying reachability. */
+.storage-target-group-heading { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.storage-target-group-heading h2 { margin: 0; font-size: var(--ui-font-size-sm); font-weight: 500; overflow-wrap: anywhere; }
+.storage-group-line { flex: 1; height: 1px; background: var(--ui-color-border); }
+.storage-card-summary { grid-template-columns: 24px minmax(180px, 1.3fr) minmax(180px, 1fr) minmax(170px, .5fr); }
+.storage-card-toggle { justify-self: center; min-width: 0; width: 24px; padding: 4px 0; }
+.storage-card-key-warning { display: flex; margin-top: 6px; cursor: pointer; text-align: left; }
+.storage-card-summary .storage-card-size small { font-size: var(--ui-font-size-xs); }
+.storage-maintenance-result-details pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .storage-card-summary { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr); }
+  .storage-card-toggle { grid-column: 1; grid-row: 1 / span 2; }
+  .storage-card-size { grid-column: 2 / -1; }
+}
+@media (max-width: 600px) {
+  .storage-card-summary { grid-template-columns: 24px minmax(0, 1fr); }
+  .storage-card-toggle { grid-row: 1; }
+  .storage-card-state, .storage-card-size { grid-column: 2; }
+}

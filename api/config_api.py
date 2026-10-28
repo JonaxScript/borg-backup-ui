@@ -595,15 +595,18 @@ def write_conf(ui_config: dict, updates: Dict[str, str], snapshot_reason: str = 
 
 def get_repositories_data(ui_config: dict) -> dict:
     """
-    Gibt die kanonischen Repository-Objekte gruppiert nach Location zurück.
+    Return cached repositories and passive storage mount observations.
+
+    USB/SMB observations read only the kernel mount table, without probing or
+    mounting repository targets. They do not establish Borg reachability.
     """
     groups: Dict[str, List[Dict]] = {"local": [], "usb": [], "smb": [], "storagebox": []}
     repository_info_refresh: Dict[str, object] = {}
     try:
         from repositories_api import build_repository_groups
-        from storage_objects_api import read_storage_store
+        from storage_objects_api import observe_storage_mount_states, read_storage_store
         groups = build_repository_groups(ui_config)
-        storages = read_storage_store(ui_config).get("storages", [])
+        storages = observe_storage_mount_states(read_storage_store(ui_config).get("storages", []))
     except Exception:
         storages = []
     try:
@@ -624,7 +627,10 @@ def get_repositories_data(ui_config: dict) -> dict:
         "groups": groups,
         "storages": storages,
         "repository_info_refresh": repository_info_refresh,
-        "smb_profiles": get_smb_profiles_with_status(ui_config),
+        "smb_profiles": get_smb_profiles_with_status(ui_config, mount_states={
+            str(row.get("mount_path") or row.get("base_path") or ""): row.get("mount_state", "unknown")
+            for row in storages if row.get("location") == "smb"
+        }),
         "conf_file": str(get_conf_file(ui_config)),
         "conf_writable": conf_exists(ui_config),
     }

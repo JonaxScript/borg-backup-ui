@@ -331,7 +331,7 @@ function renderStorage(data) {
   const search = document.getElementById('storage-sidebar-search');
   if (search && search.value !== storageState.search) search.value = storageState.search;
   el.innerHTML = visible.length
-    ? visible.map(renderStorageRepositoryCard).join('')
+    ? storageGroupRows(data, visible).map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
     : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`;
   if (focusData) Array.from(el.querySelectorAll('[data-storage-action]')).find(node => Object.entries(focusData).every(([key, value]) => node.dataset[key] === value))?.focus({ preventScroll: true });
 }
@@ -357,10 +357,10 @@ function renderStorageRepositoryCard(repo) {
   const size = repo.repository_stats?.unique_csize;
   return `<article class="storage-repository-card" data-repository-card="${escHtml(key)}">
     <div class="storage-card-summary">
-      <div class="storage-card-identity">${storageRepositoryIcon(repo, null)}<div><h2>${escHtml(storageRepositoryTitle(repo, null))}</h2><small>${escHtml(storageRepositoryName(repo))} · ${escHtml(storageName(repo))}</small></div></div>
-      <div class="storage-card-state"><span class="storage-card-status ${status.className}">${storageMaintenanceIcon(iconStatus)}${escHtml(status.label)}</span><small>${escHtml(storageRepositoryJobsLabel(repo))}</small></div>
-      <div class="storage-card-size">${size === undefined || size === null ? '—' : storageFormatBytes(size)}<small>${escHtml(storageT('storage.repositoryArchiveCount'))}: ${storageRepositoryArchiveCount(repo) ?? '—'}</small></div>
-      <button type="button" class="btn btn-secondary btn-sm storage-card-toggle" data-storage-action="toggle-repository" data-repository-key="${escHtml(key)}" aria-expanded="${!!open}">${escHtml(storageT(open ? 'storage.hideDetails' : 'storage.showDetails'))}<span aria-hidden="true">${open ? '⌃' : '⌄'}</span></button>
+      <button type="button" class="job-details-disclosure storage-card-toggle" data-storage-action="toggle-repository" data-repository-key="${escHtml(key)}" aria-expanded="${!!open}" aria-controls="repository-details-${escHtml(key)}" aria-label="${escHtml(storageT(open ? 'storage.hideDetails' : 'storage.showDetails'))}: ${escHtml(storageRepositoryTitle(repo, null))}"><span aria-hidden="true">${open ? '⌄' : '›'}</span></button>
+      <div class="storage-card-identity">${storageRepositoryIcon(repo, job)}<div><h2>${escHtml(storageRepositoryTitle(repo, null))}</h2><small>${escHtml(storageRepositoryName(repo))} · ${escHtml(storageName(repo))}</small></div></div>
+      <div class="storage-card-state"><span class="storage-card-status ${status.className}">${storageMaintenanceIcon(iconStatus)}${escHtml(status.label)}</span>${storageRepositoryNeedsExternalKeyBackup(repo) ? `<button type="button" class="storage-card-status warning storage-card-key-warning" data-storage-action="open-repository-key-export-settings">${storageMaintenanceIcon('warning')}${escHtml(storageT('storage.repositoryKeyBackupMissing'))}</button>` : ''}<small>${escHtml(storageRepositoryJobsLabel(repo))}</small></div>
+      <div class="storage-card-size">${size === undefined || size === null ? '—' : storageFormatBytes(size)}<small>${escHtml(storageT('storage.repositoryArchiveCount'))}: ${storageRepositoryArchiveCount(repo) ?? '—'}</small><small>${escHtml(storageT(repo.repository_stats ? 'storage.repositoryCachedData' : 'storage.repositoryInfoUnknown'))}${repo.last_info_refresh_at ? ` · ${escHtml(storageFormatDateTime(repo.last_info_refresh_at))}` : ''}</small></div>
     </div>
     ${open ? renderStorageRepositoryWorkspace(repo, job) : ''}
   </article>`;
@@ -380,28 +380,39 @@ function storageRepositoryArchiveCount(repo) {
   return Number.isSafeInteger(count) && count >= 0 ? count : null;
 }
 
+/** Distinguish cached maintenance results from a passive mount-table observation. */
 function storageRepositoryStatus(repo) {
   const running = storageState.maintenanceState?.running
     && String(storageState.maintenanceState?.target_key || '') === storageRepositoryKey(repo);
   if (running) return { className: 'info', label: storageT('storage.repositoryStatusRunning') };
+  const target = storageTargets(storageState.data).find(row => row.storage_key === repo.storage_key);
+  const mountState = target?.mount_state;
   const results = Object.values(repo?.maintenance_results || {}).filter((row) => row && typeof row === 'object');
   const latest = results.sort((a, b) => String(b.finished_at || '').localeCompare(String(a.finished_at || '')))[0];
-  if (latest?.status === 'error') return { className: 'error', label: storageT('storage.repositoryStatusError') };
-  if (latest?.status === 'warning') return { className: 'warning', label: storageT('storage.repositoryStatusWarning') };
+  if (latest?.status === 'error') return { className: 'error', label: storageT('storage.repositoryLastMaintenanceFailed') };
+  if (latest?.status === 'warning') return { className: 'warning', label: storageT('storage.repositoryLastMaintenanceWarning') };
   if (String(repo?.last_info_refresh_status || '').toLowerCase() === 'busy') {
     return { className: 'info', label: storageT('storage.repositoryStatusBusy') };
   }
   if (String(repo?.last_info_refresh_status || '').toLowerCase() === 'error') {
-    return { className: 'warning', label: storageT('storage.repositoryStatusWarning') };
+    return { className: 'warning', label: storageT('storage.repositoryLastInfoFailed') };
   }
-  return repo.repository_stats && Object.keys(repo.repository_stats).length
-    ? { className: 'success', label: storageT('storage.repositoryInfoAvailable') }
-    : { className: 'neutral', label: storageT('storage.repositoryInfoUnknown') };
+  if (mountState === 'not_mounted') return { className: 'neutral', label: storageT('storage.repositoryNotMounted') };
+  if (mountState === 'read_only') return { className: 'neutral', label: storageT('storage.repositoryMountedReadOnly') };
+  return mountState === 'mounted'
+    ? { className: 'neutral', label: storageT('storage.repositoryMounted') }
+    : { className: 'neutral', label: storageT('storage.repositoryReachabilityUnknown') };
 }
 
+/** Reuse a consistent linked-job icon; mixed/unassigned repositories use their type. */
 function storageRepositoryIcon(repo, job, large = false) {
-  const icon = typeof resolveJobIcon === 'function' ? resolveJobIcon(job || repo) : 'archive';
-  const color = typeof resolveJobIconColor === 'function' ? resolveJobIconColor(job || repo) : '';
+  const linked = storageJobsForRepository(repo);
+  const coherent = job && linked.every(row => row.icon === job.icon && row.icon_color === job.icon_color);
+  const type = String(repo.backup_type || '').toLowerCase();
+  const colors = { flash: 'blue', appdata: 'orange', photos: 'purple', vms: 'green', sonstiges: 'gray' };
+  const source = coherent && job.icon ? job : { icon: repo.icon || (colors[type] ? type : 'archive'), icon_color: repo.icon_color || colors[type] || '' };
+  const icon = typeof resolveJobIcon === 'function' ? resolveJobIcon(source) : 'archive';
+  const color = typeof resolveJobIconColor === 'function' ? resolveJobIconColor(source) : '';
   const colorClass = color ? ` type-icon-color-${color}` : '';
   return `<span class="type-icon${colorClass}${large ? ' storage-repository-icon-large' : ''}">${typeIcon(icon)}</span>`;
 }
@@ -465,11 +476,7 @@ function renderStorageWorkspaceHeader(repo) {
   const infoStateMarkup = infoRefreshEnabled
     ? `<small>${escHtml(infoState)}</small>`
     : `<button type="button" class="storage-repository-info-disabled" data-storage-action="open-repository-refresh-settings">${escHtml(infoState)}</button>`;
-  const keyBackupMissing = storageRepositoryNeedsExternalKeyBackup(repo);
-  const keyBackupMarkup = keyBackupMissing
-    ? `<button type="button" class="storage-repository-key-backup-link" data-storage-action="open-repository-key-export-settings">${escHtml(storageT('storage.repositoryKeyBackupMissing'))}</button>`
-    : '';
-  return `<div class="storage-repository-workspace-status">${keyBackupMarkup}${infoStateMarkup}</div>`;
+  return `<div class="storage-repository-workspace-status">${infoStateMarkup}</div>`;
 }
 
 function openRepositoryRefreshSettings() {
@@ -596,11 +603,14 @@ function renderStorageMaintenanceCard(repo, key, { withAction = false, job = nul
   const userHint = result?.failure_code === 'borg_ssh_connection_interrupted'
     ? `<p class="storage-maintenance-user-hint">${escHtml(storageT('storage.repositorySshInterruptedHint'))}</p>`
     : '';
-  const resultDetails = details.length
-    ? `<details class="storage-maintenance-result-details status-error"><summary>${escHtml(storageT('storage.repositoryErrorDetails'))}</summary><pre>${escHtml(details.join('\n'))}</pre></details>`
-    : (key === 'prune' && deletedArchives.length
+  const resultDetails = [
+    key === 'prune' && deletedArchives.length
       ? `<details class="storage-maintenance-result-details"${withAction && deletedArchives.length <= 3 ? ' open' : ''}><summary>${escHtml(storageT('storage.repositoryPruneDetails', { count: deletedArchives.length }))}</summary><ul>${deletedArchives.map((archive) => `<li>${escHtml(archive)}</li>`).join('')}</ul></details>`
-      : '');
+      : '',
+    details.length
+      ? `<details class="storage-maintenance-result-details ${status === 'error' ? 'status-error' : ''}"><summary>${escHtml(storageT('storage.repositoryExecutionDetails'))}</summary><pre>${escHtml(details.join('\n'))}</pre></details>`
+      : '',
+  ].join('');
   return `<article class="storage-maintenance-card status-${escHtml(status)}">
     <div class="storage-maintenance-title"><span class="storage-maintenance-icon">${storageMaintenanceIcon(status)}</span><small>${escHtml(storageMaintenanceTitle(key))}</small></div>
     <div class="storage-maintenance-copy">
@@ -610,6 +620,7 @@ function renderStorageMaintenanceCard(repo, key, { withAction = false, job = nul
       ${withAction && !running && result?.status === 'success' && key === 'compact' ? `<p class="storage-maintenance-scope">${escHtml(storageT('storage.repositoryCompactScope'))}</p>` : ''}
       ${!running ? userHint : ''}
       ${!running ? resultDetails : ''}
+      ${withAction && !running && result && !resultDetails ? `<small>${escHtml(storageT('storage.repositoryDetailsNotRecorded'))}</small>` : ''}
     </div>
     ${withAction ? `<button class="btn btn-secondary btn-sm" data-storage-action="repository-maintenance" data-repository-key="${escHtml(repositoryKey)}" data-repository-action="${escHtml(action)}" data-check-mode="${escHtml(mode)}"${disabled}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m8 4 12 8-12 8z"/></svg>${escHtml(storageT('storage.repositoryStartAction'))}</button>` : ''}
   </article>`;
@@ -659,7 +670,7 @@ function renderStorageRepositoryArchives(repo) {
       <div class="storage-archive-list ${canDelete ? 'can-delete' : ''}"><header><span></span><strong>${storageT('storage.repositoryArchiveName')}</strong><strong>${storageT('storage.repositoryArchiveCreated')}</strong><span></span></header>${pageRows.map((archive) => {
         const name = String(archive.name || '');
         const selected = !!browser && name === browser.archive;
-        return `<div class="storage-archive-entry"><button type="button" class="storage-archive-row ${selected ? 'is-selected' : ''}" data-storage-action="open-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" ${selected ? 'aria-current="true"' : ''}><span class="storage-archive-dot"></span><span><strong>${escHtml(name || '—')}</strong><small>${escHtml(archive.id || '')}</small></span><time>${escHtml(storageFormatDateTime(archive.start))}</time><span class="storage-archive-open" aria-hidden="true">›</span></button>${canDelete && archive.id ? `<button type="button" class="storage-archive-delete" data-storage-action="delete-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" title="${escHtml(storageT('storage.archiveDelete'))}" aria-label="${escHtml(storageT('storage.archiveDeleteLabel', { name }))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>` : ''}</div>`;
+        return `<div class="storage-archive-entry"><button type="button" class="storage-archive-row ${selected ? 'is-selected' : ''}" data-storage-action="open-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" ${selected ? 'aria-current="true"' : ''}><span class="storage-archive-dot"></span><span><strong>${escHtml(name || '—')}</strong></span><time>${escHtml(storageFormatDateTime(archive.start))}</time><span class="storage-archive-open" aria-hidden="true">›</span></button>${canDelete && archive.id ? `<button type="button" class="storage-archive-delete" data-storage-action="delete-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" title="${escHtml(storageT('storage.archiveDelete'))}" aria-label="${escHtml(storageT('storage.archiveDeleteLabel', { name }))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>` : ''}</div>`;
       }).join('')}</div>
       ${browser?.archive ? renderStorageArchiveBrowser(browser) : ''}
     </div>
@@ -920,7 +931,7 @@ function renderStorageRepositoryWorkspace(repo, job) {
     maintenance: renderStorageRepositoryMaintenance(repo, job),
     management: renderStorageRepositoryManagement(repo),
   };
-  return `<section class="storage-repository-master-detail">
+  return `<section class="storage-repository-master-detail" id="repository-details-${escHtml(storageRepositoryKey(repo))}">
     <nav class="storage-repository-tabs" aria-label="${escHtml(storageT('storage.repository'))}">${tabs.map(([key, label]) => `<button type="button" class="${selected === key ? 'is-active' : ''}" aria-pressed="${selected === key}" data-storage-action="select-repository-tab" data-repository-tab="${key}">${label}</button>`).join('')}</nav>
     <div class="storage-repository-panels">${tabs.map(([key]) => `<div class="storage-repository-tab-content ${key === selected ? 'is-active' : ''}" data-repository-panel="${key}" ${key === selected ? '' : 'inert aria-hidden="true"'}>${content[key]}</div>`).join('')}</div>
   </section>`;
