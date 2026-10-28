@@ -196,3 +196,28 @@
   .report-ledger-runs { grid-template-columns: minmax(0, 1fr) !important; }
   .report-analysis-panel > header { align-items: flex-start; flex-direction: column; }
 }
+
+/* Full-width chronological History list with Jobs navigation and status styling (#627). */
+.history-layout.ui-context-layout { grid-template-columns: minmax(0, 1fr); }
+.history-sidebar.ui-context-sidebar { display: flex; position: static; align-items: center; gap: 14px; width: auto; padding: 10px 14px; }
+.history-navigation-label { flex: 0 0 auto; color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
+.history-sidebar .ui-context-nav { display: flex; flex-wrap: wrap; gap: 0 16px; padding: 0; border: 0; }
+.history-sidebar .ui-context-nav__item { display: flex; width: auto; min-width: 0; gap: 8px; padding: 9px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; }
+.history-sidebar .ui-context-nav__item.is-active { border-bottom-color: var(--ui-color-accent); background: transparent; box-shadow: none; }
+.history-sidebar .ui-context-nav__item:hover { background: var(--ui-color-surface-subtle); }
+.history-sidebar .ui-context-nav__item:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 2px; }
+.history-sidebar .location-nav-count { border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); padding: 1px 6px; min-width: 22px; text-align: center; font-weight: 400; color: var(--ui-color-text-muted); }
+#page-history .history-filters { flex-wrap: wrap; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.history-filter-field { display: grid; min-width: 0; gap: var(--ui-space-1); color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
+#page-history .history-filter-select { max-width: 100%; }
+#page-history .history-count-label { align-self: flex-end; padding-bottom: var(--ui-space-2); }
+#page-history .history-content-table > .history-table > thead th { font-weight: 400; text-transform: none; letter-spacing: normal; }
+#page-history .history-row .history-type-badge { padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--ui-color-text); font: inherit; font-weight: var(--ui-font-weight-semibold); text-transform: none; }
+#page-history .history-row .history-loc-chip { color: var(--ui-color-text); font-size: inherit; }
+#page-history .history-row .history-chevron { color: var(--ui-color-accent); }
+#page-history .history-status-badge { border: 0; font-weight: 400; box-shadow: none; }
+#page-history .history-status-badge.running { background: var(--ui-state-info-bg); color: var(--ui-state-info-fg); }
+@media (max-width: 600px) {
+  .history-sidebar.ui-context-sidebar { flex-direction: column; align-items: stretch; gap: 4px; }
+  #page-history .history-filters { align-items: stretch; }
+}

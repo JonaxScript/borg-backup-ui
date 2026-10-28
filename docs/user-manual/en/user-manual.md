@@ -654,10 +654,10 @@ History is the first detail page after a backup run. It shows when a run happene
 
 ### 5.2 Areas and Functions
 
-- **Location sidebar:** Groups runs by location.
-- **Type filter:** Filters by backup types.
+- **Location bar:** Filters the chronological table from above the content. Only locations with configured jobs appear, including before their first run. Subtly outlined counts show History entries. If the selected location loses its final job, the view returns to **All locations**, where retained entries remain accessible.
+- **Job filter:** Filters by a configured job; locations distinguish jobs with the same name.
 - **Status filter:** Filters by success, warning, error, or skipped runs.
-- **Table:** Shows date/time, type, location, duration, original size, deduplicated size, and status.
+- **Table:** Keeps date/time, job, location, duration, original size, deduplicated size and status. Status indicators use the same symbols as Jobs, subtle fills and regular text without outlines. **Skipped** stays yellow; **Error** uses a circle with an X. Existing details and log access are retained.
 - **Detail area:** Can be expanded per run and shows archive, repository data, check status, log file, and error messages.
 - **Open:** Opens the linked log file if available.
 
