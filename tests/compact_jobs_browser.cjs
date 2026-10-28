@@ -83,7 +83,7 @@ const {chromium} = require('playwright');
     const location=page.locator('#jobs-location-list [data-jobs-location="local"]');
     assert.equal(await location.evaluate(node=>getComputedStyle(node).borderRadius),'0px','Location buttons are flat');
     assert.equal(await page.locator('#jobs-location-list select').count(),0);
-    assert.equal(await page.locator('#jobs-location-list [data-jobs-location="all"] .location-nav-count').evaluate(node=>getComputedStyle(node).borderTopWidth),'1px','All locations count has a distinct outline');
+    assert.ok(await page.locator('#jobs-location-list .location-nav-count').evaluateAll(nodes=>nodes.length>1&&nodes.every(node=>getComputedStyle(node).borderTopWidth==='1px'&&getComputedStyle(node).fontWeight==='400')),'All location counts have the same subtle outline');
     await location.click();
     assert.equal(await page.locator('#jobs-location-list [data-jobs-location="local"]').getAttribute('aria-current'),'page');
     await page.locator('#jobs-location-list [data-jobs-location="all"]').click();
