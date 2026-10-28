@@ -1,19 +1,21 @@
 /* Browse & Restore redesign (#32). */
 #page-restore { max-width: 1600px; }
-.restore-redesign-layout { align-items: start; }
-.restore-job-sidebar { overflow: hidden; }
-.restore-job-search { display: grid; gap: var(--ui-space-1); padding: var(--ui-space-3); border-bottom: 1px solid var(--ui-color-border); }
-.restore-job-search span { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); font-weight: var(--ui-font-weight-semibold); text-transform: uppercase; }
-.restore-job-search input { width: 100%; min-width: 0; }
-.restore-sidebar-job-list { display: block; max-height: calc(100vh - 20rem); overflow: auto; padding: var(--ui-space-1); }
-.restore-job-sidebar > footer { padding: var(--ui-space-2) var(--ui-space-3); border-top: 1px solid var(--ui-color-border); color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
-.restore-sidebar-group > header { display: flex; justify-content: space-between; padding: var(--ui-space-2); color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); font-weight: var(--ui-font-weight-semibold); text-transform: uppercase; }
-.restore-sidebar-job { display: grid; grid-template-columns: 2rem minmax(0, 1fr); align-items: center; gap: var(--ui-space-2); width: 100%; padding: var(--ui-space-2); border: 0; border-radius: var(--ui-radius-sm); background: transparent; color: var(--ui-color-text); text-align: left; }
-.restore-sidebar-job:hover { background: var(--ui-color-surface-subtle); }
-.restore-sidebar-job.is-active { background: var(--ui-color-surface-raised); box-shadow: inset 3px 0 var(--ui-color-accent); }
-.restore-sidebar-job strong, .restore-sidebar-job small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.restore-sidebar-job small { margin-top: 2px; color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
-.restore-sidebar-job-icon { width: 2rem; height: 2rem; }
+/* Shared location/job navigation above the four visible steps (#631). */
+.restore-redesign-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-3); }
+.restore-job-navigation { min-width: 0; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
+.restore-location-row, .restore-job-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
+.restore-location-row { padding-bottom: 0; background: var(--ui-color-surface-subtle); border-bottom: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0; }
+.restore-location-row > span, .restore-job-row > span { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
+#restore-location-list, #restore-job-list { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
+.restore-location { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--ui-radius-sm) var(--ui-radius-sm) 0 0; background: transparent; color: var(--ui-color-text); font: inherit; }
+.restore-location.is-active { border-color: var(--ui-color-border); background: var(--ui-color-surface); color: var(--ui-color-accent); }
+.restore-location .location-nav-count { min-width: 22px; padding: 1px 6px; border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); font-weight: 400; text-align: center; }
+.restore-job-tab { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ui-color-text); font: inherit; text-align: left; overflow-wrap: anywhere; }
+.restore-job-tab > span { min-width: 0; }
+.restore-job-tab.is-active { color: var(--ui-color-accent); border-bottom-color: var(--ui-color-accent); }
+.restore-job-icon { flex: 0 0 auto; width: 2rem; height: 2rem; }
+.restore-location:focus-visible, .restore-job-tab:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 2px; }
+#page-restore .restore-native-job { display: none; }
 .restore-sidebar-empty { padding: var(--ui-space-4); color: var(--ui-color-text-subtle); }
 
 .restore-redesign-workspace { width: 100%; max-width: 100%; min-width: 0; overflow: hidden; }
@@ -59,29 +61,22 @@
 .restore-history-log { margin-top: var(--ui-space-2); overflow: hidden; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-sm); background: var(--ui-color-surface); }
 .restore-history-log summary { padding: var(--ui-space-2); color: var(--ui-color-text-subtle); cursor: pointer; }
 .restore-history-log pre { max-height: 220px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.restore-stepper { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: var(--ui-space-3); overflow: hidden; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
+.restore-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: var(--ui-space-3); overflow: hidden; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .restore-stepper button { display: flex; align-items: center; gap: var(--ui-space-2); min-height: 3rem; padding: var(--ui-space-2); border: 0; border-right: 1px solid var(--ui-color-border); background: transparent; color: var(--ui-color-text-subtle); text-align: left; }
 .restore-stepper button:last-child { border-right: 0; }
 .restore-stepper button span { display: grid; place-items: center; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border: 1px solid var(--ui-color-border); border-radius: 50%; font-size: var(--ui-font-size-xs); }
-.restore-stepper button b { font-size: var(--ui-font-size-xs); }
+.restore-stepper button b { font-weight: 400; font-size: var(--ui-font-size-xs); }
 .restore-stepper button.is-active { background: var(--ui-color-surface-raised); box-shadow: inset 0 -3px var(--ui-color-accent); color: var(--ui-color-text); }
 .restore-stepper button.is-active span { border-color: var(--ui-color-accent); color: var(--ui-color-accent); }
 .restore-stepper button.is-done span { border-color: var(--ui-state-success-border); color: var(--ui-state-success-fg); }
 .restore-stepper button.is-active.is-done { box-shadow: inset 0 -3px var(--ui-state-success-fg); }
-.restore-redesign-workspace > .settings-body { display: block; padding: 0 !important; }
+.restore-redesign-workspace > .settings-body { display: block; height: clamp(28rem, calc(100dvh - 28rem), 44rem); overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior-y: contain; padding: var(--ui-space-3) !important; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .restore-workspace-header { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); min-height: 4rem; margin-bottom: var(--ui-space-3); padding: var(--ui-space-3) var(--ui-space-4); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .restore-workspace-header small, .restore-workspace-header h2, .restore-workspace-header p { display: block; margin: 0; }
 .restore-workspace-header small { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
 .restore-workspace-header h2 { margin-top: 2px; font-size: var(--ui-font-size-xl); }
 .restore-workspace-header p { margin-top: 3px; color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-sm); }
-#restore-step-panel-1 > .form-label, #restore-step-panel-1 > .restore-select,
 #restore-step-panel-2 > .form-label, #restore-step-panel-2 > .restore-select { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.restore-selected-job-card { display: flex; align-items: center; gap: var(--ui-space-3); min-height: 7rem; padding: var(--ui-space-4); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
-.restore-selected-job-card .type-icon { width: 3.25rem; height: 3.25rem; }
-.restore-selected-job-card h3, .restore-selected-job-card small { display: block; margin: 0; }
-.restore-selected-job-card h3 { margin-top: 2px; }
-.restore-selected-job-card small { margin-top: 3px; color: var(--ui-color-text-subtle); }
-.restore-selected-job-card .ready { margin-left: auto; color: var(--ui-state-success-fg); }
 
 .restore-archive-list { display: grid; gap: var(--ui-space-2); }
 .restore-archive-filter-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-3); margin-bottom: var(--ui-space-3); padding: var(--ui-space-3); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
@@ -232,21 +227,15 @@
 #restore-step-panel-5.restore-live-mode .restore-start-actions { display: none; }
 #restore-step-panel-5.restore-live-mode .restore-precheck-output { margin-top: 0; }
 #restore-step-panel-5.restore-live-mode .restore-precheck-output summary { color: var(--ui-color-text); font-weight: var(--ui-font-weight-semibold); }
-.restore-wizard-actions { display: flex; align-items: center; justify-content: space-between; margin-top: var(--ui-space-3); }
-.restore-wizard-actions span { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
+.restore-wizard-actions { display: grid; grid-template-columns: minmax(6rem, auto) 1fr minmax(6rem, auto); align-items: center; gap: var(--ui-space-2); margin-top: var(--ui-space-3); }
+.restore-wizard-actions span { text-align: center; color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
 
 @media (max-width: 1100px) {
   .restore-redesign-layout { grid-template-columns: minmax(0, 1fr); }
-  .restore-job-sidebar { position: static; }
-  .restore-sidebar-job-list { display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; }
-  .restore-sidebar-group { display: contents; }
-  .restore-sidebar-group > header { display: none; }
-  .restore-sidebar-job { min-width: 13rem; }
   .restore-browser-layout, .restore-target-grid, .restore-review-grid, .restore-run-card, .restore-history-card, .restore-history-detail-grid { grid-template-columns: minmax(0, 1fr); }
   .restore-view-tabs { width: 100%; }
   .restore-stepper button b { display: inline; font-size: .7rem; }
   .restore-stepper button { gap: .3rem; padding: .5rem .25rem; }
-  .restore-selection-steps > .restore-job-sidebar { display: none; }
 }
 @media (max-width: 767px) {
   .restore-archive-filter-controls { grid-template-columns: minmax(0, 1fr); }
@@ -314,3 +303,17 @@
   .restore-run-banner { flex-wrap: wrap; }
   .restore-run-duration { width: 100%; text-align: left; }
 }
+
+@media (max-width: 767px) {
+  .restore-location-row, .restore-job-row { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .restore-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .restore-stepper button { justify-content: flex-start; }
+}
+@media (pointer: coarse) {
+  .restore-location, .restore-job-tab { min-height: 44px; }
+}
+
+#page-restore .restore-workspace-header { min-height: 0; padding: 0 0 var(--ui-space-3); border: 0; border-radius: 0; }
+#page-restore .restore-archive-row strong { font-weight: 400; }
+#page-restore .restore-view-tabs { width: fit-content; }
+#page-restore .restore-view-tabs button { white-space: nowrap; font-weight: 400; }

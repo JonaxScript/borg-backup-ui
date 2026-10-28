@@ -6,7 +6,10 @@
 
 window.BBUI = window.BBUI || {};
 window.BBUI.restoreState = window.BBUI.restoreState || {
-  step: 1,
+  step: 2,
+  location: '',
+  changingJob: false,
+  assistBusy: false,
   job: '',
   archive: '',
   path: '',
@@ -69,13 +72,17 @@ function restoreStatusIcon(status) {
 
 /**
  * Show a clamped restore wizard step and update navigation/precheck state.
- * @param {number} step Requested step from one through five.
+ * Internal panel IDs 2–5 are retained for the existing restore operations.
+ * @param {number} step Requested panel ID (2: archive through 5: review).
  */
 function restoreSetStep(step) {
-  const next = Math.max(1, Math.min(5, Number(step) || 1));
+  const next = Math.max(2, Math.min(5, Number(step) || 2));
+  if (next !== restoreState.step) {
+    const content = document.getElementById('restore-step-content');
+    if (content) content.scrollTop = 0;
+  }
   restoreState.step = next;
-  document.getElementById('restore-wizard')?.classList.toggle('restore-selection-steps', next >= 3);
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 2; i <= 5; i++) {
     const panel = document.getElementById(`restore-step-panel-${i}`);
     if (panel) panel.style.display = i === next ? '' : 'none';
     const badge = document.getElementById(`restore-step-badge-${i}`);
@@ -86,17 +93,18 @@ function restoreSetStep(step) {
       badge.classList.toggle('is-done', done);
       badge.setAttribute('aria-current', i === next ? 'step' : 'false');
       const number = badge.querySelector('span');
-      if (number) number.textContent = done ? '✓' : String(i);
+      if (number) number.textContent = done ? '✓' : String(i - 1);
     }
   }
   _restoreMsg('');
   const backBtn = document.getElementById('restore-step-back-btn');
   const nextBtn = document.getElementById('restore-step-next-btn');
   if (backBtn) {
-    backBtn.disabled = next <= 1 && !restoreState.completed;
+    backBtn.disabled = restoreState.assistBusy || (next <= 2 && !restoreState.completed);
     backBtn.textContent = (next === 5 && restoreState.completed) ? restoreT('close') : restoreT('back');
   }
   if (nextBtn) {
+    nextBtn.disabled = restoreState.assistBusy;
     nextBtn.style.display = next >= 5 ? 'none' : '';
     nextBtn.textContent = next === 4 ? restoreT('toCheck') : restoreT('next');
   }
@@ -107,7 +115,7 @@ function restoreSetStep(step) {
     restoreEnsureAutoPrecheck();
   }
   const status = document.getElementById('restore-step-status');
-  if (status) status.textContent = restoreT('stepStatus', { step: next, total: 5 });
+  if (status) status.textContent = restoreT('stepStatus', { step: next - 1, total: 4 });
   _restoreRenderSelectionSummary();
 }
 
@@ -158,29 +166,63 @@ function restoreJobIcon(job) {
   const icon = resolveJobIcon(job);
   const color = resolveJobIconColor(job);
   const colorClass = color ? ` type-icon-color-${color}` : '';
-  return `<span class="type-icon restore-sidebar-job-icon${colorClass}">${typeIcon(icon)}</span>`;
+  return `<span class="type-icon restore-job-icon${colorClass}">${typeIcon(icon)}</span>`;
 }
 
-function renderRestoreJobSidebar() {
-  const list = document.getElementById('restore-sidebar-job-list');
-  if (!list) return;
-  const query = String(document.getElementById('restore-sidebar-search')?.value || '').trim().toLowerCase();
-  const jobs = (restoreState.jobs || []).filter((job) =>
-    `${job.display_name || ''} ${job.name || ''} ${job.key || ''} ${job.location || ''}`.toLowerCase().includes(query)
-  );
-  if (!jobs.length) {
-    list.innerHTML = `<div class="restore-sidebar-empty">${escHtml(restoreT('noMatchingJobs'))}</div>`;
-    return;
+/** Render location/job tabs; browsing locations does not change the restore source. */
+function renderRestoreJobNavigation() {
+  const list = document.getElementById('restore-job-list');
+  const locations = document.getElementById('restore-location-list');
+  if (!list || !locations) return;
+  const jobs = restoreState.jobs || [];
+  const locationOf = job => String(job.location || 'local').toLowerCase();
+  const order = [...new Set(['local', 'usb', 'smb', 'storagebox', ...jobs.map(locationOf)])]
+    .filter(location => jobs.some(job => locationOf(job) === location));
+  if (!order.includes(restoreState.location)) {
+    restoreState.location = locationOf(jobs.find(job => String(job.key) === String(restoreState.job)) || jobs[0] || {});
   }
-  const order = ['local', 'usb', 'smb', 'storagebox'];
-  list.innerHTML = order.map((location) => {
-    const locationJobs = jobs.filter((job) => String(job.location || '').toLowerCase() === location);
-    if (!locationJobs.length) return '';
-    return `<section class="restore-sidebar-group"><header>${escHtml(restoreLocationLabel(location))}<span>${locationJobs.length}</span></header>${locationJobs.map((job) => {
-      const active = String(job.key) === String(restoreState.job);
-      return `<button type="button" class="restore-sidebar-job ${active ? 'is-active' : ''}" data-restore-sidebar-job="${escHtml(job.key)}" ${active ? 'aria-current="page"' : ''}>${restoreJobIcon(job)}<span><strong>${escHtml(job.name || job.display_name || job.key)}</strong><small>${escHtml(job.archive_prefix || '')}</small></span></button>`;
-    }).join('')}</section>`;
-  }).join('');
+  const disabled = restoreState.assistBusy ? 'disabled' : '';
+  locations.innerHTML = order.map(location => `<button type="button" class="restore-location ${location === restoreState.location ? 'is-active' : ''}" data-restore-location="${escHtml(location)}" aria-pressed="${location === restoreState.location}" ${disabled}>${escHtml(restoreLocationLabel(location))}<span class="location-nav-count">${jobs.filter(job => locationOf(job) === location).length}</span></button>`).join('');
+  list.innerHTML = jobs.filter(job => locationOf(job) === restoreState.location).map(job => {
+    const active = String(job.key) === String(restoreState.job);
+    return `<button type="button" class="restore-job-tab ${active ? 'is-active' : ''}" data-restore-job="${escHtml(job.key)}" aria-pressed="${active}" ${disabled}>${restoreJobIcon(job)}<span>${escHtml(job.name || job.display_name || job.key)}</span></button>`;
+  }).join('') || `<span class="restore-sidebar-empty">${escHtml(restoreT('noMatchingJobs'))}</span>`;
+}
+
+/** Confirm before discarding a restore draft, then reset it and load the new job's archives.
+ * @param {string} key Backup-job key; unknown/current jobs or busy restores are ignored.
+ * @returns {Promise<void>} Resolves after confirmation and archive loading; API errors appear inline.
+ */
+async function restoreSelectJob(key) {
+  const job = restoreState.jobs.find(item => String(item.key) === String(key));
+  if (!job || String(key) === String(restoreState.job) || restoreState.assistBusy || restoreState.changingJob) return;
+  restoreState.changingJob = true;
+  const previous = document.activeElement;
+  const sourceRequest = restoreState.sourceRequest;
+  try {
+    if (restoreState.archive || restoreState.selectedPath || restoreState.precheck) {
+      const confirmed = await _openSettingsDialog({title: restoreT('changeJobTitle'),
+        message: restoreT('changeJobMessage'), confirmText: restoreT('changeJobConfirm'),
+        onOpen: ({modal}) => modal.querySelector('#settings-dialog-cancel-btn')?.focus()});
+      if (!confirmed || sourceRequest !== restoreState.sourceRequest || restoreState.assistBusy) return;
+    }
+    _stopRestorePolling();
+    restoreState.completed = false;
+    restoreState.activeRestoreId = '';
+    restoreState.runSnapshot = null;
+    restoreSetLiveMode(false);
+    document.getElementById('restore-target-path').value = `${_restorePrimaryAllowedRoot()}/`;
+    document.getElementById('restore-conflict-mode').value = 'skip';
+    document.getElementById('restore-dry-run').checked = true;
+    document.getElementById('restore-preserve-owner').checked = false;
+    document.getElementById('restore-job-sel').value = key;
+    restoreState.location = String(job.location || 'local').toLowerCase();
+    restoreSetStep(2);
+    return restoreLoadArchives();
+  } finally {
+    restoreState.changingJob = false;
+    if (previous?.isConnected) previous.focus();
+  }
 }
 
 function restoreJobName(key) {
@@ -196,20 +238,6 @@ function restoreLocationLabel(location) {
     smb: restoreT('locationSmb'),
     local: restoreT('locationLocal'),
   })[key] || location || '—';
-}
-
-function renderRestoreSelectedJob() {
-  const card = document.getElementById('restore-selected-job-card');
-  const badge = document.getElementById('restore-job-ready-badge');
-  if (!card) return;
-  const job = (restoreState.jobs || []).find((item) => String(item.key) === String(restoreState.job));
-  if (!job) {
-    card.innerHTML = `<span class="muted">${escHtml(restoreT('chooseJob'))}</span>`;
-    if (badge) badge.textContent = '';
-    return;
-  }
-  card.innerHTML = `${restoreJobIcon(job)}<div><small>${escHtml(restoreT('selectedJob'))}</small><h3>${escHtml(job.name || job.display_name || job.key)}</h3><small>${escHtml(job.archive_prefix || '')} · ${escHtml(restoreLocationLabel(job.location))}</small></div><span class="ready">${escHtml(restoreT('ready'))}</span>`;
-  if (badge) badge.textContent = restoreT('jobSelected');
 }
 
 function renderRestoreArchiveList() {
@@ -271,13 +299,16 @@ function renderRestoreSourceContext() {
 }
 
 function onRestoreRedesignClick(event) {
-  const jobButton = event.target.closest('[data-restore-sidebar-job]');
+  const locationButton = event.target.closest('[data-restore-location]');
+  if (locationButton) {
+    if (restoreState.assistBusy) return;
+    restoreState.location = locationButton.dataset.restoreLocation;
+    renderRestoreJobNavigation();
+    return;
+  }
+  const jobButton = event.target.closest('[data-restore-job]');
   if (jobButton) {
-    const select = document.getElementById('restore-job-sel');
-    if (!select) return;
-    select.value = jobButton.dataset.restoreSidebarJob || '';
-    restoreLoadArchives();
-    restoreSetStep(1);
+    restoreSelectJob(jobButton.dataset.restoreJob || '');
     return;
   }
   const archiveButton = event.target.closest('[data-restore-archive]');
@@ -291,14 +322,15 @@ function onRestoreRedesignClick(event) {
   }
   const stepButton = event.target.closest('[data-restore-step]');
   if (stepButton) {
-    const step = Number(stepButton.dataset.restoreStep || 1);
-    if (step <= restoreState.step || restoreCanAdvance(step - 1)) restoreSetStep(step);
+    const step = Number(stepButton.dataset.restoreStep || 2);
+    if (restoreState.assistBusy) return;
+    if (step <= restoreState.step || [2, 3, 4].filter(value => value < step).every(restoreCanAdvance)) restoreSetStep(step);
   }
 }
 
 function restoreCanAdvance(step) {
   if (step === 1) return !!restoreState.job;
-  if (step === 2) return !!restoreState.archive;
+  if (step === 2) return !!(restoreState.job && restoreState.archive);
   if (step === 3) return !!restoreState.selectedPath;
   if (step === 4) {
     const target = document.getElementById('restore-target-path')?.value?.trim() || '';
@@ -308,6 +340,7 @@ function restoreCanAdvance(step) {
 }
 
 function restoreStepNext() {
+  if (restoreState.assistBusy) return;
   if (!restoreCanAdvance(restoreState.step)) {
     if (restoreState.step === 1) return _restoreMsg(restoreT('selectJobFirst'), true);
     if (restoreState.step === 2) return _restoreMsg(restoreT('selectArchiveFirst'), true);
@@ -321,6 +354,7 @@ function restoreStepNext() {
 }
 
 function restoreStepBack() {
+  if (restoreState.assistBusy) return;
   if (restoreState.step === 5 && restoreState.completed) {
     restoreReloadWizard();
     return;
@@ -924,6 +958,8 @@ async function restoreInit() {
   const selectedJob = restoreState.job;
   const request = ++restoreState.sourceRequest;
   restoreState.job = '';
+  restoreState.jobs = [];
+  renderRestoreJobNavigation();
   restoreState.archiveFilterMode = 'job';
   restoreState.archiveFilterPattern = '';
   restoreRenderArchiveFilterControls();
@@ -937,7 +973,7 @@ async function restoreInit() {
   const empty = document.getElementById('restore-empty');
   if (empty) empty.style.display = 'none';
   restoreSwitchView(restoreState.view || 'wizard');
-  restoreSetStep(1);
+  restoreSetStep(2);
   _restoreMsg('');
   _restoreBindTargetAutocomplete();
   const targetInput = document.getElementById('restore-target-path');
@@ -970,21 +1006,22 @@ async function restoreInit() {
       if (checkRes.ok) {
         const checkData = await checkRes.json();
         if (request !== restoreState.sourceRequest) return;
-        for (const job of (checkData.jobs || [])) {
+        for (const job of (checkData.jobs || []).filter(job => !job.is_utility)) {
           const opt = document.createElement('option');
           opt.value = job.key;
           opt.textContent = job.name || job.key;
           sel.appendChild(opt);
         }
-        restoreState.jobs = (checkData.jobs || []).map((job) => ({ ...job, location: job.location || 'local' }));
+        restoreState.jobs = (checkData.jobs || []).filter(job => !job.is_utility).map((job) => ({ ...job, location: job.location || 'local' }));
       }
     }
-    if (restoreState.jobs.some(job => String(job.key) === String(selectedJob))) {
-      sel.value = selectedJob;
-      restoreState.job = selectedJob;
+    const selected = restoreState.jobs.find(job => String(job.key) === String(selectedJob)) || restoreState.jobs[0];
+    if (selected) {
+      sel.value = selected.key;
+      restoreState.job = selected.key;
+      restoreState.location = String(selected.location || 'local').toLowerCase();
     }
-    renderRestoreJobSidebar();
-    renderRestoreSelectedJob();
+    renderRestoreJobNavigation();
     renderRestoreSourceContext();
     if (restoreState.job) await restoreLoadArchives();
   } catch (e) {
@@ -1057,8 +1094,7 @@ async function restoreLoadArchives() {
     restoreEditArchiveFilter();
     return;
   }
-  renderRestoreJobSidebar();
-  renderRestoreSelectedJob();
+  renderRestoreJobNavigation();
   _restoreMsg(restoreT('loadingArchives'));
 
   try {
@@ -1552,6 +1588,12 @@ async function restoreLoadAllowedTargetRoots() {
 }
 
 function _setRestoreAssistBusy(busy) {
+  restoreState.assistBusy = !!busy;
+  document.querySelectorAll?.('[data-restore-location], [data-restore-job], #restore-stepper button').forEach(button => { button.disabled = !!busy; });
+  const back = document.getElementById('restore-step-back-btn');
+  const next = document.getElementById('restore-step-next-btn');
+  if (back) back.disabled = !!busy || restoreState.step <= 2;
+  if (next) next.disabled = !!busy;
   const preBtn = document.getElementById('restore-precheck-btn');
   const startBtn = document.getElementById('restore-start-btn');
   const confirmCheck = document.getElementById('restore-confirm-check');
@@ -1918,13 +1960,12 @@ window.addEventListener?.('bbui:language-changed', () => {
   if (Array.isArray(restoreState.files) && restoreState.files.length) {
     _restoreRenderFiles(restoreState.files);
   }
-  renderRestoreJobSidebar();
-  renderRestoreSelectedJob();
+  renderRestoreJobNavigation();
   renderRestoreArchiveList();
   renderRestorePrecheck(restoreState.precheck);
   if (restoreState.liveMode && restoreState.runSnapshot) renderRestoreRunStatus(restoreState.runSnapshot);
   const stepLabel = document.getElementById('restore-step-status');
-  if (stepLabel) stepLabel.textContent = restoreT('stepStatus', {step: restoreState.step, total: 5});
+  if (stepLabel) stepLabel.textContent = restoreT('stepStatus', {step: restoreState.step - 1, total: 4});
   _restoreRenderBreadcrumb(restoreState.path);
   if (restoreState.precheck && !restoreState.liveMode) {
     const output = document.getElementById('restore-precheck-output');

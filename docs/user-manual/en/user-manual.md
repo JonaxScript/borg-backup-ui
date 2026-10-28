@@ -748,13 +748,11 @@ The page has two tabs:
 
 ### 7.3 Restore Wizard
 
-The wizard consists of five steps.
+First select the location and backup job in the shared tabs at the top. The tabs show configured job icons and only locations with backup jobs. Changing location filters the offered jobs; selecting a job changes the restore source. Switching jobs asks for confirmation before resetting an existing archive, file and destination selection. Selection is locked during an active restore operation.
 
-#### Step 1: Select Job
+The wizard below contains four steps. Location and job tabs remain visible; long content scrolls inside the workspace while Back and Next stay in place. The separate Restore History remains available.
 
-Select the job whose archive you want to browse. The sidebar groups jobs by location and shows the configured job icons.
-
-#### Step 2: Select Archive
+#### Step 1: Select Archive
 
 Select an archive from the repository assigned to the job. **Show archives** offers three options:
 
@@ -766,7 +764,7 @@ The filter applies only to this restore selection. Backup names and retention ru
 
 If no archives are visible, check repository access, passphrase, storage status, and the displayed archive pattern. After a job repository change, older archives remain in the previous repository and do not appear here; the change neither moves nor copies them.
 
-#### Step 3: Selection
+#### Step 2: Selection
 
 Use the **Folder tree** on the left: the arrow expands or collapses a branch; clicking a folder name shows its contents on the right. When first opening an archive, the view automatically follows folders with only one subfolder until it reaches files or several subfolders. This avoids clicking through every level of paths such as `mnt/user/demo/source/Documents`. Further branches load only when opened, and expanded folders stay open while you select entries.
 
@@ -776,7 +774,7 @@ Use the checkboxes to select up to 256 files or folders from the same archive. T
 
 Multiple selections keep the structure below their common parent. For example, selecting `Backup/Test1` and `Backup/Test2` restores `Target/Test1` and `Target/Test2`. Selecting `Backup/Test1` and `Other/Test1` preserves both parent folders below the target. A single selected directory keeps the previous behavior: if the target already has the same name, its contents are restored directly there.
 
-#### Step 4: Target & Mode
+#### Step 3: Target & Mode
 
 Review the read-only **Archive path**, then set the target directory and conflict behavior. The repository and archive are shown separately below the archive path so the origin of the selection remains clear.
 
@@ -816,9 +814,9 @@ Allowed examples when deliberately configured:
 
 > **Warning:** Never restore directly into system paths. A wrong restore target path can overwrite existing data or make a system unusable.
 
-#### Step 5: Review & Start
+#### Step 4: Review & Start
 
-Below the three summary cards in **Step 5**, the **Restore plan** lists the archive source, planned action and destination path for every entry. Skipped destinations and simulations are explicitly identified; timestamp renaming is noted alongside the destination.
+Below the three summary cards in **Step 4**, the **Restore plan** lists the archive source, planned action and destination path for every entry. Skipped destinations and simulations are explicitly identified; timestamp renaming is noted alongside the destination.
 
 The final step shows summary and system check. Depending on the selection, the technical precheck output can be expanded. Validation errors state the concrete reason, such as a missing or unwritable target, a target outside the allowed restore roots, or a missing archive selection. **Cancel** closes the start dialog without restoring; after explicit confirmation, the restore starts.
 
