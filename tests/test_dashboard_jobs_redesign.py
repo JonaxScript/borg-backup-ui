@@ -144,15 +144,16 @@ def test_dashboard_jobs_layout_is_tablet_and_mobile_responsive() -> None:
     assert "var(--ui-state-neutral-bg)" in css
 
 
-def test_dashboard_circular_summaries_and_disclosures_use_theme_and_accessible_controls() -> None:
+def test_dashboard_circular_summaries_and_disclosures_use_semantic_colors_and_accessible_controls() -> None:
     css = _read("ui/dashboard-jobs.css")
     script = _read("ui/js/pages/dashboard.js")
     html = _read("ui/index.html")
 
     assert html.count('class="dashboard-summary-section"') == 3
     assert 'id="dashboard-attention"' in html
-    for state in ("success", "warning", "error", "neutral"):
-        assert f"--dashboard-ring-{state}: var(--ui-state-{state}-fg)" in css
+    for state in ("success", "warning", "error", "cancelled", "unknown"):
+        assert f"--dashboard-ring-{state}: var(--dashboard-status-{state})" in css
+    assert "--dashboard-ring-neutral: var(--dashboard-status-skipped)" in css
     assert 'role="img" aria-label=' in script
     assert 'aria-controls="${id}" aria-expanded=' in script
     assert '.dashboard-details-row[hidden]' in css

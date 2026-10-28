@@ -198,7 +198,7 @@ function dashboardBackupSummary(backups) {
 }
 
 /**
- * Build a compact labeled ring and outcome counts using the current theme.
+ * Build a compact labeled ring with solid, hard-stop color segments and outcome counts.
  * @param {object[]} rows Counts, translated labels and fixed semantic color classes.
  * @param {number} value Verified/successful count shown inside the ring.
  * @param {number} total Scope denominator; zero produces an empty neutral ring.
@@ -236,7 +236,7 @@ function renderSummaryBar(backups) {
     { cls: 'warning', count: summary.counts.warning, label: dashboardT('dashboard.withWarnings') },
     { cls: 'error', count: summary.counts.error, label: dashboardT('dashboard.errors') },
     { cls: 'neutral', count: summary.counts.skipped, label: dashboardT('dashboard.skipped') },
-    ...(summary.counts.cancelled ? [{ cls: 'warning', count: summary.counts.cancelled, label: dashboardT('jobs.statusCancelled') }] : []),
+    ...(summary.counts.cancelled ? [{ cls: 'cancelled', count: summary.counts.cancelled, label: dashboardT('jobs.statusCancelled') }] : []),
     ...(summary.counts.unknown ? [{ cls: 'unknown', count: summary.counts.unknown, label: dashboardT('dashboard.unknownOrNever') }] : []),
   ];
   const focused = document.activeElement?.id === 'dashboard-overdue-toggle';
@@ -321,11 +321,11 @@ function renderDashboardAttention(backups) {
   const focused = document.activeElement?.id === 'dashboard-attention-toggle';
   const first = items[0];
   el.innerHTML = items.length ? `<details class="dashboard-attention-disclosure ${first.cls}"${dashboardAttentionExpanded ? ' open' : ''}>
-    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${first.cls === 'error' ? iconX() : iconWarn()}</span>
+    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${iconWarn()}</span>
       <strong>${escHtml(dashboardT('dashboard.attentionCount', {count: items.length}))}</strong>
-      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · ${escHtml(first.label)}</span>
+      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · <span class="dashboard-attention-label">${escHtml(first.label)}</span></span>
       <span class="dashboard-attention-action">${escHtml(dashboardT('dashboard.viewDetails'))}<span class="dashboard-details-chevron" aria-hidden="true">›</span></span></summary>
-    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div></li>`).join('')}</ul></details>` : '';
+    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div></li>`).join('')}</ul></details>` : '';
   el.querySelector('details')?.addEventListener('toggle', event => { dashboardAttentionExpanded = event.currentTarget.open; });
   if (focused) el.querySelector('summary')?.focus({preventScroll: true});
 }
@@ -900,11 +900,11 @@ function renderManagementAttention(rows) {
   el.hidden = false;
   const open = el.querySelector('details')?.open || false;
   patchJobMarkup(el, items.length ? `<details class="dashboard-attention-disclosure ${first.cls}"${open ? ' open' : ''}>
-    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${first.cls === 'error' ? iconX() : iconWarn()}</span>
+    <summary id="dashboard-attention-toggle"><span class="dashboard-attention-icon" aria-hidden="true">${iconWarn()}</span>
       <strong>${escHtml(dashboardT('management.attention'))} · ${items.length}</strong>
-      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · ${escHtml(first.label)}</span>
+      <span class="dashboard-attention-preview">${escHtml(first.backup.name || first.backup.display_name || first.backup.key)} · <span class="dashboard-attention-label">${escHtml(first.label)}</span></span>
       <span class="dashboard-attention-action">${escHtml(dashboardT('dashboard.viewDetails'))}<span class="dashboard-details-chevron" aria-hidden="true">›</span></span></summary>
-    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${item.cls === 'error' ? iconX() : iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button class="btn btn-secondary btn-sm" data-dashboard-jobs="${escHtml(item.backup.key)}" data-location="${escHtml(dashboardLocationKey(item.backup))}">${escHtml(dashboardT('management.openJob'))}</button></li>`).join('')}</ul></details>`
+    <ul>${items.map(item => `<li class="${item.cls}"><span class="dashboard-attention-icon" aria-hidden="true">${iconWarn()}</span><div><strong>${escHtml(item.backup.name || item.backup.display_name || item.backup.key)} · ${escHtml(dashboardLocationLabel(dashboardLocationKey(item.backup)))}</strong><span class="dashboard-attention-label">${escHtml(item.label)}</span><p>${escHtml(item.message)}</p></div><button class="btn btn-secondary btn-sm" data-dashboard-jobs="${escHtml(item.backup.key)}" data-location="${escHtml(dashboardLocationKey(item.backup))}">${escHtml(dashboardT('management.openJob'))}</button></li>`).join('')}</ul></details>`
     : `<div class="dashboard-attention-clear"><span class="dashboard-attention-icon" aria-hidden="true">${iconCheck()}</span><strong>${escHtml(dashboardT('management.attention'))}</strong><span>${escHtml(dashboardT('management.noProblems'))}</span></div>`);
 }
 

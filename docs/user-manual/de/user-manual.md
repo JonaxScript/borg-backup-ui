@@ -173,6 +173,8 @@ Vier kompakte Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung**, **A
 
 **Handlungsbedarf** zeigt eine kompakte Statuszeile. Bei Problemen öffnet **Ansehen** vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden in der Karte **Restore-Abdeckung** mit einem Link zu Restore Tests genannt.
 
+Statusgrafiken verwenden einheitliche, klare Vollfarben: Grün für Erfolg, Orange für Warnungen, Rot für Fehler, Grau für übersprungene, Blauviolett für abgebrochene und Hellgrau für unbekannte Ergebnisse. Handlungsbedarf bleibt auf einer neutralen Kartenfläche mit Warndreieck; konkrete Fehler sind weiterhin am Text erkennbar. Die Server-Auslastung behält ihre blaue Darstellung.
+
 Die Info-Symbole an den Diagrammtiteln öffnen Erläuterungen zur Berechnung und Datengrundlage. Sie lassen sich auch per Tastatur bedienen. Auf großen Desktop-Bildschirmen bleibt die normale Übersicht einschließlich Standorttabelle kompakt; geöffnete Details, laufende Tests oder kleinere Bildschirme können Scrollen erfordern.
 
 **Entwicklung** wertet gespeicherte Backup-Läufe über 7, 30 oder 90 Kalendertage einschließlich heute in der Server-Zeitzone aus. Die Erfolgsquote ist erfolgreiche Läufe / (erfolgreiche Läufe + Warnungen + Fehler). Übersprungene, abgebrochene und unbekannte Läufe zählen separat. Das ist eine historische Quote und nicht der Anteil der aktuell erfolgreichen Jobs.
