@@ -16,7 +16,6 @@ window.BBUI.storageState = window.BBUI.storageState || {
   archiveBrowser: { repositoryKey: '', archive: '', path: '', files: [], loading: false, error: '' },
   lifecycleCache: {},
   maintenanceState: { running: false },
-  search: '',
   pendingRepositoryKeyImportGuide: false,
 };
 const storageState = window.BBUI.storageState;
@@ -265,25 +264,9 @@ function storageRepositories(data) {
   );
 }
 
+/** Select registered repositories by exact storage target, including unassigned entries. */
 function storageVisibleRepositories(data) {
-  const query = String(storageState.search || '').trim().toLocaleLowerCase();
-  return storageRepositories(data).filter((repo) => {
-    if (storageState.target !== 'all' && storageTargetKey(repo) !== storageState.target) return false;
-    if (!query) return true;
-    return [
-      repo.backup_type,
-      repo.conf_key,
-      repo.repository_key,
-      repo.repository_name,
-      repo.display_name,
-      repo.storage_name,
-      repo.path_display,
-      storageLocationLabel(repo.location),
-      ...(repo.used_by || []),
-      ...storageJobsForRepository(repo).map(job => storageJobName(repo, job)),
-    ]
-      .some((value) => String(value || '').toLocaleLowerCase().includes(query));
-  });
+  return storageRepositories(data).filter(repo => storageState.target === 'all' || storageTargetKey(repo) === storageState.target);
 }
 
 async function refreshStorage() {
@@ -328,11 +311,13 @@ function renderStorage(data) {
   }
   if (storageState.archiveBrowser.repositoryKey !== storageState.selectedRepositoryKey) resetStorageArchiveBrowser();
   renderStorageLocationSidebar(data, storageRepositories(data));
-  const search = document.getElementById('storage-sidebar-search');
-  if (search && search.value !== storageState.search) search.value = storageState.search;
-  el.innerHTML = visible.length
-    ? storageGroupRows(data, visible).map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
-    : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`;
+  const groups = storageGroupRows(data, visible);
+  const title = storageState.target === 'all' ? storageT('storage.allStorageTargets') : groups[0]?.target.display_name || storageT('storage.storageTargets');
+  const countLabel = count => storageT(count === 1 ? 'storage.repositoryCountOne' : 'storage.repositoryCountMany', { count });
+  el.innerHTML = `<div class="storage-selection-summary"><h2>${escHtml(title)}</h2><span class="storage-target-count">${escHtml(countLabel(visible.length))}</span></div>` + (visible.length
+    ? groups.map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-count">${escHtml(countLabel(rows.length))}</span><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header><div class="storage-column-headings" aria-hidden="true">${['repository', 'storageTarget', 'linkedJobs', 'archiveData'].map(column => `<span>${escHtml(storageT('storage.columns.' + column))}</span>`).join('')}</div>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
+    : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`);
+
   if (focusData) Array.from(el.querySelectorAll('[data-storage-action]')).find(node => Object.entries(focusData).every(([key, value]) => node.dataset[key] === value))?.focus({ preventScroll: true });
 }
 
@@ -344,23 +329,39 @@ function storageTargetKey(repo) {
 /** List every linked job; an unassigned repository remains a first-class entry. */
 function storageRepositoryJobsLabel(repo) {
   const jobs = storageJobsForRepository(repo);
-  return jobs.length ? jobs.map(job => storageJobName(repo, job)).join(' · ') : storageT('storage.repositoryNoLinkedJobs');
+  return jobs.length ? jobs.map(job => storageJobName(repo, job)).join(', ') : storageT('storage.repositoryNoLinkedJobs');
 }
 
-/** Compact repository identity, cached facts and one expandable management workspace. */
+/** Describe the configured transport without claiming that its target is reachable. */
+function storageRepositoryTransport(repo) {
+  return { local: storageT('storage.local'), usb: 'USB', smb: 'SMB', storagebox: 'SSH', ssh: 'SSH' }[repo.location] || storageLocationLabel(repo.location);
+}
+
+/** Render four aligned repository facts and an expandable management workspace. */
 function renderStorageRepositoryCard(repo) {
   const key = storageRepositoryKey(repo);
   const open = storageState.expanded && storageState.selectedRepositoryKey === key;
   const job = storageJobForRepository(repo);
   const status = storageRepositoryStatus(repo);
-  const iconStatus = { success: 'success', warning: 'warning', error: 'error', info: 'running', neutral: 'idle' }[status.className];
+  const iconStatus = status && { warning: 'warning', error: 'error', info: 'running' }[status.className];
   const size = repo.repository_stats?.unique_csize;
+  const count = storageRepositoryArchiveCount(repo);
+  const updatedAt = repo.last_info_refresh_at;
+  const label = column => `<span class="storage-card-mobile-label">${escHtml(storageT('storage.columns.' + column))}</span>`;
+  const jobs = storageJobsForRepository(repo).length
+    ? storageT('storage.columns.jobs', { names: storageRepositoryJobsLabel(repo) })
+    : storageT('storage.columns.noJobs');
   return `<article class="storage-repository-card" data-repository-card="${escHtml(key)}">
     <div class="storage-card-summary">
-      <button type="button" class="job-details-disclosure storage-card-toggle" data-storage-action="toggle-repository" data-repository-key="${escHtml(key)}" aria-expanded="${!!open}" aria-controls="repository-details-${escHtml(key)}" aria-label="${escHtml(storageT(open ? 'storage.hideDetails' : 'storage.showDetails'))}: ${escHtml(storageRepositoryTitle(repo, null))}"><span aria-hidden="true">${open ? '⌄' : '›'}</span></button>
-      <div class="storage-card-identity">${storageRepositoryIcon(repo, job)}<div><h2>${escHtml(storageRepositoryTitle(repo, null))}</h2><small>${escHtml(storageRepositoryName(repo))} · ${escHtml(storageName(repo))}</small></div></div>
-      <div class="storage-card-state"><span class="storage-card-status ${status.className}">${storageMaintenanceIcon(iconStatus)}${escHtml(status.label)}</span>${storageRepositoryNeedsExternalKeyBackup(repo) ? `<button type="button" class="storage-card-status warning storage-card-key-warning" data-storage-action="open-repository-key-export-settings">${storageMaintenanceIcon('warning')}${escHtml(storageT('storage.repositoryKeyBackupMissing'))}</button>` : ''}<small>${escHtml(storageRepositoryJobsLabel(repo))}</small></div>
-      <div class="storage-card-size">${size === undefined || size === null ? '—' : storageFormatBytes(size)}<small>${escHtml(storageT('storage.repositoryArchiveCount'))}: ${storageRepositoryArchiveCount(repo) ?? '—'}</small><small>${escHtml(storageT(repo.repository_stats ? 'storage.repositoryCachedData' : 'storage.repositoryInfoUnknown'))}${repo.last_info_refresh_at ? ` · ${escHtml(storageFormatDateTime(repo.last_info_refresh_at))}` : ''}</small></div>
+      <div class="storage-card-identity">
+        <button type="button" class="job-details-disclosure storage-card-toggle" data-storage-action="toggle-repository" data-repository-key="${escHtml(key)}" aria-expanded="${!!open}" aria-controls="repository-details-${escHtml(key)}" aria-label="${escHtml(storageT(open ? 'storage.hideDetails' : 'storage.showDetails'))}: ${escHtml(storageRepositoryTitle(repo, null))}"><span aria-hidden="true">${open ? '⌄' : '›'}</span></button>
+        ${storageRepositoryIcon(repo, job)}<div><h2>${escHtml(storageRepositoryTitle(repo, null))}</h2><small>${escHtml(storageRepositoryName(repo))}</small>
+        ${status ? `<span class="storage-card-status ${status.className}">${storageMaintenanceIcon(iconStatus)}${escHtml(status.label)}</span>` : ''}
+        ${storageRepositoryNeedsExternalKeyBackup(repo) ? `<button type="button" class="storage-card-status warning storage-card-key-warning" data-storage-action="open-repository-key-export-settings">${storageMaintenanceIcon('warning')}${escHtml(storageT('storage.repositoryKeyBackupMissing'))}</button>` : ''}</div>
+      </div>
+      <div class="storage-card-target">${label('storageTarget')}${escHtml(storageName(repo))}<small>${escHtml(storageRepositoryTransport(repo))}</small></div>
+      <div class="storage-card-jobs">${label('linkedJobs')}${escHtml(jobs)}</div>
+      <div class="storage-card-size">${label('archiveData')}<div class="storage-card-facts"><span>${escHtml(storageT(count === 1 ? 'storage.columns.archiveOne' : 'storage.columns.archiveMany', { count: count ?? '—' }))}</span><span>${escHtml(storageT('storage.columns.diskUsed', { size: size === undefined || size === null ? '—' : storageFormatBytes(size) }))}</span></div><small>${escHtml(updatedAt ? storageT('storage.columns.asOf', { date: storageFormatDateTime(updatedAt) }) : storageT('storage.columns.dateUnknown'))}</small></div>
     </div>
     ${open ? renderStorageRepositoryWorkspace(repo, job) : ''}
   </article>`;
@@ -380,13 +381,11 @@ function storageRepositoryArchiveCount(repo) {
   return Number.isSafeInteger(count) && count >= 0 ? count : null;
 }
 
-/** Distinguish cached maintenance results from a passive mount-table observation. */
+/** Return active work or recorded actionable outcomes; no reachability assertions. */
 function storageRepositoryStatus(repo) {
   const running = storageState.maintenanceState?.running
     && String(storageState.maintenanceState?.target_key || '') === storageRepositoryKey(repo);
   if (running) return { className: 'info', label: storageT('storage.repositoryStatusRunning') };
-  const target = storageTargets(storageState.data).find(row => row.storage_key === repo.storage_key);
-  const mountState = target?.mount_state;
   const results = Object.values(repo?.maintenance_results || {}).filter((row) => row && typeof row === 'object');
   const latest = results.sort((a, b) => String(b.finished_at || '').localeCompare(String(a.finished_at || '')))[0];
   if (latest?.status === 'error') return { className: 'error', label: storageT('storage.repositoryLastMaintenanceFailed') };
@@ -397,11 +396,7 @@ function storageRepositoryStatus(repo) {
   if (String(repo?.last_info_refresh_status || '').toLowerCase() === 'error') {
     return { className: 'warning', label: storageT('storage.repositoryLastInfoFailed') };
   }
-  if (mountState === 'not_mounted') return { className: 'neutral', label: storageT('storage.repositoryNotMounted') };
-  if (mountState === 'read_only') return { className: 'neutral', label: storageT('storage.repositoryMountedReadOnly') };
-  return mountState === 'mounted'
-    ? { className: 'neutral', label: storageT('storage.repositoryMounted') }
-    : { className: 'neutral', label: storageT('storage.repositoryReachabilityUnknown') };
+  return null;
 }
 
 /** Reuse a consistent linked-job icon; mixed/unassigned repositories use their type. */
@@ -452,15 +447,6 @@ function onStorageLocationClick(event) {
   storageState.target = button.dataset.storageTarget;
   renderStorage(storageState.data);
   Array.from(document.querySelectorAll('[data-storage-target]')).find(node => node.dataset.storageTarget === storageState.target)?.focus({ preventScroll: true });
-}
-
-function onStorageSearchInput(event) {
-  if (event.target.id !== 'storage-sidebar-search' || !storageState.data) return;
-  storageState.search = event.target.value || '';
-  renderStorage(storageState.data);
-  const input = document.getElementById('storage-sidebar-search');
-  input?.focus();
-  // Search inputs retain their native caret because the toolbar is not replaced.
 }
 
 /** Cached info timestamps and existing settings/key-backup links for an expanded card. */
@@ -652,6 +638,7 @@ function renderStorageRepositoryOverview(repo, job) {
   </div>`;
 }
 
+/** Render paged archives beside a reserved browser pane, retaining navigation geometry. */
 function renderStorageRepositoryArchives(repo) {
   const key = storageRepositoryKey(repo);
   const cache = storageState.archiveCache[key];
@@ -672,7 +659,7 @@ function renderStorageRepositoryArchives(repo) {
         const selected = !!browser && name === browser.archive;
         return `<div class="storage-archive-entry"><button type="button" class="storage-archive-row ${selected ? 'is-selected' : ''}" data-storage-action="open-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" ${selected ? 'aria-current="true"' : ''}><span class="storage-archive-dot"></span><span><strong>${escHtml(name || '—')}</strong></span><time>${escHtml(storageFormatDateTime(archive.start))}</time><span class="storage-archive-open" aria-hidden="true">›</span></button>${canDelete && archive.id ? `<button type="button" class="storage-archive-delete" data-storage-action="delete-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" title="${escHtml(storageT('storage.archiveDelete'))}" aria-label="${escHtml(storageT('storage.archiveDeleteLabel', { name }))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>` : ''}</div>`;
       }).join('')}</div>
-      ${browser?.archive ? renderStorageArchiveBrowser(browser) : ''}
+      ${browser?.archive ? renderStorageArchiveBrowser(browser) : `<section class="storage-archive-browser storage-archive-browser-placeholder"><div class="storage-archive-browser-state">${escHtml(storageT('storage.repositoryArchiveBrowseHint'))}</div></section>`}
     </div>
     <div class="storage-archive-pagination"><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page="${page - 1}"${page === 0 ? ' disabled' : ''}>${escHtml(storageT('storage.previousPage'))}</button><span>${escHtml(storageT('storage.archivePage', { start: page * 5 + 1, end: Math.min(archives.length, page * 5 + 5), count: archives.length }))}</span><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page="${page + 1}"${(page + 1) * 5 >= archives.length ? ' disabled' : ''}>${escHtml(storageT('storage.nextPage'))}</button></div>
     ${storageRepositoryArchiveCount(repo) > archives.length ? `<small>${escHtml(storageT('storage.archiveListLimited', { count: archives.length, total: storageRepositoryArchiveCount(repo) }))}</small>` : ''}`;

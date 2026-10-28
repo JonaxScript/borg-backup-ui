@@ -142,7 +142,6 @@
     document.getElementById('storage-refresh-btn')?.addEventListener('click', refreshStorage);
     document.getElementById('storage-add-repository-btn')?.addEventListener('click', openRepositoryManager);
     document.getElementById('storage-location-list')?.addEventListener('click', onStorageLocationClick);
-    document.getElementById('storage-sidebar-search')?.addEventListener('input', onStorageSearchInput);
     document.getElementById('storage-content')?.addEventListener('click', onStorageContentClick);
     document.getElementById('storage-content')?.addEventListener('change', onStorageContentChange);
     document.getElementById('storage-maintenance-confirm-close-btn')?.addEventListener('click', () => closeStorageMaintenanceConfirm(false));

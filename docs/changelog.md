@@ -2,6 +2,9 @@
 
 ## Pending - Repository management cards (#621)
 
+- Stabilize archive/browser pane geometry across selection, folder contents, loading, errors, and close; keep pagination controls anchored on desktop and mobile.
+- Apply the approved four-column card layout and Jobs typography; remove repository search and generic reachability badges, retain actionable notices, and label linked jobs and cached archive facts explicitly.
+
 - Follow up on user testing: group cards by target, restore job/type icons and left disclosures, surface key-export warnings, and remove visible archive IDs while retaining guarded archive identity.
 - Observe USB/SMB mounts from the kernel table without probing targets; treat unmounted targets as neutral and keep cached metrics separate from reachability.
 - Retain bounded masked success output, enable verbose Check/Compact output, and parse zero-byte reclamation.
