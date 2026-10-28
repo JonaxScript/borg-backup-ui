@@ -187,7 +187,9 @@ def test_jobs_page_uses_structured_runtime_actions():
     jobs = (ROOT / "ui/js/pages/jobs.js").read_text(encoding="utf-8")
     styles = (ROOT / "ui/dashboard-jobs.css").read_text(encoding="utf-8")
 
-    assert 'class="jobs-running-state"' in jobs
+    assert 'class="jobs-running-actions"' in jobs
+    assert 'jobs.compact.currentAction' in jobs
+    assert 'class="jobs-running-state"' not in jobs
     assert 'class="jobs-running-buttons"' in jobs
     assert 'class="jobs-running-message"' in jobs
     assert ".jobs-running-actions" in styles
