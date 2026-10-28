@@ -989,3 +989,6 @@
 .jobs-redesign-row .job-restore-proof > .restore-v-badge::before { display: none; }
 @media (prefers-reduced-motion: reduce) { .job-status-icon.is-running svg { animation: none; } }
 .jobs-location-sidebar [data-jobs-location="all"] .location-nav-count { border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); padding: 1px 6px; min-width: 22px; text-align: center; font-weight: 400; }
+
+.jobs-redesign-row .job-meta .feature-badge { background: var(--ui-color-surface-subtle); color: var(--ui-color-text-muted); border: 0; font-weight: 400; }
+.jobs-redesign-row .job-meta .feature-badge svg { flex: 0 0 12px; }

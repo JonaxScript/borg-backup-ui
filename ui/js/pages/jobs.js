@@ -803,6 +803,18 @@ function renderJobCard(job) {
     </span>`);
   }
 
+  // The existing group overview loads current script assignments for every job,
+  // including jobs without group membership. Do not infer configuration from past runs.
+  const hooks = window.BBUI.jobGroups?.state?.hooks?.[job.key] || {};
+  for (const [phase, labelKey] of [['pre', 'wizard.preScript'], ['post', 'wizard.postScript']]) {
+    if (typeof hooks[phase] !== 'string' || !hooks[phase].trim()) continue;
+    const label = jobsT(labelKey);
+    const condition = phase === 'post' ? ` · ${jobsT(hooks.post_when === 'always' ? 'wizard.postAlways' : 'wizard.postSuccess')}` : '';
+    features.push(`<span class="feature-badge" data-job-feature="${phase}" title="${escHtml(`${label}: ${hooks[phase]}${condition}`)}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/></svg>${escHtml(label)}
+    </span>`);
+  }
+
   const nextRun = schedActive ? calcNextRun(sched.cron) : null;
   const schedHtml = (job.enabled === false) ? '' : (sched
     ? `<div class="job-schedule-info ${schedActive ? '' : 'disabled'}">

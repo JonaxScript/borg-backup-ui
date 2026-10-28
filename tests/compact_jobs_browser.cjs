@@ -42,11 +42,23 @@ const {chromium} = require('playwright');
         {...base,key:'running',name:'Dokumente',...jobRuntimeState(live)},
         {...base,key:'failed',name:'Offsite',last_status:'error',saved_status:{status:'error',error_message:'SSH failed <img src=x onerror=bad> '+ 'reason '.repeat(100)}},
         {key:'new',name:'New job',location:'local',enabled:false,last_status:null,retention:{mode:'all'}}];
+      BBUI.jobGroups={state:{view:'jobs',hooks:{vms:{pre:'Prepare <test>',post:'Notify',post_when:'always'},app:{post:'Cleanup',post_when:'success'}}},membership:()=>'',schedules:()=>''};
       renderJobsGrid(jobsState.jobs);
       document.getElementById('jobs-grid').addEventListener('click',onJobsGridClick);
     });
     const card=page.locator('#job-card-vms');
     assert.equal(await page.locator('.borg-stepper').count(),0);
+    assert.equal(await card.locator('[data-job-feature]').count(),2,'Both configured script options are visible');
+    assert.equal(await page.locator('#job-card-app [data-job-feature="pre"]').count(),0);
+    assert.equal(await page.locator('#job-card-app [data-job-feature="post"]').count(),1,'Post-only configuration is independent');
+    assert.equal(await page.locator('#job-card-running [data-job-feature]').count(),0,'No inferred hooks from run history');
+    assert.equal(await card.locator('[data-job-feature="pre"]').getAttribute('title'),'Pre-Skript: Prepare <test>');
+    assert.equal(await card.locator('[data-job-feature="pre"] test').count(),0,'Script names are escaped');
+    await page.evaluate(()=>{delete BBUI.jobGroups.state.hooks.vms.post;renderJobsGrid(jobsState.jobs);});
+    assert.equal(await card.locator('[data-job-feature="pre"]').count(),1,'Pre-only configuration is independent');
+    assert.equal(await card.locator('[data-job-feature="post"]').count(),0,'Removed assignment disappears on refresh');
+    await page.evaluate(()=>{BBUI.jobGroups.state.hooks.vms.post='Notify';renderJobsGrid(jobsState.jobs);});
+
     assert.equal(await page.locator('#jobs-location-list .location-nav-copy strong').evaluateAll(nodes=>nodes.every(node=>node.scrollWidth<=node.clientWidth)),true);
     assert.equal(await card.locator('.job-workflow-details').count(),0,'Closed rows omit detailed steps');
     assert.ok((await card.boundingBox()).height<165,'Completed job must be compact');
@@ -146,6 +158,7 @@ const {chromium} = require('playwright');
       assert.equal(await card.locator('[data-job-view="workflow"]').getAttribute('aria-selected'),'true');
       assert.equal(await page.evaluate(()=>document.activeElement.dataset.jobView),'workflow');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`No page overflow ${width}`);
+      assert.match(await card.locator('[data-job-feature="pre"]').textContent(),lang==='de'?/Pre-Skript/:/Pre script/);
     }
     await page.setViewportSize({width:1600,height:1100});
     await page.evaluate(()=>{window.lang='de';renderJobsGrid(jobsState.jobs);});

@@ -238,6 +238,8 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 Jobs appear as separate compact cards with spacing. The **Single jobs/Job groups** tabs attach directly to the workspace. The **All locations** total uses a subtly outlined count badge. A labelled location bar below them shares the surrounding panel, without pills or a dropdown. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
 
+Subtle markers below the job name identify configured **VMs**, **Docker**, **Pre script** and **Post script** options. Script markers reflect current assignments, not historical run results; their tooltip names the script and the post-script execution condition.
+
 Status and restore evidence use distinct symbols and subtle background fills with normal-weight text and no outline. Last test and validity dates have separate labels and vertically aligned values.
 
 **Start**, **Log** and **Cancel** have matching icons and retain their positions and labels below the centered **Actions** heading. Unavailable actions remain disabled. **Log** opens the live log during a run (marked with a live dot) and the saved log afterwards; it is disabled when no log is available. During Docker/VM recovery, **Cancel** stays disabled, with the explanation in a tooltip instead of an extra text row. Requested cancellation appears in the status badge.
