@@ -113,9 +113,15 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 
 **Next run** shows the scheduled time. The last run time and duration remain separate values.
 
-The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
+Jobs appear as separate compact cards with spacing. The **Single jobs/Job groups** tabs attach directly to the workspace. The **All locations** total and each individual location count use the same subtly outlined badge. A labelled location bar below them shares the surrounding panel, without pills or a dropdown. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
+Subtle markers below the job name identify configured **VMs**, **Docker**, **Pre script** and **Post script** options. Script markers reflect current assignments, not historical run results; their tooltip names the script and the post-script execution condition.
+
+Status and restore evidence use distinct symbols and subtle background fills with normal-weight text and no outline. Last test and validity dates have separate labels and vertically aligned values.
+
+**Start**, **Log** and **Cancel** have matching icons and retain their positions and labels below the centered **Actions** heading. Unavailable actions remain disabled. **Log** opens the live log during a run (marked with a live dot) and the saved log afterwards; it is disabled when no log is available. During Docker/VM recovery, **Cancel** stays disabled, with the explanation in a tooltip instead of an extra text row. Requested cancellation appears in the status badge.
+
+Collapsed cards identify failures, warnings, skipped or cancelled runs by status only. The full message appears exactly once under **Workflow**, labelled **Last saved outcome**, including during a new run. Dashboard problem links open this view directly. Long live-log lines scroll horizontally. Missing status files never imply success.
 
 ### Job Wizard
 
@@ -148,7 +154,7 @@ Exclusions are optional child folders or files inside a source that should not b
 
 ### Cancel a Running Job Safely
 
-For a running job, **Cancel job** requests a controlled cancellation. An active Borg step is interrupted. If Docker containers or VMs are currently being stopped, that operation is completed first and the systems that were running before the backup are restarted afterwards. No further cancellation is possible during recovery. If recovery fails, the run ends as an error and the runtime recovery notice remains visible.
+For a running job, **Cancel** requests a controlled cancellation. An active Borg step is interrupted. If Docker containers or VMs are currently being stopped, that operation is completed first and the systems that were running before the backup are restarted afterwards. No further cancellation is possible during recovery. If recovery fails, the run ends as an error and the runtime recovery notice remains visible.
 
 A cancelled run is stored with the **Cancelled** status. The application does not automatically run a repository check or remove Borg locks afterwards. Review the live or stored log if Borg reports anything unusual.
 

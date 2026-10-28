@@ -235,8 +235,8 @@ def test_dashboard_labels_relative_time_and_duration_separately() -> None:
     assert '"scheduleDisabled": "Schedule disabled"' in english
     assert "Nächster Lauf" in help_de
     assert "**Next run**" in help_en
-    assert "**Status anzeigen**" in manual_de
-    assert "**Show status**" in manual_en
+    assert "**Daten & Einstellungen**" in manual_de
+    assert "**Data & settings**" in manual_en
 
 
 def test_dashboard_displays_overdue_alongside_last_run_outcome() -> None:

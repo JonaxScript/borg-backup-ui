@@ -854,7 +854,36 @@
     },
     "showLiveLog": "Show live log",
     "databaseArchived": "archived and verified",
-    "databaseDumped": "Dump completed"
+    "databaseDumped": "Dump completed",
+    "compact": {
+      "workflow": "Workflow",
+      "dataSettings": "Data & settings",
+      "dates": "Schedule & restore test",
+      "job": "Job",
+      "actionsLabel": "Actions",
+      "archivePrefix": "Archive prefix",
+      "openJob": "Open details for {name}",
+      "closeJob": "Close details for {name}",
+      "currentAction": "Current action: {action}",
+      "stepElapsed": "Step elapsed: {time}",
+      "noSteps": "No step results are available for this run.",
+      "actions": {
+        "create": "Create backup (borg create)",
+        "prune": "Prune archives (borg prune)",
+        "compact": "Reclaim space (borg compact)",
+        "check": "Check integrity (borg check)"
+      },
+      "liveProgress": "Live metrics",
+      "view": "View",
+      "log": "Log",
+      "cancel": "Cancel",
+      "noLog": "No log available yet",
+      "cancelPendingStatus": "Cancellation requested",
+      "lastTest": "Last test",
+      "lastCompletedTest": "Last completed test",
+      "lastTestCancelled": "Last attempt (cancelled)",
+      "validUntil": "Valid until"
+    }
   },
   "schedule": {
     "title": "Schedule",
