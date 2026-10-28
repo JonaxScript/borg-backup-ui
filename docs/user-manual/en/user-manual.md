@@ -165,6 +165,8 @@ Four compact cards show **Latest backup runs**, **Restore coverage**, **Active r
 
 **Needs attention** shows a compact status strip. When problems exist, **View** expands full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed in the **Restore coverage** card with a link to Restore Tests.
 
+Status charts use consistent solid colors: green for success, orange for warnings, red for errors, gray for skipped, blue-violet for cancelled, and light gray for unknown outcomes. Needs attention uses a neutral card surface with a warning triangle; specific failures remain identifiable by their labels. Server resources retain their blue styling.
+
 Info icons beside chart titles expand explanations of calculations and data sources and support keyboard access. The normal overview including the location table stays compact on large desktop screens; expanded details, running tests or smaller screens can require scrolling.
 
 **Trends** evaluates saved backup runs over 7, 30 or 90 calendar days including today in the server timezone. Success rate is successful runs / (successful runs + warnings + failures). Skipped, cancelled and unknown runs are counted separately. This historical rate differs from the share of jobs whose current outcome is successful.

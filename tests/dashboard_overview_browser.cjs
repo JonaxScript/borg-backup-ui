@@ -87,6 +87,30 @@ const { chromium } = require('playwright');
   // A populated desktop overview fits without clipping; disclosures remain keyboard accessible.
   for (const lang of ['de','en']) for (const theme of ['light','dark']) {
     await page.evaluate(({lang,theme})=>{window.lang=lang;document.documentElement.dataset.theme=theme;translate();updateRefreshLabel();renderDashboard(BBUI.core.state.data,null);},{lang,theme});
+    // Status fills stay consistent across themes without recoloring host telemetry (#623).
+    const palette = await page.evaluate(() => {
+      const style = selector => getComputedStyle(document.querySelector(selector));
+      const triangle = document.createElement('span');
+      triangle.innerHTML = iconWarn();
+      return {
+        legend: ['success','warning','error','skipped','cancelled','unknown'].map(status => style(`.management-legend .${status} i`).backgroundColor),
+        coverage: style('.dashboard-coverage-track .success').backgroundColor,
+        attention: style('.dashboard-attention-disclosure').backgroundColor,
+        surface: style('.dashboard-summary-section').backgroundColor,
+        stripe: style('.dashboard-attention-disclosure').borderLeftWidth,
+        icon: document.querySelector('#dashboard-attention-toggle .dashboard-attention-icon').innerHTML,
+        triangle: triangle.innerHTML,
+        resourceAccent: style('.resource-ram-capacity').accentColor,
+        unchangedAccent: style('.management-chart-line').stroke,
+      };
+    });
+    assert.deepEqual(palette.legend, ['rgb(34, 160, 107)','rgb(233, 162, 59)','rgb(228, 93, 101)','rgb(148, 163, 184)','rgb(124, 140, 232)','rgb(226, 232, 240)']);
+    assert.equal(palette.coverage, palette.legend[0]);
+    assert.equal(palette.attention, palette.surface);
+    if (theme === 'light') assert.equal(palette.attention, 'rgb(255, 255, 255)');
+    assert.equal(palette.stripe, '0px');
+    assert.equal(palette.icon, palette.triangle);
+    assert.equal(palette.resourceAccent, palette.unchangedAccent);
     for (const viewport of [{width:1920,height:1080},{width:1600,height:1000}]) {
       await page.setViewportSize(viewport);
       const bounds=await page.locator('#dashboard-locations').boundingBox();
@@ -96,6 +120,14 @@ const { chromium } = require('playwright');
     }
     await capture(`compact-dashboard-${lang}-${theme}`);
   }
+  // Cancelled outcomes use their own solid segment, distinct from warnings.
+  const outcomeRing = await page.evaluate(() => {
+    renderSummaryBar(['success','warning','error','skipped','cancelled','unknown'].map(status => ({status})));
+    const ring = getComputedStyle(document.querySelector('.dashboard-summary-ring')).backgroundImage;
+    renderDashboard(BBUI.core.state.data,null);
+    return ring;
+  });
+  for (const color of ['34, 160, 107','233, 162, 59','228, 93, 101','148, 163, 184','124, 140, 232','226, 232, 240']) assert(outcomeRing.includes(`rgb(${color})`));
   await page.setViewportSize({width:1920,height:1080});
   await page.evaluate(()=>{window.lang='de';document.documentElement.dataset.theme='light';translate();renderDashboard(BBUI.core.state.data,null);});
   await page.locator('#dashboard-attention-toggle').focus();
