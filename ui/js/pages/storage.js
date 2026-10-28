@@ -315,7 +315,7 @@ function renderStorage(data) {
   const title = storageState.target === 'all' ? storageT('storage.allStorageTargets') : groups[0]?.target.display_name || storageT('storage.storageTargets');
   const countLabel = count => storageT(count === 1 ? 'storage.repositoryCountOne' : 'storage.repositoryCountMany', { count });
   el.innerHTML = `<div class="storage-selection-summary"><h2>${escHtml(title)}</h2><span class="storage-target-count">${escHtml(countLabel(visible.length))}</span></div>` + (visible.length
-    ? groups.map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-count">${escHtml(countLabel(rows.length))}</span><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header><div class="storage-column-headings" aria-hidden="true">${['repository', 'storageTarget', 'linkedJobs', 'archiveData'].map(column => `<span>${escHtml(storageT('storage.columns.' + column))}</span>`).join('')}</div>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
+    ? groups.map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-count">${escHtml(countLabel(rows.length))}</span><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header><div class="storage-column-headings" aria-hidden="true">${['storage.columns.repository', 'storage.columns.storageTarget', 'storage.columns.linkedJobs', 'storage.columns.archiveData'].map(column => `<span>${escHtml(storageT(column))}</span>`).join('')}</div>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
     : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`);
 
   if (focusData) Array.from(el.querySelectorAll('[data-storage-action]')).find(node => Object.entries(focusData).every(([key, value]) => node.dataset[key] === value))?.focus({ preventScroll: true });
@@ -347,7 +347,7 @@ function renderStorageRepositoryCard(repo) {
   const size = repo.repository_stats?.unique_csize;
   const count = storageRepositoryArchiveCount(repo);
   const updatedAt = repo.last_info_refresh_at;
-  const label = column => `<span class="storage-card-mobile-label">${escHtml(storageT('storage.columns.' + column))}</span>`;
+  const label = column => `<span class="storage-card-mobile-label">${escHtml(storageT(column))}</span>`;
   const jobs = storageJobsForRepository(repo).length
     ? storageT('storage.columns.jobs', { names: storageRepositoryJobsLabel(repo) })
     : storageT('storage.columns.noJobs');
@@ -359,9 +359,9 @@ function renderStorageRepositoryCard(repo) {
         ${status ? `<span class="storage-card-status ${status.className}">${storageMaintenanceIcon(iconStatus)}${escHtml(status.label)}</span>` : ''}
         ${storageRepositoryNeedsExternalKeyBackup(repo) ? `<button type="button" class="storage-card-status warning storage-card-key-warning" data-storage-action="open-repository-key-export-settings">${storageMaintenanceIcon('warning')}${escHtml(storageT('storage.repositoryKeyBackupMissing'))}</button>` : ''}</div>
       </div>
-      <div class="storage-card-target">${label('storageTarget')}${escHtml(storageName(repo))}<small>${escHtml(storageRepositoryTransport(repo))}</small></div>
-      <div class="storage-card-jobs">${label('linkedJobs')}${escHtml(jobs)}</div>
-      <div class="storage-card-size">${label('archiveData')}<div class="storage-card-facts"><span>${escHtml(storageT(count === 1 ? 'storage.columns.archiveOne' : 'storage.columns.archiveMany', { count: count ?? '—' }))}</span><span>${escHtml(storageT('storage.columns.diskUsed', { size: size === undefined || size === null ? '—' : storageFormatBytes(size) }))}</span></div><small>${escHtml(updatedAt ? storageT('storage.columns.asOf', { date: storageFormatDateTime(updatedAt) }) : storageT('storage.columns.dateUnknown'))}</small></div>
+      <div class="storage-card-target">${label('storage.columns.storageTarget')}${escHtml(storageName(repo))}<small>${escHtml(storageRepositoryTransport(repo))}</small></div>
+      <div class="storage-card-jobs">${label('storage.columns.linkedJobs')}${escHtml(jobs)}</div>
+      <div class="storage-card-size">${label('storage.columns.archiveData')}<div class="storage-card-facts"><span>${escHtml(storageT(count === 1 ? 'storage.columns.archiveOne' : 'storage.columns.archiveMany', { count: count ?? '—' }))}</span><span>${escHtml(storageT('storage.columns.diskUsed', { size: size === undefined || size === null ? '—' : storageFormatBytes(size) }))}</span></div><small>${escHtml(updatedAt ? storageT('storage.columns.asOf', { date: storageFormatDateTime(updatedAt) }) : storageT('storage.columns.dateUnknown'))}</small></div>
     </div>
     ${open ? renderStorageRepositoryWorkspace(repo, job) : ''}
   </article>`;
