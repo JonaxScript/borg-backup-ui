@@ -13,15 +13,16 @@ def test_restore_tests_redesign_styles_are_loaded() -> None:
     assert html.index('/ui/design-system.css') < html.index('/ui/restore-tests-redesign.css')
 
 
-def test_restore_tests_keeps_sidebar_modes_and_actions() -> None:
+def test_restore_tests_keeps_location_filters_and_actions() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/restore-tests.js")
     for element_id in (
-        "rt-subtab-plan-btn", "rt-subtab-reports-btn",
-        "rt-sidebar-location-list", "restore-tests-plan", "restore-tests-reports",
+        "rt-sidebar-location-list", "restore-tests-plan",
         "rt-run-btn", "rt-log-panel", "rt-log-output",
     ):
         assert f'id="{element_id}"' in html
+    assert 'id="rt-subtab-reports-btn"' not in html
+    assert 'id="restore-tests-reports"' not in html
     for contract in (
         "data-rt-sidebar-location", 'data-rt-plan-action="edit"',
         '''data-rt-plan-action="${running ? 'cancel' : 'run'}"''', "/api/restore-tests/policy",
@@ -47,7 +48,7 @@ def test_restore_tests_layout_is_responsive_and_prioritizes_summaries() -> None:
     assert ".rt-plan-summary" in css
     assert "#rt-sidebar-location-list" in css
     assert "overflow-x: auto" in css
-    assert "#restore-tests-summary" in css
+    assert ".rt-job-report-panel" in css
 
 
 def test_verification_report_matches_approved_detail_hierarchy() -> None:

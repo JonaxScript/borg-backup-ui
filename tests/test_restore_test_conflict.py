@@ -27,7 +27,7 @@ def test_restore_tests_ui_opens_live_log_on_running_conflict() -> None:
 def test_restore_tests_ui_opens_live_log_when_refresh_detects_running_test() -> None:
     source = (ROOT / "ui/js/pages/restore-tests.js").read_text(encoding="utf-8")
     refresh_handler = source.split("async function refreshRestoreTests", 1)[1].split(
-        "function switchRestoreTestsSubtab", 1
+        "function restoreTestsCards", 1
     )[0]
 
     assert "function resumeRestoreTestLiveLog" in source

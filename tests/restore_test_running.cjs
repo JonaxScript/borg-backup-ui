@@ -25,6 +25,7 @@ function fixture(language = 'en') {
       getLanguage: () => language,
     } } } },
     document: { getElementById: id => elements.get(id) || null },
+    patchJobMarkup: (el, html) => { el.innerHTML = html; },
     resolveJobIcon: job => job.icon || 'archive', resolveJobIconColor: job => job.icon_color || '',
     setInterval: () => 1, clearInterval() {}, showMsg: (...args) => messages.push(args), apiErrorMessage: () => 'error',
     fetch: async (url, options = {}) => {
@@ -65,7 +66,7 @@ function fixture(language = 'en') {
   return { context, state, requests, plan, setSnapshot: value => { snapshot = withRuns(value); },
     confirm: value => {confirmed = value;}, cancelError: () => {cancelError = true;}, messages,
     fail: value => { failed = value; }, posted: () => posted,
-    row: key => elements.get('restore-tests-plan-content').innerHTML.match(new RegExp(`<tr[^>]*data-rt-job-key="${key}"[\\s\\S]*?</tr>`))?.[0],
+    row: key => elements.get('restore-tests-plan-content').innerHTML.match(new RegExp(`<article[^>]*data-rt-job-key="${key}"[\\s\\S]*?</article>`))?.[0],
   };
 }
 

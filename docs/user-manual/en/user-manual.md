@@ -886,13 +886,13 @@ The page manages:
 - due scheduled tests
 - verification reports
 
-### 8.2 Planning & Policy Tab
+### 8.2 Planning and Job Cards
 
-The left sidebar filters both tabs by **All locations** or an occupied location and shows job counts. Empty locations are hidden; if the selected location loses its final job, the view returns to **All locations**. Jobs appear on the right, with their configured icons and colors in planning and report rows. **Evidence & history** opens all reports for a job, including former locations. Clicking a location clears that job selection.
+The location bar above the cards filters by **All locations** or an occupied location and shows job counts. Empty locations are hidden. Job cards use their configured icons and colors. The chevron on the left or **Evidence & history** opens reports directly inside the job card, including reports from former locations. There is no separate reports tab.
 
-The compact table shows **Job**, **Test planning**, **Last test** and **Actions**. Location headings with the shared location icons and job counts group the table. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the table.
+Separate compact cards show **Job**, **Test planning**, **Last test** and **Actions** in aligned columns. Location headings with dividers, shared location icons and job counts group the cards. All location navigation counts have subtle outlines. Status indicators use icons and muted fills without bold text or borders. Empty locations are hidden; location is not repeated below each job name. Schedule, test level and next execution are combined under Test planning. Guidance can be expanded below the cards.
 
-Choose **⋮ > Edit plan** for a job to configure its policy, test level and evidence validity. The floating menu matches the Jobs page without increasing the table row height; Escape or a click outside closes it. **Evidence & history** opens the job reports and clears their filters. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
+Choose **⋮ > Edit plan** for a job to configure its policy, test level and evidence validity. The floating menu matches the Jobs page without increasing the card height; Escape or a click outside closes it. **Evidence & history** opens the latest report directly inside the job card. The last attempt shows its result independently of evidence validity; an expired successful test remains **Successful**.
 
 - **Scheduled:** Choose a daily, weekly or monthly time. Monthly plans use days 1–28. Times use the Unraid server's local timezone.
 - **Manual / Off:** Disable automatic execution. **Test now** remains available for enabled backup jobs.
@@ -996,7 +996,7 @@ remove that history. Text logs live in the configured log directory as
 `Borg-Restore-Test--<timestamp>-<PID>.log`. Lifecycle events go to the application
 log `/var/log/borg_backup_ui.log`, not automatically to Unraid syslog.
 
-The **Test reports** tab shows individual attempts as expandable rows. Details open directly below across the content width. Job, location, result and date filters remain available; **Cancelled** is a separate result filter.
+Expanded job cards show reports in a panel with a stable height. The report selector identifies each attempt by date, result and test level; the full report scrolls within the panel below it. Automatic refresh preserves the selected report, expanded technical details and scroll position. Reports for removed jobs remain accessible through read-only cards at their last recorded location, without planning or start actions.
 
 A successful run is presented as **Restoration evidence**, identifying the actual archive, repository, timestamp, duration and documented scope. The **Coverage** row combines the percentage with its file-count basis (checked files out of archive files). Levels are cumulative: **L1**, **L1 + L2** and **L1 + L2 + L3**. Each level displays its recorded result; excluded levels and missing legacy report details are explicitly identified. L3 identifies sample files read and SHA-256 hashes recorded without claiming an independent expected-hash comparison. A single **Technical evidence** section combines checks and log diagnostics. **Show check data** below each check reveals its file lists, hashes and detail values. The repeated execution block with report ID, start and end is omitted.
 
@@ -1467,7 +1467,7 @@ Missed slots or tests skipped for repository conflicts are not caught up. Run
 manually if needed. Skipping does not renew validity. Legacy interval tests
 remain separate under **Settings > Restore**; their interval does not replace a
 calendar schedule. No restore-overdue reminder is sent without a previous report.
-See [planning](#82-planning--policy-tab).
+See [planning](#82-planning-and-job-cards).
 
 ### 11.5 Configure Notifications
 
