@@ -886,8 +886,6 @@ The page manages:
 - due scheduled tests
 - verification reports
 
-<a id="82-planning--policy-tab"></a>
-
 ### 8.2 Planning and Job Cards
 
 The location bar above the cards filters by **All locations** or an occupied location and shows job counts. Empty locations are hidden. Job cards use their configured icons and colors. The chevron on the left or **Evidence & history** opens reports directly inside the job card, including reports from former locations. There is no separate reports tab.
@@ -1469,7 +1467,7 @@ Missed slots or tests skipped for repository conflicts are not caught up. Run
 manually if needed. Skipping does not renew validity. Legacy interval tests
 remain separate under **Settings > Restore**; their interval does not replace a
 calendar schedule. No restore-overdue reminder is sent without a previous report.
-See [planning](#82-planning--policy-tab).
+See [planning](#82-planning-and-job-cards).
 
 ### 11.5 Configure Notifications
 

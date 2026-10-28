@@ -894,8 +894,6 @@ Die Seite verwaltet:
 - fällige geplante Tests
 - Prüfberichte
 
-<a id="82-reiter-planung--policy"></a>
-
 ### 8.2 Planung und Jobkarten
 
 Die Standortleiste oberhalb der Karten filtert nach **Alle Standorte** oder einem belegten Standort und zeigt die jeweilige Jobanzahl. Leere Standorte werden ausgeblendet. Die Jobkarten verwenden die konfigurierten Symbole und Farben. Über den Pfeil links an der Karte oder **Nachweis & Verlauf** öffnen Sie die Prüfberichte direkt beim Job, einschließlich Berichten von früheren Standorten. Einen separaten Reiter für Prüfberichte gibt es nicht mehr.
@@ -1488,7 +1486,7 @@ Verpasste oder wegen Repository-Konflikt übersprungene Termine werden nicht
 nachgeholt. Starten Sie dann manuell. Ein Skip erneuert die Gültigkeit nicht.
 Legacy-Intervalltests bleiben unter **Einstellungen > Restore** getrennt; deren
 Intervall ist kein Ersatz für den Kalenderplan. Ohne bisherigen Testbericht
-wird kein Restore-Überfälligkeits-Reminder gesendet. Referenz: [Planung](#82-reiter-planung--policy).
+wird kein Restore-Überfälligkeits-Reminder gesendet. Referenz: [Planung](#82-planung-und-jobkarten).
 
 ### 11.5 Benachrichtigungen einrichten
 
