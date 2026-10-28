@@ -113,14 +113,14 @@ def test_repository_maintenance_commands_use_repository_and_job_retention(tmp_pa
     manager = CheckManager()
 
     assert manager._repository_command(config, repository, "/mnt/backup/photos", "check", "quick") == [
-        "borg", "check", "--lock-wait", "30", "--progress", "/mnt/backup/photos",
+        "borg", "check", "--lock-wait", "30", "--progress", "--verbose", "/mnt/backup/photos",
     ]
     assert manager._repository_command(config, repository, "/mnt/backup/photos", "check", "verify_data") == [
         "borg", "check", "--lock-wait", "30", "--progress", "--verbose", "--verify-data",
         "/mnt/backup/photos",
     ]
     assert manager._repository_command(config, repository, "/mnt/backup/photos", "compact", "quick") == [
-        "borg", "compact", "--lock-wait", "30", "--progress", "/mnt/backup/photos",
+        "borg", "compact", "--lock-wait", "30", "--progress", "--verbose", "/mnt/backup/photos",
     ]
     assert manager._repository_command(config, repository, "/mnt/backup/photos", "prune", "quick") == [
         "borg", "prune", "--lock-wait", "30", "--list", "--progress",
@@ -257,7 +257,7 @@ def test_repository_maintenance_uses_repository_secret_without_shell(tmp_path: P
 
     assert ok is True and error is None
     assert captured["cmd"] == [
-        "borg", "check", "--lock-wait", "30", "--progress", "/mnt/backup/test",
+        "borg", "check", "--lock-wait", "30", "--progress", "--verbose", "/mnt/backup/test",
     ]
     assert "shell" not in captured["kwargs"]
     assert captured["kwargs"]["env"]["BORG_PASSCOMMAND"].endswith(str(secret))
@@ -727,3 +727,88 @@ def test_repository_import_browser_marks_borg_repositories_as_terminal_choices(t
 
     nested = repositories_api.browse_repository_directories(config, "storage_local_test", "k8s-master")
     assert nested["directories"] == []
+
+
+@pytest.mark.parametrize('action', ['check', 'compact'])
+def test_repository_maintenance_records_success_evidence(action):
+    """Successful runs keep bounded, masked logs and emit informative Borg output."""
+    from types import SimpleNamespace
+
+    state = check_api._CheckState(SimpleNamespace(returncode=0), 'repo', 'quick',
+                                  datetime.now(), action=action)
+    state.append_line('[Info] Starting repository ignored command')
+    for index in range(25):
+        state.append_line(f'Checked segment {index}')
+    state.append_line('Completed: password=hunter2 token=secret-token')
+    state.append_line('x' * 3000)
+    result = CheckManager._maintenance_result(state)
+    assert result['status'] == 'success'
+    assert len(result['details']) == 20
+    assert max(map(len, result['details'])) == 2000
+    assert result['details'][-2] == 'Completed: password=*** token=***'
+    assert 'Starting repository' not in '\n'.join(result['details'])
+    command = CheckManager()._repository_command({}, {}, '/repository', action, 'quick')
+    assert '--verbose' in command
+
+
+@pytest.mark.parametrize('output,expected', [
+    ('compaction freed about 0 B repository space.', '0 B'),
+    ('compaction freed 1,5 MiB repository space.', '1.5 MiB'),
+    ('compaction freed 12 bytes repository space.', '12 bytes'),
+    ('compaction freed -4 B repository space.', ''),
+    ('compaction complete.', ''),
+])
+def test_repository_compact_distinguishes_zero_from_missing(output, expected):
+    from types import SimpleNamespace
+
+    state = check_api._CheckState(SimpleNamespace(returncode=0), 'repo', 'quick',
+                                  datetime.now(), action='compact')
+    state.append_line(output)
+    assert CheckManager._maintenance_result(state)['freed_space'] == expected
+
+
+def test_storage_mount_observations_do_not_probe_targets(monkeypatch):
+    from runtime.lib import usb_storage
+
+    mounts = [usb_storage.Mount(Path('/'), 'rootfs', False),
+              usb_storage.Mount(Path('/mnt/disks/USB'), 'xfs', False),
+              usb_storage.Mount(Path('/mnt/remotes/share'), 'cifs', True)]
+    monkeypatch.setattr(usb_storage, '_read_mounts', lambda: mounts)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Mount observation must not access the target filesystem')
+    monkeypatch.setattr(Path, 'stat', forbidden)
+    monkeypatch.setattr(Path, 'resolve', forbidden)
+    rows = [
+        {'location': 'usb', 'mount_path': '/mnt/disks/USB/backups'},
+        {'location': 'usb', 'mount_path': '/mnt/disks/absent'},
+        {'location': 'smb', 'mount_path': '/mnt/remotes/share'},
+        {'location': 'usb', 'mount_path': ''},
+        {'location': 'storagebox', 'base_path': 'ssh://example/repo'},
+        {'location': 'local', 'base_path': '/mnt/backup'},
+    ]
+    result = storage_objects_api.observe_storage_mount_states(rows)
+    assert [row['mount_state'] for row in result] == [
+        'mounted', 'not_mounted', 'read_only', 'unknown', 'unknown', 'unknown']
+    assert all('mount_state' not in row for row in rows)
+    mounts.append(usb_storage.Mount(Path('/mnt/disks/USB'), 'xfs', True))
+    assert storage_objects_api.observe_storage_mount_states(rows)[0]['mount_state'] == 'unknown'
+    def unreadable():
+        raise OSError('Unreadable mount table')
+    monkeypatch.setattr(usb_storage, '_read_mounts', unreadable)
+    assert all(row['mount_state'] == 'unknown' for row in storage_objects_api.observe_storage_mount_states(rows))
+
+
+def test_repository_smb_profile_status_reuses_passive_observations(monkeypatch):
+    import smb_profiles_api
+
+    monkeypatch.setattr(storage_objects_api, 'settings_profiles_from_storages', lambda _: {'smb_profiles': []})
+    monkeypatch.setattr(smb_profiles_api, 'validate_smb_profiles_json', lambda _: [
+        {'key': 'mounted', 'mount_path': '/mnt/remotes/a'},
+        {'key': 'offline', 'mount_path': '/mnt/remotes/b'},
+    ])
+    monkeypatch.setattr(smb_profiles_api, 'get_smb_profile_job_refs', lambda _: {})
+    def forbidden(*args, **kwargs):
+        raise AssertionError('The repository page must not run findmnt on a target')
+    monkeypatch.setattr(subprocess, 'run', forbidden)
+    rows = smb_profiles_api.get_smb_profiles_with_status({}, mount_states={'/mnt/remotes/a': 'read_only'})
+    assert [row['is_mounted'] for row in rows] == [True, False]

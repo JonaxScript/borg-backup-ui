@@ -176,7 +176,13 @@ def get_smb_profile_job_refs(ui_config: dict) -> Dict[str, List[str]]:
     return profile_job_references(ui_config, "smb")
 
 
-def get_smb_profiles_with_status(ui_config: dict) -> List[Dict[str, Any]]:
+def get_smb_profiles_with_status(ui_config: dict, *, mount_states: dict[str, str] | None = None) -> List[Dict[str, Any]]:
+    """Return profile metadata with observed mount flags.
+
+    A supplied mount-path/state mapping avoids findmnt and target path lookups;
+    missing or unknown observations are not reported as mounted. Without a
+    mapping, retain the existing findmnt-based profile status query.
+    """
     from storage_objects_api import settings_profiles_from_storages
     rows = validate_smb_profiles_json(json.dumps(settings_profiles_from_storages(ui_config).get("smb_profiles", [])))
     refs = get_smb_profile_job_refs(ui_config)
@@ -185,7 +191,9 @@ def get_smb_profiles_with_status(ui_config: dict) -> List[Dict[str, Any]]:
         key = str(row.get("key", "")).strip().lower()
         mount_path = str(row.get("mount_path", "")).strip()
         mounted = False
-        if mount_path:
+        if mount_states is not None:
+            mounted = mount_states.get(mount_path) in {"mounted", "read_only"}
+        elif mount_path:
             try:
                 proc = subprocess.run(
                     ["findmnt", "-T", mount_path, "-n", "-o", "FSTYPE"],

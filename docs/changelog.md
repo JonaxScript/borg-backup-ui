@@ -1,5 +1,19 @@
 # Changelog
 
+## Pending - Repository management cards (#621)
+
+- Stabilize archive/browser pane geometry across selection, folder contents, loading, errors, and close; keep pagination controls anchored on desktop and mobile.
+- Apply the approved four-column card layout and Jobs typography; remove repository search and generic reachability badges, retain actionable notices, and label linked jobs and cached archive facts explicitly.
+
+- Follow up on user testing: group cards by target, restore job/type icons and left disclosures, surface key-export warnings, and remove visible archive IDs while retaining guarded archive identity.
+- Observe USB/SMB mounts from the kernel table without probing targets; treat unmounted targets as neutral and keep cached metrics separate from reachability.
+- Retain bounded masked success output, enable verbose Check/Compact output, and parse zero-byte reclamation.
+
+- Replace the repository picker/sidebar with registry-backed cards and exact storage-target filters; retain unassigned and shared repositories.
+- Share intrinsic panel height across all four detail tabs, keep inactive panels inert, paginate loaded archives, and preserve action routing and safety confirmations.
+- Use subtle status symbols and normal-weight result text; expose maintenance scope and distinguish missing Compact amounts from reported zero.
+- Update German/English help and add real-browser regression coverage for navigation, panel geometry, archive actions, maintenance states, and lifecycle/key recovery blockers.
+
 ## Pending - Dashboard resource monitoring (#602)
 
 - Label expanded charts with current values, five unit-aware Y-axis ticks and timestamped sample readouts. Support pointer/touch and keyboard inspection, preserve keyboard focus across live refresh, and keep missing values distinct from zero.

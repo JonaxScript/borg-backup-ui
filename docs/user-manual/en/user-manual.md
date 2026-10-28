@@ -550,9 +550,7 @@ After loss of the coordinating service process, the group run is marked **Interr
 
 ## 4. Repositories
 
-The **Repositories** page uses a master-detail workspace. Borg repositories are grouped by their exact storage target on the left, while the selected repository remains visible in the workspace on the right. **Add repository** creates or imports a repository on a storage target that has already been configured under **Settings**.
-
-![Repository management with storage-target groups and a detail workspace](../assets/en/current/repositories.png)
+The **Repositories** page displays registered Borg repositories as separate cards, including repositories without a linked backup job. The storage-target bar filters by the exact target. The left chevron opens the workspace inside a card; its tabs share the height of their largest content so the following cards do not jump when switching tabs. **Add repository** creates or imports a repository on a storage target already configured under **Settings**.
 
 Local storage targets are created under **Settings > Local Profiles**. A
 concrete directory below `/mnt`, such as `/mnt/backup` or `/mnt/disks/USB-A`,
@@ -565,14 +563,15 @@ The page separates storage targets, Borg repositories, and backup jobs. A storag
 
 ### 4.2 Areas and Functions
 
-- **Repository sidebar:** Groups repositories by the exact storage target and shows display name, repository directory, and status for each entry.
-- **Search:** Filters sidebar entries by name, path, job, or storage target.
-- **Workspace header:** Shows the selected repository, its path, and the summarized current state.
+- **Repository cards:** Arrange facts in **Repository**, **Storage target**, **Linked jobs**, and **Archive data** columns. Names and group headings match the Jobs page typography. The transport appears below the storage target; "Jobs: Appdata, Flash" lists all linked jobs. Archive count and used space appear together with the cached statistics timestamp. Dividers separate storage targets. Consistent linked-job icons are reused; mixed or unassigned repositories use their repository type. A missing Borg key export is visible on the collapsed card.
+- **Storage-target bar:** Shows all targets with subtly outlined repository counts. Multiple local targets remain separately selectable.
 - **Overview:** Shows Borg statistics, maintenance state, and human-readable repository, storage target, job, encryption, and path details.
-- **Archives:** Loads the current Borg archive inventory with archive name, technical ID, start time, and duration.
-- **Maintenance:** Provides Check, Verify Data, Prune, and Compact as separate actions with persistent results.
+- **Archives:** Loads the newest up to 100 archives directly from Borg and displays five entries per page. The total count remains visible; a limited list states how many archives were loaded. The list shows archive name and creation time. The technical archive ID remains internal for safe identification. The archive list and file browser retain their size when navigating large, small, or empty folders. Long contents scroll inside the panes; Previous and Next remain in the same position.
+- **Maintenance:** Provides Check, Verify Data, Prune, and Compact with fixed **Start** buttons. Results include timestamp, duration, check scope, and recorded deleted archive names for Prune. Compact shows the reclaimed space reported by Borg, including `0 B`; historical results without that amount say "reclaimed space not recorded". New runs retain up to 20 masked output lines as expandable execution details, including successful runs. Missing details for historical runs are explicitly identified. Further starts are disabled while maintenance runs. Existing confirmation dialogs remain in place.
 - **Management:** Shows current job links, Borg key export/import, and separates non-destructive removal from the UI from permanent repository deletion.
 - **Add repository:** Opens a wizard for selecting an existing storage target and creating or importing a repository.
+
+Cards do not show a generic reachability status. A temporarily powered-off or unmounted target, for example controlled by pre/post scripts, is not itself an error. Active maintenance, recorded failed or warning outcomes, and missing key exports remain visible. Cached statistics labeled "As of" do not prove current reachability. Loading the overview does not mount drives or trigger repository access.
 
 Automatic Borg-statistics refresh is disabled by default so repositories and disks are not contacted unexpectedly. It can be enabled deliberately under **Settings > Repositories**, where its interval is configurable; the default refresh interval is 24 hours and a failed access attempt is retried after one hour by default. Results are cached in `repositories.json`. Opening the Repositories page displays that cache and does not wait for every local and remote repository to refresh. **Refresh info** starts the query manually for the selected repository.
 

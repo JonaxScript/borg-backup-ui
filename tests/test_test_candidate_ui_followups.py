@@ -8,14 +8,14 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_storage_uses_repository_master_detail_navigation() -> None:
+def test_storage_uses_repository_cards_and_target_navigation() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/storage.js")
     assert '<small data-i18n="storage.locationsHint">' not in html
     assert "function renderStorageLocationSidebar(data, repos)" in script
     assert "function renderStorageRepositoryWorkspace(repo, job)" in script
     assert "function storageGroupRows(data, repos)" in script
-    assert 'data-storage-repository-key=' in script
+    assert 'data-storage-target=' in script
     assert 'data-storage-action="select-repository-tab"' in script
     assert "renderStorageSmbProfiles" not in script
 
@@ -30,7 +30,7 @@ def test_storage_repository_details_focus_on_user_facing_metadata() -> None:
     assert "storage.repositoryDisplayNameLabel" in details_panel
     assert "storage.repositoryDirectoryLabel" in details_panel
     assert "storage.storageNameLabel" in details_panel
-    assert "storage.jobNameLabel" in details_panel
+    assert "storage.repositoryLinkedJobs" in details_panel
     assert "storage.location" not in details_panel
     assert "storage.repositoryPathLabel" in details_panel
     assert "storage.repositoryEncryption" in details_panel
@@ -51,8 +51,8 @@ def test_storage_repositories_use_configured_job_icons() -> None:
     assert "fetch('/api/jobs')" in script
     assert "function storageJobForRepository(repo)" in script
     assert "function storageRepositoryTitle(repo, job)" in script
-    assert "resolveJobIcon(job || repo)" in script
-    assert "resolveJobIconColor(job || repo)" in script
+    assert "resolveJobIcon(source)" in script
+    assert "resolveJobIconColor(source)" in script
     assert ".storage-repository-icon-large" in css
     assert "justify-content: center" in css
     title_helper = script.split("function storageRepositoryTitle(repo, job)", 1)[1].split(
@@ -60,11 +60,11 @@ def test_storage_repositories_use_configured_job_icons() -> None:
     )[0]
     assert "repo?.display_name" in title_helper
     assert "storageLocationLabel" not in title_helper
-    repository_row = script.split("function renderStorageLocationSidebar(data, repos)", 1)[1].split(
-        "function onStorageLocationClick", 1
+    repository_row = script.split("function renderStorageRepositoryCard(repo)", 1)[1].split(
+        "function storageRepositoryKey", 1
     )[0]
     assert "storageRepositoryIcon(repo, job)" in repository_row
-    assert "storageRepositoryTitle(repo, job)" in repository_row
+    assert "storageRepositoryTitle(repo, null)" in repository_row
     assert "storageRepositoryName(repo)" in repository_row
     assert "storageRepositoryStatus(repo)" in repository_row
     assert ".storage-repository-nav-item" in css

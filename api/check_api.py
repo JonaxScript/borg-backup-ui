@@ -59,7 +59,7 @@ class CheckManager:
     _init_lock = threading.Lock()
     _LOCK_WAIT_SECONDS = "30"
     _MODE_ARGS = {
-        "quick": ["--progress"],
+        "quick": ["--progress", "--verbose"],
         "verbose": ["--progress", "--verbose"],
         "verify_data": ["--progress", "--verbose", "--verify-data"],
     }
@@ -191,7 +191,7 @@ class CheckManager:
         if action == "compact":
             return [
                 "borg", "compact", "--lock-wait", self._LOCK_WAIT_SECONDS,
-                "--progress", repo_path,
+                "--progress", "--verbose", repo_path,
             ]
 
         from repository_context import jobs_using_repository
@@ -288,6 +288,7 @@ class CheckManager:
 
     @staticmethod
     def _maintenance_result(state: _CheckState) -> dict:
+        """Summarize a completed run with bounded, secret-masked execution evidence."""
         from borg_ssh import SSH_INTERRUPTION_CODE, SSH_INTERRUPTION_MESSAGE, is_ssh_connection_interruption
         from security_utils import mask_secrets
 
@@ -311,21 +312,21 @@ class CheckManager:
                 if archive and archive not in deleted_archives:
                     deleted_archives.append(archive)
             freed = re.search(
-                r"\bfreed(?:\s+about)?\s+([0-9]+(?:[.,][0-9]+)?\s*(?:[KMGTPE]i?B|bytes?))",
+                r"\bfreed(?:\s+about)?\s+([0-9]+(?:[.,][0-9]+)?\s*(?:[KMGTPE]i?B|B|bytes?))\b",
                 line,
                 re.IGNORECASE,
             )
             if freed:
                 freed_space = freed.group(1).replace(",", ".")
 
-        details = []
-        if status != "success":
-            visible = [
-                mask_secrets(str(line or "").strip())
-                for line in lines
-                if str(line or "").strip() and not str(line or "").startswith("[Info] Starting repository")
-            ]
-            details = visible[-20:]
+        # Keep bounded, masked execution evidence for successful runs as well.
+        # Mask before truncation so a cut-off secret cannot escape redaction.
+        visible = [
+            mask_secrets(str(line or "").strip())[:2000]
+            for line in lines
+            if str(line or "").strip() and not str(line or "").startswith("[Info] Starting repository")
+        ]
+        details = visible[-20:]
         combined_output = "\n".join(str(line or "") for line in lines)
         interrupted = status != "success" and is_ssh_connection_interruption(combined_output)
         return {
