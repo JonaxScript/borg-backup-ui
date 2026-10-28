@@ -176,13 +176,14 @@ function renderRestoreJobNavigation() {
   if (!list || !locations) return;
   const jobs = restoreState.jobs || [];
   const locationOf = job => String(job.location || 'local').toLowerCase();
-  const order = [...new Set(['local', 'usb', 'smb', 'storagebox', ...jobs.map(locationOf)])]
+  const order = ['local', 'usb', 'smb', 'storagebox'];
+  const visibleLocations = [...new Set([...order, ...jobs.map(locationOf)])]
     .filter(location => jobs.some(job => locationOf(job) === location));
-  if (!order.includes(restoreState.location)) {
+  if (!visibleLocations.includes(restoreState.location)) {
     restoreState.location = locationOf(jobs.find(job => String(job.key) === String(restoreState.job)) || jobs[0] || {});
   }
   const disabled = restoreState.assistBusy ? 'disabled' : '';
-  locations.innerHTML = order.map(location => `<button type="button" class="restore-location ${location === restoreState.location ? 'is-active' : ''}" data-restore-location="${escHtml(location)}" aria-pressed="${location === restoreState.location}" ${disabled}>${escHtml(restoreLocationLabel(location))}<span class="location-nav-count">${jobs.filter(job => locationOf(job) === location).length}</span></button>`).join('');
+  locations.innerHTML = visibleLocations.map(location => `<button type="button" class="restore-location ${location === restoreState.location ? 'is-active' : ''}" data-restore-location="${escHtml(location)}" aria-pressed="${location === restoreState.location}" ${disabled}>${escHtml(restoreLocationLabel(location))}<span class="location-nav-count">${jobs.filter(job => locationOf(job) === location).length}</span></button>`).join('');
   list.innerHTML = jobs.filter(job => locationOf(job) === restoreState.location).map(job => {
     const active = String(job.key) === String(restoreState.job);
     return `<button type="button" class="restore-job-tab ${active ? 'is-active' : ''}" data-restore-job="${escHtml(job.key)}" aria-pressed="${active}" ${disabled}>${restoreJobIcon(job)}<span>${escHtml(job.name || job.display_name || job.key)}</span></button>`;
