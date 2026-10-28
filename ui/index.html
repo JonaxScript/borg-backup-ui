@@ -826,13 +826,9 @@
         </div>
       </div>
       <div id="restore-tests-message" class="status-message hidden"></div>
-      <div class="segmented-control" style="margin-bottom:12px">
-        <button type="button" class="segmented-btn active" id="rt-subtab-plan-btn" data-i18n="restoreTests.planTab">Planung &amp; Policy</button>
-        <button type="button" class="segmented-btn" id="rt-subtab-reports-btn" data-i18n="restoreTests.reportsTab">Prüfberichte</button>
-      </div>
       <div class="rt-redesign-layout ui-context-layout">
         <aside class="rt-location-sidebar ui-context-sidebar" data-i18n-aria-label="jobs.locations" aria-label="Standorte">
-          <div class="ui-context-sidebar__header"><small data-i18n="jobs.grouping">Gruppierung</small><strong data-i18n="jobs.locations">Standorte</strong></div>
+          <span class="rt-navigation-label" data-i18n="jobs.locations">Standorte</span>
           <nav id="rt-sidebar-location-list" class="ui-context-nav"></nav>
         </aside>
         <section class="rt-redesign-workspace ui-workspace">
@@ -869,42 +865,6 @@
           <div id="restore-tests-plan-summary" class="muted" style="font-size:12px;margin-bottom:8px"></div>
           <div id="restore-tests-plan-content">
             <div class="loading-spinner"><div class="spinner"></div><span data-i18n="restoreTests.loadingPlan">Lade Plan...</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card hidden" id="restore-tests-reports" style="margin-bottom:12px">
-        <div class="card-header">
-          <h3 data-i18n="restoreTests.reportsTitle">Prüfberichte</h3>
-        </div>
-        <div class="card-body">
-          <div id="restore-tests-reports-filters" class="restore-reports-filters">
-            <input type="text" id="rt-report-filter-job" class="form-input" placeholder="Job filtern (Name/Key)" data-i18n-placeholder="restoreTests.filterJob">
-            <select id="rt-report-filter-location" class="form-select">
-              <option value="all" data-i18n="restoreTests.allLocations">Alle Standorte</option>
-            </select>
-            <select id="rt-report-filter-status" class="form-select">
-              <option value="all" data-i18n="restoreTests.allStatuses">Alle Status</option>
-              <option value="success" data-i18n="restoreTests.successful">Erfolgreich</option>
-              <option value="cancelled" data-i18n="restoreTests.cancelled">Abgebrochen</option>
-              <option value="failed" data-i18n="restoreTests.failed">Fehlgeschlagen</option>
-              <option value="unavailable" data-i18n="restoreTests.unavailable">Nicht verfügbar</option>
-              <option value="stale" data-i18n="restoreTests.overdue">Überfällig</option>
-            </select>
-            <select id="rt-report-filter-range" class="form-select">
-              <option value="all" data-i18n="restoreTests.allTime">Gesamter Zeitraum</option>
-              <option value="7" data-i18n="restoreTests.last7Days">Letzte 7 Tage</option>
-              <option value="30" data-i18n="restoreTests.last30Days">Letzte 30 Tage</option>
-              <option value="90" data-i18n="restoreTests.last90Days">Letzte 90 Tage</option>
-            </select>
-            <label class="form-checkbox-row" style="margin:0">
-              <input type="checkbox" id="rt-report-filter-problem">
-              <span data-i18n="restoreTests.problemsOnly">Nur fehlgeschlagen/überfällig</span>
-            </label>
-          </div>
-          <div id="restore-tests-summary" class="summary-bar hidden"></div>
-          <div id="restore-tests-content">
-            <div class="loading-spinner"><div class="spinner"></div><span data-i18n="restoreTests.loadingReports">Lade Prüfberichte...</span></div>
           </div>
         </div>
       </div>

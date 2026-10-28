@@ -213,16 +213,10 @@
     });
     document.getElementById('restore-tests-refresh-btn')?.addEventListener('click', refreshRestoreTests);
     document.getElementById('rt-run-btn')?.addEventListener('click', runRestoreTestNow);
-    document.getElementById('rt-subtab-plan-btn')?.addEventListener('click', () => switchRestoreTestsSubtab('plan'));
-    document.getElementById('rt-subtab-reports-btn')?.addEventListener('click', () => switchRestoreTestsSubtab('reports'));
-    document.getElementById('rt-report-filter-job')?.addEventListener('input', onRTReportFilterChange);
-    document.getElementById('rt-report-filter-location')?.addEventListener('change', onRTReportFilterChange);
-    document.getElementById('rt-report-filter-status')?.addEventListener('change', onRTReportFilterChange);
-    document.getElementById('rt-report-filter-range')?.addEventListener('change', onRTReportFilterChange);
-    document.getElementById('rt-report-filter-problem')?.addEventListener('change', onRTReportFilterChange);
     document.getElementById('rt-log-close-btn')?.addEventListener('click', closeRTLogPanel);
-    document.getElementById('restore-tests-content')?.addEventListener('click', onRestoreTestsContentClick);
+    document.getElementById('restore-tests-plan-content')?.addEventListener('click', onRestoreTestsContentClick);
     document.getElementById('restore-tests-plan-content')?.addEventListener('click', onRestoreTestsPlanClick);
+    document.getElementById('restore-tests-plan-content')?.addEventListener('change', onRTJobReportChange);
     document.getElementById('settings-save-btn')?.addEventListener('click', saveSettings);
     document.getElementById('help-refresh-btn')?.addEventListener('click', helpInit);
     document.getElementById('help-search-input')?.addEventListener('input', (event) => helpFilter(event.target.value));

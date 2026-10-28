@@ -894,13 +894,15 @@ Die Seite verwaltet:
 - fällige geplante Tests
 - Prüfberichte
 
-### 8.2 Reiter Planung & Policy
+<a id="82-reiter-planung--policy"></a>
 
-Die linke Sidebar filtert beide Reiter nach **Alle Standorte** oder einem belegten Standort und zeigt die jeweilige Jobanzahl. Leere Standorte werden ausgeblendet; verliert der ausgewählte Standort seinen letzten Job, erscheint wieder **Alle Standorte**. Die Jobliste steht rechts; Planzeilen und Prüfberichte zeigen die konfigurierten Job-Symbole und Farben. **Nachweis & Verlauf** öffnet alle Berichte eines Jobs, auch von früheren Standorten. Ein Klick auf einen Standort hebt diese Jobauswahl auf.
+### 8.2 Planung und Jobkarten
 
-Die kompakte Tabelle zeigt **Job**, **Testplanung**, **Letzter Test** und **Aktionen**. Standortüberschriften mit den bekannten Standortsymbolen und Jobanzahl gliedern die Tabelle. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Tabelle einklappbar.
+Die Standortleiste oberhalb der Karten filtert nach **Alle Standorte** oder einem belegten Standort und zeigt die jeweilige Jobanzahl. Leere Standorte werden ausgeblendet. Die Jobkarten verwenden die konfigurierten Symbole und Farben. Über den Pfeil links an der Karte oder **Nachweis & Verlauf** öffnen Sie die Prüfberichte direkt beim Job, einschließlich Berichten von früheren Standorten. Einen separaten Reiter für Prüfberichte gibt es nicht mehr.
 
-Öffnen Sie **⋮ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. Das schwebende Menü entspricht der Jobs-Seite und vergrößert die Tabellenzeile nicht; Escape oder ein Klick außerhalb schließt es. **Nachweis & Verlauf** öffnet die zugehörigen Prüfberichte und setzt deren Filter zurück. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
+Separate kompakte Karten zeigen **Job**, **Testplanung**, **Letzter Test** und **Aktionen** in ausgerichteten Spalten. Standortüberschriften mit Trennlinien, den bekannten Standortsymbolen und Jobanzahl gliedern die Karten. Die Standortleiste zeigt alle Zähler dezent umrahmt. Statusanzeigen verwenden Symbole und dezente Farbflächen ohne fette Schrift oder Umrandung. Leere Standorte werden ausgeblendet; die Standortangabe unter dem Jobnamen entfällt. Zeitplan, Testlevel und nächster Termin stehen zusammen unter Testplanung. Hinweise sind unterhalb der Karten einklappbar.
+
+Öffnen Sie **⋮ > Plan bearbeiten** bei einem Job, um Policy, Testlevel und Nachweisgültigkeit festzulegen. Das schwebende Menü entspricht der Jobs-Seite und vergrößert die Karte nicht; Escape oder ein Klick außerhalb schließt es. **Nachweis & Verlauf** öffnet den neuesten zugehörigen Prüfbericht direkt in der Karte. Der letzte Versuch zeigt sein Ergebnis unabhängig von der Nachweisgültigkeit; auch ein abgelaufener erfolgreicher Test bleibt als **Erfolgreich** erkennbar.
 
 - **Geplant:** Tägliche, wöchentliche oder monatliche Ausführung mit Uhrzeit. Monatliche Pläne verwenden die Tage 1–28. Es gilt die lokale Zeitzone des Unraid-Servers.
 - **Manuell / Aus:** Deaktiviert die automatische Ausführung. **Jetzt testen** bleibt für aktivierte Backup-Jobs verfügbar.
@@ -1008,7 +1010,7 @@ Historie nicht. Textprotokolle liegen im konfigurierten Logverzeichnis
 (`Borg-Restore-Test--<Zeitstempel>-<PID>.log`), Ablaufmeldungen im Anwendungslog
 `/var/log/borg_backup_ui.log`; sie werden nicht automatisch in den Unraid-Syslog kopiert.
 
-Der Reiter **Prüfberichte** zeigt die einzelnen Versuche als aufklappbare Zeilen. Details öffnen sich direkt darunter über die gesamte Inhaltsbreite. Filter für Job, Standort, Ergebnis und Zeitraum bleiben verfügbar; **Abgebrochen** ist ein eigener Ergebnisfilter.
+Die aufgeklappte Jobkarte zeigt die Prüfberichte in einem Bereich mit gleichbleibender Höhe. Die Berichtsauswahl nennt Datum, Ergebnis und Testlevel; darunter ist der vollständige Bericht innerhalb des Bereichs scrollbar. Beim automatischen Aktualisieren bleiben Berichtsauswahl, aufgeklappte technische Details und Scrollposition erhalten. Auch Berichte von inzwischen entfernten Jobs bleiben über eigene schreibgeschützte Karten am zuletzt dokumentierten Standort zugänglich; dort stehen keine Planungs- oder Startaktionen zur Verfügung.
 
 Ein erfolgreicher Lauf wird als **Wiederherstellungsnachweis** dargestellt. Er nennt das tatsächlich geprüfte Archiv, Repository, Zeitpunkt, Dauer und den dokumentierten Umfang. Die Zeile **Abdeckung** kombiniert den Prozentwert mit seiner Dateibasis (geprüfte Dateien von Dateien im Archiv). Die Teststufen bauen aufeinander auf: **L1**, **L1 + L2** und **L1 + L2 + L3**. Jede Stufe zeigt ihr belegtes Ergebnis; nicht ausgewählte Stufen und fehlende Angaben älterer Berichte werden ausdrücklich gekennzeichnet. L3 weist ausgelesene Stichprobendateien und erfasste SHA-256-Werte aus, ohne einen unabhängigen Sollwertvergleich zu behaupten. Ein einziger Bereich **Technische Nachweise** bündelt Prüfschritte und Logdiagnose. Unter **Prüfdaten anzeigen** beim jeweiligen Schritt stehen die zugehörigen Dateilisten, Prüfsummen und Detailwerte. Der wiederholte Ausführungsblock mit Report-ID, Start und Ende entfällt.
 
