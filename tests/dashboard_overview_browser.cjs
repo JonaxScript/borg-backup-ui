@@ -212,9 +212,10 @@ const { chromium } = require('playwright');
   assert.equal(plots.length,2);assert.equal(plots[0].top,plots[1].top);
   await page.locator('#dashboard-attention-toggle').click();
   await page.locator('#dashboard-attention [data-dashboard-jobs="4"]').click();
-  await page.waitForSelector('#job-card-4 .dashboard-job-details', {timeout:5000}).catch(async error => { console.error(errors, await page.locator('#jobs-message').innerText()); throw error; });
-  assert(await page.locator('#job-card-4 .dashboard-job-details').isVisible());
-  assert.match(await page.locator('#job-card-4 > .job-saved-message').innerText(),/Missing path:/);
+  await page.waitForSelector('#job-card-4 .job-details .job-saved-message', {timeout:5000}).catch(async error => { console.error(errors, await page.locator('#jobs-message').innerText()); throw error; });
+  assert(await page.locator('#job-card-4 .job-details .job-saved-message').isVisible());
+  assert.equal(await page.locator('#job-card-4 > .job-saved-message').count(),0);
+    assert.match(await page.locator('#job-card-4 .job-details .job-saved-message').innerText(),/Missing path:/);
   assert.equal(await page.locator('#jobs-grid script').count(),0);
   assert.equal(await page.locator('#job-card-0 tr[data-step]').count(),0);
   await page.locator('#job-card-0 [data-jobs-action="toggle-workflow"]').click();
@@ -241,7 +242,8 @@ const { chromium } = require('playwright');
     assert(await savedError.isVisible());
     assert.equal(await page.locator('#jobs-grid script').count(),0);
     await page.evaluate(()=>{jobsState.jobs[4].running=false;renderJobsGrid(jobsState.jobs);});
-    assert.match(await page.locator('#job-card-4 > .job-saved-message').innerText(),/Missing path:/);
+    assert.equal(await page.locator('#job-card-4 > .job-saved-message').count(),0);
+    assert.match(await page.locator('#job-card-4 .job-details .job-saved-message').innerText(),/Missing path:/);
   }
   await page.evaluate(()=>{window.lang='de';});
   // Real log-panel placement must not resize any location's cards (#613).

@@ -225,7 +225,7 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 ### 3.2 Areas and Functions
 
-- **Location selector:** Filters jobs by storage target above the compact list.
+- **Location selector:** Filters jobs by storage target above the compact cards.
 - **Job list:** Shows name, operating state, dates and actions. Description, policy and storage facts are available in expandable details.
 - **Start:** Starts a job manually.
 - **More actions:** Opens actions such as edit, schedule, logs, or delete depending on the job.
@@ -236,9 +236,9 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 **Next run** shows the scheduled time. The last run time and duration remain separate values.
 
-Jobs appear as a compact list with the location selector above it. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
+Jobs appear as separate compact cards with spacing. Below the Single jobs/Job groups view tabs, a separate flat location bar uses underlined text buttons without pills or a dropdown. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
 
-Errors, warnings and reasons for skipped or cancelled runs remain identifiable in the job row. **Last saved outcome** identifies the completed run; the complete message is available under **Workflow**. During a new run, the earlier message appears only there, keeping it separate from current operating status. Long live-log lines scroll horizontally. Missing status files never imply success.
+Collapsed cards identify failures, warnings, skipped or cancelled runs by status only. The full message appears exactly once under **Workflow**, labelled **Last saved outcome**, including during a new run. Dashboard problem links open this view directly. Long live-log lines scroll horizontally. Missing status files never imply success.
 
 ### 3.3 Start a Job Manually
 
@@ -339,7 +339,7 @@ A planned VM shutdown is reported as informational. A failed shutdown or restart
 
 Once archive creation (`borg create`) finishes, containers and VMs stopped by the job are restarted immediately, including when Borg reports warnings. Retention (`prune`), space reclamation (`compact`), and any due repository check (`check`) run afterwards and do not extend service downtime. If archive creation fails or is cancelled, cleanup still restarts the stopped workloads. If a restart fails, recovery is still attempted for the other workload type; the run ends as an error and maintenance does not start.
 
-Each job has a compact row with its name, operating status, dates and actions. **All locations** groups only destinations with jobs; the location selector sits above the list. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
+Each job has a compact card with its name, operating status, dates and actions. **All locations** groups only destinations with jobs; the location selector sits above the cards. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
 
 The overall result appears directly below **Operating status**.
 

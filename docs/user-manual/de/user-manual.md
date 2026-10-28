@@ -233,7 +233,7 @@ Jobs definieren, welche Daten wohin gesichert werden. Ein Job enthält:
 
 ### 3.2 Bereiche und Funktionen
 
-- **Standortauswahl:** Filtert Jobs nach Speicherziel über der kompakten Liste.
+- **Standortauswahl:** Filtert Jobs nach Speicherziel über den kompakten Karten.
 - **Job-Liste:** Zeigt Name, Betriebszustand, Termine und Aktionen. Beschreibung, Richtlinie und Speicherwerte stehen in den aufklappbaren Details.
 - **Starten:** Startet einen Job manuell.
 - **Weitere Aktionen:** Öffnet je nach Job Aktionen wie Bearbeiten, Zeitplan, Logs oder Löschen.
@@ -244,9 +244,9 @@ Jobs definieren, welche Daten wohin gesichert werden. Ein Job enthält:
 
 **Nächster Lauf** zeigt den geplanten Termin. Zeitpunkt und Dauer des letzten Laufs bleiben getrennte Angaben.
 
-Die Jobs stehen in einer kompakten Liste. Die Standortauswahl befindet sich darüber; die eigene Terminspalte zeigt Zeitpläne, letzten Restore-Test und Gültigkeit des Nachweises. Der Pfeil am Job öffnet einen gemeinsamen Detailbereich mit **Ablauf** und **Daten & Einstellungen**. Letzterer fasst Speicherdaten, Richtlinie, Archivpräfix, Beschreibung, Borg-/Repository-Checks und Restore-Nachweise zusammen. Beide Ansichten reservieren die Höhe des größeren Inhalts; beim Wechsel springt die Liste nicht. Geöffnete Details und die ausgewählte Ansicht bleiben bei Aktualisierungen erhalten.
+Die Jobs stehen in einzelnen kompakten Karten mit Abstand. Unter den Ansichtsreitern Einzeljobs/Jobgruppen befindet sich eine separate, flache Standortleiste ohne Dropdown oder Pillen; die eigene Terminspalte zeigt Zeitpläne, letzten Restore-Test und Gültigkeit des Nachweises. Der Pfeil am Job öffnet einen gemeinsamen Detailbereich mit **Ablauf** und **Daten & Einstellungen**. Letzterer fasst Speicherdaten, Richtlinie, Archivpräfix, Beschreibung, Borg-/Repository-Checks und Restore-Nachweise zusammen. Beide Ansichten reservieren die Höhe des größeren Inhalts; beim Wechsel springt die Liste nicht. Geöffnete Details und die ausgewählte Ansicht bleiben bei Aktualisierungen erhalten.
 
-Fehler, Warnungen und Gründe für übersprungene oder abgebrochene Läufe bleiben in der Jobzeile erkennbar. **Letztes gespeichertes Ergebnis** kennzeichnet den abgeschlossenen Lauf; die vollständige Meldung steht unter **Ablauf**. Während eines neuen Laufs erscheint die frühere Meldung ausschließlich dort, damit sie nicht als aktueller Fehler verstanden wird. Lange Live-Log-Zeilen lassen sich horizontal scrollen. Fehlende Statusdateien werden nicht als Erfolg gewertet.
+Eingeklappte Karten zeigen Fehler, Warnungen, übersprungene oder abgebrochene Läufe nur als Status. Die vollständige Meldung erscheint genau einmal unter **Ablauf**, gekennzeichnet als **Letztes gespeichertes Ergebnis**. Das gilt auch während eines neuen Laufs. Problemverweise aus dem Dashboard öffnen diesen Bereich direkt. Lange Live-Log-Zeilen lassen sich horizontal scrollen. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### 3.3 Job manuell starten
 
@@ -347,7 +347,7 @@ Das planmäßige Herunterfahren einer VM wird als Information gemeldet. Ein fehl
 
 Nach Abschluss der Archiverstellung (`borg create`) werden die vom Job gestoppten Container und VMs sofort wieder gestartet, auch bei Borg-Warnungen. Erst danach laufen Aufbewahrung (`prune`), Speicherbereinigung (`compact`) und eine fällige Repository-Prüfung (`check`). Diese Wartung verlängert die Ausfallzeit der Dienste nicht. Bei Fehlern oder Abbruch der Archiverstellung erfolgt der Neustart weiterhin beim Aufräumen. Schlägt ein Neustart fehl, wird der Neustart auch für die andere Dienstgruppe versucht; der Lauf endet als Fehler und die Wartung wird nicht gestartet.
 
-Jeder Job erhält eine kompakte Zeile mit Name, Betriebszustand, Terminen und Aktionen. **Alle Standorte** gruppiert nur belegte Ziele; die Standortauswahl steht platzsparend über der Liste. Verliert ein ausgewählter Standort seinen letzten Job, wechselt die Ansicht zu **Alle Standorte**.
+Jeder Job erhält eine kompakte Karte mit Name, Betriebszustand, Terminen und Aktionen. **Alle Standorte** gruppiert nur belegte Ziele; die Standortauswahl steht platzsparend über den Karten. Verliert ein ausgewählter Standort seinen letzten Job, wechselt die Ansicht zu **Alle Standorte**.
 
 Der Gesamtstatus steht direkt unter **Betriebszustand**.
 

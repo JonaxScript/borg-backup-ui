@@ -56,7 +56,24 @@ const {chromium} = require('playwright');
     assert.ok((await page.locator('#job-card-running .job-active-step').textContent()).includes('Schrittzeit:'));
     assert.equal(await page.locator('#job-card-running .borg-progress-metric').count(),3);
     assert.equal(await page.locator('#job-card-running progress').getAttribute('value'),null,'Create must never invent a percentage');
-    assert.equal(await page.locator('#job-card-failed .job-saved-message img').count(),0);
+    const failed=page.locator('#job-card-failed');
+    assert.equal(await failed.locator('.job-saved-message').count(),0,'Collapsed failures only show status');
+    await failed.locator('[data-jobs-action="toggle-workflow"]').click();
+    assert.equal(await failed.locator('.job-saved-message').count(),1,'Full outcome appears exactly once');
+    assert.equal(await failed.locator('.job-saved-message img').count(),0,'Outcome is escaped');
+    assert.ok((await failed.locator('.job-saved-message').innerText()).includes('reason '.repeat(99)),'Full outcome is not truncated');
+    await failed.locator('[data-jobs-action="toggle-workflow"]').click();
+    const cards=await page.locator('.jobs-redesign-row').evaluateAll(nodes=>nodes.map(node=>({
+      top:node.getBoundingClientRect().top,bottom:node.getBoundingClientRect().bottom,
+      radius:parseFloat(getComputedStyle(node).borderRadius),border:parseFloat(getComputedStyle(node).borderTopWidth)
+    })));
+    assert.ok(cards.every((row,i)=>row.radius>0&&row.border>0&&(!i||row.top-cards[i-1].bottom>=8)),'Separate bordered cards have visible spacing');
+    const location=page.locator('#jobs-location-list [data-jobs-location="local"]');
+    assert.equal(await location.evaluate(node=>getComputedStyle(node).borderRadius),'0px','Location buttons are flat');
+    assert.equal(await page.locator('#jobs-location-list select').count(),0);
+    await location.click();
+    assert.equal(await page.locator('#jobs-location-list [data-jobs-location="local"]').getAttribute('aria-current'),'page');
+    await page.locator('#jobs-location-list [data-jobs-location="all"]').click();
     assert.equal(await page.locator('#job-card-new [data-jobs-action="start-job"]').isDisabled(),true);
     await page.evaluate(()=>document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page==='jobs')));
     if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/jobs-compact-overview.png`,fullPage:true});

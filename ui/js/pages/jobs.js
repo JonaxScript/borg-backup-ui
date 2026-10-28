@@ -658,6 +658,10 @@ function renderJobsGrid(jobs) {
       return String(a.name || a.display_name || '').localeCompare(String(b.name || b.display_name || ''));
     });
 
+  // Dashboard problem links open the full outcome; other links keep saved facts selected.
+  const targetJob = jobStatusTarget && jobs.find(job => String(job.key) === String(jobStatusTarget));
+  if (targetJob?.saved_status && dashboardRunMessage(targetJob.saved_status).cls) jobDataView.delete(String(jobStatusTarget));
+
   renderJobsLocationSidebar(jobs);
   updateJobsSelection(visible);
 
@@ -911,7 +915,6 @@ function renderJobCard(job) {
             </div>
           </div>
     </div>
-    ${isRunning ? '' : renderJobSavedMessage(job, true)}
     <div class="job-live-metrics" id="job-live-metrics-${escHtml(job.key)}">${renderBorgProgress(job)}</div>
     <div class="job-details" id="job-details-${escHtml(job.key)}"${jobWorkflowOpen.has(job.key) ? '' : ' hidden'}>${renderJobDetails(job)}</div>
   </article>`;
@@ -1861,18 +1864,15 @@ function hideJobsMessage() {
 }
 
 /**
- * Render an escaped saved outcome. Summary banners truncate to 180 characters;
- * the full message remains available in Workflow, separate from a new active run.
+ * Render the full escaped saved outcome in Workflow, separate from a new active run.
  * @param {Object} job Job with an optional saved_status report.
- * @param {boolean} summary Whether to render a compact one-line excerpt.
  * @returns {string} Outcome markup, or an empty string without a relevant message.
  */
-function renderJobSavedMessage(job, summary = false) {
+function renderJobSavedMessage(job) {
   if (!job.saved_status) return '';
   const message = dashboardRunMessage(job.saved_status);
   if (!message.cls || !message.text) return '';
-  const text = summary && message.text.length > 180 ? message.text.slice(0, 180) + '…' : message.text;
-  return `<div class="job-saved-message ${message.cls}${summary ? ' is-summary' : ''}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(text)}</p></div>`;
+  return `<div class="job-saved-message ${message.cls}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(message.text)}</p></div>`;
 }
 
 /** Render saved facts inside Data & settings; missing reports are never inferred as success. */
@@ -1894,7 +1894,10 @@ function onJobDetailsKeydown(event) {
 }
 document.addEventListener('keydown', onJobDetailsKeydown);
 
-/** Navigate from a dashboard aggregate or problem to Jobs without running any action. */
+/**
+ * Navigate from Dashboard to Jobs without starting an action. Open saved facts by
+ * default; rendering selects Workflow for a target with a saved outcome message.
+ */
 async function openJobsStatus(key = '', location = 'all') {
   jobsState.selectedLocation = JOBS_LOCATION_ORDER.includes(location) ? location : 'all';
   if (window.BBUI.jobGroups?.view) {
