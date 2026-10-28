@@ -492,7 +492,7 @@
     "repositoryCheckSuccessful": "Check erfolgreich",
     "repositoryPruneResult": "{count} Archive entfernt",
     "repositoryPruneDetails": "Entfernte Archive anzeigen ({count})",
-    "repositoryCompactResult": "{value} eingespart",
+    "repositoryCompactResult": "{value} freigegeben",
     "repositoryCompactDone": "Repository optimiert",
     "repositoryErrorDetails": "Fehlerdetails anzeigen",
     "repositoryStartAction": "Starten",
@@ -632,7 +632,7 @@
     "mount": "Mount",
     "unmount": "Unmount",
     "details": "Details",
-    "hideDetails": "Details ausblenden",
+    "hideDetails": "Schließen",
     "unknown": "Unbekannt",
     "noDetails": "Keine Details verfügbar.",
     "error": "Fehler",
@@ -659,7 +659,19 @@
       "logError": "[Fehler] {message}"
     },
     "repositoryRetentionHourly": "{count} Stundenstände",
-    "repositoryRetentionHourlyLimit": "max. 1/Stunde"
+    "repositoryRetentionHourlyLimit": "max. 1/Stunde",
+    "allStorageTargets": "Alle Speicherziele",
+    "showDetails": "Details",
+    "repositoryInfoAvailable": "Info verfügbar",
+    "repositoryCompactAmountUnknown": "Abgeschlossen · Speichermenge nicht erfasst",
+    "repositoryCheckScope": "Repository- und Archivstrukturen geprüft. Keine Datenverifikation.",
+    "repositoryVerifyScope": "Gespeicherte Daten gelesen und ihre Integrität geprüft.",
+    "repositoryCompactScope": "Nicht mehr benötigte Repository-Daten entfernt. Die Speichermenge stammt aus der Borg-Ausgabe.",
+    "previousPage": "Zurück",
+    "nextPage": "Weiter",
+    "archivePage": "{start}–{end} von {count} geladenen Archiven",
+    "archiveListLimited": "Die neuesten {count} von insgesamt {total} Archiven sind geladen.",
+    "repositoryInfoUnknown": "Info nicht geladen"
   },
   "jobs": {
     "createRunning": "Archiv erstellen (borg create)",

@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Repository management cards (#621)
+
+- Replace the repository picker/sidebar with registry-backed cards and exact storage-target filters; retain unassigned and shared repositories.
+- Share intrinsic panel height across all four detail tabs, keep inactive panels inert, paginate loaded archives, and preserve action routing and safety confirmations.
+- Use subtle status symbols and normal-weight result text; expose maintenance scope and distinguish missing Compact amounts from reported zero.
+- Update German/English help and add real-browser regression coverage for navigation, panel geometry, archive actions, maintenance states, and lifecycle/key recovery blockers.
+
 ## Pending - Dashboard resource monitoring (#602)
 
 - Label expanded charts with current values, five unit-aware Y-axis ticks and timestamped sample readouts. Support pointer/touch and keyboard inspection, preserve keyboard focus across live refresh, and keep missing values distinct from zero.

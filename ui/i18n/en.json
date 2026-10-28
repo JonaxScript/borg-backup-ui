@@ -632,7 +632,7 @@
     "mount": "Mount",
     "unmount": "Unmount",
     "details": "Details",
-    "hideDetails": "Hide details",
+    "hideDetails": "Close",
     "unknown": "Unknown",
     "noDetails": "No details available.",
     "error": "Error",
@@ -659,7 +659,19 @@
       "logError": "[Error] {message}"
     },
     "repositoryRetentionHourly": "{count} hourly restore points",
-    "repositoryRetentionHourlyLimit": "max. 1/hour"
+    "repositoryRetentionHourlyLimit": "max. 1/hour",
+    "allStorageTargets": "All storage targets",
+    "showDetails": "Details",
+    "repositoryInfoAvailable": "Info available",
+    "repositoryCompactAmountUnknown": "Completed · reclaimed space not recorded",
+    "repositoryCheckScope": "Repository and archive structures checked. No data verification.",
+    "repositoryVerifyScope": "Stored data read and its integrity verified.",
+    "repositoryCompactScope": "Unused repository data removed. Reclaimed space is reported by Borg.",
+    "previousPage": "Previous",
+    "nextPage": "Next",
+    "archivePage": "{start}–{end} of {count} loaded archives",
+    "archiveListLimited": "The newest {count} of {total} archives are loaded.",
+    "repositoryInfoUnknown": "Info not loaded"
   },
   "jobs": {
     "createRunning": "Creating archive (borg create)",

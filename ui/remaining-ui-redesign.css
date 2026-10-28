@@ -1617,3 +1617,91 @@
 .help-doc h4, .help-doc h5, .help-doc h6 { scroll-margin-top: 1rem; }
 
 .help-figure img { height: auto; }
+
+/* Registry-backed repository cards and stable detail panels (#621). */
+.storage-cards-layout { display: grid; gap: var(--ui-space-3); min-width: 0; }
+.storage-target-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 8px 16px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
+.storage-target-label { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-sm); }
+.storage-target-bar button { display: flex; align-items: center; gap: 8px; padding: 10px 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ui-color-text-muted); font: inherit; font-weight: 400; }
+.storage-target-bar button[aria-pressed="true"] { color: var(--ui-color-accent); border-bottom-color: var(--ui-color-accent); }
+.storage-target-count, .storage-repository-card .storage-repository-tabs b { border: 1px solid var(--ui-color-border); border-radius: 999px; padding: 1px 6px; background: var(--ui-color-surface-subtle); font-size: var(--ui-font-size-xs); font-weight: 400; }
+.storage-cards-toolbar { display: flex; justify-content: flex-end; }
+.storage-cards-toolbar input { max-width: 100%; width: 270px; }
+.storage-repository-card { min-width: 0; margin-bottom: 12px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); overflow: hidden; }
+.storage-card-summary { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(180px, 1fr) 130px 110px; gap: 20px; padding: 16px; align-items: center; }
+.storage-card-identity { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.storage-card-identity > div { min-width: 0; }
+.storage-card-identity h2 { font-size: var(--ui-font-size-md); font-weight: 500; margin: 0; }
+.storage-card-summary small { display: block; color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); overflow-wrap: anywhere; margin-top: 4px; }
+.storage-card-toggle { display: flex; gap: 8px; justify-content: center; }
+.storage-card-status { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 5px; padding: 3px 7px; font-size: var(--ui-font-size-xs); font-weight: 400; }
+.storage-card-status svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.storage-card-status.success { background: var(--ui-state-success-bg); color: var(--ui-state-success-fg); }
+.storage-card-status.warning { background: var(--ui-state-warning-bg); color: var(--ui-state-warning-fg); }
+.storage-card-status.error { background: var(--ui-state-error-bg); color: var(--ui-state-error-fg); }
+.storage-card-status.info { background: var(--ui-state-info-bg); color: var(--ui-state-info-fg); }
+.storage-card-status.neutral { background: var(--ui-color-surface-subtle); color: var(--ui-color-text-muted); }
+.storage-card-size { font-variant-numeric: tabular-nums; }
+.storage-repository-card .storage-repository-master-detail { min-height: 0; border-top: 1px solid var(--ui-color-border); }
+.storage-repository-card .storage-repository-tabs { flex-wrap: wrap; overflow: visible; }
+.storage-repository-card .storage-repository-tabs button { font-weight: 400; padding: 12px; }
+/* Inactive panels contribute their intrinsic height, but cannot be read or focused. */
+.storage-repository-panels { display: grid; min-height: 650px; }
+.storage-repository-panels > .storage-repository-tab-content { grid-area: 1 / 1; align-self: start; min-width: 0; visibility: hidden; pointer-events: none; }
+.storage-repository-panels > .is-active { visibility: visible; pointer-events: auto; }
+.storage-repository-card strong, .storage-repository-card b, .storage-repository-card dt, .storage-repository-card dd { font-weight: 400; }
+.storage-repository-card h3, .storage-repository-card h4 { font-weight: 500; }
+.storage-repository-card .storage-repository-detail-item { background: transparent; border: 0; padding: 8px 0; }
+.storage-repository-card .storage-repository-detail-item span { text-transform: none; font-weight: 400; }
+.storage-repository-card .storage-repository-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.storage-repository-card .storage-repository-stats strong { font-size: 1.2rem; }
+.storage-repository-card .storage-repository-workspace-status { justify-items: start; }
+.storage-repository-card .storage-repository-key-backup-link { font-weight: 400; }
+.storage-repository-card .storage-maintenance-summary-grid { grid-template-columns: 1fr; gap: 0; }
+.storage-repository-card .storage-maintenance-card { border: 0; border-bottom: 1px solid var(--ui-color-border); border-radius: 0; background: transparent; padding: 14px 0; grid-template-columns: 20px minmax(0, 1fr) 110px; align-items: start; }
+.storage-repository-card .storage-maintenance-card > button { width: 110px; display: inline-flex; justify-content: center; gap: 7px; grid-column: 3; }
+.storage-repository-card .storage-maintenance-summary-grid .storage-maintenance-card { grid-template-columns: 20px minmax(0, 1fr); }
+.storage-repository-card .storage-maintenance-icon { width: 20px; height: 20px; }
+.storage-repository-card .storage-maintenance-icon svg { width: 16px; height: 16px; stroke-width: 1.7; }
+.storage-repository-card .storage-maintenance-copy > small { color: var(--ui-color-text); font-size: var(--ui-font-size-sm); }
+.storage-maintenance-scope { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-sm); margin: 5px 0; }
+.storage-repository-card .storage-lifecycle-jobs, .storage-repository-card .storage-lifecycle-card { background: transparent; border: 0; border-bottom: 1px solid var(--ui-color-border); border-radius: 0; padding: 12px 0; }
+.storage-repository-card .storage-lifecycle-jobs span { font-weight: 400; }
+.storage-repository-card .storage-lifecycle-card.danger h4 { color: var(--ui-state-error-fg); }
+.storage-repository-card .storage-lifecycle-card dt { text-transform: none; }
+.storage-repository-card .storage-repository-management { gap: 10px; }
+.storage-archive-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-top: 14px; font-size: var(--ui-font-size-sm); }
+.storage-repository-card .storage-archive-list strong, .storage-repository-card .storage-archive-browser h3 { font-weight: 400; }
+.storage-repository-card .storage-archive-row strong { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .storage-card-summary { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 12px; }
+  .storage-card-toggle { justify-self: end; min-width: 110px; }
+  .storage-repository-card .storage-repository-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .storage-card-summary { grid-template-columns: minmax(0, 1fr); }
+  .storage-card-toggle { justify-self: start; }
+  .storage-target-bar { gap: 8px 16px; }
+  .storage-target-label { width: 100%; }
+  .storage-repository-card .storage-repository-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .storage-repository-card .storage-repository-tabs { padding: 0 4px; }
+  .storage-repository-card .storage-repository-tabs button { padding: 10px 8px; }
+  .storage-repository-card .storage-maintenance-card { grid-template-columns: 20px minmax(0, 1fr); }
+  .storage-repository-card .storage-maintenance-card > button { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .storage-maintenance-spinner { animation: none; } }
+/* Explicit descendant visibility also covers controls with their own visibility rule. */
+.storage-repository-panels > .storage-repository-tab-content:not(.is-active),
+.storage-repository-panels > .storage-repository-tab-content:not(.is-active) * { visibility: hidden !important; }
+.storage-repository-card .storage-maintenance-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.storage-repository-card .storage-maintenance-title small { color: var(--ui-color-text); font-size: var(--ui-font-size-sm); }
+.storage-repository-card .storage-maintenance-card { grid-template-columns: 145px minmax(0, 1fr) 110px; }
+.storage-repository-card .storage-maintenance-summary-grid .storage-maintenance-card { grid-template-columns: 145px minmax(0, 1fr); }
+.storage-repository-card .storage-maintenance-result-details summary { font-weight: 400; }
+@media (max-width: 600px) {
+  .storage-repository-card .storage-maintenance-card,
+  .storage-repository-card .storage-maintenance-summary-grid .storage-maintenance-card { grid-template-columns: minmax(0, 1fr); }
+  .storage-repository-card .storage-maintenance-card > button { grid-column: 1; }
+}
+/* Global button transitions must not delay hiding controls on a tab switch. */
+.storage-repository-panels > .storage-repository-tab-content:not(.is-active) * { transition: none !important; }

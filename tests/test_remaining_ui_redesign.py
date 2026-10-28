@@ -20,7 +20,7 @@ def test_storage_uses_approved_variant_a_and_preserves_controls() -> None:
     script = _read("ui/js/pages/storage.js")
     for element_id in (
         "storage-location-list",
-        "storage-workspace-header",
+        "storage-sidebar-search",
         "storage-content",
         "storage-add-repository-btn",
         "storage-maintenance-confirm-modal",

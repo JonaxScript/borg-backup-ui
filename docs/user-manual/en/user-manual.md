@@ -550,9 +550,7 @@ After loss of the coordinating service process, the group run is marked **Interr
 
 ## 4. Repositories
 
-The **Repositories** page uses a master-detail workspace. Borg repositories are grouped by their exact storage target on the left, while the selected repository remains visible in the workspace on the right. **Add repository** creates or imports a repository on a storage target that has already been configured under **Settings**.
-
-![Repository management with storage-target groups and a detail workspace](../assets/en/current/repositories.png)
+The **Repositories** page displays registered Borg repositories as separate cards, including repositories without a linked backup job. The storage-target bar filters by the exact target. **Details** opens the workspace inside a card; its tabs share the height of their largest content so the following cards do not jump when switching tabs. **Add repository** creates or imports a repository on a storage target already configured under **Settings**.
 
 Local storage targets are created under **Settings > Local Profiles**. A
 concrete directory below `/mnt`, such as `/mnt/backup` or `/mnt/disks/USB-A`,
@@ -565,12 +563,12 @@ The page separates storage targets, Borg repositories, and backup jobs. A storag
 
 ### 4.2 Areas and Functions
 
-- **Repository sidebar:** Groups repositories by the exact storage target and shows display name, repository directory, and status for each entry.
-- **Search:** Filters sidebar entries by name, path, job, or storage target.
-- **Workspace header:** Shows the selected repository, its path, and the summarized current state.
+- **Repository cards:** Show display name, repository directory, storage target, status, cached size, archive count, and every linked job.
+- **Search:** Filters cards by name, path, job, or storage target.
+- **Storage-target bar:** Shows all targets with subtly outlined repository counts. Multiple local targets remain separately selectable.
 - **Overview:** Shows Borg statistics, maintenance state, and human-readable repository, storage target, job, encryption, and path details.
-- **Archives:** Loads the current Borg archive inventory with archive name, technical ID, start time, and duration.
-- **Maintenance:** Provides Check, Verify Data, Prune, and Compact as separate actions with persistent results.
+- **Archives:** Loads the newest up to 100 archives directly from Borg and displays five entries per page. The total count remains visible; a limited list states how many archives were loaded. Archive name, technical ID, and start time remain available.
+- **Maintenance:** Provides Check, Verify Data, Prune, and Compact with fixed **Start** buttons. Results include timestamp, duration, check scope, and recorded deleted archive names for Prune. Compact shows the reclaimed space reported by Borg, including `0 B`; historical results without that amount say "reclaimed space not recorded". Long result lists can be expanded. Further starts are disabled while maintenance runs. Existing confirmation dialogs remain in place.
 - **Management:** Shows current job links, Borg key export/import, and separates non-destructive removal from the UI from permanent repository deletion.
 - **Add repository:** Opens a wizard for selecting an existing storage target and creating or importing a repository.
 

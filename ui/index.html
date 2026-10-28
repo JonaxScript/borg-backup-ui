@@ -378,26 +378,14 @@
         </div>
       </div>
       <div id="storage-message" class="status-message hidden"></div>
-      <div class="storage-redesign-layout ui-context-layout">
-        <aside class="storage-location-sidebar ui-context-sidebar">
-          <div class="ui-context-sidebar__header">
-            <small data-i18n="storage.storageTargets">Speicherziele</small>
-            <strong data-i18n="storage.repositories">Repositories</strong>
-          </div>
-          <nav id="storage-location-list" class="ui-context-nav" data-i18n-aria-label="storage.locations" aria-label="Standorte"></nav>
-        </aside>
-        <section class="storage-workspace ui-workspace">
-          <header id="storage-workspace-header" class="ui-workspace-header">
-            <div class="ui-workspace-header__title">
-              <small data-i18n="storage.overview">Repository-Übersicht</small>
-              <h2 data-i18n="storage.allLocations">Alle Standorte</h2>
-              <span class="ui-workspace-header__subtitle" data-i18n="storage.overviewHint">Repository-Pfade, Verfügbarkeit und Einzeltests</span>
-            </div>
-          </header>
-          <div id="storage-content">
-            <div class="loading-spinner"><div class="spinner"></div><span data-i18n="storage.loading">Lade Repositories...</span></div>
-          </div>
-        </section>
+      <div class="storage-cards-layout">
+        <nav id="storage-location-list" class="storage-target-bar" data-i18n-aria-label="storage.storageTargets" aria-label="Speicherziele"></nav>
+        <div class="storage-cards-toolbar">
+          <input id="storage-sidebar-search" class="form-input" type="search" data-i18n-placeholder="storage.searchPlaceholder" data-i18n-aria-label="storage.searchPlaceholder" placeholder="Repository suchen..." aria-label="Repository suchen...">
+        </div>
+        <div id="storage-content">
+          <div class="loading-spinner"><div class="spinner"></div><span data-i18n="storage.loading">Lade Repositories...</span></div>
+        </div>
       </div>
     </div>
 

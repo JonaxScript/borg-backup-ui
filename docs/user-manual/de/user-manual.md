@@ -558,9 +558,7 @@ Nach einem Verlust des koordinierenden Dienstprozesses wird der Gruppenlauf als 
 
 ## 4. Repositories
 
-Die Seite **Repositories** verwendet eine Master-Detail-Ansicht. Links werden Borg-Repositorys nach dem exakten Speicherziel gruppiert; rechts bleibt der Arbeitsbereich des ausgewählten Repositorys sichtbar. Über **Repository hinzufügen** können Repositorys auf einem bereits unter **Einstellungen** eingerichteten Speicherziel erstellt oder importiert werden.
-
-![Repository-Verwaltung mit Speicherzielgruppen und Detailbereich](../assets/de/current/repositories.png)
+Die Seite **Repositories** zeigt registrierte Borg-Repositorys als separate Karten, auch ohne verknüpften Backup-Job. Die Speicherzielleiste filtert nach dem exakten Ziel. **Details** öffnet den Arbeitsbereich innerhalb einer Karte; die Reiter teilen sich die Höhe ihres größten Inhalts, damit die folgenden Karten beim Wechsel nicht springen. Über **Repository hinzufügen** können Repositorys auf einem bereits unter **Einstellungen** eingerichteten Speicherziel erstellt oder importiert werden.
 
 Lokale Speicherziele werden unter **Einstellungen > Lokale Profile** angelegt.
 Zulässig sind konkrete Verzeichnisse unter `/mnt`, etwa `/mnt/backup` oder
@@ -573,12 +571,12 @@ Die Seite trennt Speicherziele, Borg-Repositorys und Backup-Jobs. Ein Speicherzi
 
 ### 4.2 Bereiche und Funktionen
 
-- **Repository-Sidebar:** Gruppiert Repositorys nach dem konkreten Speicherziel und zeigt pro Eintrag Anzeigename, Repository-Verzeichnis und Status.
-- **Suche:** Filtert die Einträge der Sidebar nach Namen, Pfad, Job oder Speicherziel.
-- **Kopfbereich:** Zeigt das ausgewählte Repository, seinen Pfad und den aktuellen zusammengefassten Zustand.
+- **Repository-Karten:** Zeigen Anzeigename, Repository-Verzeichnis, Speicherziel, Status, gespeicherte Größe, Archivanzahl und alle zugeordneten Jobs.
+- **Suche:** Filtert die Karten nach Namen, Pfad, Job oder Speicherziel.
+- **Speicherzielleiste:** Zeigt alle Ziele mit dezent umrahmten Repository-Anzahlen. Auch mehrere lokale Ziele bleiben getrennt auswählbar.
 - **Übersicht:** Zeigt Borg-Kennzahlen, Wartungsstatus sowie verständliche Angaben zu Repository, Speicherziel, Job, Verschlüsselung und Pfad.
-- **Archive:** Lädt die aktuelle Archivliste mit Archivname, technischer ID, Startzeit und Dauer direkt aus Borg.
-- **Wartung:** Bietet Check, Datenprüfung, Prune und Compact als klar getrennte Aktionen mit dauerhaft sichtbarem Ergebnis.
+- **Archive:** Lädt die neuesten bis zu 100 Archive direkt aus Borg und zeigt sie in Seiten mit fünf Einträgen. Die Gesamtzahl bleibt sichtbar; bei einer begrenzten Liste wird die Zahl geladener Archive genannt. Archivname, technische ID und Startzeit bleiben verfügbar.
+- **Wartung:** Bietet Check, Datenprüfung, Prune und Compact mit festen **Starten**-Schaltflächen. Ergebnisse zeigen Zeitpunkt, Dauer, Prüfumfang und bei Prune die aufgezeichneten gelöschten Archive. Compact nennt die von Borg gemeldete freigegebene Menge, einschließlich `0 B`; fehlt sie in einem älteren Ergebnis, steht dort „Speichermenge nicht erfasst“. Lange Ergebnislisten lassen sich aufklappen. Während einer Wartungsaktion sind weitere Starts gesperrt. Bestehende Bestätigungsdialoge bleiben erhalten.
 - **Verwaltung:** Zeigt aktuelle Job-Verknüpfungen, Borg-Key-Export/Import und trennt das nicht-destruktive Entfernen aus der UI von der endgültigen Repository-Löschung.
 - **Repository hinzufügen:** Öffnet einen Assistenten zum Auswählen eines vorhandenen Speicherziels und zum Erstellen oder Importieren eines Repositorys.
 
