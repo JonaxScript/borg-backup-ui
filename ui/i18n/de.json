@@ -854,7 +854,27 @@
     },
     "showLiveLog": "Live-Log anzeigen",
     "databaseArchived": "archiviert und geprüft",
-    "databaseDumped": "Dump erstellt"
+    "databaseDumped": "Dump erstellt",
+    "compact": {
+      "workflow": "Ablauf",
+      "dataSettings": "Daten & Einstellungen",
+      "dates": "Termine & Restore-Test",
+      "job": "Job",
+      "actionsLabel": "Aktionen",
+      "archivePrefix": "Archivpräfix",
+      "openJob": "Details für {name} öffnen",
+      "closeJob": "Details für {name} schließen",
+      "currentAction": "Aktuell: {action}",
+      "stepElapsed": "Schrittzeit: {time}",
+      "noSteps": "Für diesen Lauf liegen keine Schrittergebnisse vor.",
+      "actions": {
+        "create": "Backup erstellen (borg create)",
+        "prune": "Archive aufräumen (borg prune)",
+        "compact": "Speicher freigeben (borg compact)",
+        "check": "Integrität prüfen (borg check)"
+      },
+      "liveProgress": "Live-Messwerte"
+    }
   },
   "schedule": {
     "title": "Zeitplan",

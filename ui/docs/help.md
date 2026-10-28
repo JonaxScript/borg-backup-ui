@@ -113,9 +113,9 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 
 **Nächster Lauf** zeigt den geplanten Termin. Zeitpunkt und Dauer des letzten Laufs bleiben getrennte Angaben.
 
-Der bestehende Jobverlauf mit seinen benannten Schritten und **Details anzeigen** bleibt erhalten. **Status anzeigen** öffnet unabhängig davon direkt unter der Jobkarte die gespeicherten Speicherwerte, Borg- und Repository-Checks, Restore-Nachweise, Archivnamen, letzten Lauf und letztes erfolgreiches Backup. Die beiden Bereiche können gleichzeitig geöffnet sein und bleiben bei Aktualisierungen geöffnet.
+Die Jobs stehen in einer kompakten Liste. Die Standortauswahl befindet sich darüber; die eigene Terminspalte zeigt Zeitpläne, letzten Restore-Test und Gültigkeit des Nachweises. Der Pfeil am Job öffnet einen gemeinsamen Detailbereich mit **Ablauf** und **Daten & Einstellungen**. Letzterer fasst Speicherdaten, Richtlinie, Archivpräfix, Beschreibung, Borg-/Repository-Checks und Restore-Nachweise zusammen. Beide Ansichten reservieren die Höhe des größeren Inhalts; beim Wechsel springt die Liste nicht. Geöffnete Details und die ausgewählte Ansicht bleiben bei Aktualisierungen erhalten.
 
-Vollständige Fehler- und Warnmeldungen sowie Gründe für übersprungene oder abgebrochene Läufe stehen direkt in der Karte. **Letztes gespeichertes Ergebnis** kennzeichnet den Bezug zum abgeschlossenen Lauf. Während eines neuen aktiven Laufs wird diese Meldung nur unter **Status anzeigen** angezeigt; der Betriebszustand zeigt den aktuellen Lauf. Lange Zeilen im Live-Log lassen sich horizontal scrollen, ohne die Job-Kacheln zu verbreitern. Fehlende Statusdateien werden nicht als Erfolg gewertet.
+Fehler, Warnungen und Gründe für übersprungene oder abgebrochene Läufe bleiben in der Jobzeile erkennbar. **Letztes gespeichertes Ergebnis** kennzeichnet den abgeschlossenen Lauf; die vollständige Meldung steht unter **Ablauf**. Während eines neuen Laufs erscheint die frühere Meldung ausschließlich dort, damit sie nicht als aktueller Fehler verstanden wird. Lange Live-Log-Zeilen lassen sich horizontal scrollen. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
 ### Job-Wizard
 

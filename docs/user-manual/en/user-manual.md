@@ -225,8 +225,8 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 ### 3.2 Areas and Functions
 
-- **Location sidebar:** Groups jobs by storage target.
-- **Job list:** Shows name, description, operating state, policy, and next run.
+- **Location selector:** Filters jobs by storage target above the compact list.
+- **Job list:** Shows name, operating state, dates and actions. Description, policy and storage facts are available in expandable details.
 - **Start:** Starts a job manually.
 - **More actions:** Opens actions such as edit, schedule, logs, or delete depending on the job.
 - **New job:** Opens the job wizard.
@@ -236,9 +236,9 @@ Jobs define which data is backed up and where it is stored. A job contains:
 
 **Next run** shows the scheduled time. The last run time and duration remain separate values.
 
-The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
+Jobs appear as a compact list with the location selector above it. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
+Errors, warnings and reasons for skipped or cancelled runs remain identifiable in the job row. **Last saved outcome** identifies the completed run; the complete message is available under **Workflow**. During a new run, the earlier message appears only there, keeping it separate from current operating status. Long live-log lines scroll horizontally. Missing status files never imply success.
 
 ### 3.3 Start a Job Manually
 
@@ -339,21 +339,21 @@ A planned VM shutdown is reported as informational. A failed shutdown or restart
 
 Once archive creation (`borg create`) finishes, containers and VMs stopped by the job are restarted immediately, including when Borg reports warnings. Retention (`prune`), space reclamation (`compact`), and any due repository check (`check`) run afterwards and do not extend service downtime. If archive creation fails or is cancelled, cleanup still restarts the stopped workloads. If a restart fails, recovery is still attempted for the other workload type; the run ends as an error and maintenance does not start.
 
-Each job has its own bordered card with spacing. **All locations** shows separate headings only for destinations with jobs. Destinations without jobs are also hidden in the sidebar. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
+Each job has a compact row with its name, operating status, dates and actions. **All locations** groups only destinations with jobs; the location selector sits above the list. If the selected destination loses its last job, the view returns to **All locations**. Selecting one location avoids a duplicate section heading.
 
 The overall result appears directly below **Operating status**.
 
-The workflow spans the full job-card width and shows the configured run steps in execution order: optional Pre script, database backups, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Names and measured durations are always visible; all steps stay in one row. When space is limited, scroll the workflow horizontally; keyboard scrolling is available after focusing it with Tab.
+The expandable **Workflow** view shows each configured step exactly once, in execution order: optional Pre script, database backups, Docker/VM shutdown, `borg create`, Docker/VM recovery, `borg prune`, `borg compact`, `borg check` and Post script. With “Keep all archives”, prune is absent. A configured check that is not due remains visible with its reason. Each row contains its status symbol, result and measured duration; long results wrap.
 
 A circled check, circled cross, warning triangle, stop symbol, minus, empty circle and rotating ring distinguish success, failure, warning, cancellation, skipped, pending and running steps without relying on color alone. Reduced-motion preferences disable ring animation. Progress updates preserve the running animation without restarting it. Unexecuted steps never receive invented durations or success symbols. Recovery after errors or cancellation is tracked too.
 
-**Show details** opens a compact row per step with a small status symbol, result and duration. Successful steps show available results without repeated success text or exit code 0; failures and warnings keep their status and exit code. Service counts identify the action as stopped or started. Kept/deleted archives and script names come from reported results. Raw script output and paths are not copied here. The keyboard-accessible disclosure stays open during polling.
+The arrow next to the job opens **Workflow** with a compact row per step with a small status symbol, result and duration. Successful steps show available results without repeated success text or exit code 0; failures and warnings keep their status and exit code. Service counts identify the action as stopped or started. Kept/deleted archives and script names come from reported results. Raw script output and paths are not copied here. The keyboard-accessible disclosure stays open during polling.
 
 For `borg create`, **Files processed** includes unchanged files, not just new or modified files. **Original data** is the archive's uncompressed amount; **New data (deduplicated)** is the additional deduplicated and compressed data reported by Borg. Neither value is the total repository size or a measurement of filesystem usage. For `borg compact`, **Approx. … freed** shows Borg's estimate of reclaimed repository space. Missing values remain unknown; zero appears only when explicitly reported. Older reports are not filled with estimated metrics.
 
-Operating status identifies the current step immediately. Additional Borg progress details appear only after the respective command has run for at least 60 seconds. Each command starts a new delay. Creation shows available file/data counters without an overall percentage or remaining-time estimate.File count, original data and newly stored data each occupy their own line. Prune, compact and check report current-operation progress, not total backup progress. Prune/compact progress details require actual progress events. “Last Borg update” refers to the last progress report; a longer pause alone does not indicate failure.
+Operating status labels the **current action**, **step elapsed time** and **total elapsed time** separately. After the respective Borg command has run for at least 60 seconds, a slim row shows available live file/data counters and the age of the last Borg update. Creation never invents an overall percentage or remaining-time estimate. Prune, compact and check percentages describe only the current operation; prune/compact require actual progress events. Detailed service, script and database results remain available under **Workflow**. A longer pause since the last update alone does not indicate failure.
 
-After completion, steps, results and durations remain in the existing run report. Total duration also includes preparation, service recovery and scripts. The permanent card footer shows the **last successful backup**, its date/time, relative age and duration, even when details are collapsed. Later failed, warning, cancelled or skipped runs do not replace this success summary. New reports carry it forward so it survives normal history retention. If no prior success report exists, no date is guessed. Older reports show only their recorded Borg steps; additional steps are not invented retrospectively.
+After completion, steps, results and durations remain in the existing run report. Total duration also includes preparation, service recovery and scripts. The status column shows the **last successful backup**, its date/time, relative age; duration is available under **Workflow**, even when details are collapsed. Later failed, warning, cancelled or skipped runs do not replace this success summary. New reports carry it forward so it survives normal history retention. If no prior success report exists, no date is guessed. Older reports show only their recorded Borg steps; additional steps are not invented retrospectively.
 
 Starting a job does not open the live log automatically. Click **Show live log** during the run; an already opened log stays visible after completion. **Show log** opens the saved log after completion when available. The live log has no duplicate progress display; changing progress values are neither saved nor downloaded. Checks keep one final summary plus warnings/errors. Final statistics and optional file activity remain intact. Empty INFO lines and internal cache progress are suppressed; prune archive decisions, warnings and errors remain visible.
 

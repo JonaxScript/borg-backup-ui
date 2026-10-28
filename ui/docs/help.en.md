@@ -113,9 +113,9 @@ A job connects sources to exactly one existing repository. Encryption belongs to
 
 **Next run** shows the scheduled time. The last run time and duration remain separate values.
 
-The existing job timeline with named steps and **Show details** is retained. **Show status** independently expands saved storage values, Borg and repository checks, restore evidence, archive name, latest run and latest successful backup directly below the job card. Both sections can remain open together across refreshes.
+Jobs appear as a compact list with the location selector above it. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
 
-Complete error and warning messages and reasons for skipped or cancelled runs appear directly in the card. **Last saved outcome** identifies the completed run. While a new run is active, this message appears only under **Show status**; the operating state shows the current run. Long live-log lines scroll horizontally without widening job cards. Missing status files never imply success.
+Errors, warnings and reasons for skipped or cancelled runs remain identifiable in the job row. **Last saved outcome** identifies the completed run; the complete message is available under **Workflow**. During a new run, the earlier message appears only there, keeping it separate from current operating status. Long live-log lines scroll horizontally. Missing status files never imply success.
 
 ### Job Wizard
 

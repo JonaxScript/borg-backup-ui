@@ -272,7 +272,7 @@ function jobRuntimeState(runtime, previous = {}) {
 /**
  * Render process progress after 60 seconds, separately from persisted log text.
  * @param {Object|null} runtime Active run with phase and transient borg_progress.
- * @param {number} now Current Unix time in seconds for elapsed/last-update ages.
+ * @param {number} now Current Unix time in seconds for the visibility gate and last-update age.
  * @returns {string} Escaped status markup, or an empty string before 60 seconds or outside a supported Borg process.
  */
 function renderBorgProgress(runtime, now = Date.now() / 1000) {
@@ -289,12 +289,10 @@ function renderBorgProgress(runtime, now = Date.now() / 1000) {
   const percent = !creating && typeof progress.percent === 'number' && Number.isFinite(progress.percent)
     ? Math.max(0, Math.min(100, progress.percent)) : null;
   const age = timestamp => Math.max(0, Math.floor(now - timestamp));
-  const elapsed = typeof progress.started_at === 'number' && Number.isFinite(progress.started_at)
-    ? jobsT('jobs.borgElapsed', { time: borgProgressDuration(age(progress.started_at)) }) : '';
   const updated = typeof progress.updated_at === 'number' && Number.isFinite(progress.updated_at)
     ? jobsT('jobs.borgUpdated', { time: borgProgressDuration(age(progress.updated_at)) })
     : jobsT('jobs.borgWaiting');
-  const label = jobsT(maintenance ? `jobs.${phase === 'borg_prune' ? 'prune' : 'compact'}Running` : (creating ? 'jobs.createTitle' : 'jobs.checkTitle'));
+  const label = jobsT('jobs.compact.liveProgress');
   const counters = [];
   if (creating) {
     if (Number.isSafeInteger(progress.nfiles) && progress.nfiles >= 0) {
@@ -312,7 +310,7 @@ function renderBorgProgress(runtime, now = Date.now() / 1000) {
     <div class="borg-progress-heading"><strong>${escHtml(label)}</strong>${percent === null ? '' : `<strong>${escHtml(percent)} %</strong>`}</div>
     <progress max="100"${percent === null ? '' : ` value="${percent}"`} aria-label="${escHtml(jobsT(creating ? 'jobs.createRunning' : 'jobs.borgCurrentStep'))}"></progress>
     ${details.map(detail => `<small class="borg-progress-metric">${escHtml(detail)}</small>`).join('')}
-    <small>${escHtml([elapsed, updated].filter(Boolean).join(' · '))}</small>
+    <small>${escHtml(updated)}</small>
   </div>`;
 }
 
@@ -445,23 +443,20 @@ function renderJobBackupFooter(job, now) {
 }
 
 const jobWorkflowOpen = new Set();
-const jobStatusOpen = new Set();
+const jobDataView = new Set();
 let jobStatusTarget = null;
 
-/** Render the permanently named timeline and optional details below the full job row. */
+/**
+ * Render each configured step once, with measured results and duration, inside job details.
+ * @param {Object} job Current job and its live or saved step ledger.
+ * @param {number} now Current Unix time in seconds.
+ * @returns {string} Escaped workflow table or a no-results message.
+ */
 function renderBorgRun(job, now = Date.now() / 1000) {
   const steps = jobWorkflowSteps(job);
   const footer = renderJobBackupFooter(job, now);
-  if (!steps.length) return footer ? `<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div></div>` : '';
-  const opened = jobWorkflowOpen.has(job.key);
-  const items = steps.map(step => {
-    const view = jobStepView(step, job, now);
-    return `<li class="borg-step is-${view.state}" data-step="${escHtml(step.id)}"${view.state === 'running' ? ' aria-current="step"' : ''} title="${escHtml(view.status)}">
-      <span class="borg-step-dot" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>
-      <span class="borg-step-command">${escHtml(view.label)}</span>
-      <span class="borg-step-duration">${escHtml(view.duration)}</span></li>`;
-  }).join('');
-  const details = opened ? `<div class="job-workflow-details" id="job-step-details-${escHtml(job.key)}"><table>
+  if (!steps.length) return `<p class="job-status-empty">${escHtml(jobsT('jobs.compact.noSteps'))}</p>${footer}`;
+  return `<div class="job-workflow-details"><table>
     <caption>${jobsT('jobs.workflow.details')}</caption>
     <colgroup><col class="job-detail-step-col"><col><col class="job-detail-duration-col"></colgroup>
     <thead class="job-details-sr"><tr><th>${jobsT('jobs.workflow.step')}</th><th>${jobsT('jobs.workflow.result')}</th><th>${jobsT('jobs.workflow.duration')}</th></tr></thead>
@@ -469,27 +464,94 @@ function renderBorgRun(job, now = Date.now() / 1000) {
       const view = jobStepView(step, job, now);
       const duration = ['skipped', 'pending', 'interrupted'].includes(view.state) ? '—' : view.duration;
       const explanation = step.id === 'create' ? jobsT('jobs.workflow.createMeaning') : step.id === 'compact' ? jobsT('jobs.workflow.compactMeaning') : '';
-      return `<tr class="is-${view.state}" data-step="${escHtml(step.id)}"><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
+      return `<tr class="is-${view.state}" data-step="${escHtml(step.id)}"${view.state === 'running' ? ' aria-current="step"' : ''}><th scope="row"><span class="job-detail-name"><span class="job-detail-icon" role="img" aria-label="${escHtml(view.status)}">${jobStepIcon(view.state)}</span>${escHtml(view.label)}</span></th><td${explanation ? ` title="${escHtml(explanation)}"` : ''}>${escHtml(jobStepDetails(step, view))}</td><td class="job-detail-duration">${escHtml(duration)}</td></tr>`;
     }).join('')}</tbody>
-    </table></div>` : `<div id="job-step-details-${escHtml(job.key)}" hidden></div>`;
-  return `<ol class="borg-stepper" tabindex="0" aria-label="${escHtml(jobsT('jobs.workflow.steps'))}">${items}</ol>
-    ${details}<div class="job-workflow-footer"><div class="job-backup-summary">${footer}</div>
-    <button class="job-workflow-toggle" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${opened}" aria-controls="job-step-details-${escHtml(job.key)}">${jobsT(opened ? 'jobs.workflow.hideDetails' : 'jobs.workflow.showDetails')} <span aria-hidden="true">${opened ? '⌃' : '⌄'}</span></button></div>`;
+    </table></div><div class="job-detail-backup-summary">${footer}</div>`;
 }
 
-/** Identify the current configured action immediately; Borg counters wait 60 seconds. */
+/**
+ * Name the active action immediately and distinguish step duration from total run duration.
+ * @param {Object} job Current job with runtime metadata.
+ * @param {number} now Current Unix time in seconds.
+ * @returns {string} Escaped active-action summary, empty for idle jobs.
+ */
 function renderJobOperation(job, now = Date.now() / 1000) {
-  const active = job.running && jobWorkflowSteps(job).find(step => step.status === 'running');
+  if (!job.running) return '';
+  const active = jobWorkflowSteps(job).find(step => step.status === 'running');
   const view = active && jobStepView(active, job, now);
-  const progress = renderBorgProgress(job, now);
-  let html = view ? `<div class="job-active-step"><strong>${escHtml(view.label)}</strong>${progress ? '' : `<small>${escHtml(jobsT('jobs.borgElapsed', {time:view.duration}))}</small>`}</div>` : '';
-  if (!view && job.running && ['preparing', 'mounting', 'unmounting', 'pre_script', 'database_backup', 'post_script', 'stopping_docker', 'stopping_vms', 'recovering_docker', 'recovering_vms'].includes(job.run_phase)) {
-    html += `<div class="job-active-step"><strong>${escHtml(jobsT(`jobGroups.phases.${job.run_phase}`))}</strong></div>`;
-  }
-  html += progress;
+  const borgNames = {create:'create', prune:'prune', compact:'compact', check:'check'};
+  const phase = job.run_phase || job.phase;
+  const phaseStep = {borg_create:'create', borg_prune:'prune', borg_compact:'compact', borg_check:'check'}[phase];
+  const borgStep = active ? borgNames[active.id] : phaseStep;
+  const label = borgStep ? jobsT(`jobs.compact.actions.${borgStep}`) : view?.label
+    || (phase ? jobsT(`jobGroups.phases.${phase}`) : jobsT('jobs.running'));
+  const progressStart = phaseStep && (!job.borg_progress?.phase || job.borg_progress.phase === phase) ? job.borg_progress?.started_at : null;
+  const stepStart = active ? active.started_at : progressStart;
+  const stepElapsed = typeof stepStart === 'number' && Number.isFinite(stepStart) && stepStart >= 0
+    ? borgProgressDuration(Math.max(0, Math.floor(now - stepStart))) : '';
   const start = Date.parse(job.run_start_time || '');
-  if (job.running && Number.isFinite(start)) html += `<small class="borg-run-summary">${escHtml(jobsT('jobs.borgTotalElapsed', {time:borgProgressDuration(Math.max(0, Math.floor(now - start/1000)))}))}</small>`;
-  return html;
+  return `<div class="job-active-step"><strong>${escHtml(jobsT('jobs.compact.currentAction', {action:label}))}</strong>
+    ${stepElapsed ? `<small>${escHtml(jobsT('jobs.compact.stepElapsed', {time:stepElapsed}))}</small>` : ''}
+    ${Number.isFinite(start) ? `<small>${escHtml(jobsT('jobs.borgTotalElapsed', {time:borgProgressDuration(Math.max(0, Math.floor(now - start/1000)))}))}</small>` : ''}</div>`;
+}
+
+/**
+ * Keep the latest successful backup visible even while a later run fails or is running.
+ * @param {Object} job Job containing its latest successful backup reference.
+ * @param {number} now Current Unix time for relative age formatting.
+ * @returns {string} Escaped success summary or explicit missing-history text.
+ */
+function renderJobBackupSummary(job, now = Date.now() / 1000) {
+  const success = job.last_successful_backup?.timestamp ? job.last_successful_backup
+    : job.last_status === 'success' ? {timestamp:job.last_timestamp} : null;
+  const date = success && jobBackupDate(success.timestamp, now);
+  return `<small class="job-last-success">${escHtml(date ? jobsT('jobs.workflow.lastSuccess', {date})
+    : jobsT(job.last_timestamp || job.running ? 'jobs.workflow.noSuccess' : 'jobs.neverRun'))}</small>`;
+}
+
+/**
+ * Combine saved storage/check facts and the current policy in one detail view.
+ * @param {Object} job Job configuration and optional saved status.
+ * @returns {string} Description, policy and saved facts as escaped/sanitized markup.
+ */
+function renderJobDataSettings(job) {
+  const retention = [job.retention_daily, job.retention_weekly, job.retention_monthly, job.retention_yearly]
+    .map(value => String(value ?? '').trim());
+  const policy = job.retention || {};
+  const retentionText = policy.mode === 'all' ? jobsT('wizard.retentionAllSummary')
+    : policy.mode === 'last' ? jobsT('wizard.retentionLastSummary', {count:policy.last})
+    : [Number(policy.hourly) > 0 ? `${jobsT('wizard.retentionHourly')}: ${policy.hourly}` : '',
+       retention.every(Boolean) ? retention.join('/') : '',
+       policy.within ? jobsT('wizard.retentionWithinSummary', {count:policy.within}) : ''].filter(Boolean).join(' · ');
+  return `${job.description ? `<div class="job-description">${renderDescriptionMarkdown(job.description)}</div>` : ''}
+    <section class="job-settings-facts"><h3>${escHtml(jobsT('jobs.policy'))}</h3><dl>
+      <div><dt>${escHtml(jobsT('jobs.compressionShort'))}</dt><dd>${escHtml(job.compression || '—')}</dd></div>
+      <div><dt>${escHtml(jobsT('jobs.retentionShort'))}</dt><dd>${escHtml(retentionText || '—')}</dd></div>
+      <div><dt>${escHtml(jobsT('jobs.compact.archivePrefix'))}</dt><dd>${escHtml(job.archive_prefix || '—')}</dd></div>
+    </dl></section>${renderJobSavedStatus(job)}`;
+}
+
+/**
+ * Render two intrinsic-height detail panels in one grid cell. The inactive panel
+ * remains measurable but is invisible and inert, so switching never changes height.
+ * Closed jobs omit both panels. All data is escaped by the underlying renderers.
+ * @param {Object} job Job configuration and runtime/saved result metadata.
+ * @param {number} now Current Unix time in seconds for elapsed durations.
+ * @returns {string} Detail tabs and panels, or an empty string for a closed job.
+ */
+function renderJobDetails(job, now = Date.now() / 1000) {
+  if (!jobWorkflowOpen.has(job.key)) return '';
+  const base = `job-details-${job.key}`;
+  const data = jobDataView.has(job.key);
+  return `<div class="job-detail-tabs" role="tablist" aria-label="${escHtml(jobsT('jobs.workflow.details'))}">
+    ${[['workflow','jobs.compact.workflow',!data],['data','jobs.compact.dataSettings',data]].map(([view,label,selected]) =>
+      `<button type="button" role="tab" id="${escHtml(base)}-tab-${view}" aria-controls="${escHtml(base)}-${view}" aria-selected="${selected}" tabindex="${selected ? '0' : '-1'}" data-jobs-action="select-details" data-job-key="${escHtml(job.key)}" data-job-view="${view}">${escHtml(jobsT(label))}</button>`).join('')}
+    </div><div class="job-detail-panels">
+      <section class="job-detail-panel" id="${escHtml(base)}-workflow" role="tabpanel" aria-labelledby="${escHtml(base)}-tab-workflow"${data ? ' aria-hidden="true" inert' : ''}>
+        ${renderJobSavedMessage(job)}<div id="job-workflow-${escHtml(job.key)}">${renderBorgRun(job, now)}</div>
+      </section>
+      <section class="job-detail-panel" id="${escHtml(base)}-data" role="tabpanel" aria-labelledby="${escHtml(base)}-tab-data"${data ? '' : ' aria-hidden="true" inert'}>${renderJobDataSettings(job)}</section>
+    </div>`;
 }
 
 /**
@@ -542,6 +604,10 @@ function updateBorgProgressDisplays(running) {
     const current = {...job, ...jobRuntimeState(running[job.key], job)};
     const progress = document.getElementById(`job-borg-progress-${job.key}`);
     if (progress) patchJobMarkup(progress, renderJobOperation(current));
+    const metrics = document.getElementById(`job-live-metrics-${job.key}`);
+    if (metrics) patchJobMarkup(metrics, renderBorgProgress(current));
+    const summary = document.getElementById(`job-backup-summary-${job.key}`);
+    if (summary) patchJobMarkup(summary, renderJobBackupSummary(current));
     const target = document.getElementById(`job-workflow-${job.key}`);
     if (target) patchJobMarkup(target, renderBorgRun(current));
   }
@@ -611,7 +677,7 @@ function renderJobsGrid(jobs) {
     const card = document.getElementById(`job-card-${jobStatusTarget}`);
     if (card) {
       card.scrollIntoView({block: 'center'});
-      card.querySelector('[data-jobs-action="toggle-status"]')?.focus({preventScroll: true});
+      card.querySelector('[data-jobs-action="toggle-workflow"]')?.focus({preventScroll: true});
       jobStatusTarget = null;
     }
   }
@@ -699,7 +765,7 @@ function renderJobsLocationGroup(location, jobs) {
       </div>
       <span class="ui-badge">${jobs.length}</span>
     </header>` : ''}
-    <div class="jobs-location-group__body">${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
+    <div class="jobs-location-group__body"><div class="jobs-column-headings" aria-hidden="true"><span>${jobsT('jobs.compact.job')}</span><span>${jobsT('jobs.operatingState')}</span><span>${jobsT('jobs.compact.dates')}</span><span>${jobsT('jobs.compact.actionsLabel')}</span></div>${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
   </section>`;
 }
 
@@ -734,20 +800,6 @@ function renderJobCard(job) {
   }
 
   const nextRun = schedActive ? calcNextRun(sched.cron) : null;
-  const retention = [job.retention_daily, job.retention_weekly, job.retention_monthly, job.retention_yearly]
-    .map((v) => String(v || '').trim())
-    .filter((v) => v !== '');
-  const policy = job.retention || {};
-  const retentionText = policy.mode === 'all' ? jobsT('wizard.retentionAllSummary')
-    : policy.mode === 'last' ? jobsT('wizard.retentionLastSummary', {count: policy.last})
-    : [Number(policy.hourly) > 0 ? `${jobsT('wizard.retentionHourly')}: ${policy.hourly}` : '', retention.join('/'),
-       policy.within ? jobsT('wizard.retentionWithinSummary', {count: policy.within}) : ''].filter(Boolean).join(' · ');
-  const policyHtml = (job.compression || retention.length === 4)
-    ? `<div class="job-policy">
-         ${job.compression ? `<span>${jobsT('jobs.compressionShort')} <code>${escHtml(job.compression)}</code></span>` : ''}
-         ${retention.length === 4 ? `<span>${jobsT('jobs.retentionShort')} <code>${escHtml(retentionText)}</code></span>` : ''}
-       </div>`
-    : '';
   const schedHtml = (job.enabled === false) ? '' : (sched
     ? `<div class="job-schedule-info ${schedActive ? '' : 'disabled'}">
          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -757,7 +809,7 @@ function renderJobCard(job) {
            ? (nextRun ? jobsT('jobs.nextRun', { date: fmtDateShort(nextRun) }) : sched.cron)
            : jobsT('jobs.scheduleDisabled')}
        </div>`
-    : '');
+    : `<div class="job-schedule-info disabled">${jobsT('dashboard.nextRunTime')}: ${jobsT('dashboard.notScheduled')}</div>`);
 
   const stateClass = isRunning ? 'info' : job.enabled === false ? 'warning' : (job.last_status === 'cancelled' ? 'warning' : (job.last_status || 'unknown'));
   const stateLabel = isRunning
@@ -767,9 +819,6 @@ function renderJobCard(job) {
       : job.last_status
         ? (job.last_status === 'success' && jobWorkflowSteps(job).length ? jobsT('jobs.borgSuccessful') : statusLabel(job.last_status))
         : jobsT('jobs.ready');
-  const lastRunText = job.last_status
-    ? `${jobsT('jobs.lastRun')} ${job.last_time_ago || '—'}`
-    : jobsT('jobs.neverRun');
   const verificationHtml = renderJobRestoreVerification(job);
 
   const startDisabled = !_isDataDirReady();
@@ -784,7 +833,6 @@ function renderJobCard(job) {
     : '';
   const actionHtml = isRunning
     ? `<div class="jobs-running-actions">
-         <div class="jobs-running-state"><span class="running-dot"></span><span>${jobsT('jobs.running')}</span></div>
          <div class="jobs-running-buttons">
            ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLiveLog')}</button>`}
            ${cancelButton}
@@ -801,24 +849,21 @@ function renderJobCard(job) {
   return `<article class="jobs-redesign-row ${isRunning ? 'is-running' : ''} ${job.enabled === false ? 'is-disabled' : ''}" id="job-card-${escHtml(job.key)}">
     <div class="jobs-redesign-cell jobs-redesign-main">
       <div class="job-card-title">
+        <button type="button" class="job-details-disclosure" data-jobs-action="toggle-workflow" data-job-key="${escHtml(job.key)}" aria-expanded="${jobWorkflowOpen.has(job.key)}" aria-controls="job-details-${escHtml(job.key)}" aria-label="${escHtml(jobsT(jobWorkflowOpen.has(job.key) ? 'jobs.compact.closeJob' : 'jobs.compact.openJob', {name:titleName}))}"><span aria-hidden="true">${jobWorkflowOpen.has(job.key) ? '⌄' : '›'}</span></button>
         <div class="type-icon${iconColorClass}">${typeIcon(iconKey)}</div>
         <div><div class="type-name">${escHtml(titleName)}</div><span class="type-sub">${escHtml(job.archive_prefix || '')}</span></div>
       </div>
       ${window.BBUI.jobGroups?.membership(job) || ''}
-      ${job.description ? `<div class="job-description">${renderDescriptionMarkdown(job.description)}</div>` : ''}
       <div class="job-meta">${features.join('')}</div>
-      ${job.enabled === false ? `<div class="status-message warning-state jobs-redesign-disabled-note">${jobsT('jobs.disabled')}</div>` : ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-operation">
-      <span class="jobs-redesign-label">${jobsT('jobs.operatingState')}</span>
       <span class="badge ${stateClass}"><span class="badge-dot"></span>${escHtml(stateLabel)}</span>
-      ${!jobWorkflowSteps(job).length ? `<span class="jobs-redesign-detail">${escHtml(lastRunText)}</span>` : ''}
       <div id="job-borg-progress-${escHtml(job.key)}">${renderJobOperation(job)}</div>
+      <div id="job-backup-summary-${escHtml(job.key)}">${renderJobBackupSummary(job)}</div>
       ${job.running && job.group_name ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.startedBy', { name: job.group_name }))}</span>` : ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-policy">
-      <span class="jobs-redesign-label">${jobsT('jobs.policy')}</span>
-      ${policyHtml || `<span class="jobs-redesign-detail">—</span>`}
+      <span class="jobs-redesign-label">${jobsT('jobs.compact.dates')}</span>
       ${verificationHtml}
       ${job.groups?.length ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.individualSchedule'))}</span>` : ''}
       ${schedHtml || (job.enabled === false ? `<span class="jobs-redesign-detail">${jobsT('jobs.scheduleDisabled')}</span>` : '')}
@@ -866,9 +911,9 @@ function renderJobCard(job) {
             </div>
           </div>
     </div>
-    ${isRunning ? '' : renderJobSavedMessage(job)}
-    <div class="job-workflow" id="job-workflow-${escHtml(job.key)}">${renderBorgRun(job)}</div>
-    <div class="job-saved-status" id="job-status-${escHtml(job.key)}">${renderJobSavedStatus(job)}</div>
+    ${isRunning ? '' : renderJobSavedMessage(job, true)}
+    <div class="job-live-metrics" id="job-live-metrics-${escHtml(job.key)}">${renderBorgProgress(job)}</div>
+    <div class="job-details" id="job-details-${escHtml(job.key)}"${jobWorkflowOpen.has(job.key) ? '' : ' hidden'}>${renderJobDetails(job)}</div>
   </article>`;
 }
 
@@ -957,24 +1002,16 @@ function onJobsGridClick(event) {
   const action = btn.dataset.jobsAction || '';
   const jobKey = btn.dataset.jobKey || '';
 
-  if (action === 'toggle-status') {
-    jobStatusOpen.has(jobKey) ? jobStatusOpen.delete(jobKey) : jobStatusOpen.add(jobKey);
-    const job = jobsState.jobs.find(item => item.key === jobKey);
-    const target = document.getElementById(`job-status-${jobKey}`);
-    if (job && target) {
-      patchJobMarkup(target, renderJobSavedStatus(job));
-      target.querySelector('[data-jobs-action="toggle-status"]')?.focus({preventScroll:true});
+  if (action === 'toggle-workflow' || action === 'select-details') {
+    if (action === 'toggle-workflow') {
+      jobWorkflowOpen.has(jobKey) ? jobWorkflowOpen.delete(jobKey) : jobWorkflowOpen.add(jobKey);
+    } else {
+      btn.dataset.jobView === 'data' ? jobDataView.add(jobKey) : jobDataView.delete(jobKey);
     }
-    return;
-  }
-  if (action === 'toggle-workflow') {
-    jobWorkflowOpen.has(jobKey) ? jobWorkflowOpen.delete(jobKey) : jobWorkflowOpen.add(jobKey);
-    const job = jobsState.jobs.find(item => item.key === jobKey);
-    const target = document.getElementById(`job-workflow-${jobKey}`);
-    if (job && target) {
-      patchJobMarkup(target, renderBorgRun(job));
-      target.querySelector?.('[data-jobs-action="toggle-workflow"]')?.focus({preventScroll:true});
-    }
+    renderJobsGrid(jobsState.jobs);
+    // Reconciliation retains the button; refocus without moving the viewport.
+    document.getElementById(`job-card-${jobKey}`)?.querySelector(action === 'toggle-workflow'
+      ? '[data-jobs-action="toggle-workflow"]' : `[data-job-view="${jobDataView.has(jobKey) ? 'data' : 'workflow'}"]`)?.focus({preventScroll:true});
     return;
   }
   if (action === 'open-wizard') return openWizard();
@@ -1823,23 +1860,39 @@ function hideJobsMessage() {
   hideEl('jobs-message');
 }
 
-/** Render the complete escaped saved outcome; the caller chooses banner or disclosure. */
-function renderJobSavedMessage(job) {
+/**
+ * Render an escaped saved outcome. Summary banners truncate to 180 characters;
+ * the full message remains available in Workflow, separate from a new active run.
+ * @param {Object} job Job with an optional saved_status report.
+ * @param {boolean} summary Whether to render a compact one-line excerpt.
+ * @returns {string} Outcome markup, or an empty string without a relevant message.
+ */
+function renderJobSavedMessage(job, summary = false) {
   if (!job.saved_status) return '';
   const message = dashboardRunMessage(job.saved_status);
   if (!message.cls || !message.text) return '';
-  return `<div class="job-saved-message ${message.cls}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(message.text)}</p></div>`;
+  const text = summary && message.text.length > 180 ? message.text.slice(0, 180) + '…' : message.text;
+  return `<div class="job-saved-message ${message.cls}${summary ? ' is-summary' : ''}"><strong>${escHtml(jobsT('management.lastResult'))}: ${escHtml(statusLabel(job.saved_status.status))}</strong><p>${escHtml(text)}</p></div>`;
 }
 
-/** Disclose saved facts and, during a new run, its previous outcome message. */
+/** Render saved facts inside Data & settings; missing reports are never inferred as success. */
 function renderJobSavedStatus(job) {
   if (job.is_utility) return '';
-  const open = jobStatusOpen.has(job.key);
-  const id = 'job-status-details-' + dashboardDetailsId(job.key);
   const facts = {...job, ...(job.saved_status || {})};
-  return `<div class="job-status-toolbar"><span>${escHtml(jobsT('management.savedStatus'))}</span><button class="dashboard-details-toggle" data-jobs-action="toggle-status" data-job-key="${escHtml(job.key)}" aria-expanded="${open}" aria-controls="${id}">${escHtml(jobsT(open ? 'management.hideStatus' : 'management.showStatus'))} ${open ? '⌃' : '⌄'}</button></div>
-    <div id="${id}"${open ? '' : ' hidden'}>${job.running ? renderJobSavedMessage(job) : ''}${job.saved_status ? '' : `<p class="job-status-empty">${escHtml(jobsT('jobs.neverRun'))}</p>`}${renderDashboardJobDetails(facts)}${facts.backup_overdue ? `<p class="job-status-empty">${escHtml(jobsT('dashboard.backupOverdue'))}</p>` : ''}</div>`;
+  return `${job.saved_status ? '' : `<p class="job-status-empty">${escHtml(jobsT('jobs.neverRun'))}</p>`}${renderDashboardJobDetails(facts)}${facts.backup_overdue ? `<p class="job-status-empty">${escHtml(jobsT('dashboard.backupOverdue'))}</p>` : ''}`;
 }
+
+/** Support standard keyboard navigation between the two job detail tabs. */
+function onJobDetailsKeydown(event) {
+  const tab = event.target.closest('[data-jobs-action="select-details"]');
+  if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  const view = event.key === 'Home' ? 'workflow' : event.key === 'End' ? 'data'
+    : tab.dataset.jobView === 'data' ? 'workflow' : 'data';
+  const next = tab.parentElement.querySelector(`[data-job-view="${view}"]`);
+  next?.click();
+}
+document.addEventListener('keydown', onJobDetailsKeydown);
 
 /** Navigate from a dashboard aggregate or problem to Jobs without running any action. */
 async function openJobsStatus(key = '', location = 'all') {
@@ -1848,6 +1901,6 @@ async function openJobsStatus(key = '', location = 'all') {
     await window.BBUI.jobGroups.view('jobs');
     if (window.BBUI.jobGroups.state.view !== 'jobs') return;
   }
-  if (key) { jobStatusOpen.add(key); jobStatusTarget = key; }
+  if (key) { jobWorkflowOpen.add(key); jobDataView.add(key); jobStatusTarget = key; }
   window.BBUI.core.navigate('jobs');
 }

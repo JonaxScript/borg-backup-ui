@@ -4,7 +4,7 @@ const nodes = new Map();
 const fakeNode = () => ({style: {}, append(){}, textContent: ''});
 const element = id => {
   if (!nodes.has(id)) nodes.set(id, {innerHTML: '', textContent: '', classes: new Set(),
-    removeAttribute(){}, append(){}, appendChild(){},
+    removeAttribute(){}, append(){}, appendChild(){}, querySelector(){return {focus(){}};},
     classList: {add(name) {nodes.get(id).classes.add(name);}, remove(name) {nodes.get(id).classes.delete(name);},
       toggle(name, value) {value ? nodes.get(id).classes.add(name) : nodes.get(id).classes.delete(name);}}});
   return nodes.get(id);
@@ -21,7 +21,7 @@ context.patchJobMarkup = (target, html) => {target.innerHTML = html;};
 const runtime = {running: true, phase: 'borg_check', run_id: 'first', borg_progress: {percent: 63, started_at: 100, updated_at: 180}};
 let html = context.renderBorgProgress(runtime, 200);
 assert.match(html, /value="63"/);
-assert.match(html, /jobs.borgElapsed 1:40/);
+assert.match(html, /jobs.compact.liveProgress/);
 assert.match(html, /jobs.borgUpdated 0:20/);
 assert.match(html, /jobs.checkStep/);
 assert.equal(context.renderBorgProgress({...runtime, running: false}), '');
@@ -36,13 +36,13 @@ const state = context.window.BBUI.jobsState;
 state.jobs = [{key:'demo'}];
 element('log-output').textContent = 'Existing log\n';
 context.updateBorgProgressDisplays({demo:runtime});
-assert.match(element('job-borg-progress-demo').innerHTML, /value="63"/);
+assert.match(element('job-live-metrics-demo').innerHTML, /value="63"/);
 context.updateBorgProgressDisplays({demo:{...runtime, borg_progress:{...runtime.borg_progress, percent:70}}});
-assert.match(element('job-borg-progress-demo').innerHTML, /value="70"/);
-assert.doesNotMatch(element('job-borg-progress-demo').innerHTML, /value="63"/);
+assert.match(element('job-live-metrics-demo').innerHTML, /value="70"/);
+assert.doesNotMatch(element('job-live-metrics-demo').innerHTML, /value="63"/);
 assert.equal(element('log-output').textContent, 'Existing log\n');
 context.updateBorgProgressDisplays({});
-assert.equal(element('job-borg-progress-demo').innerHTML, '');
+assert.equal(element('job-live-metrics-demo').innerHTML, '');
 assert.ok(!nodes.has('log-borg-progress'), 'Progress never creates a live-log status field');
 console.log('Check progress: percentage, indeterminate state, age, run identity and log isolation passed.');
 
@@ -81,13 +81,13 @@ for(const fileActivity of [false,true]) {
   job.borg_progress={...job.borg_progress, percent:75};
   context.openLogPanel('demo');
   context.updateBorgProgressDisplays({demo:job});
-  assert.match(element('job-borg-progress-demo').innerHTML, /value="75"/);
+  assert.match(element('job-live-metrics-demo').innerHTML, /value="75"/);
   assert.equal(element('log-output').textContent, '', 'Opening the log does not insert progress lines');
   context.closeLogPanel();
   job.borg_progress={started_at:Date.now()/1000, percent:1};
   context.openLogPanel('demo');
   context.updateBorgProgressDisplays({demo:job});
-  assert.equal(element('job-borg-progress-demo').innerHTML, '', 'Short processes stay hidden on open');
+  assert.equal(element('job-live-metrics-demo').innerHTML, '', 'Short processes stay hidden on open');
   assert.ok(!nodes.has('log-borg-progress'));
   context.closeLogPanel();
 }
@@ -97,7 +97,7 @@ console.log('Borg progress: 60-second per-process gate, create counters and late
 const steps = {create:{status:'success',duration_seconds:492},prune:{status:'warning',duration_seconds:18},
   compact:{status:'skipped',reason:'keep_all'},check:{status:'running',started_at:100}};
 let timeline = context.renderBorgRun({...runtime, run_borg_steps:steps}, 159);
-assert.equal((timeline.match(/class="borg-step is-/g)||[]).length,4);
+assert.equal((timeline.match(/<tr class="is-/g)||[]).length,4);
 assert.match(timeline, /8:12/);
 assert.match(timeline, /is-warning/);
 assert.match(timeline, /is-skipped/);
@@ -112,7 +112,7 @@ assert.match(timeline,/is-error/);
 assert.match(timeline,/3:13/);
 assert.match(timeline,/jobs.borgTotalDuration 12:48/);
 assert.doesNotMatch(timeline,/<progress|aria-current/);
-assert.equal(context.renderBorgRun({running:false,last_status:'success'},500),'','Old successful reports must not invent step successes');
+assert.doesNotMatch(context.renderBorgRun({running:false,last_status:'success'},500),/is-success/,'Old reports must not invent step successes');
 assert.doesNotMatch(context.renderBorgRun({...completed,running:true,run_borg_steps:{}},500),/borg-step is-/,'New runs never show old completed steps');
 assert.match(context.renderBorgRun({running:false,last_borg_steps:steps},500),/is-interrupted/);
 for(const phase of ['borg_prune','borg_compact']) {
@@ -125,7 +125,7 @@ for(const phase of ['borg_prune','borg_compact']) {
 state.jobs=[{key:'demo',...completed}];
 context.updateBorgProgressDisplays({});
 assert.match(element('job-workflow-demo').innerHTML,/is-error/);
-assert.doesNotMatch(element('job-borg-progress-demo').innerHTML,/<progress/);
+assert.doesNotMatch(element('job-live-metrics-demo').innerHTML,/<progress/);
 console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and maintenance gate passed.');
 
 (async () => {
@@ -188,24 +188,18 @@ const workflowJob={key:'workflow',running:true,run_job_steps:workflow,run_phase:
   last_successful_backup:{timestamp:'2026-10-21 10:16:00',duration_seconds:892}};
 state.jobs=[workflowJob];
 let configured=context.renderBorgRun(workflowJob,200);
-assert.equal((configured.match(/class="borg-step is-/g)||[]).length,7);
-assert.doesNotMatch(configured,/borg prune|<table|<progress/);
+assert.equal((configured.match(/<tr class="is-/g)||[]).length,7);
+assert.doesNotMatch(configured,/borg prune|<progress/);
+assert.match(configured,/<table/);
 assert.match(configured,/jobs.workflow.names.stop_docker/);
 assert.match(configured,/<svg/);
 assert.match(configured,/aria-current="step"/);
 assert.match(configured,/jobs.workflow.lastSuccess/);
-assert.match(configured,/aria-expanded="false"/);
-const click={target:{closest:()=>({dataset:{jobsAction:'toggle-workflow',jobKey:'workflow'}})}};
-context.onJobsGridClick(click);
-assert.match(element('job-workflow-workflow').innerHTML,/<table/);
-assert.match(element('job-workflow-workflow').innerHTML,/&lt;img/);
-assert.doesNotMatch(element('job-workflow-workflow').innerHTML,/<img/);
+assert.match(configured,/&lt;img/);
+assert.doesNotMatch(configured,/<img/);
 context.updateBorgProgressDisplays({workflow:{running:true,job_steps:workflow,phase:'borg_check',borg_progress:workflowJob.borg_progress}});
-assert.match(element('job-workflow-workflow').innerHTML,/aria-expanded="true"/);
-assert.match(element('job-borg-progress-workflow').innerHTML,/value="63"/);
-context.onJobsGridClick(click);
-assert.doesNotMatch(element('job-workflow-workflow').innerHTML,/<table/);
-assert.match(element('job-workflow-workflow').innerHTML,/jobs.workflow.lastSuccess/);
+assert.match(element('job-workflow-workflow').innerHTML,/<table/);
+assert.match(element('job-live-metrics-workflow').innerHTML,/value="63"/);
 const failedLater={...workflowJob,running:false,last_status:'error',last_timestamp:'2026-10-22 10:20:00',last_job_steps:workflow};
 assert.match(context.renderBorgRun(failedLater,200),/jobs.borgCompletedAt/);
 assert.match(context.renderBorgRun(failedLater,200),/jobs.workflow.lastSuccess/);
@@ -252,11 +246,11 @@ const dbWorkflow = [
 ];
 const dbJob={key:'database',running:true,run_phase:'database_backup',run_job_steps:dbWorkflow};
 const dbTimeline=context.renderBorgRun(dbJob,200);
-assert.equal((dbTimeline.match(/class="borg-step is-/g)||[]).length,5);
+assert.equal((dbTimeline.match(/<tr class="is-/g)||[]).length,5);
 assert.ok(dbTimeline.indexOf('data-step="pre_script"')<dbTimeline.indexOf('data-step="database_backup"'));
 assert.ok(dbTimeline.indexOf('data-step="database_backup"')<dbTimeline.indexOf('data-step="stop_docker"'));
 assert.match(dbTimeline,/is-running" data-step="database_backup" aria-current="step"/);
-assert.match(context.renderJobOperation(dbJob,200),/jobs.workflow.names.database_backup.*0:30/);
+assert.match(context.renderJobOperation(dbJob,200),/jobs.workflow.names.database_backup[\s\S]*0:30/);
 assert.doesNotMatch(context.renderJobOperation(dbJob,200),/<progress/);
 assert.match(context.renderJobOperation({...dbJob,run_job_steps:[]},200),/jobGroups.phases.database_backup/);
 assert.doesNotMatch(context.renderBorgRun({...dbJob,run_job_steps:[{id:'unknown',status:'running'}]},200),/data-step="unknown"/);
@@ -265,12 +259,19 @@ for (const status of ['success','error','cancelled','skipped']) {
   assert.match(context.renderBorgRun({...dbJob,running:false,last_job_steps:lastSteps},200),new RegExp(`is-${status}.*data-step="database_backup"`));
 }
 state.jobs=[dbJob];
-context.onJobsGridClick({target:{closest:()=>({dataset:{jobsAction:'toggle-workflow',jobKey:'database'}})}});
+
 const dbCompleted={id:'database_backup',status:'success',duration_seconds:30,details:{results:[{archived:true,files:[{database:'<img src=x>',bytes:1024,duration_seconds:12}]}]}};
 const persisted=context.renderBorgRun({...dbJob,running:false,last_job_steps:[dbCompleted]},200);
 assert.match(persisted,/&lt;img src=x>.*1.0 KiB.*0:12.*jobs.databaseArchived/);
 assert.doesNotMatch(persisted,/<img/);
 for (const id of ['pre_script','post_script']) {
-  assert.match(context.renderJobOperation({...dbJob,run_job_steps:[{id,status:'running',started_at:190}]},200),new RegExp(`jobs.workflow.names.${id}.*0:10`));
+  assert.match(context.renderJobOperation({...dbJob,run_job_steps:[{id,status:'running',started_at:190}]},200),new RegExp(`jobs.workflow.names.${id}[\\s\\S]*0:10`));
 }
 console.log('Database and hook steps: immediate active phase, ordered timeline, final outcomes and escaped saved details passed.');
+
+// Old progress from another command must never become the elapsed time of a hook/export.
+assert.doesNotMatch(context.renderJobOperation({...dbJob,run_job_steps:[{id:'database_backup',status:'running'}],borg_progress:{phase:'borg_create',started_at:100}},200),/jobs.compact.stepElapsed/);
+const timed=context.renderJobOperation({...workflowJob,run_start_time:new Date(50000).toISOString()},200);
+assert.match(timed,/jobs.compact.currentAction/);
+assert.match(timed,/jobs.compact.stepElapsed 1:40/);
+assert.match(timed,/jobs.borgTotalElapsed 2:30/);
