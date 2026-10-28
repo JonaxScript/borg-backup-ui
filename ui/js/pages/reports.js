@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 window.BBUI = window.BBUI || {};
-window.BBUI.reportState = window.BBUI.reportState || { data: null, job: null, jobs: [], borgInfo: null, borgInfoLoaded: false };
+window.BBUI.reportState = window.BBUI.reportState || { data: null, job: null, jobs: [], borgInfo: null, borgInfoLoaded: false, location: null, selectedJobs: {}, loadRequest: 0 };
 const reportState = window.BBUI.reportState;
 
 function reportsT(key, params = {}) {
@@ -10,10 +10,18 @@ function reportsT(key, params = {}) {
 // BERICHTE PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** Load report-capable jobs and populate the report selector/sidebar. */
+/** Load report-capable jobs and populate the shared location/job navigation; retain a valid selection. */
 async function berichtInit() {
   const sel = document.getElementById('bericht-job-sel');
   if (!sel) return;
+  const previousKey = sel.value;
+  const initRequest = reportState.initRequest = (reportState.initRequest || 0) + 1;
+  reportState.loadRequest = (reportState.loadRequest || 0) + 1;
+  reportState.data = null;
+  reportState.job = null;
+  reportState.borgInfo = null;
+  reportState.borgInfoLoaded = false;
+  _berichtUpdateSelection(null);
   sel.innerHTML = `<option value="">${escHtml(reportsT('selectJob'))}</option>`;
   document.getElementById('bericht-body').style.display = 'none';
   document.getElementById('bericht-empty').style.display = '';
@@ -26,6 +34,7 @@ async function berichtInit() {
     const data = await reportResponse.json();
     if (!reportResponse.ok || data.error) throw new Error(apiErrorMessage(data, reportResponse.status));
     const jobsData = jobsResponse.ok ? await jobsResponse.json() : { jobs: [] };
+    if (initRequest !== reportState.initRequest) return;
     const configuredJobs = jobsData.jobs || [];
     reportState.jobs = (data.jobs || []).map((job) => {
       const configured = configuredJobs.find((candidate) => String(candidate.key) === String(job.key));
@@ -44,20 +53,39 @@ async function berichtInit() {
       opt.textContent = job.display_name;
       sel.appendChild(opt);
     }
-    _berichtRenderJobSidebar();
+    const previous = reportState.jobs.find((job) => String(job.key) === previousKey);
+    if (previous) reportState.location = _berichtJobLocation(previous);
+    const available = _berichtLocations();
+    if (!available.includes(reportState.location)) reportState.location = available[0] || null;
+    _berichtSelectLocationJob(previousKey);
+    _berichtRenderNavigation();
     const search = document.getElementById('report-job-search');
     if (search && !search.dataset.bound) {
       search.dataset.bound = 'true';
-      search.addEventListener('input', _berichtRenderJobSidebar);
+      search.addEventListener('input', _berichtRenderNavigation);
     }
+    await berichtLoad();
   } catch (e) {
+    if (initRequest !== reportState.initRequest) return;
     _berichtMsg(reportsT('jobsLoadError', { message: e.message }), true);
   }
 }
 
-/** Fetch and render the selected job report, or reset to the empty state. */
+/** Fetch the selected report, ignoring outdated responses after another selection. */
 async function berichtLoad() {
   const jobKey = document.getElementById('bericht-job-sel').value;
+  const request = reportState.loadRequest = (reportState.loadRequest || 0) + 1;
+  reportState.data = null;
+  reportState.borgInfo = null;
+  reportState.borgInfoLoaded = false;
+  reportState.job = reportState.jobs.find((job) => String(job.key) === jobKey) || null;
+  if (reportState.job) {
+    reportState.location = _berichtJobLocation(reportState.job);
+    reportState.selectedJobs ||= {};
+    reportState.selectedJobs[reportState.location] = jobKey;
+  }
+  _berichtRenderNavigation();
+  _berichtUpdateSelection(reportState.job);
   document.getElementById('bericht-body').style.display = 'none';
   _berichtMsg('');
   _berichtRestoreVerification('');
@@ -67,7 +95,7 @@ async function berichtLoad() {
     reportState.borgInfo = null;
     reportState.borgInfoLoaded = false;
     document.getElementById('bericht-empty').style.display = '';
-    _berichtRenderJobSidebar();
+    _berichtRenderNavigation();
     _berichtUpdateSelection(null);
     return;
   }
@@ -79,8 +107,10 @@ async function berichtLoad() {
       fetch('/api/jobs'),
     ]);
     const data = await reportRes.json();
+    if (request !== reportState.loadRequest) return;
     if (!reportRes.ok || data.error) { _berichtMsg(reportsT('error', { message: apiErrorMessage(data, reportRes.status) }), true); return; }
     const jobsData = jobsRes.ok ? await jobsRes.json() : { jobs: [] };
+    if (request !== reportState.loadRequest) return;
     const selected = (jobsData.jobs || []).find((j) => String(j.key) === String(jobKey));
     const reportJob = reportState.jobs.find((job) => String(job.key) === String(jobKey));
     reportState.data = data;
@@ -88,12 +118,12 @@ async function berichtLoad() {
     reportState.borgInfo = null;
     reportState.borgInfoLoaded = false;
     _berichtRestoreVerification(reportState.job);
-    _berichtRenderJobSidebar();
     _berichtUpdateSelection(reportState.job);
     _berichtMsg('');
     _berichtRender(data);
     document.getElementById('bericht-body').style.display = '';
   } catch (e) {
+    if (request !== reportState.loadRequest) return;
     _berichtMsg(reportsT('error', { message: e.message }), true);
   }
 }
@@ -110,24 +140,55 @@ function _berichtJobIcon(job) {
   return `<span class="type-icon report-job-icon${colorClass}">${typeIcon(icon)}</span>`;
 }
 
-function _berichtRenderJobSidebar() {
+/** Return the normalized location of a report job (missing values use Local). */
+function _berichtJobLocation(job) {
+  return String(job.location || 'local').toLowerCase();
+}
+
+/** Return occupied report locations in the established Jobs order. */
+function _berichtLocations() {
+  const order = ['local', 'usb', 'smb', 'storagebox'];
+  const rank = (location) => order.includes(location) ? order.indexOf(location) : order.length;
+  return [...new Set(reportState.jobs.map(_berichtJobLocation))]
+    .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+/** Select the requested, remembered or first report job within the active location. */
+function _berichtSelectLocationJob(preferredKey = '') {
+  const jobs = reportState.jobs.filter((job) => _berichtJobLocation(job) === reportState.location);
+  const remembered = reportState.selectedJobs?.[reportState.location];
+  const selected = jobs.find((job) => String(job.key) === preferredKey)
+    || jobs.find((job) => String(job.key) === remembered) || jobs[0];
+  document.getElementById('bericht-job-sel').value = selected ? String(selected.key) : '';
+}
+
+/** Render both navigation rows; search filters jobs only within the active location. */
+function _berichtRenderNavigation() {
   const list = document.getElementById('report-job-list');
-  if (!list) return;
+  const locations = document.getElementById('report-location-list');
+  if (!list || !locations) return;
+  locations.innerHTML = _berichtLocations().map((location) => {
+    const active = location === reportState.location;
+    const count = reportState.jobs.filter((job) => _berichtJobLocation(job) === location).length;
+    return `<button type="button" class="report-location${active ? ' is-active' : ''}" data-report-location="${escHtml(location)}" aria-pressed="${active}">${escHtml(_berichtLocationLabel(location))}<span class="location-nav-count">${count}</span></button>`;
+  }).join('');
   const query = String(document.getElementById('report-job-search')?.value || '').trim().toLowerCase();
   const selected = document.getElementById('bericht-job-sel')?.value || '';
-  const jobs = (reportState.jobs || []).filter((job) => `${job.display_name || ''} ${job.key || ''} ${job.location || ''}`.toLowerCase().includes(query));
-  if (!jobs.length) {
-    list.innerHTML = `<div class="ui-empty report-job-empty">${escHtml(reportsT('noMatchingJobs'))}</div>`;
-    return;
-  }
-  const order = ['local', 'usb', 'smb', 'storagebox'];
-  const locations = [...new Set(jobs.map((job) => String(job.location || 'local').toLowerCase()))]
-    .sort((a, b) => (order.indexOf(a) < 0 ? 99 : order.indexOf(a)) - (order.indexOf(b) < 0 ? 99 : order.indexOf(b)));
-  list.innerHTML = locations.map((location) => `<section class="report-job-group"><h3>${escHtml(_berichtLocationLabel(location))}</h3>${jobs.filter((job) => String(job.location || 'local').toLowerCase() === location).map((job) => `<button class="report-job ${String(job.key) === selected ? 'is-active' : ''}" data-report-job="${escHtml(job.key)}" ${String(job.key) === selected ? 'aria-current="page"' : ''}>${_berichtJobIcon(job)}<span><strong>${escHtml(job.display_name || job.key)}</strong><small>${escHtml(job.archive_prefix || '')}</small></span><span class="report-job-dot"></span></button>`).join('')}</section>`).join('');
-  list.querySelectorAll('[data-report-job]').forEach((button) => button.addEventListener('click', () => {
-    const select = document.getElementById('bericht-job-sel');
-    if (select) select.value = button.dataset.reportJob || '';
+  const jobs = reportState.jobs.filter((job) => _berichtJobLocation(job) === reportState.location
+    && `${job.display_name || ''} ${job.key || ''} ${job.archive_prefix || ''} ${job.location || ''}`.toLowerCase().includes(query));
+  list.innerHTML = jobs.length ? jobs.map((job) => `<button type="button" class="report-job ${String(job.key) === selected ? 'is-active' : ''}" data-report-job="${escHtml(job.key)}" aria-pressed="${String(job.key) === selected}">${_berichtJobIcon(job)}<span><strong>${escHtml(job.display_name || job.key)}</strong><small>${escHtml(job.archive_prefix || '')}</small></span></button>`).join('')
+    : `<div class="ui-empty report-job-empty">${escHtml(reportsT('noMatchingJobs'))}</div>`;
+  locations.querySelectorAll('[data-report-location]').forEach((button) => button.addEventListener('click', () => {
+    reportState.location = button.dataset.reportLocation;
+    document.getElementById('report-job-search').value = '';
+    _berichtSelectLocationJob();
     berichtLoad();
+    locations.querySelector('.is-active')?.focus();
+  }));
+  list.querySelectorAll('[data-report-job]').forEach((button) => button.addEventListener('click', () => {
+    document.getElementById('bericht-job-sel').value = button.dataset.reportJob || '';
+    berichtLoad();
+    list.querySelector('.is-active')?.focus();
   }));
 }
 
@@ -592,9 +653,11 @@ function _berichtRestoreVerification(job) {
   el.textContent = detailParts.length ? `${item.text} · ${detailParts.join(' · ')}` : item.text;
 }
 
+/** Load on-demand repository details only for the current report selection. */
 async function berichtLoadBorgInfo() {
   const jobKey = document.getElementById('bericht-job-sel').value;
   if (!jobKey) return;
+  const request = reportState.loadRequest;
   const btn = document.getElementById('bericht-borginfo-btn');
   btn.disabled = true;
   btn.textContent = reportsT('loadingShort');
@@ -603,6 +666,7 @@ async function berichtLoadBorgInfo() {
   try {
     const res = await fetch(`/api/restore/repo-stats?job=${encodeURIComponent(jobKey)}`);
     const data = await res.json();
+    if (request !== reportState.loadRequest) return;
     if (!res.ok || data.error) { _berichtBorgInfoMsg(reportsT('error', { message: apiErrorMessage(data, res.status) }), true); btn.disabled = false; btn.textContent = reportsT('load'); return; }
     reportState.borgInfo = data;
     reportState.borgInfoLoaded = true;
@@ -611,6 +675,7 @@ async function berichtLoadBorgInfo() {
     btn.textContent = reportsT('refresh');
     btn.disabled = false;
   } catch (e) {
+    if (request !== reportState.loadRequest) return;
     _berichtBorgInfoMsg(reportsT('error', { message: e.message }), true);
     btn.disabled = false;
     btn.textContent = reportsT('load');
@@ -651,7 +716,7 @@ window.addEventListener?.('bbui:language-changed', () => {
   }
   const button = document.getElementById('bericht-borginfo-btn');
   if (button) button.textContent = reportState.borgInfoLoaded ? reportsT('refresh') : reportsT('load');
-  _berichtRenderJobSidebar();
+  _berichtRenderNavigation();
   _berichtUpdateSelection(reportState.job);
 });
 

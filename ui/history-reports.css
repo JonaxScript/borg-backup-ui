@@ -77,33 +77,42 @@
 }
 .history-pagination { padding-bottom: var(--ui-space-1); }
 
-.report-sidebar { overflow: hidden; }
-.report-search { display: grid; gap: var(--ui-space-1); padding: var(--ui-space-3); border-bottom: 1px solid var(--ui-color-border); }
-.report-search span { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); font-weight: var(--ui-font-weight-semibold); text-transform: uppercase; }
-.report-search input { width: 100%; min-width: 0; }
-.report-job-list { display: grid; max-height: calc(100vh - 18rem); overflow-y: auto; padding: var(--ui-space-1); }
-.report-job-group h3 { margin: var(--ui-space-2); color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); text-transform: uppercase; }
-.report-job {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) 0.5rem;
-  align-items: center;
-  gap: var(--ui-space-2);
-  width: 100%;
-  padding: var(--ui-space-2);
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  background: transparent;
-  color: var(--ui-color-text);
-  text-align: left;
-}
+/* Shared location tabs and job row above the unchanged reports (#629). */
+.report-layout.ui-context-layout { grid-template-columns: minmax(0, 1fr); }
+.report-navigation { min-width: 0; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
+.report-location-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 14px 0; border-bottom: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0; background: var(--ui-color-surface-subtle); }
+.report-navigation-label { flex: 0 0 auto; color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
+.report-location-list { display: flex; flex-wrap: wrap; align-self: stretch; gap: 4px 8px; }
+.report-location { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--ui-radius-sm) var(--ui-radius-sm) 0 0; background: transparent; color: var(--ui-color-text); font: inherit; font-weight: var(--ui-font-weight-semibold); }
+.report-location.is-active { border-color: var(--ui-color-border); background: var(--ui-color-surface); color: var(--ui-color-accent); }
+.report-location:hover { color: var(--ui-color-accent); }
+.report-location .location-nav-count { min-width: 22px; padding: 1px 6px; border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); font-weight: 400; text-align: center; }
+.report-search { display: flex; align-items: center; gap: var(--ui-space-2); margin: 0 0 8px auto; min-width: 0; }
+.report-search span { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
+.report-search input { width: 13rem; max-width: 100%; min-width: 0; padding: 6px 10px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-sm); background: var(--ui-color-surface); color: var(--ui-color-text); font: inherit; }
+.report-job-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
+.report-job-list { display: flex; flex: 1; flex-wrap: wrap; min-width: 0; gap: 4px 12px; }
+.report-job { display: flex; align-items: center; gap: var(--ui-space-2); max-width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ui-color-text); font: inherit; text-align: left; }
 .report-job:hover { background: var(--ui-color-surface-subtle); }
-.report-job.is-active { background: var(--ui-color-surface-raised); box-shadow: inset 3px 0 var(--ui-color-accent); }
-.report-job-icon { width: 2rem; height: 2rem; }
-.report-job strong, .report-job small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-job.is-active { color: var(--ui-color-accent); border-bottom-color: var(--ui-color-accent); }
+.report-job-icon { flex: 0 0 auto; width: 2rem; height: 2rem; }
+.report-job > span { min-width: 0; }
+.report-job strong, .report-job small { display: block; overflow-wrap: anywhere; }
+.report-job strong { font-weight: 400; }
 .report-job small { margin-top: 2px; color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
-.report-job-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ui-state-neutral-fg); }
-.report-job.is-active .report-job-dot { background: var(--ui-color-accent); }
-.report-job-empty { padding: var(--ui-space-4); }
+.report-job-empty { padding: var(--ui-space-2); }
+.report-location:focus-visible, .report-job:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 2px; }
+.report-workspace { min-width: 0; }
+.report-workspace > .ui-workspace-header { padding: 0; border: 0; border-radius: 0; background: transparent; }
+#report-selection-subtitle { overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .report-job-row { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .report-search { flex: 1 1 100%; margin-top: 4px; }
+  .report-search input { flex: 1; }
+}
+@media (pointer: coarse) {
+  .report-location, .report-job { min-height: 44px; }
+}
 
 #bericht-empty { margin: 0; }
 .report-metric-ledger,
@@ -180,10 +189,6 @@
 @media (max-width: 1023px) {
   .history-detail-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .history-sidebar .ui-context-nav__item { min-width: 12.5rem; }
-  .report-job-list { display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; }
-  .report-job-group { display: flex; min-width: max-content; }
-  .report-job-group h3 { align-self: center; }
-  .report-job { min-width: 13rem; }
   .report-ledger-runs { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
