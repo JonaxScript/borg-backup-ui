@@ -113,7 +113,11 @@ Ein Job verbindet Quellen mit genau einem vorhandenen Repository. Verschlüsselu
 
 **Nächster Lauf** zeigt den geplanten Termin. Zeitpunkt und Dauer des letzten Laufs bleiben getrennte Angaben.
 
-Die Jobs stehen in einzelnen kompakten Karten mit Abstand. Unter den Ansichtsreitern Einzeljobs/Jobgruppen befindet sich eine separate, flache Standortleiste ohne Dropdown oder Pillen; die eigene Terminspalte zeigt Zeitpläne, letzten Restore-Test und Gültigkeit des Nachweises. Der Pfeil am Job öffnet einen gemeinsamen Detailbereich mit **Ablauf** und **Daten & Einstellungen**. Letzterer fasst Speicherdaten, Richtlinie, Archivpräfix, Beschreibung, Borg-/Repository-Checks und Restore-Nachweise zusammen. Beide Ansichten reservieren die Höhe des größeren Inhalts; beim Wechsel springt die Liste nicht. Geöffnete Details und die ausgewählte Ansicht bleiben bei Aktualisierungen erhalten.
+Die Jobs stehen in einzelnen kompakten Karten mit Abstand. Die Reiter **Einzeljobs/Jobgruppen** sind direkt an den Arbeitsbereich angesetzt. Darunter liegt die beschriftete Standortleiste in einem gemeinsamen Rahmen, ohne Dropdown oder Pillen; die eigene Terminspalte zeigt Zeitpläne, letzten Restore-Test und Gültigkeit des Nachweises. Der Pfeil am Job öffnet einen gemeinsamen Detailbereich mit **Ablauf** und **Daten & Einstellungen**. Letzterer fasst Speicherdaten, Richtlinie, Archivpräfix, Beschreibung, Borg-/Repository-Checks und Restore-Nachweise zusammen. Beide Ansichten reservieren die Höhe des größeren Inhalts; beim Wechsel springt die Liste nicht. Geöffnete Details und die ausgewählte Ansicht bleiben bei Aktualisierungen erhalten.
+
+Status und Restore-Nachweis verwenden dezente Hintergrundfarben ohne Umrandung und ohne Fettschrift. Letzter Test und Gültigkeitsende stehen mit getrennten Beschriftungen und bündigen Datumswerten untereinander.
+
+**Starten**, **Log** und **Abbrechen** behalten ihre Position und Beschriftung. Nicht verfügbare Aktionen bleiben deaktiviert. **Log** öffnet während eines Laufs das Live-Log (mit Live-Punkt), sonst das gespeicherte Log; ohne verfügbares Log ist der Button deaktiviert. Während Docker/VMs wieder starten, bleibt **Abbrechen** deaktiviert, mit der Erklärung als Tooltip statt zusätzlicher Textzeile. Ein angeforderter Abbruch wird im Status angezeigt.
 
 Eingeklappte Karten zeigen Fehler, Warnungen, übersprungene oder abgebrochene Läufe nur als Status. Die vollständige Meldung erscheint genau einmal unter **Ablauf**, gekennzeichnet als **Letztes gespeichertes Ergebnis**. Das gilt auch während eines neuen Laufs. Problemverweise aus dem Dashboard öffnen diesen Bereich direkt. Lange Live-Log-Zeilen lassen sich horizontal scrollen. Fehlende Statusdateien werden nicht als Erfolg gewertet.
 
@@ -148,7 +152,7 @@ Ausschlüsse sind optionale Unterordner oder Dateien innerhalb einer Quelle, die
 
 ### Laufenden Job kontrolliert abbrechen
 
-Bei einem laufenden Job fordert **Job abbrechen** einen kontrollierten Abbruch an. Ein aktiver Borg-Schritt wird unterbrochen. Läuft gerade das Stoppen von Docker-Containern oder VMs, wird dieser Vorgang vollständig beendet und anschließend werden die zuvor laufenden Systeme wieder gestartet. Während des Neustarts ist kein weiterer Abbruch möglich. Schlägt die Wiederherstellung fehl, endet der Lauf als Fehler und der Runtime-Recovery-Hinweis bleibt sichtbar.
+Bei einem laufenden Job fordert **Abbrechen** einen kontrollierten Abbruch an. Ein aktiver Borg-Schritt wird unterbrochen. Läuft gerade das Stoppen von Docker-Containern oder VMs, wird dieser Vorgang vollständig beendet und anschließend werden die zuvor laufenden Systeme wieder gestartet. Während des Neustarts ist kein weiterer Abbruch möglich. Schlägt die Wiederherstellung fehl, endet der Lauf als Fehler und der Runtime-Recovery-Hinweis bleibt sichtbar.
 
 Ein abgebrochener Lauf wird mit dem Status **Abgebrochen** gespeichert. Die Anwendung startet danach nicht automatisch einen Repository-Check und entfernt keine Borg-Locks. Prüfen Sie bei auffälligen Meldungen das Live- beziehungsweise gespeicherte Log.
 

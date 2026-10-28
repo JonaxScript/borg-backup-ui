@@ -873,7 +873,16 @@
         "compact": "Reclaim space (borg compact)",
         "check": "Check integrity (borg check)"
       },
-      "liveProgress": "Live metrics"
+      "liveProgress": "Live metrics",
+      "view": "View",
+      "log": "Log",
+      "cancel": "Cancel",
+      "noLog": "No log available yet",
+      "cancelPendingStatus": "Cancellation requested",
+      "lastTest": "Last test",
+      "lastCompletedTest": "Last completed test",
+      "lastTestCancelled": "Last attempt (cancelled)",
+      "validUntil": "Valid until"
     }
   },
   "schedule": {

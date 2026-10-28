@@ -817,38 +817,13 @@ function renderJobCard(job) {
 
   const stateClass = isRunning ? 'info' : job.enabled === false ? 'warning' : (job.last_status === 'cancelled' ? 'warning' : (job.last_status || 'unknown'));
   const stateLabel = isRunning
-    ? jobsT('jobs.running')
+    ? jobsT(job.cancel_requested ? 'jobs.compact.cancelPendingStatus' : 'jobs.running')
     : job.enabled === false
       ? jobsT('jobs.disabled')
       : job.last_status
         ? (job.last_status === 'success' && jobWorkflowSteps(job).length ? jobsT('jobs.borgSuccessful') : statusLabel(job.last_status))
         : jobsT('jobs.ready');
   const verificationHtml = renderJobRestoreVerification(job);
-
-  const startDisabled = !_isDataDirReady();
-  const effectiveStartDisabled = startDisabled || job.enabled === false;
-  const cancelStatus = job.cancel_requested
-    ? jobsT(job.cancel_message_key || 'jobs.cancelPending')
-    : (!job.cancel_allowed && job.cancel_message_key)
-      ? jobsT(job.cancel_message_key)
-      : '';
-  const cancelButton = job.cancel_allowed && !job.cancel_requested && job.run_id
-    ? `<button class="btn btn-danger btn-sm" data-jobs-action="cancel-job" data-job-key="${escHtml(job.key)}">${jobsT('jobs.cancelJob')}</button>`
-    : '';
-  const actionHtml = isRunning
-    ? `<div class="jobs-running-actions">
-         <div class="jobs-running-buttons">
-           ${job.run_log_available === false ? '' : `<button class="btn btn-secondary btn-sm" data-jobs-action="open-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLiveLog')}</button>`}
-           ${cancelButton}
-         </div>
-         ${cancelStatus ? `<div class="jobs-running-message">${escHtml(cancelStatus)}</div>` : ''}
-       </div>`
-    : `<div class="jobs-completed-actions"><button class="btn btn-primary" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" ${effectiveStartDisabled ? `disabled title="${job.enabled === false ? jobsT('jobs.disabled') : jobsT('jobs.dataDirRequired')}"` : ''}>
-         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-           <polygon points="5 3 19 12 5 21 5 3"/>
-         </svg>
-         ${jobsT('jobs.startAction')}
-       </button>${job.last_log_file && jobWorkflowSteps(job).length ? `<button class="btn btn-secondary btn-sm" data-jobs-action="open-saved-log" data-job-key="${escHtml(job.key)}">${jobsT('jobs.showLog')}</button>` : ''}</div>`;
 
   return `<article class="jobs-redesign-row ${isRunning ? 'is-running' : ''} ${job.enabled === false ? 'is-disabled' : ''}" id="job-card-${escHtml(job.key)}">
     <div class="jobs-redesign-cell jobs-redesign-main">
@@ -874,7 +849,7 @@ function renderJobCard(job) {
       ${window.BBUI.jobGroups?.schedules(job) || ''}
     </div>
     <div class="jobs-redesign-cell jobs-redesign-actions">
-      ${actionHtml}
+      ${renderJobActions(job)}
       <div class="job-card-menu">
             <button class="job-menu-btn" data-jobs-action="toggle-menu" data-job-key="${escHtml(job.key)}" title="${jobsT('jobs.options')}" aria-label="${jobsT('jobs.options')}">
               <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
@@ -920,6 +895,28 @@ function renderJobCard(job) {
   </article>`;
 }
 
+/**
+ * Render stable Start, Log and Cancel slots across idle, active and protected phases.
+ * Unavailable actions remain disabled; cancellation reasons are accessible tooltips.
+ * @param {Object} job Job configuration with current runtime and saved-log metadata.
+ * @returns {string} Escaped action markup; does not initiate any action.
+ */
+function renderJobActions(job) {
+  const running = !!job.running;
+  const startDisabled = running || !_isDataDirReady() || job.enabled === false;
+  const startHint = running ? jobsT('jobs.running') : job.enabled === false ? jobsT('jobs.disabled') : !_isDataDirReady() ? jobsT('jobs.dataDirRequired') : jobsT('jobs.start');
+  const logAvailable = running ? job.run_log_available !== false : !!job.last_log_file;
+  const logHint = logAvailable ? jobsT(running ? 'jobs.showLiveLog' : 'jobs.showLog') : jobsT('jobs.compact.noLog');
+  const cancelDisabled = !running || !job.cancel_allowed || job.cancel_requested || !job.run_id || _coreState().currentRole === 'viewer';
+  const cancelHint = running && job.cancel_message_key ? jobsT(job.cancel_message_key)
+    : job.cancel_requested ? jobsT('jobs.cancelPending') : jobsT('jobs.cancelJob');
+  return `<div class="job-action-stack">
+    <button class="btn btn-primary btn-sm" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" title="${escHtml(startHint)}" ${startDisabled ? 'disabled' : ''}>${escHtml(jobsT('jobs.startAction'))}</button>
+    <button class="btn btn-secondary btn-sm job-log-action" data-jobs-action="open-job-log" data-job-key="${escHtml(job.key)}" title="${escHtml(logHint)}" aria-label="${escHtml(logHint)}" ${logAvailable ? '' : 'disabled'}>${escHtml(jobsT('jobs.compact.log'))}<span class="job-log-live ${running && logAvailable ? '' : 'is-idle'}" aria-hidden="true">●</span></button>
+    <span class="job-cancel-slot" title="${escHtml(cancelHint)}"><button class="btn btn-secondary btn-sm job-cancel-action" data-jobs-action="cancel-job" data-job-key="${escHtml(job.key)}" aria-label="${escHtml(cancelHint)}" ${cancelDisabled ? 'disabled' : ''}>${escHtml(jobsT('jobs.compact.cancel'))}</button></span>
+  </div>`;
+}
+
 /** Render proof validity separately from the latest cancelled test attempt. */
 function renderJobRestoreVerification(job) {
   const status = String(job.restore_verification_status || '').toLowerCase();
@@ -935,12 +932,12 @@ function renderJobRestoreVerification(job) {
   if (!item) return '';
   const cancelled = job.restore_verification_last_test_result === 'cancelled';
   const details = [
-    cancelled && job.restore_verification_evidence_date ? jobsT('jobs.lastCompletedTest', {date: job.restore_verification_evidence_date}) : '',
-    job.restore_verification_last_test_date ? jobsT(cancelled ? 'jobs.lastTestCancelled' : 'jobs.lastTest', { date: job.restore_verification_last_test_date }) : '',
-    job.restore_verification_valid_until ? jobsT('jobs.validUntil', { date: job.restore_verification_valid_until }) : '',
+    cancelled && job.restore_verification_evidence_date ? ['lastCompletedTest', job.restore_verification_evidence_date] : null,
+    job.restore_verification_last_test_date ? [cancelled ? 'lastTestCancelled' : 'lastTest', job.restore_verification_last_test_date] : null,
+    job.restore_verification_valid_until ? ['validUntil', job.restore_verification_valid_until] : null,
   ].filter(Boolean);
-  const detailText = details.join(' · ');
-  return `<div class="job-restore-proof"><span class="restore-v-badge ${item.cls}" title="${escHtml(detailText || item.text)}">${item.text}</span>${details.length ? `<span class="jobs-restore-dates">${details.map((detail) => `<span>${escHtml(detail)}</span>`).join('')}</span>` : ''}</div>`;
+  const detailText = details.map(([key, date]) => jobsT('jobs.' + key, {date})).join(' · ');
+  return `<div class="job-restore-proof"><span class="restore-v-badge ${item.cls}" title="${escHtml(detailText || item.text)}">${item.text}</span>${details.length ? `<dl class="jobs-restore-dates">${details.map(([key, date]) => `<dt>${escHtml(jobsT(`jobs.compact.${key}`))}</dt><dd>${escHtml(date)}</dd>`).join('')}</dl>` : ''}</div>`;
 }
 
 function resolveJobIcon(job) {
@@ -1000,7 +997,7 @@ function _showDeleteJobModalForKey(jobKey) {
 
 function onJobsGridClick(event) {
   const btn = event.target.closest('[data-jobs-action]');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
 
   const action = btn.dataset.jobsAction || '';
   const jobKey = btn.dataset.jobKey || '';
@@ -1018,6 +1015,12 @@ function onJobsGridClick(event) {
     return;
   }
   if (action === 'open-wizard') return openWizard();
+  if (action === 'open-job-log') {
+    const job = jobsState.jobs.find(job => job.key === jobKey);
+    if (job?.running && job.run_log_available !== false) return openLogPanel(jobKey);
+    if (!job?.running && job?.last_log_file) window.BBUI?.components?.logViewer?.open?.(job.last_log_file);
+    return;
+  }
   if (action === 'open-log') return openLogPanel(jobKey);
   if (action === 'open-saved-log') {
     const logFile = jobsState.jobs.find(job => job.key === jobKey)?.last_log_file;

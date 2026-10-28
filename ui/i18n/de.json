@@ -873,7 +873,16 @@
         "compact": "Speicher freigeben (borg compact)",
         "check": "Integrität prüfen (borg check)"
       },
-      "liveProgress": "Live-Messwerte"
+      "liveProgress": "Live-Messwerte",
+      "view": "Ansicht",
+      "log": "Log",
+      "cancel": "Abbrechen",
+      "noLog": "Noch kein Log verfügbar",
+      "cancelPendingStatus": "Abbruch angefordert",
+      "lastTest": "Letzter Test",
+      "lastCompletedTest": "Letzter abgeschlossener Test",
+      "lastTestCancelled": "Letzter Testversuch (abgebrochen)",
+      "validUntil": "Gültig bis"
     }
   },
   "schedule": {

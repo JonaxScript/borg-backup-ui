@@ -31,7 +31,7 @@ const {chromium} = require('playwright');
         {id:'compact',status:'success',duration_seconds:1},{id:'check',status:'skipped',reason:'not_due'}];
       const base={location:'local',enabled:true,compression:'lz4',retention:{mode:'last',last:3},archive_prefix:'vms-backup',
         restore_verification_status:'verified',restore_verification_last_test_date:'2026-10-27 11:12:50',restore_verification_valid_until:'2026-11-26 11:12:50',
-        last_status:'success',last_timestamp:'2026-10-28 00:47:00',last_successful_backup:{timestamp:'2026-10-28 00:47:00',duration_seconds:783},last_job_steps:steps,
+        last_log_file:'vms.log',last_status:'success',last_timestamp:'2026-10-28 00:47:00',last_successful_backup:{timestamp:'2026-10-28 00:47:00',duration_seconds:783},last_job_steps:steps,
         saved_status:{status:'success',timestamp:'2026-10-28 00:47:00',original_size:1024**4,original_size_formatted:'1 TiB',deduplicated_size:194*1024**3,deduplicated_size_formatted:'194 GiB',archive_name:'vms-archive'}};
       const now=Date.now()/1000;
       window.live={running:true,phase:'borg_create',start_time:new Date((now-480)*1000).toISOString(),run_id:'active',cancel_allowed:true,
@@ -77,6 +77,49 @@ const {chromium} = require('playwright');
     assert.equal(await page.locator('#job-card-new [data-jobs-action="start-job"]').isDisabled(),true);
     await page.evaluate(()=>document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page==='jobs')));
     if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/jobs-compact-overview.png`,fullPage:true});
+    // Stable actions preserve positions and DOM identity across protected/pending/completed states.
+    const runningCard=page.locator('#job-card-running');
+    const actionGeometry=()=>runningCard.evaluate(node=>{
+      const origin=node.querySelector('.jobs-redesign-actions').getBoundingClientRect();
+      return [...node.querySelectorAll('.job-action-stack button')].map(b=>{
+        const box=b.getBoundingClientRect();return {x:box.x-origin.x,y:box.y-origin.y,width:box.width,height:box.height,text:b.textContent.replace('●','').trim()};
+      });
+    });
+    const positions=await actionGeometry();
+    await page.evaluate(()=>{window.actionNodes=[...document.querySelectorAll('#job-card-running .job-action-stack button')];});
+    for(const state of [
+      {running:true,cancel_allowed:false,cancel_requested:false,cancel_message_key:'jobs.cancelUnavailableRecovery'},
+      {running:true,cancel_allowed:true,cancel_requested:true,cancel_message_key:'jobs.cancelPending'},
+      {running:false,cancel_allowed:false,cancel_requested:false,cancel_message_key:''},
+    ]){
+      await page.evaluate(state=>{Object.assign(jobsState.jobs.find(j=>j.key==='running'),state);renderJobsGrid(jobsState.jobs);},state);
+      const current=await actionGeometry();
+      assert.ok(current.every((button,i)=>button.text===positions[i].text&&['x','y','width','height'].every(key=>Math.abs(button[key]-positions[i][key])<1)),'Action slots must not move or change their labels');
+      assert.equal(await runningCard.locator('[data-jobs-action="cancel-job"]').isDisabled(),true);
+      assert.equal(await runningCard.locator('.jobs-running-message').count(),0);
+      assert.equal(await page.evaluate(()=>actionNodes.every((node,i)=>node===document.querySelectorAll('#job-card-running .job-action-stack button')[i])),true);
+      if(state.cancel_requested)assert.match(await runningCard.locator('.jobs-redesign-operation > .badge').innerText(),/Abbruch angefordert/);
+    }
+    await page.evaluate(()=>{Object.assign(jobsState.jobs.find(j=>j.key==='running'),jobRuntimeState(live));renderJobsGrid(jobsState.jobs);});
+    assert.equal(await runningCard.locator('[data-jobs-action="cancel-job"]').isDisabled(),false);
+    await page.evaluate(()=>{window.openedSavedLog=null;BBUI.components.logViewer={open:file=>window.openedSavedLog=file};});
+    await card.locator('[data-jobs-action="open-job-log"]').click();
+    assert.equal(await page.evaluate(()=>openedSavedLog),'vms.log');
+    await page.evaluate(()=>{window.originalOpenLogPanel=openLogPanel;window.openedLiveJob=null;openLogPanel=key=>{window.openedLiveJob=key;};});
+    await runningCard.locator('[data-jobs-action="open-job-log"]').click();
+    assert.equal(await page.evaluate(()=>openedLiveJob),'running');
+    await page.evaluate(()=>{openLogPanel=originalOpenLogPanel;});
+    await page.evaluate(()=>{const j=jobsState.jobs.find(j=>j.key==='running');j.run_log_available=false;renderJobsGrid(jobsState.jobs);});
+    assert.equal(await runningCard.locator('[data-jobs-action="open-job-log"]').isDisabled(),true);
+    await page.evaluate(()=>{jobsState.jobs.find(j=>j.key==='running').run_log_available=true;renderJobsGrid(jobsState.jobs);});
+    const dateLefts=await card.locator('.jobs-restore-dates dd').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().left));
+    assert.ok(dateLefts.length===2&&dateLefts.every(x=>x===dateLefts[0]),'Restore dates share the value column');
+    for(const theme of ['light','dark']){
+      await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+      const styles=await card.locator('.jobs-redesign-operation > .badge, .job-restore-proof > .restore-v-badge').evaluateAll(nodes=>nodes.map(n=>({border:getComputedStyle(n).borderTopWidth,weight:getComputedStyle(n).fontWeight,background:getComputedStyle(n).backgroundColor})));
+      assert.ok(styles.every(s=>s.border==='0px'&&s.weight==='400'&&s.background!=='rgba(0, 0, 0, 0)'),`Soft borderless normal-weight statuses in ${theme}`);
+    }
+    await page.evaluate(()=>document.documentElement.dataset.theme='light');
     const open=card.locator('[data-jobs-action="toggle-workflow"]');
     await open.click();
     assert.equal(await card.locator('tr[data-step="create"]').count(),1,'Each step renders exactly once');

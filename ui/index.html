@@ -290,15 +290,19 @@
         </div>
       </div>
 
-      <div class="restore-view-tabs job-view-tabs" role="tablist" aria-label="Jobs">
-        <button type="button" class="is-active" data-group-view="jobs" role="tab" aria-selected="true" data-i18n="jobGroups.individual">Einzeljobs</button>
-        <button type="button" data-group-view="groups" role="tab" aria-selected="false" data-i18n="jobGroups.title">Jobgruppen</button>
+      <div class="jobs-view-header">
+        <span class="jobs-navigation-label" data-i18n="jobs.compact.view">Ansicht</span>
+        <div class="restore-view-tabs job-view-tabs" role="tablist" aria-label="Jobs">
+          <button type="button" class="is-active" data-group-view="jobs" role="tab" aria-selected="true" data-i18n="jobGroups.individual">Einzeljobs</button>
+          <button type="button" data-group-view="groups" role="tab" aria-selected="false" data-i18n="jobGroups.title">Jobgruppen</button>
+        </div>
       </div>
       <div id="job-groups-pane" class="ui-context-layout hidden"></div>
       <div id="jobs-message" class="status-message hidden"></div>
       <div id="jobs-data-dir-warning" class="status-message hidden"></div>
       <div class="jobs-location-layout">
         <aside class="jobs-location-sidebar ui-context-sidebar" aria-label="Standorte" data-i18n-aria-label="jobs.locations">
+          <span class="jobs-navigation-label" data-i18n="jobs.locations">Standorte</span>
           <nav id="jobs-location-list" class="ui-context-nav"></nav>
         </aside>
         <section class="jobs-workspace ui-workspace">

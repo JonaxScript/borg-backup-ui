@@ -232,11 +232,15 @@ Jobs define which data is backed up and where it is stored. A job contains:
 - **New job:** Opens the job wizard.
 - **Refresh:** Reloads job list and status.
 - **Live log:** During a running job, output can be followed in the browser.
-- **Cancel job:** Requests a controlled cancellation of the running job.
+- **Cancel:** Requests a controlled cancellation of the running job.
 
 **Next run** shows the scheduled time. The last run time and duration remain separate values.
 
-Jobs appear as separate compact cards with spacing. Below the Single jobs/Job groups view tabs, a separate flat location bar uses underlined text buttons without pills or a dropdown. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
+Jobs appear as separate compact cards with spacing. The **Single jobs/Job groups** tabs attach directly to the workspace. A labelled location bar below them shares the surrounding panel, without pills or a dropdown. A dedicated date column shows schedules, the latest restore test and evidence validity. The arrow next to a job opens one detail area with **Workflow** and **Data & settings**. The latter combines storage facts, policy, archive prefix, description, Borg/repository checks and restore evidence. Both views reserve the height of the larger content, so switching does not shift the list. Open details and the selected view survive refreshes.
+
+Status and restore evidence use subtle background fills with normal-weight text and no outline. Last test and validity dates have separate labels and vertically aligned values.
+
+**Start**, **Log** and **Cancel** retain their positions and labels. Unavailable actions remain disabled. **Log** opens the live log during a run (marked with a live dot) and the saved log afterwards; it is disabled when no log is available. During Docker/VM recovery, **Cancel** stays disabled, with the explanation in a tooltip instead of an extra text row. Requested cancellation appears in the status badge.
 
 Collapsed cards identify failures, warnings, skipped or cancelled runs by status only. The full message appears exactly once under **Workflow**, labelled **Last saved outcome**, including during a new run. Dashboard problem links open this view directly. Long live-log lines scroll horizontally. Missing status files never imply success.
 
@@ -355,7 +359,7 @@ Operating status labels the **current action**, **step elapsed time** and **tota
 
 After completion, steps, results and durations remain in the existing run report. Total duration also includes preparation, service recovery and scripts. The status column shows the **last successful backup**, its date/time, relative age; duration is available under **Workflow**, even when details are collapsed. Later failed, warning, cancelled or skipped runs do not replace this success summary. New reports carry it forward so it survives normal history retention. If no prior success report exists, no date is guessed. Older reports show only their recorded Borg steps; additional steps are not invented retrospectively.
 
-Starting a job does not open the live log automatically. Click **Show live log** during the run; an already opened log stays visible after completion. **Show log** opens the saved log after completion when available. The live log has no duplicate progress display; changing progress values are neither saved nor downloaded. Checks keep one final summary plus warnings/errors. Final statistics and optional file activity remain intact. Empty INFO lines and internal cache progress are suppressed; prune archive decisions, warnings and errors remain visible.
+Starting a job does not open the live log automatically. Click **Log** during the run; an already opened log stays visible after completion. **Log** opens the saved log after completion when available. The live log has no duplicate progress display; changing progress values are neither saved nor downloaded. Checks keep one final summary plus warnings/errors. Final statistics and optional file activity remain intact. Empty INFO lines and internal cache progress are suppressed; prune archive decisions, warnings and errors remain visible.
 
 #### VM Shutdown Failures and Optional Force-Off
 
