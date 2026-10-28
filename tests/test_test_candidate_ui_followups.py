@@ -202,7 +202,8 @@ def test_dashboard_and_jobs_preserve_readable_content() -> None:
     assert ".jobs-redesign-main .job-description" in css
     assert "-webkit-line-clamp: unset" in css
     assert "jobs-restore-dates" in css
-    assert "details.map((detail)" in jobs
+    assert '<dl class="jobs-restore-dates">' in jobs
+    assert "<dt>" in jobs and "<dd>" in jobs
     assert '"policy": "Richtlinie"' in german
 
 

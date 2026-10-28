@@ -977,3 +977,15 @@
   .jobs-location-sidebar .jobs-navigation-label { flex-basis: auto; }
 }
 @media (pointer: coarse) { .job-action-stack .btn { min-height: 44px; } }
+
+.jobs-column-headings > span:last-child { display: flex; justify-content: flex-end; padding-right: 46px; }
+.jobs-actions-heading { flex: 0 0 112px; text-align: center; }
+.job-action-icon { width: 14px; height: 14px; flex: 0 0 14px; }
+.job-action-stack .btn { gap: 5px; border-radius: 5px; font-weight: 400; }
+.job-action-stack .btn:disabled { opacity: .4; }
+.job-status-icon { display: inline-flex; width: 13px; height: 13px; flex: 0 0 13px; }
+.job-status-icon svg { width: 100%; height: 100%; }
+.job-status-icon.is-running svg { animation: job-step-spin 1.2s linear infinite; }
+.jobs-redesign-row .job-restore-proof > .restore-v-badge::before { display: none; }
+@media (prefers-reduced-motion: reduce) { .job-status-icon.is-running svg { animation: none; } }
+.jobs-location-sidebar [data-jobs-location="all"] .location-nav-count { border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); padding: 1px 6px; min-width: 22px; text-align: center; font-weight: 400; }

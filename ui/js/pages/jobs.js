@@ -769,7 +769,7 @@ function renderJobsLocationGroup(location, jobs) {
       </div>
       <span class="ui-badge">${jobs.length}</span>
     </header>` : ''}
-    <div class="jobs-location-group__body"><div class="jobs-column-headings" aria-hidden="true"><span>${jobsT('jobs.compact.job')}</span><span>${jobsT('jobs.operatingState')}</span><span>${jobsT('jobs.compact.dates')}</span><span>${jobsT('jobs.compact.actionsLabel')}</span></div>${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
+    <div class="jobs-location-group__body"><div class="jobs-column-headings" aria-hidden="true"><span>${jobsT('jobs.compact.job')}</span><span>${jobsT('jobs.operatingState')}</span><span>${jobsT('jobs.compact.dates')}</span><span><span class="jobs-actions-heading">${jobsT('jobs.compact.actionsLabel')}</span></span></div>${jobs.map(renderJobCard).join('')}<div class="group-log-slot" id="log-slot-${location}"></div></div>
   </section>`;
 }
 
@@ -823,6 +823,7 @@ function renderJobCard(job) {
       : job.last_status
         ? (job.last_status === 'success' && jobWorkflowSteps(job).length ? jobsT('jobs.borgSuccessful') : statusLabel(job.last_status))
         : jobsT('jobs.ready');
+  const stateIcon = isRunning ? (job.cancel_requested ? 'cancelled' : 'running') : job.enabled === false ? 'warning' : job.last_status || 'pending';
   const verificationHtml = renderJobRestoreVerification(job);
 
   return `<article class="jobs-redesign-row ${isRunning ? 'is-running' : ''} ${job.enabled === false ? 'is-disabled' : ''}" id="job-card-${escHtml(job.key)}">
@@ -836,7 +837,7 @@ function renderJobCard(job) {
       <div class="job-meta">${features.join('')}</div>
     </div>
     <div class="jobs-redesign-cell jobs-redesign-operation">
-      <span class="badge ${stateClass}"><span class="badge-dot"></span>${escHtml(stateLabel)}</span>
+      <span class="badge ${stateClass}"><span class="job-status-icon ${stateIcon === 'running' ? 'is-running' : ''}">${jobStepIcon(stateIcon)}</span>${escHtml(stateLabel)}</span>
       <div id="job-borg-progress-${escHtml(job.key)}">${renderJobOperation(job)}</div>
       <div id="job-backup-summary-${escHtml(job.key)}">${renderJobBackupSummary(job)}</div>
       ${job.running && job.group_name ? `<span class="jobs-redesign-detail">${escHtml(jobsT('jobGroups.startedBy', { name: job.group_name }))}</span>` : ''}
@@ -896,6 +897,20 @@ function renderJobCard(job) {
 }
 
 /**
+ * Return a decorative action symbol; visible button labels supply accessible names.
+ * @param {'start'|'log'|'cancel'} action Symbol to render.
+ * @returns {string} SVG markup; unknown actions return an empty SVG.
+ */
+function jobActionIcon(action) {
+  const shapes = {
+    start: '<path d="m7 4 14 8-14 8Z"/>',
+    log: '<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+    cancel: '<rect x="5" y="5" width="14" height="14" rx="1"/>',
+  };
+  return `<svg class="job-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[action] || ''}</svg>`;
+}
+
+/**
  * Render stable Start, Log and Cancel slots across idle, active and protected phases.
  * Unavailable actions remain disabled; cancellation reasons are accessible tooltips.
  * @param {Object} job Job configuration with current runtime and saved-log metadata.
@@ -911,9 +926,9 @@ function renderJobActions(job) {
   const cancelHint = running && job.cancel_message_key ? jobsT(job.cancel_message_key)
     : job.cancel_requested ? jobsT('jobs.cancelPending') : jobsT('jobs.cancelJob');
   return `<div class="job-action-stack">
-    <button class="btn btn-primary btn-sm" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" title="${escHtml(startHint)}" ${startDisabled ? 'disabled' : ''}>${escHtml(jobsT('jobs.startAction'))}</button>
-    <button class="btn btn-secondary btn-sm job-log-action" data-jobs-action="open-job-log" data-job-key="${escHtml(job.key)}" title="${escHtml(logHint)}" aria-label="${escHtml(logHint)}" ${logAvailable ? '' : 'disabled'}>${escHtml(jobsT('jobs.compact.log'))}<span class="job-log-live ${running && logAvailable ? '' : 'is-idle'}" aria-hidden="true">●</span></button>
-    <span class="job-cancel-slot" title="${escHtml(cancelHint)}"><button class="btn btn-secondary btn-sm job-cancel-action" data-jobs-action="cancel-job" data-job-key="${escHtml(job.key)}" aria-label="${escHtml(cancelHint)}" ${cancelDisabled ? 'disabled' : ''}>${escHtml(jobsT('jobs.compact.cancel'))}</button></span>
+    <button class="btn btn-primary btn-sm" data-jobs-action="start-job" data-job-key="${escHtml(job.key)}" title="${escHtml(startHint)}" ${startDisabled ? 'disabled' : ''}>${jobActionIcon('start')}<span>${escHtml(jobsT('jobs.startAction'))}</span></button>
+    <button class="btn btn-secondary btn-sm job-log-action" data-jobs-action="open-job-log" data-job-key="${escHtml(job.key)}" title="${escHtml(logHint)}" aria-label="${escHtml(logHint)}" ${logAvailable ? '' : 'disabled'}>${jobActionIcon('log')}<span>${escHtml(jobsT('jobs.compact.log'))}</span><span class="job-log-live ${running && logAvailable ? '' : 'is-idle'}" aria-hidden="true">●</span></button>
+    <span class="job-cancel-slot" title="${escHtml(cancelHint)}"><button class="btn btn-secondary btn-sm job-cancel-action" data-jobs-action="cancel-job" data-job-key="${escHtml(job.key)}" aria-label="${escHtml(cancelHint)}" ${cancelDisabled ? 'disabled' : ''}>${jobActionIcon('cancel')}<span>${escHtml(jobsT('jobs.compact.cancel'))}</span></button></span>
   </div>`;
 }
 
@@ -937,7 +952,7 @@ function renderJobRestoreVerification(job) {
     job.restore_verification_valid_until ? ['validUntil', job.restore_verification_valid_until] : null,
   ].filter(Boolean);
   const detailText = details.map(([key, date]) => jobsT('jobs.' + key, {date})).join(' · ');
-  return `<div class="job-restore-proof"><span class="restore-v-badge ${item.cls}" title="${escHtml(detailText || item.text)}">${item.text}</span>${details.length ? `<dl class="jobs-restore-dates">${details.map(([key, date]) => `<dt>${escHtml(jobsT(`jobs.compact.${key}`))}</dt><dd>${escHtml(date)}</dd>`).join('')}</dl>` : ''}</div>`;
+  return `<div class="job-restore-proof"><span class="restore-v-badge ${item.cls}" title="${escHtml(detailText || item.text)}"><span class="job-status-icon">${jobStepIcon(item.cls === 'neutral' ? 'skipped' : item.cls)}</span>${item.text}</span>${details.length ? `<dl class="jobs-restore-dates">${details.map(([key, date]) => `<dt>${escHtml(jobsT(`jobs.compact.${key}`))}</dt><dd>${escHtml(date)}</dd>`).join('')}</dl>` : ''}</div>`;
 }
 
 function resolveJobIcon(job) {
