@@ -13,11 +13,11 @@ def test_browse_restore_redesign_styles_are_loaded() -> None:
     assert html.index("/ui/design-system.css") < html.index("/ui/browse-restore-redesign.css")
 
 
-def test_browse_restore_keeps_five_step_workflow_and_api_contracts() -> None:
+def test_browse_restore_keeps_restore_workflow_and_api_contracts() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/restore.js")
     for element_id in (
-        "restore-sidebar-job-list", "restore-job-sel", "restore-archive-sel",
+        "restore-job-list", "restore-location-list", "restore-job-sel", "restore-archive-sel",
         "restore-archive-filter-summary",
         "restore-browser", "restore-target-path", "restore-conflict-mode",
         "restore-dry-run", "restore-preserve-owner", "restore-confirm-check",

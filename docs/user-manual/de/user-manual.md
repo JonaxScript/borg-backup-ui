@@ -756,13 +756,11 @@ Die Seite hat zwei Reiter:
 
 ### 7.3 Restore-Wizard
 
-Der Wizard besteht aus fünf Schritten.
+Wählen Sie zuerst oben den Standort und den Backup-Job. Die gemeinsame Reiterleiste zeigt die konfigurierten Job-Icons und nur Standorte mit Backup-Jobs. Ein Standortwechsel filtert die angebotenen Jobs; erst die Jobauswahl wechselt die Restore-Quelle. Eine vorhandene Archiv-, Datei- und Zielauswahl wird beim Jobwechsel nach Bestätigung zurückgesetzt. Während einer laufenden Restore-Aktion ist die Auswahl gesperrt.
 
-#### Schritt 1: Job auswählen
+Darunter führt der Assistent durch vier Schritte. Die Standort- und Jobleiste bleibt sichtbar; lange Inhalte scrollen im Arbeitsbereich, während Zurück und Weiter an derselben Position bleiben. Die separate Restore History bleibt verfügbar.
 
-Wählen Sie den Job, dessen Archiv Sie durchsuchen möchten. Die Sidebar gruppiert Jobs nach Standort und zeigt die konfigurierten Job-Icons.
-
-#### Schritt 2: Archiv auswählen
+#### Schritt 1: Archiv auswählen
 
 Wählen Sie ein Archiv aus dem Repository, das dem Job zugeordnet ist. **Archive anzeigen** bietet drei Optionen:
 
@@ -774,7 +772,7 @@ Der Filter gilt nur für diese Restore-Auswahl. Backup-Namen und Aufbewahrungsre
 
 Wenn keine Archive sichtbar sind, prüfen Sie Repository-Zugriff, Passphrase, Storage-Status und das angezeigte Archivmuster. Nach einem Wechsel des Job-Repositorys bleiben frühere Archive im alten Repository und erscheinen hier nicht; sie werden durch die Änderung weder verschoben noch kopiert.
 
-#### Schritt 3: Auswahl
+#### Schritt 2: Auswahl
 
 Nutzen Sie links den **Verzeichnisbaum**: Der Pfeil klappt einen Zweig auf oder zu, ein Klick auf den Ordnernamen zeigt rechts dessen Inhalt. Beim ersten Öffnen des Archivs führt die Ansicht automatisch durch Ordner mit jeweils nur einem Unterordner, bis Dateien oder mehrere Unterordner erscheinen. So müssen Sie sich beispielsweise nicht einzeln durch `mnt/user/demo/source/Documents` klicken. Weitere Zweige werden erst beim Öffnen geladen; aufgeklappte Ordner bleiben während der Auswahl geöffnet.
 
@@ -784,7 +782,7 @@ Wählen Sie über die Kontrollkästchen bis zu 256 Dateien oder Ordner aus demse
 
 Bei mehreren Einträgen bleibt die Struktur ab dem gemeinsamen Elternordner erhalten. `Backup/Test1` und `Backup/Test2` werden beispielsweise zu `Ziel/Test1` und `Ziel/Test2`. Bei `Backup/Test1` und `Other/Test1` bleiben beide Elternordner unter dem Ziel erhalten. Bei einem einzelnen Ordner gilt das bisherige Verhalten: Hat der Zielordner bereits denselben Namen, wird der Inhalt direkt dort wiederhergestellt.
 
-#### Schritt 4: Ziel & Modus
+#### Schritt 3: Ziel & Modus
 
 Prüfen Sie den schreibgeschützten **Archiv-Pfad** und legen Sie Zielordner sowie Verhalten bei Konflikten fest. Repository und Archiv werden unter dem Archiv-Pfad separat angezeigt, damit die Herkunft der Auswahl eindeutig bleibt.
 
@@ -824,9 +822,9 @@ Erlaubte Beispiele, wenn bewusst konfiguriert:
 
 > **Warnung:** Stellen Sie niemals direkt in Systempfade wieder her. Ein falscher Restore-Zielpfad kann vorhandene Daten überschreiben oder ein System unbrauchbar machen.
 
-#### Schritt 5: Prüfen & Start
+#### Schritt 4: Prüfen & Start
 
-Unter den drei Übersichtskarten in **Schritt 5** zeigt der **Wiederherstellungsplan** für jeden Eintrag die Quelle im Archiv, die geplante Aktion und den Zielpfad. Übersprungene Ziele und reine Testläufe sind ausdrücklich gekennzeichnet; bei Umbenennung weist die Tabelle auf den zusätzlichen Zeitstempel hin.
+Unter den drei Übersichtskarten in **Schritt 4** zeigt der **Wiederherstellungsplan** für jeden Eintrag die Quelle im Archiv, die geplante Aktion und den Zielpfad. Übersprungene Ziele und reine Testläufe sind ausdrücklich gekennzeichnet; bei Umbenennung weist die Tabelle auf den zusätzlichen Zeitstempel hin.
 
 Der letzte Schritt zeigt Zusammenfassung und Systemprüfung. Je nach Auswahl kann die technische Precheck-Ausgabe aufgeklappt werden. Validierungsfehler nennen den konkreten Grund, beispielsweise ein fehlendes oder nicht beschreibbares Ziel, ein Ziel außerhalb der erlaubten Restore-Wurzeln oder eine fehlende Archivauswahl. Mit **Abbrechen** wird der Startdialog ohne Restore geschlossen; nach der ausdrücklichen Bestätigung startet der Restore.
 

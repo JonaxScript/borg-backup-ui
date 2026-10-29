@@ -164,7 +164,7 @@
     document.getElementById('history-filter-status')?.addEventListener('change', applyHistoryFilters);
     document.getElementById('bericht-job-sel')?.addEventListener('change', berichtLoad);
     document.getElementById('bericht-borginfo-btn')?.addEventListener('click', berichtLoadBorgInfo);
-    document.getElementById('restore-job-sel')?.addEventListener('change', restoreLoadArchives);
+    document.getElementById('restore-job-sel')?.addEventListener('change', event => restoreSelectJob(event.target.value));
     document.getElementById('restore-archive-filter-mode')?.addEventListener('change', restoreChangeArchiveFilter);
     document.getElementById('restore-archive-filter-pattern')?.addEventListener('input', restoreEditArchiveFilter);
     document.getElementById('restore-archive-filter-apply')?.addEventListener('click', restoreApplyArchiveFilter);
@@ -173,7 +173,6 @@
     });
     document.getElementById('restore-archive-sel')?.addEventListener('change', () => restoreBrowse(''));
     document.getElementById('restore-wizard')?.addEventListener('click', onRestoreRedesignClick);
-    document.getElementById('restore-sidebar-search')?.addEventListener('input', renderRestoreJobSidebar);
     document.getElementById('restore-browser')?.addEventListener('click', onRestoreBrowserClick);
     document.getElementById('restore-selected-list')?.addEventListener('click', onRestoreBrowserClick);
     document.getElementById('restore-selection-filter')?.addEventListener('input', _restoreRenderSelectedBox);

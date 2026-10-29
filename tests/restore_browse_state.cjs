@@ -49,7 +49,7 @@ function page(language = 'en') {
     step: context.restoreSetStep, precheck: context.renderRestorePrecheck};
   for (const name of ['restoreSetLiveMode', 'restoreSwitchView', 'restoreSetStep',
     '_restoreBindTargetAutocomplete', '_restoreRenderSelectionSummary', '_restoreRenderSelectedBox',
-    'restoreLoadRuns', 'restoreLoadHistory', 'renderRestoreJobSidebar', 'renderRestoreSelectedJob',
+    'restoreLoadRuns', 'restoreLoadHistory', 'renderRestoreJobNavigation',
     'renderRestoreSourceContext', 'renderRestoreArchiveList', 'renderRestorePrecheck',
     '_restoreRenderBreadcrumb', '_setRestoreAssistBusy', 'restoreUpdateConfirmState']) context[name] = () => {};
   context.restoreLoadAllowedTargetRoots = async () => {};
@@ -142,7 +142,7 @@ test('a removed job or failed archive refresh leaves no old selectable archive',
   state.job = 'removed'; state.archive = 'old'; state.archives = [{name: 'old'}];
   context.fetch = async () => response({jobs: [{key: 'remaining'}]});
   await context.restoreInit();
-  assert.equal(state.job, '');
+  assert.equal(state.job, 'remaining');
   assert.equal(state.archives.length, 0);
   get('restore-job-sel').value = 'remaining';
   context.fetch = async () => response({code: 'internal_error'}, 500);
@@ -631,14 +631,14 @@ test('step five and header distinguish completion, simulation, failure, skipping
     context.fetch = async () => response(result);
     await context._pollRestoreState('run');
     assert.equal(step.classList.contains('is-done'), finished);
-    assert.equal(step.querySelector('span').textContent, finished ? '✓' : '5');
+    assert.equal(step.querySelector('span').textContent, finished ? '✓' : '4');
     assert.equal(header.dataset.state, color);
   }
   state.completed = false;
   context.renderRestoreRunStatus({state: 'running'});
   context.restoreSetStep(5);
   assert.equal(step.classList.contains('is-done'), false);
-  assert.equal(step.querySelector('span').textContent, '5');
+  assert.equal(step.querySelector('span').textContent, '4');
   assert.equal(header.dataset.state, 'running');
   context.renderRestoreRunStatus({state: 'running'}, false);
   assert.equal(header.dataset.state, 'warning');
@@ -729,4 +729,33 @@ test('editing a custom pattern discards pending archives, file listings and prec
   await checking;
   assert.equal(state.precheck, null);
   assert.equal(state.archive, '');
+});
+
+test('job tabs confirm discarding the restore draft and restore safe destination defaults', async () => {
+  const {context,get,state} = page();
+  state.jobs=[{key:'first',location:'local'},{key:'second',location:'usb'}];
+  state.job='first';state.archive='old';state.selectedPath='folder';state.precheck={ok:true};
+  get('restore-target-path').value='/mnt/user/old-target';get('restore-conflict-mode').value='overwrite';
+  get('restore-dry-run').checked=false;get('restore-preserve-owner').checked=true;
+  context._openSettingsDialog=async()=>false;
+  await context.restoreSelectJob('second');
+  assert.equal(state.job,'first');assert.equal(state.archive,'old');assert.equal(get('restore-target-path').value,'/mnt/user/old-target');
+  context._openSettingsDialog=async()=>true;
+  context.fetch=async()=>response({archives:[{name:'new'}]});
+  await context.restoreSelectJob('second');
+  assert.equal(state.job,'second');assert.equal(state.location,'usb');assert.equal(state.archive,'');
+  assert.equal(state.selectedPath,'');assert.equal(state.precheck,null);
+  assert.equal(get('restore-target-path').value,'/mnt/user/');assert.equal(get('restore-conflict-mode').value,'skip');
+  assert.equal(get('restore-dry-run').checked,true);assert.equal(get('restore-preserve-owner').checked,false);
+  state.assistBusy=true;await context.restoreSelectJob('first');assert.equal(state.job,'second');
+});
+
+test('a slow job archive request does not block changing jobs or overwrite the newer list', async () => {
+  const {context,state} = page();const first=deferred();
+  state.jobs=[{key:'first',location:'local'},{key:'second',location:'usb'}];
+  context.fetch=url=>url.endsWith('job=first')?first.promise:Promise.resolve(response({archives:[{name:'current'}]}));
+  const pending=context.restoreSelectJob('first');
+  await context.restoreSelectJob('second');
+  first.resolve(response({archives:[{name:'obsolete'}]}));await pending;
+  assert.equal(state.job,'second');assert.equal(state.archives[0].name,'current');
 });

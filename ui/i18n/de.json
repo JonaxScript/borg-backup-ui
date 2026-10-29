@@ -1713,11 +1713,11 @@
     "locationLocal": "Lokal",
     "emptyTitle": "Start über Schritt 1",
     "emptyDescription": "Wähle zuerst einen Job. Danach führt dich der Assistent durch alle Schritte.",
-    "selectJob": "1. Job auswählen",
+    "selectJob": "Job auswählen",
     "chooseJob": "— Job wählen —",
     "backupJobsOnly": "Nur Backup-Jobs werden angezeigt.",
     "backupJobs": "Backup-Jobs",
-    "selectArchive": "2. Archiv auswählen",
+    "selectArchive": "Archiv auswählen",
     "chooseArchive": "— Archiv wählen —",
     "selection": "Auswahl",
     "selectionHelp": "Ausgewählte Ordner enthalten alle Unterordner und Dateien. Die Auswahl bleibt beim Navigieren erhalten. Über den Download-Pfeil lädst du einen einzelnen Eintrag direkt herunter.",
@@ -1968,7 +1968,10 @@
     "skippedSelections": "{count} ausgewählte Einträge wurden übersprungen, da ihre Ziele bereits vorhanden sind.",
     "entryRestored": "Wiederhergestellt",
     "errorDetails": "Technische Fehlerdetails",
-    "runSimulationHelp": "Borg liest und prüft die ausgewählten Daten. Es werden keine Dateien ins Ziel geschrieben."
+    "runSimulationHelp": "Borg liest und prüft die ausgewählten Daten. Es werden keine Dateien ins Ziel geschrieben.",
+    "changeJobTitle": "Job wechseln?",
+    "changeJobMessage": "Die bisherige Archiv-, Datei- und Zielauswahl wird zurückgesetzt. Möchtest du einen anderen Job auswählen?",
+    "changeJobConfirm": "Job wechseln"
   },
   "restoreTests": {
     "coverageFileBasis": "{checked} von {total} Dateien",
