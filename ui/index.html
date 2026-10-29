@@ -406,15 +406,16 @@
 
       <div class="history-layout ui-context-layout">
         <aside class="history-sidebar ui-context-sidebar" data-i18n-aria-label="history.locations" aria-label="Standorte">
-          <div class="ui-context-sidebar__header"><small data-i18n="history.grouping">Gruppierung</small><strong data-i18n="history.locations">Standorte</strong></div>
+          <span class="history-navigation-label" data-i18n="history.locations">Standorte</span>
           <nav id="history-location-list" class="ui-context-nav"></nav>
         </aside>
         <section class="history-workspace ui-workspace">
-          <header class="ui-workspace-header"><div class="ui-workspace-header__title"><small data-i18n="history.selection">Auswahl</small><h2 id="history-selection-title" data-i18n="history.allLocations">Alle Standorte</h2><span class="ui-workspace-header__subtitle" data-i18n="history.workspaceSubtitle">Backup-Läufe und Restore-Testberichte</span></div><span id="history-selection-count" class="ui-badge"></span></header>
       <div class="history-filters ui-filter-bar">
+        <label class="history-filter-field"><span data-i18n="history.job">Job</span>
         <select class="history-filter-select" id="history-filter-type">
           <option value="" data-i18n="history.allTypes">Alle Jobs</option>
         </select>
+        </label>
         <select class="history-filter-select history-location-contract" id="history-filter-location" aria-hidden="true" tabindex="-1">
           <option value="" data-i18n="history.allLocations">Alle Standorte</option>
           <option value="local" data-i18n="jobs.locationLocal">Lokal</option>
@@ -422,6 +423,7 @@
           <option value="smb">SMB</option>
           <option value="storagebox" data-i18n="jobs.locationStoragebox">Storagebox</option>
         </select>
+        <label class="history-filter-field"><span data-i18n="history.status">Status</span>
         <select class="history-filter-select" id="history-filter-status">
           <option value="" data-i18n="history.allStatuses">Alle Status</option>
           <option value="success" data-i18n="history.statusSuccess">Erfolg</option>
@@ -429,6 +431,7 @@
           <option value="warning" data-i18n="history.statusWarning">Warnung</option>
           <option value="error" data-i18n="history.statusError">Fehler</option>
         </select>
+        </label>
         <span id="history-count" class="history-count-label"></span>
       </div>
 

@@ -662,10 +662,10 @@ History ist die erste Detailseite nach einem Backup-Lauf. Sie zeigt, wann ein La
 
 ### 5.2 Bereiche und Funktionen
 
-- **Standort-Sidebar:** Gruppiert Läufe nach Standort.
-- **Typ-Filter:** Filtert nach Backup-Typen.
+- **Standortleiste:** Filtert die chronologische Tabelle oberhalb des Inhalts nach Standort. Nur Standorte mit angelegten Jobs erscheinen, auch vor dem ersten Lauf. Die dezent umrahmten Zahlen zählen History-Einträge. Verliert der ausgewählte Standort seinen letzten Job, wechselt die Ansicht zu **Alle Standorte**; vorhandene Einträge bleiben dort erreichbar.
+- **Job-Filter:** Filtert nach einem angelegten Job; gleichnamige Jobs sind anhand ihres Standorts unterscheidbar.
 - **Status-Filter:** Filtert nach Erfolg, Warnung, Fehler oder übersprungenen Läufen.
-- **Tabelle:** Zeigt Datum/Zeit, Typ, Ort, Dauer, Originalgröße, deduplizierte Größe und Status.
+- **Tabelle:** Zeigt unverändert Datum/Zeit, Job, Ort, Dauer, Originalgröße, deduplizierte Größe und Status. Statusanzeigen nutzen dieselben Symbole wie Jobs, dezente Farbflächen und normale Schrift ohne Umrandung. **Übersprungen** bleibt gelb, **Fehler** zeigt ein Kreuz im Kreis. Detailbereich und Logzugriff bleiben erhalten.
 - **Detailbereich:** Kann pro Lauf aufgeklappt werden und zeigt Archiv, Repository-Daten, Check-Status, Logdatei und Fehlermeldungen.
 - **Öffnen:** Öffnet die verknüpfte Logdatei, sofern verfügbar.
 

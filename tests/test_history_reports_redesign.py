@@ -29,7 +29,7 @@ def test_history_preserves_filter_pagination_and_detail_contracts() -> None:
     script = _read("ui/js/pages/history.js")
     for element_id in (
         "history-location-list", "history-filter-type", "history-filter-location",
-        "history-filter-status", "history-content", "history-selection-count",
+        "history-filter-status", "history-content", "history-count",
     ):
         assert f'id="{element_id}"' in html
     for contract in (
@@ -40,7 +40,7 @@ def test_history_preserves_filter_pagination_and_detail_contracts() -> None:
     ):
         assert contract in script
     assert "data.location_counts" in script
-    assert "locationIcon(location)" in script
+    assert "historyOccupiedLocations(data.jobs)" in script
     assert "'custom'" not in script.split("const HISTORY_LOCATIONS", 1)[1].split(";", 1)[0]
     for obsolete_id in (
         "bericht-size-chart", "bericht-dedup-chart",

@@ -13,7 +13,9 @@ function historyLocale() {
   return window.BBUI?.components?.i18n?.getLanguage?.() === 'en' ? 'en-US' : 'de-DE';
 }
 
-/** Fetch the filtered history page and update results or show an API error. */
+/** Fetch filtered history or show an API error; reset to page one of all locations
+ * when the selected location no longer has a configured job.
+ */
 async function refreshHistory() {
   const btn = document.getElementById('history-refresh-btn');
   if (btn) btn.disabled = true;
@@ -33,6 +35,12 @@ async function refreshHistory() {
     const res  = await fetch('/api/history?' + params.toString(), { credentials: 'include' });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(apiErrorMessage(data, res.status));
+    // A removed or relocated job must not leave an invisible location filter active.
+    if (location && Array.isArray(data.jobs) && !historyOccupiedLocations(data.jobs).includes(location)) {
+      document.getElementById('history-filter-location').value = '';
+      historyState.page = 1;
+      return await refreshHistory();
+    }
     historyState.data   = data;
     historyState.loaded = true;
     renderHistory(data);
@@ -57,8 +65,6 @@ function renderHistory(data) {
   renderHistoryLocationSidebar(data);
   const countEl = document.getElementById('history-count');
   if (countEl) countEl.textContent = historyT('entryCount', { count: data.total });
-  const selectionCount = document.getElementById('history-selection-count');
-  if (selectionCount) selectionCount.textContent = historyT('entryCount', { count: data.total });
 
   const el = document.getElementById('history-content');
   if (!el) return;
@@ -107,27 +113,30 @@ function renderHistoryJobFilter(jobs) {
   filter.value = selected;
 }
 
-function historyLocationDetail(location) {
-  return historyT({ storagebox: 'locationRemote', usb: 'locationLocal', smb: 'locationNetwork', local: 'locationLocal' }[location] || 'overview');
+/** Return configured job locations in the shared order, independently of run counts.
+ * @param {object[]} jobs Unfiltered job choices supplied by the History API.
+ * @returns {string[]} Supported locations with at least one configured job.
+ */
+function historyOccupiedLocations(jobs) {
+  const occupied = new Set((jobs || []).map(job => String(job.location || '').toLowerCase()));
+  return HISTORY_LOCATIONS.filter(location => occupied.has(location));
 }
 
+/** Render the top location bar; counts describe history entries, visibility follows jobs. */
 function renderHistoryLocationSidebar(data) {
   const list = document.getElementById('history-location-list');
-  const title = document.getElementById('history-selection-title');
   const selected = document.getElementById('history-filter-location')?.value || '';
   historyState.selectedLocation = selected;
   const entries = data.entries || [];
   const counts = data.location_counts || Object.fromEntries(HISTORY_LOCATIONS.map((location) => [location, entries.filter((entry) => String(entry.location || '').toLowerCase() === location).length]));
   const allCount = Number(data.location_total ?? Object.values(counts).reduce((sum, count) => sum + Number(count || 0), 0));
-  if (title) title.textContent = selected ? historyLocationLabel(selected) : historyT('allLocations');
   if (!list) return;
-  const locations = ['all', ...HISTORY_LOCATIONS];
+  const locations = ['all', ...historyOccupiedLocations(data.jobs)];
   list.innerHTML = locations.map((location) => {
     const value = location === 'all' ? '' : location;
     const count = location === 'all' ? allCount : Number(counts[location] || 0);
     const label = location === 'all' ? historyT('allLocations') : historyLocationLabel(location);
-    const detail = location === 'all' ? historyT('overview') : historyLocationDetail(location);
-    return `<button class="ui-context-nav__item ${selected === value ? 'is-active' : ''}" data-history-location="${value}" ${selected === value ? 'aria-current="page"' : ''}><span class="location-nav-glyph history-location-icon ${location}">${locationIcon(location)}</span><span class="location-nav-copy"><strong>${escHtml(label)}</strong><small>${escHtml(detail)}</small></span><span class="ui-badge location-nav-count">${count}</span></button>`;
+    return `<button type="button" class="ui-context-nav__item ${selected === value ? 'is-active' : ''}" data-history-location="${value}" ${selected === value ? 'aria-current="page"' : ''}><span class="location-nav-copy"><strong>${escHtml(label)}</strong></span><span class="ui-badge location-nav-count">${count}</span></button>`;
   }).join('');
   list.querySelectorAll('[data-history-location]').forEach((button) => button.addEventListener('click', () => {
     const select = document.getElementById('history-filter-location');
@@ -139,8 +148,7 @@ function renderHistoryLocationSidebar(data) {
 function renderHistoryRow(e, idx) {
   if (e.entry_kind === 'restore_test_report') return renderRestoreReportRow(e, idx);
   const detailError = historyRunDetailMessage(e);
-  const statusClass = e.status === 'cancelled' ? 'warning' : e.status;
-  const statusBadge = `<span class="history-status-badge ${statusClass}">${historyStatusLabel(e.status)}</span>`;
+  const statusBadge = renderHistoryStatus(e.status);
   const locClass = e.location || '';
   const typeLabel = e.job_name || historyTypeLabel(e.backup_type);
   const rowId = `hrow-${idx}`;
@@ -218,7 +226,7 @@ function historyRunDetailMessage(entry) {
 function renderRestoreReportRow(e, idx) {
   const rowId = `hrow-${idx}`;
   const detailId = `hdetail-${idx}`;
-  const statusBadge = `<span class="history-status-badge ${e.status}">${historyStatusLabel(e.status)}</span>`;
+  const statusBadge = renderHistoryStatus(e.status);
   const locClass = e.location || '';
   const cov = Number(e.coverage_percent || 0);
   const covTxt = Number.isFinite(cov) ? `${cov.toLocaleString(historyLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` : `0${historyLocale() === 'de-DE' ? ',' : '.'}0%`;
@@ -338,6 +346,17 @@ function detailGroup(label, value, valueClass = '') {
 function renderHistoryError(message, isNotice = false) {
   const label = isNotice ? historyT('statusSkipped') : historyT('statusError');
   return `<div class="history-error-msg ${isNotice ? 'is-notice' : ''}" role="${isNotice ? 'status' : 'alert'}"><strong>${escHtml(label)}</strong><span>${escHtml(message)}</span></div>`;
+}
+
+/** Render a subtle status badge using the exact Jobs symbols and shared color tokens.
+ * @param {string} status Recorded backup or restore-test status; unknown values stay neutral.
+ * @returns {string} Escaped status label with a decorative Jobs icon.
+ */
+function renderHistoryStatus(status) {
+  const state = ({failed: 'error', unavailable: 'warning'})[status] || status;
+  const known = ['success', 'warning', 'error', 'skipped', 'cancelled', 'interrupted', 'running'].includes(state);
+  const tone = state === 'cancelled' || state === 'interrupted' ? 'warning' : known ? state : 'unknown';
+  return `<span class="history-status-badge ${tone}"><span class="job-status-icon">${jobStepIcon(known ? state : 'pending')}</span>${escHtml(historyStatusLabel(status))}</span>`;
 }
 
 function historyStatusLabel(s) {

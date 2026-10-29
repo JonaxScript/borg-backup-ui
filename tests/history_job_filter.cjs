@@ -27,7 +27,7 @@ test('History distinguishes same-name jobs and preserves IDs on refresh and lang
       }}},
       addEventListener: (name, callback) => { listeners[name] = callback; },
     },
-    document: {getElementById: id => id === 'history-filter-type' ? filter : null},
+    document: {getElementById: id => id === 'history-filter-type' ? filter : null, addEventListener() {}},
     fetch: async url => {
       requests.push(new URL(url, 'http://localhost'));
       return {ok: true, json: async () => ({jobs, entries: [], total: 0})};
@@ -36,6 +36,7 @@ test('History distinguishes same-name jobs and preserves IDs on refresh and lang
     showMsg: (_id, _severity, message) => assert.fail(message),
   });
   vm.runInContext(fs.readFileSync('ui/js/utils/format.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('ui/js/pages/jobs.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('ui/js/pages/history.js', 'utf8'), context);
 
   await context.refreshHistory();
@@ -67,6 +68,7 @@ for (const language of ['de', 'en']) {
   test(`History explains hook failures and retains safe legacy fallback (${language})`, () => {
     const labels = JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`, 'utf8'));
     const context = vm.createContext({
+      document: {addEventListener() {}},
       window: {BBUI: {components: {i18n: {
         t: (key, params = {}) => (key.split('.').reduce((v, part) => v?.[part], labels) || key)
           .replace(/\{(\w+)\}/g, (_, name) => params[name] ?? ''),
@@ -74,6 +76,7 @@ for (const language of ['de', 'en']) {
       }}}, addEventListener() {}},
     });
     vm.runInContext(fs.readFileSync('ui/js/utils/format.js', 'utf8'), context);
+    vm.runInContext(fs.readFileSync('ui/js/pages/jobs.js', 'utf8'), context);
     vm.runInContext(fs.readFileSync('ui/js/pages/history.js', 'utf8'), context);
     const generic = {status: 'error', error_message: 'token=do-not-render'};
     assert.equal(context.historyRunDetailMessage(generic), labels.history.backupFailedDetails);
