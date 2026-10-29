@@ -71,9 +71,10 @@ const {chromium} = require('playwright');
   assert(await months.evaluate(el=>el.clientHeight<=parseFloat(getComputedStyle(document.documentElement).fontSize)*11+1));
   const headingY=await months.locator('th').first().evaluate(el=>el.getBoundingClientRect().top-el.closest('.report-month-scroll').getBoundingClientRect().top);
   await months.focus();await page.keyboard.press('End');
-  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-2;});
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-0.5;});
   assert(Math.abs(await months.locator('th').first().evaluate(el=>el.getBoundingClientRect().top-el.closest('.report-month-scroll').getBoundingClientRect().top)-headingY)<2);
-  assert(await months.locator('tbody tr').last().evaluate(el=>{const box=el.getBoundingClientRect(),parent=el.closest('.report-month-scroll').getBoundingClientRect();return box.bottom<=parent.bottom+1&&box.top>=parent.top;}));
+  // End scrolling is animated by the browser; wait until the final row is fully visible.
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll tbody tr:last-child'),box=el.getBoundingClientRect(),parent=el.closest('.report-month-scroll').getBoundingClientRect();return box.bottom<=parent.bottom+1&&box.top>=parent.top;});
   await page.evaluate(()=>_berichtStatusTable(reportFixture('local-vms').monthly_status));
   assert.equal(await months.evaluate(el=>el.scrollTop),0);
   // Six months fit the large desktop page without sacrificing report sections.
@@ -85,7 +86,7 @@ const {chromium} = require('playwright');
   await page.setViewportSize({width:390,height:720});
   assert(await page.evaluate(()=>{return document.scrollingElement.scrollHeight>innerHeight;}),'Small windows retain page scrolling');
   await months.focus();await page.keyboard.press('End');
-  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-2;});
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-0.5;});
   await page.setViewportSize({width:1600,height:1100});
   await page.locator('#bericht-borginfo-btn').click();await page.waitForFunction(()=>BBUI.reportState.borgInfoLoaded);
   assert.equal(await page.locator('#bi-count').innerText(),'18');assert.equal(await page.locator('#bi-savings').innerText(),'75%');
