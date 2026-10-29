@@ -1,4 +1,13 @@
 {
+  "jobPicker": {
+    "change": "Switch job",
+    "close": "Close",
+    "cancel": "Cancel",
+    "locations": "Locations",
+    "search": "Search jobs",
+    "empty": "No matching jobs",
+    "jobs": "Jobs"
+  },
   "app": {
     "title": "Borg Backup Manager",
     "logoContext": "for Unraid"

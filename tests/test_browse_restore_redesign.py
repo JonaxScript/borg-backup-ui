@@ -17,7 +17,7 @@ def test_browse_restore_keeps_restore_workflow_and_api_contracts() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/restore.js")
     for element_id in (
-        "restore-job-list", "restore-location-list", "restore-job-sel", "restore-archive-sel",
+        "restore-source-summary", "restore-source-toggle", "restore-job-sel", "restore-archive-sel",
         "restore-archive-filter-summary",
         "restore-browser", "restore-target-path", "restore-conflict-mode",
         "restore-dry-run", "restore-preserve-owner", "restore-confirm-check",

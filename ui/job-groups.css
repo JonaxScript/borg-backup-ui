@@ -1,5 +1,5 @@
 /* Job groups reuse the Jobs/Settings surfaces and the unchanged themed log. */
-.job-view-tabs { margin-bottom: 16px; }
+#job-groups-pane { margin-top: 16px; }
 .job-group-membership { margin: 7px 0; font-size: 12px; color: var(--text-muted); }
 .job-group-link { border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
 .job-group-link:hover { text-decoration: underline; }

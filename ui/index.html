@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="/ui/design-system.css">
   <link rel="stylesheet" href="/ui/dashboard-jobs.css">
   <link rel="stylesheet" href="/ui/job-groups.css">
+  <link rel="stylesheet" href="/ui/job-picker.css">
   <link rel="stylesheet" href="/ui/history-reports.css">
   <link rel="stylesheet" href="/ui/restore-tests-redesign.css">
   <link rel="stylesheet" href="/ui/browse-restore-redesign.css">
@@ -457,20 +458,11 @@
       </div>
 
       <div class="report-layout ui-context-layout">
-        <section class="report-navigation" data-i18n-aria-label="reports.selection" aria-label="Selection">
-          <div class="report-location-row">
-            <span class="report-navigation-label" data-i18n="jobs.locations">Standorte</span>
-            <nav id="report-location-list" class="report-location-list" data-i18n-aria-label="jobs.locations" aria-label="Standorte"></nav>
-            <label class="report-search"><span data-i18n="reports.search">Search</span><input id="report-job-search" type="search" data-i18n-placeholder="reports.searchPlaceholder" placeholder="Search jobs"></label>
-          </div>
-          <div class="report-job-row">
-            <span class="report-navigation-label" data-i18n="reports.jobs">Backup jobs</span>
-            <nav id="report-job-list" class="report-job-list" data-i18n-aria-label="reports.jobs" aria-label="Backup jobs"></nav>
-          </div>
+        <section class="report-navigation job-context" data-i18n-aria-label="reports.selection" aria-label="Selection">
+          <div class="job-context-identity"><span id="report-selection-icon"></span><div><h2 id="report-selection-title"></h2><span id="report-selection-subtitle"></span></div></div>
+          <button type="button" id="report-source-toggle" class="btn btn-secondary btn-sm" aria-haspopup="dialog" data-i18n="jobPicker.change">Job wechseln</button>
         </section>
         <section class="report-workspace ui-workspace">
-          <header class="ui-workspace-header"><div class="ui-workspace-header__title"><small data-i18n="reports.analysis">Analysis</small><h2 id="report-selection-title" data-i18n="reports.noJobSelected">No job selected</h2><span id="report-selection-subtitle" class="ui-workspace-header__subtitle" data-i18n="reports.workspaceSubtitle">Exact run, growth, and repository values</span></div></header>
-
       <div id="bericht-msg" class="status-message hidden"></div>
 
       <div id="bericht-empty" class="page-empty-state">
@@ -624,15 +616,9 @@
       </div>
 
       <div id="restore-wizard" class="restore-redesign-layout" style="display:none">
-        <section class="restore-job-navigation" data-i18n-aria-label="restore.backupJobs" aria-label="Backup jobs">
-          <div class="restore-source-summary">
-            <span id="restore-source-summary" aria-live="polite"></span>
-            <button type="button" id="restore-source-toggle" class="btn btn-secondary btn-sm" data-restore-source-toggle aria-expanded="false" aria-controls="restore-source-choices" data-i18n="restore.changeSource">Auswahl ändern</button>
-          </div>
-          <div id="restore-source-choices" class="restore-source-choices">
-            <div class="restore-location-row"><span data-i18n="jobs.locations">Standorte</span><nav id="restore-location-list" data-i18n-aria-label="jobs.locations" aria-label="Standorte"></nav></div>
-            <div class="restore-job-row"><span data-i18n="restore.job">Job</span><nav id="restore-job-list" data-i18n-aria-label="restore.selectJob" aria-label="Job auswählen"></nav></div>
-          </div>
+        <section class="restore-job-navigation job-context" data-i18n-aria-label="restore.backupJobs" aria-label="Backup jobs">
+          <div id="restore-source-summary" class="job-context-identity" aria-live="polite"></div>
+          <button type="button" id="restore-source-toggle" class="btn btn-secondary btn-sm" data-restore-source-toggle aria-haspopup="dialog" aria-expanded="false" data-i18n="jobPicker.change">Job wechseln</button>
           <label for="restore-job-sel" class="form-label form-label-required restore-native-job"><span class="form-required-marker" aria-hidden="true">*</span><span data-i18n="restore.selectJob">Job auswählen</span></label>
           <select id="restore-job-sel" class="restore-native-job" tabindex="-1" aria-hidden="true"><option value="" data-i18n="restore.chooseJob">— Job wählen —</option></select>
         </section>

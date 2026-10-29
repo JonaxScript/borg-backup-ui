@@ -53,6 +53,7 @@
     '/ui/js/components/log-viewer.js',
     '/ui/js/components/activity-log.js',
     '/ui/js/components/modal.js',
+    '/ui/js/components/job-picker.js',
     '/ui/js/components/schedule-modal.js',
     '/ui/js/components/toast.js',
     '/ui/js/components/app-bindings.js',

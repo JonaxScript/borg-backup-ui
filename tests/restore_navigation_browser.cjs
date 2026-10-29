@@ -11,7 +11,8 @@ const {chromium} = require('playwright');
  let html=fs.readFileSync('ui/index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
  html=html.replace(/<link[^>]+href="\/([^\"]+)"[^>]*>/g,(_,path)=>path.endsWith('.css')?`<style>${fs.readFileSync(path,'utf8')}</style>`:'');
  html=html.replace('src="/ui/assets/app-icon.png"',`src="data:image/png;base64,${fs.readFileSync('ui/assets/app-icon.png').toString('base64')}"`);
- await page.setContent(html);
+ await page.route('http://bbui.test/',route=>route.fulfill({contentType:'text/html',body:html}));
+ await page.goto('http://bbui.test/');
  await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});
  await page.evaluate(dicts=>{
   window.lang='de';window.dicts=dicts;
@@ -48,7 +49,7 @@ const {chromium} = require('playwright');
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-restore'));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page==='restore'));
  },Object.fromEntries(['de','en'].map(l=>[l,JSON.parse(fs.readFileSync(`ui/i18n/${l}.json`))])));
- for(const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/pages/jobs.js','ui/js/pages/settings.js','ui/js/pages/restore.js'])await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
+ for(const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/pages/jobs.js','ui/js/pages/settings.js','ui/js/components/job-picker.js','ui/js/pages/restore.js'])await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
  await page.evaluate(()=>{
   for(const [id,event,fn] of [
    ['restore-wizard','click',onRestoreRedesignClick],['restore-step-next-btn','click',restoreStepNext],['restore-step-back-btn','click',restoreStepBack],
@@ -63,12 +64,14 @@ const {chromium} = require('playwright');
  const capture=async name=>{if(process.env.BBUI_SCREENSHOT_DIR){fs.mkdirSync(process.env.BBUI_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/${name}.png`,fullPage:true});}};
  for(const language of ['de','en'])for(const theme of ['light','dark']){
   await page.setViewportSize({width:1600,height:1100});
-  await page.evaluate(async({language,theme})=>{lang=language;translate();document.documentElement.dataset.theme=theme;BBUI.restoreState.job='';BBUI.restoreState.view='wizard';await restoreInit();},{language,theme});
-  assert.deepEqual(await page.locator('[data-restore-location]').evaluateAll(es=>es.map(e=>e.dataset.restoreLocation)),['local','usb','storagebox']);
+  await page.evaluate(async({language,theme})=>{localStorage.clear();lang=language;translate();document.documentElement.dataset.theme=theme;BBUI.restoreState.job='';BBUI.restoreState.view='wizard';await restoreInit();},{language,theme});
+  await page.locator('#restore-source-toggle').click();
+  assert.deepEqual(await page.locator('[data-picker-location]').evaluateAll(es=>es.map(e=>e.dataset.pickerLocation)),['local','usb','storagebox']);
   assert.equal(await page.locator('#restore-stepper button').count(),4);
-  assert.equal(await page.locator('[data-restore-location=local] .location-nav-count').innerText(),'2');
-  assert.equal(await page.locator('[data-restore-location=local] .location-nav-count').evaluate(e=>getComputedStyle(e).borderTopWidth),'1px');
-  assert.equal(await page.locator('[data-restore-job=local-app][aria-pressed=true]').count(),1);
+  assert.equal(await page.locator('[data-picker-location=local] .location-nav-count').innerText(),'2');
+  assert.equal(await page.locator('[data-picker-location=local] .location-nav-count').evaluate(e=>getComputedStyle(e).borderTopWidth),'1px');
+  assert.equal(await page.locator('[data-picker-job=local-app][aria-pressed=true]').count(),1);
+  await page.keyboard.press('Escape');
   const footer=await page.locator('.restore-wizard-actions').evaluate(e=>e.getBoundingClientRect().top+scrollY);
   await capture(`restore-archive-${language}-${theme}`);
   await page.locator('[data-restore-step="5"]').click();
@@ -94,16 +97,22 @@ const {chromium} = require('playwright');
   assert.ok(Math.abs((await page.locator('.restore-wizard-actions').evaluate(e=>e.getBoundingClientRect().top+scrollY))-footer)<2,'Stable wizard footer');
   await capture(`restore-review-${language}-${theme}`);
   // Location filtering does not discard the existing draft. Switching job does.
-  await page.locator('[data-restore-location=usb]').click();
+  await page.locator('#restore-source-toggle').click();
+  await page.locator('[data-picker-location=usb]').click();
   assert.equal(await page.evaluate(()=>BBUI.restoreState.job),'local-app');
-  await page.locator('[data-restore-job=usb-app]').click();
+  await page.locator('[data-picker-job=usb-app]').click();
+  await page.waitForFunction(()=>document.getElementById('settings-dialog-cancel-btn')===document.activeElement);
   await page.locator('#settings-dialog-cancel-btn').click();
   assert.equal(await page.evaluate(()=>BBUI.restoreState.job),'local-app');
-  await page.locator('[data-restore-job=usb-app]').click();
+  await page.locator('#restore-source-toggle').click();
+  await page.locator('[data-picker-location=usb]').click();
+  await page.locator('[data-picker-job=usb-app]').click();
   await page.locator('#settings-dialog-confirm-btn').click();
   await page.waitForFunction(()=>BBUI.restoreState.job==='usb-app'&&!BBUI.restoreState.changingJob);
   assert.equal(await page.evaluate(()=>BBUI.restoreState.step),2);
   assert.equal(await page.evaluate(()=>BBUI.restoreState.archive),'');
+  await page.evaluate(async()=>{BBUI.restoreState.job='';await restoreInit();});
+  assert.equal(await page.evaluate(()=>BBUI.restoreState.job),'usb-app');
   assert.equal(await page.locator('#restore-target-path').inputValue(),'/mnt/user/');
   assert.equal(await page.locator('#restore-conflict-mode').inputValue(),'skip');
   assert.equal(await page.locator('#restore-preserve-owner').isChecked(),false);
@@ -118,10 +127,11 @@ const {chromium} = require('playwright');
   assert.equal(await page.evaluate(()=>BBUI.restoreState.job),'usb-app');
   for(const width of [390,768,1024]){
    await page.setViewportSize({width,height:1000});
-   if (!(await page.locator('[data-restore-location=storagebox]').isVisible())) await page.locator('#restore-source-toggle').click();
-   await page.locator('[data-restore-location=storagebox]').click();
+   if (!(await page.locator('[data-picker-location=storagebox]').isVisible())) await page.locator('#restore-source-toggle').click();
+   await page.locator('[data-picker-location=storagebox]').click();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Overflow at ${width}`);
    if(width===390)await capture(`restore-mobile-${language}-${theme}`);
+   await page.keyboard.press('Escape');
   }
  }
  // Long plans must never push the existing confirmation/start controls off screen (#633).
@@ -161,9 +171,9 @@ const {chromium} = require('playwright');
     const source=await page.locator('#restore-source-summary').innerText();
     await page.locator('#restore-source-toggle').click();
     assert.ok((await page.locator('#restore-start-btn').boundingBox()).y < height, 'Expanded source picker keeps actions visible');
-    await page.locator('[data-restore-location=local]').click();
+    await page.locator('[data-picker-location=local]').click();
     assert.equal(await page.locator('#restore-source-summary').innerText(),source,'Filtering must not change source summary');
-    await page.locator('#restore-source-toggle').click();
+    await page.keyboard.press('Escape');
    }
   }
  }
@@ -191,7 +201,7 @@ const {chromium} = require('playwright');
  await page.locator('#restore-confirm-check').check();await page.locator('#restore-start-btn').click();
  await page.waitForFunction(()=>!!BBUI.restoreState.confirmResolver);await page.evaluate(()=>closeRestoreConfirmModal(true));
  await page.waitForFunction(()=>BBUI.restoreState.activeRestoreId==='run-1');
- assert.equal(await page.locator('[data-restore-job]').first().isDisabled(),true);
+ assert.equal(await page.locator('#restore-source-toggle').isDisabled(),true);
  assert.equal(await page.locator('#restore-start-btn').isVisible(),false);
  assert.equal(await page.locator('#restore-footer-confirm').isVisible(),false);
  assert.equal(await page.locator('#restore-step-back-btn').isDisabled(),true);
