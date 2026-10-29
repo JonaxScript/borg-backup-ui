@@ -124,3 +124,40 @@ def test_existing_file_and_directory_sources_keep_valid_job_behavior(
     job.check_prerequisites()
 
     assert config.borg_cache_dir.is_dir()
+
+
+@pytest.mark.parametrize('paths,reason', [
+    (['/mnt/disks/USB/photos'], 'source_disk_not_mounted'),
+    (['/mnt/remotes/server_share/data'], 'source_remote_not_mounted'),
+    (['/mnt/disks/USB', '/mnt/remotes/server_share'], 'source_mounts_not_mounted'),
+])
+def test_absent_ud_sources_skip_entire_local_target_job(tmp_path, monkeypatch, paths, reason):
+    from runtime.lib import source_availability
+    monkeypatch.setattr(source_availability, '_read_mounts', lambda: [])
+    config = _config(tmp_path, [Path(path) for path in paths] + [tmp_path])
+    config.borg_repo = str(tmp_path / 'repository')
+    manager = _RuntimeManager()
+    def reject_borg(*args, **kwargs):
+        raise AssertionError('No Borg operation is allowed for an unmounted source')
+    monkeypatch.setattr('runtime.lib.backup_job.subprocess.run', reject_borg)
+    with pytest.raises(SystemExit) as caught:
+        _run_validation(config, manager)
+    assert caught.value.code == 0
+    assert manager.stop_calls == 0
+    payload = json.loads(next(config.status_dir.glob('*.status')).read_text())
+    assert payload['status'] == 'skipped'
+    assert payload['exit_code'] == 0
+    assert payload['skip_reason_code'] == reason
+    assert payload['location'] == 'local'
+    assert config.backup_paths == [Path(path) for path in paths] + [tmp_path]
+
+
+def test_unmounted_source_does_not_hide_missing_required_source(tmp_path, monkeypatch):
+    from runtime.lib import source_availability
+    monkeypatch.setattr(source_availability, '_read_mounts', lambda: [])
+    missing = tmp_path / 'missing'
+    with pytest.raises(RequiredSourcePathsMissing) as caught:
+        _run_validation(_config(tmp_path, [Path('/mnt/disks/USB'), missing]), _RuntimeManager())
+    assert caught.value.missing_paths == [missing]
+    payload = json.loads(next((tmp_path / 'status').glob('*.status')).read_text())
+    assert payload['status'] == 'error'

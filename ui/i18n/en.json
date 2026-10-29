@@ -1390,7 +1390,10 @@
       "parity_active": "The backup was skipped because a parity operation is running.",
       "usb_not_mounted": "The backup was skipped because the USB target is not mounted.",
       "usb_not_writable": "The backup was skipped because the USB target is not writable.",
-      "skipped": "The backup run was skipped."
+      "skipped": "The backup run was skipped.",
+      "source_disk_not_mounted": "Source drive is not mounted. Entire backup skipped.",
+      "source_remote_not_mounted": "Network source is not mounted. Entire backup skipped.",
+      "source_mounts_not_mounted": "Source drive or network source is not mounted. Entire backup skipped."
     },
     "source": "Source",
     "compressed": "Compressed",
@@ -3425,7 +3428,9 @@
         "storage_profile_not_found": "Storage profile '{profile}' not found",
         "ssh_key_file_missing": "SSH key file not found",
         "storage_profile_incomplete": "Storage profile is incomplete",
-        "exclusion_file_invalid": "Exclusions are invalid or the exclusion file is missing or corrupt."
+        "exclusion_file_invalid": "Exclusions are invalid or the exclusion file is missing or corrupt.",
+        "source_mounts_not_mounted": "Source is currently not mounted: {paths}. Backups are skipped until it is mounted.",
+        "source_inspection_failed": "Sources could not be inspected. Check mounts and access permissions."
       },
       "registryJobsDirTitle": "Job metadata directory",
       "registryJobsDirPresent": "The job metadata directory exists.",

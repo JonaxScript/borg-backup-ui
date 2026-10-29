@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import sys
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -344,3 +345,36 @@ def test_collect_job_health_loads_canonical_inventory_once_for_all_jobs(tmp_path
 
     assert health["summary"] == {"total": 3, "ok": 3, "failed": 0, "warnings": 0}
     assert loads == [True]
+
+
+@pytest.mark.parametrize('mode,state,code', [
+    ('unmounted', 'warn', 'source_mounts_not_mounted'),
+    ('mounted_missing', 'bad', 'source_paths_not_found'),
+    ('inspection_error', 'bad', 'source_inspection_failed'),
+])
+def test_ud_source_health_separates_availability_from_configuration(tmp_path, monkeypatch, mode, state, code):
+    import repository_context
+    from runtime.lib import source_availability
+    from runtime.lib.usb_storage import Mount
+    jobs_dir = tmp_path / 'jobs'
+    jobs_dir.mkdir()
+    source = Path('/mnt/disks/Absent-Health-Test-639/photos')
+    (jobs_dir / 'portableapps.json').write_text(json.dumps({
+        'schema_version': 3, 'job_key': 'portableapps', 'name': 'Portableapps',
+        'location': 'local', 'repository_key': 'portableapps', 'source_paths': [str(source)],
+    }))
+    monkeypatch.setattr(repository_context, 'load_repository_inventory', lambda _: {})
+    monkeypatch.setattr(repository_context, 'resolve_job_repository_context', lambda *args, **kwargs: {'location': 'local'})
+    def mounts():
+        if mode == 'inspection_error':
+            raise OSError('Mount table unavailable')
+        return [Mount(source.parent, 'ext4', False)] if mode == 'mounted_missing' else []
+    monkeypatch.setattr(source_availability, '_read_mounts', mounts)
+    health = _collect_job_health({'BACKUP_SCRIPTS_DIR': str(tmp_path)}, jobs_dir)
+    item = health['items'][0]
+    assert item['state'] == state
+    assert item['location'] == 'local'
+    details = item['warning_details'] if state == 'warn' else item['error_details']
+    assert details[0]['code'] == code
+    assert health['summary']['failed'] == (state == 'bad')
+    assert health['summary']['warnings'] == (state == 'warn')

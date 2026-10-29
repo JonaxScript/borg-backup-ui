@@ -316,6 +316,7 @@ class BackupJob:
         self._final_sent: bool = False
         self._skip_finish: bool = False
         self._skip_reason: str = ""
+        self._skip_reason_code: str = ""
         self._skip_status_written: bool = False
         self._failure_code: str = ""
         self._cancelled: bool = False
@@ -810,13 +811,18 @@ class BackupJob:
         Prüft Backup-Voraussetzungen: Pfade, borg-Installation, Cache-Verzeichnis.
 
         Lock-File wird NICHT hier erstellt – das übernimmt __enter__.
-        Fehlende Backup-Pfade brechen den Lauf vor Docker/VM und Borg ab.
+        Fehlende UD-Quellmounts speichern den Skip-Grund und beenden mit
+        SystemExit(0). Andere fehlende Backup-Pfade loesen
+        RequiredSourcePathsMissing aus; Mount-/Zugriffsfehler bleiben OSError.
+        Die Pruefung erfolgt vor Docker/VM und Borg.
         """
         _log_section("PHASE 1: VALIDATION")
         logger.info("Validating prerequisites...")
 
         logger.info("  [1/3] Checking backup paths...")
-        missing = [p for p in self.config.backup_paths if not p.exists()]
+        from .source_availability import inspect_backup_sources
+        availability = inspect_backup_sources(self.config.backup_paths)
+        missing = availability.missing
         existing_count = len(self.config.backup_paths) - len(missing)
         if missing:
             logger.error("  ERROR: %d required source path(s) do not exist:", len(missing))
@@ -826,6 +832,18 @@ class BackupJob:
                 "  Backup aborted before Docker, VMs, borg create, prune, or compact."
             )
             raise RequiredSourcePathsMissing(missing)
+        if availability.unmounted:
+            roots = availability.unmounted
+            kinds = {path.parts[2] for path in roots}
+            self._skip_reason_code = (
+                "source_disk_not_mounted" if kinds == {"disks"} else
+                "source_remote_not_mounted" if kinds == {"remotes"} else
+                "source_mounts_not_mounted"
+            )
+            self._skip_reason = "Backup source mount(s) are not mounted: " + ", ".join(map(str, roots))
+            logger.info("%s. Entire backup skipped before service changes or Borg.", self._skip_reason)
+            self._persist_skip_status_once()
+            raise SystemExit(0)
         logger.info(
             "  OK - %d/%d paths found", existing_count, len(self.config.backup_paths)
         )
@@ -1171,7 +1189,9 @@ class BackupJob:
         duration = max(0, int(time.time() - self._start_time))
         reason = self._skip_reason or "Backup was skipped"
         reason_low = reason.lower()
-        if reason_low.startswith("resource locked"):
+        if self._skip_reason_code:
+            reason_code = self._skip_reason_code
+        elif reason_low.startswith("resource locked"):
             reason_code = "resource_lock_unavailable"
         elif reason_low.startswith("parity operation active"):
             reason_code = "parity_active"

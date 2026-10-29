@@ -205,6 +205,12 @@ def _build_migration_summary(migration: Dict[str, Any], migration_log: Dict[str,
 
 
 def _collect_job_health(config: dict, jobs_dir: Path) -> Dict[str, Any]:
+    """Report job configuration errors and transient source availability warnings.
+
+    UD mounts are inspected without mounting devices or running hooks. Missing
+    mounts produce localized warning details; mounted missing paths and inspection
+    failures remain errors. Repository location still describes the target.
+    """
     items = []
     if jobs_dir.is_dir():
         job_files = sorted(jobs_dir.glob("*.json"))
@@ -240,6 +246,7 @@ def _collect_job_health(config: dict, jobs_dir: Path) -> Dict[str, Any]:
         errors: list[str] = []
         error_details: list[dict] = []
         warnings: list[str] = []
+        warning_details: list[dict] = []
 
         def add_error(code: str, message: str, **params: Any) -> None:
             errors.append(message)
@@ -274,11 +281,19 @@ def _collect_job_health(config: dict, jobs_dir: Path) -> Dict[str, Any]:
             source_paths = normalize_source_paths(raw.get("source_paths"), field=f"Job '{job_key}' source_paths", allow_empty=bool(raw.get("database_profile_ids")))
             from database_profiles import snapshot_profiles
             snapshot_profiles(config, raw.get("database_profile_ids"))
-            missing = [p for p in source_paths if not Path(p).exists()]
+            from runtime.lib.source_availability import inspect_backup_sources
+            availability = inspect_backup_sources(Path(p) for p in source_paths)
+            missing = availability.missing
+            if availability.unmounted:
+                paths = ", ".join(map(str, availability.unmounted))
+                warnings.append(f"Backup source mount(s) are not mounted: {paths}")
+                warning_details.append({"code": "source_mounts_not_mounted", "params": {"paths": paths}})
             if missing:
                 add_error("source_paths_not_found", f"{len(missing)} source path(s) do not exist", count=len(missing))
         except ValueError as exc:
             add_error("source_paths_invalid", str(exc), message=str(exc))
+        except OSError:
+            add_error("source_inspection_failed", "Backup sources could not be inspected; check mount and access permissions")
 
         if repository_context and location == "storagebox":
             storage = repository_context.get("storage") if isinstance(repository_context.get("storage"), dict) else {}
@@ -297,6 +312,7 @@ def _collect_job_health(config: dict, jobs_dir: Path) -> Dict[str, Any]:
             "errors": errors,
             "error_details": error_details,
             "warnings": warnings,
+            "warning_details": warning_details,
         })
 
     failed = sum(1 for item in items if item.get("state") == "bad")
