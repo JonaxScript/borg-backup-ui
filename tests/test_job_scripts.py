@@ -23,6 +23,8 @@ from lib.status import BackupStatus
 from job_fixtures import job_id
 from test_runtime_before_maintenance import run_backup
 
+SOURCE_PREREQUISITES = BackupJob.check_prerequisites
+
 
 def script(content='exit 0', **overrides):
     """Return an execution definition with a bounded timeout."""
@@ -239,6 +241,63 @@ def test_skip_waits_for_post_before_persisting(run_backup, monkeypatch):
     assert state.run() == 0
     assert state.actions.index('post') < state.actions.index('save_skip')
     assert state.phases[-1][0] == 'skipped'
+
+
+@pytest.mark.parametrize('mount_in_pre,mode,post_exit', [
+    (False, 'always', 0), (False, 'success', 0),
+    (False, 'always', 42), (True, 'always', 0),
+])
+def test_real_source_check_follows_pre_and_preserves_post_semantics(
+    run_backup, monkeypatch, mount_in_pre, mode, post_exit,
+):
+    from lib import source_availability
+    from lib.usb_storage import Mount
+    import database_backup
+
+    state = run_backup
+    configure_hooks(monkeypatch, state, mode=mode, post=post_exit)
+    source = Path('/mnt/remotes/restore-source-639/data')
+    state.config.backup_paths = [source]
+    monkeypatch.setattr(BackupJob, 'check_prerequisites', SOURCE_PREREQUISITES)
+    mounted = []
+    monkeypatch.setattr(source_availability, '_read_mounts', lambda: mounted)
+    original_hook = job_scripts.run_hook
+
+    def hook(definition, phase, *args, **kwargs):
+        result = original_hook(definition, phase, *args, **kwargs)
+        if phase == 'pre' and mount_in_pre:
+            mounted.append(Mount(source.parent, 'cifs', True))
+        return result
+
+    monkeypatch.setattr(job_scripts, 'run_hook', hook)
+    original_stat, original_resolve = Path.stat, Path.resolve
+    monkeypatch.setattr(Path, 'stat', lambda self, *a, **kw:
+                        object() if self == source else original_stat(self, *a, **kw))
+    monkeypatch.setattr(Path, 'resolve', lambda self, *a, **kw:
+                        self if self == source else original_resolve(self, *a, **kw))
+    monkeypatch.setattr('lib.backup_job.shutil.which', lambda name: '/usr/bin/' + name)
+    monkeypatch.setattr('lib.backup_job.subprocess.run', lambda *a, **kw: SimpleNamespace(stdout='borg 1.4.5\n'))
+    monkeypatch.setattr(BackupJob, '_send_notification_event', lambda *_: None)
+    saved = []
+    monkeypatch.setattr(BackupJob, '_save_skip_status', lambda job:
+                        saved.append(job._skip_reason_code) or state.actions.append('save_skip'))
+
+    def unexpected_export(*args, **kwargs):
+        raise AssertionError('No database exports for a skipped source')
+
+    monkeypatch.setattr(database_backup, 'export_profiles', unexpected_export)
+    assert state.run() == (2 if post_exit else 0)
+    assert state.actions[0] == 'pre'
+    assert ('post' in state.actions) == (mode == 'always' or mount_in_pre)
+    if mount_in_pre:
+        assert 'create' in state.actions and 'compact' in state.actions
+        assert not saved
+    else:
+        assert not {'stop_docker', 'stop_vms', 'create', 'prune', 'compact', 'repo_info'} & set(state.actions)
+        assert state.phases[-1][0] == ('failed' if post_exit else 'skipped')
+        assert saved == ([] if post_exit else ['source_remote_not_mounted'])
+        if not post_exit and mode == 'always':
+            assert state.actions.index('post') < state.actions.index('save_skip')
 
 
 def test_status_roundtrip_retains_hook_outcomes(tmp_path):

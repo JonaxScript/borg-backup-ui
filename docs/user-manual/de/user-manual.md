@@ -1646,6 +1646,12 @@ Ein vorhandenes, aber leeres Quellverzeichnis ist technisch gültig. Prüfen Sie
 
 Fehlt ein konfigurierter Quellpfad, bricht Borg-Backup-UI den Lauf ab. Dadurch wird kein scheinbar erfolgreiches, aber unvollständiges Archiv erzeugt.
 
+Bei Quellen unter `/mnt/disks/<Name>` oder `/mnt/remotes/<Name>` prüft die Anwendung den tatsächlichen Mount von Unassigned Devices. Ist dieser nicht eingebunden, wird der **gesamte Lauf übersprungen**; ein zurückgebliebenes leeres Mount-Verzeichnis reicht nicht aus. Das gilt auch für ausgewählte Unterordner und für Jobs mit weiteren Quellen. Es werden keine Datenbankexporte, Docker-/VM-Stopps, Archive oder Aufbewahrungsaktionen ausgeführt. Das Speicherziel des Jobs bleibt unverändert, beispielsweise **Lokal**.
+
+Die Prüfung erfolgt nach einem erfolgreichen Pre-Skript, sodass dieses die Quelle einbinden kann. Ein Post-Skript mit **Immer** wird auch beim Überspringen ausgeführt; schlägt es fehl, bleibt der Lauf ein Fehler. Lesbar eingebundene Quellen dürfen schreibgeschützt sein. Fehlt auf einem eingebundenen Medium der ausgewählte Pfad, fehlt eine normale lokale Quelle oder scheitert die Mount-/Zugriffsprüfung, bleibt dies ein Fehler. Die Prüfung schützt nicht vor dem Abziehen eines Mediums während des Backups.
+
+Unter **Einstellungen > Systemzustand & Migration** erscheint eine nicht eingebundene Quelle als Verfügbarkeitshinweis statt als fehlerhafte Job-Konfiguration. Die Prüfung dort führt keine Skripte aus und bindet nichts ein. Historische Fehler bleiben erhalten; erst ein neuer Lauf erhält den passenden aktuellen Status.
+
 ### 13.2 Repository-Lock oder SSH-Verbindungsabbruch
 
 Ein Lock bedeutet meistens, dass ein anderer Borg-Prozess das Repository verwendet oder eine vorherige Verbindung nicht sauber beendet wurde. Borg-Backup-UI wartet begrenzt auf den Lock. Prüfen Sie vor jeder manuellen Lock-Entfernung:

@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Unassigned Devices backup sources (#639)
+
+- Inspect exact source mount roots in the kernel mount table after Pre hooks. Skip the whole job for absent `/mnt/disks/<name>` and `/mnt/remotes/<name>` mounts, retaining the target location and preventing partial archives and maintenance.
+- Share the read-only inspection with System Health: unavailable mounts are warnings; mounted missing paths, ambiguous mounts, escaping symlinks and inspection errors remain failures. Preserve Post-always cleanup and historical outcomes.
+- Cover read-only mounts, leftover mount directories, mixed source failures, lifecycle ordering and bilingual status messages. Physical Unraid device verification remains a maintainer test.
+
 ## Pending - Repository management cards (#621)
 
 - Stabilize archive/browser pane geometry across selection, folder contents, loading, errors, and close; keep pagination controls anchored on desktop and mobile.

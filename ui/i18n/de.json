@@ -1390,7 +1390,10 @@
       "parity_active": "Backup wurde wegen einer laufenden Parity-Operation übersprungen.",
       "usb_not_mounted": "Backup wurde übersprungen, weil das USB-Ziel nicht eingehängt ist.",
       "usb_not_writable": "Backup wurde übersprungen, weil das USB-Ziel nicht beschreibbar ist.",
-      "skipped": "Backup-Lauf wurde übersprungen."
+      "skipped": "Backup-Lauf wurde übersprungen.",
+      "source_disk_not_mounted": "Quelllaufwerk nicht eingebunden. Lauf vollständig übersprungen.",
+      "source_remote_not_mounted": "Netzwerkquelle nicht eingebunden. Lauf vollständig übersprungen.",
+      "source_mounts_not_mounted": "Quelllaufwerk oder Netzwerkquelle nicht eingebunden. Lauf vollständig übersprungen."
     },
     "source": "Quelle",
     "compressed": "Komprimiert",
@@ -3425,7 +3428,9 @@
         "storage_profile_not_found": "Storage-Profil '{profile}' nicht gefunden",
         "ssh_key_file_missing": "SSH-Key-Datei nicht vorhanden",
         "storage_profile_incomplete": "Storage-Profil ist unvollständig",
-        "exclusion_file_invalid": "Ausschlüsse sind ungültig oder die Ausschlussdatei fehlt bzw. ist beschädigt."
+        "exclusion_file_invalid": "Ausschlüsse sind ungültig oder die Ausschlussdatei fehlt bzw. ist beschädigt.",
+        "source_mounts_not_mounted": "Quelle derzeit nicht eingebunden: {paths}. Backups werden bis zum Einbinden übersprungen.",
+        "source_inspection_failed": "Quellen konnten nicht geprüft werden. Mounts und Zugriffsrechte prüfen."
       },
       "registryJobsDirTitle": "Job-Metadaten-Verzeichnis",
       "registryJobsDirPresent": "Job-Metadaten-Verzeichnis ist vorhanden.",

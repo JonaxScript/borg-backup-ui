@@ -1625,6 +1625,12 @@ An existing but empty source directory is technically valid. Do not rely on the 
 
 If a configured source path is missing, Borg-Backup-UI stops the run. This prevents an apparently successful but incomplete archive.
 
+For sources below `/mnt/disks/<Name>` or `/mnt/remotes/<Name>`, the application checks the actual Unassigned Devices mount. If it is not mounted, the **entire run is skipped**; a leftover empty mount directory is not sufficient. This also applies to selected subfolders and jobs with additional sources. No database exports, Docker/VM stops, archives, or retention actions are performed. The job's target location stays unchanged, for example **Local**.
+
+The check runs after a successful Pre script, allowing that script to mount the source. A Post script set to **Always** also runs when the backup is skipped; if it fails, the run is an error. Readable sources may be mounted read-only. A selected path missing on a mounted device, a missing ordinary local source, or a mount/access inspection failure remains an error. The check cannot protect against unplugging a device during backup.
+
+Under **Settings > System health & migration**, an unmounted source appears as an availability warning instead of a failed job configuration. That check does not run scripts or mount anything. Historical errors remain unchanged; a new run receives the appropriate current status.
+
 ### 13.2 Repository Lock or SSH Disconnect
 
 A lock normally means that another Borg process is using the repository or that a previous connection did not close cleanly. Borg-Backup-UI waits for a limited time. Before removing any lock manually, verify:

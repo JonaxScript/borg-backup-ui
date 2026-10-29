@@ -1720,7 +1720,11 @@ function _renderJobHealthProblems(items) {
         return code ? settingsT(`health.jobErrors.${code}`, row?.params || {}) : '';
       }).filter(Boolean)
       : errors;
-    const details = localizedErrors.concat(warnings).map((v) => String(v || '').trim()).filter(Boolean).join(' · ');
+    const warningDetails = Array.isArray(item?.warning_details) ? item.warning_details : [];
+    const localizedWarnings = warningDetails.length
+      ? warningDetails.map(row => settingsT(`health.jobErrors.${row.code}`, row.params || {}))
+      : warnings;
+    const details = localizedErrors.concat(localizedWarnings).map((v) => String(v || '').trim()).filter(Boolean).join(' · ');
     return `
       <div class="migration-action-row ${escHtml(String(item?.state || 'bad'))}">
         <div>
