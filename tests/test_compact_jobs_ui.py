@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize('script', ['compact_jobs_browser.cjs', 'job_workflow_browser.cjs', 'dashboard_overview_browser.cjs', 'restore_test_evidence_browser.cjs', 'history_layout_browser.cjs', 'reports_navigation_browser.cjs', 'restore_navigation_browser.cjs'])
+@pytest.mark.parametrize('script', ['compact_jobs_browser.cjs', 'job_workflow_browser.cjs', 'dashboard_overview_browser.cjs', 'restore_test_evidence_browser.cjs', 'history_layout_browser.cjs', 'reports_navigation_browser.cjs', 'job_picker_browser.cjs', 'restore_navigation_browser.cjs'])
 def test_compact_jobs_browser(script):
     """Exercise the actual renderers when optional Node/Playwright/Chromium tools exist."""
     if not shutil.which('node'):

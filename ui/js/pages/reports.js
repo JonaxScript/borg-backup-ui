@@ -10,11 +10,11 @@ function reportsT(key, params = {}) {
 // BERICHTE PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** Load report-capable jobs and populate the shared location/job navigation; retain a valid selection. */
+/** Load report-capable jobs and populate the shared location/job picker; retain a valid selection. */
 async function berichtInit() {
   const sel = document.getElementById('bericht-job-sel');
   if (!sel) return;
-  const previousKey = sel.value;
+  const previousKey = sel.value || window.BBUI.components?.jobPicker?.recalled('reports') || '';
   const initRequest = reportState.initRequest = (reportState.initRequest || 0) + 1;
   reportState.loadRequest = (reportState.loadRequest || 0) + 1;
   reportState.data = null;
@@ -59,11 +59,6 @@ async function berichtInit() {
     if (!available.includes(reportState.location)) reportState.location = available[0] || null;
     _berichtSelectLocationJob(previousKey);
     _berichtRenderNavigation();
-    const search = document.getElementById('report-job-search');
-    if (search && !search.dataset.bound) {
-      search.dataset.bound = 'true';
-      search.addEventListener('input', _berichtRenderNavigation);
-    }
     await berichtLoad();
   } catch (e) {
     if (initRequest !== reportState.initRequest) return;
@@ -83,6 +78,7 @@ async function berichtLoad() {
     reportState.location = _berichtJobLocation(reportState.job);
     reportState.selectedJobs ||= {};
     reportState.selectedJobs[reportState.location] = jobKey;
+    window.BBUI.components?.jobPicker?.remember('reports', reportState.job);
   }
   _berichtRenderNavigation();
   _berichtUpdateSelection(reportState.job);
@@ -162,41 +158,31 @@ function _berichtSelectLocationJob(preferredKey = '') {
   document.getElementById('bericht-job-sel').value = selected ? String(selected.key) : '';
 }
 
-/** Render both navigation rows; search filters jobs only within the active location. */
+/** Update the compact context and bind the shared picker without changing analysis. */
 function _berichtRenderNavigation() {
-  const list = document.getElementById('report-job-list');
-  const locations = document.getElementById('report-location-list');
-  if (!list || !locations) return;
-  locations.innerHTML = _berichtLocations().map((location) => {
-    const active = location === reportState.location;
-    const count = reportState.jobs.filter((job) => _berichtJobLocation(job) === location).length;
-    return `<button type="button" class="report-location${active ? ' is-active' : ''}" data-report-location="${escHtml(location)}" aria-pressed="${active}">${escHtml(_berichtLocationLabel(location))}<span class="location-nav-count">${count}</span></button>`;
-  }).join('');
-  const query = String(document.getElementById('report-job-search')?.value || '').trim().toLowerCase();
-  const selected = document.getElementById('bericht-job-sel')?.value || '';
-  const jobs = reportState.jobs.filter((job) => _berichtJobLocation(job) === reportState.location
-    && `${job.display_name || ''} ${job.key || ''} ${job.archive_prefix || ''} ${job.location || ''}`.toLowerCase().includes(query));
-  list.innerHTML = jobs.length ? jobs.map((job) => `<button type="button" class="report-job ${String(job.key) === selected ? 'is-active' : ''}" data-report-job="${escHtml(job.key)}" aria-pressed="${String(job.key) === selected}">${_berichtJobIcon(job)}<span><strong>${escHtml(job.display_name || job.key)}</strong><small>${escHtml(job.archive_prefix || '')}</small></span></button>`).join('')
-    : `<div class="ui-empty report-job-empty">${escHtml(reportsT('noMatchingJobs'))}</div>`;
-  locations.querySelectorAll('[data-report-location]').forEach((button) => button.addEventListener('click', () => {
-    reportState.location = button.dataset.reportLocation;
-    document.getElementById('report-job-search').value = '';
-    _berichtSelectLocationJob();
-    berichtLoad();
-    locations.querySelector('.is-active')?.focus();
-  }));
-  list.querySelectorAll('[data-report-job]').forEach((button) => button.addEventListener('click', () => {
-    document.getElementById('bericht-job-sel').value = button.dataset.reportJob || '';
-    berichtLoad();
-    list.querySelector('.is-active')?.focus();
-  }));
+  const button = document.getElementById('report-source-toggle');
+  if (!button) return;
+  button.disabled = !reportState.jobs.length;
+  button.onclick = () => window.BBUI.components.jobPicker.open({
+    jobs: reportState.jobs, selected: document.getElementById('bericht-job-sel').value,
+    icon: _berichtJobIcon, locationLabel: _berichtLocationLabel, trigger: button,
+    onSelect: key => {
+      if (!reportState.jobs.some(job => String(job.key) === key)) return;
+      document.getElementById('bericht-job-sel').value = key; berichtLoad();
+    },
+  });
 }
 
 function _berichtUpdateSelection(job) {
   const title = document.getElementById('report-selection-title');
   const subtitle = document.getElementById('report-selection-subtitle');
-  if (title) title.textContent = job?.display_name || reportsT('noJobSelected');
-  if (subtitle) subtitle.textContent = job ? `${_berichtLocationLabel(job.location)} · ${job.key}` : reportsT('workspaceSubtitle');
+  if (title) {
+    title.textContent = job?.name || job?.display_name || reportsT('noJobSelected');
+    title.title = title.textContent;
+  }
+  const icon = document.getElementById('report-selection-icon');
+  if (icon) icon.innerHTML = job ? _berichtJobIcon(job) : '';
+  if (subtitle) subtitle.textContent = job ? _berichtLocationLabel(_berichtJobLocation(job)) : reportsT('workspaceSubtitle');
 }
 
 function _berichtRender(d) {

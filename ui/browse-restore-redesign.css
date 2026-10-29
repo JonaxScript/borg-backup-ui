@@ -1,20 +1,9 @@
 /* Browse & Restore redesign (#32). */
 #page-restore { max-width: 1600px; }
-/* Shared location/job navigation above the four visible steps (#631). */
+/* Compact job context above the four visible steps (#642). */
 .restore-redesign-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-3); }
 .restore-job-navigation { min-width: 0; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
-.restore-location-row, .restore-job-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
-.restore-location-row { padding-bottom: 0; background: var(--ui-color-surface-subtle); border-bottom: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0; }
-.restore-location-row > span, .restore-job-row > span { color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); }
-#restore-location-list, #restore-job-list { display: flex; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
-.restore-location { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--ui-radius-sm) var(--ui-radius-sm) 0 0; background: transparent; color: var(--ui-color-text); font: inherit; }
-.restore-location.is-active { border-color: var(--ui-color-border); background: var(--ui-color-surface); color: var(--ui-color-accent); }
-.restore-location .location-nav-count { min-width: 22px; padding: 1px 6px; border: 1px solid var(--ui-color-border); border-radius: 999px; background: var(--ui-color-surface-subtle); color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); font-weight: 400; text-align: center; }
-.restore-job-tab { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ui-color-text); font: inherit; text-align: left; overflow-wrap: anywhere; }
-.restore-job-tab > span { min-width: 0; }
-.restore-job-tab.is-active { color: var(--ui-color-accent); border-bottom-color: var(--ui-color-accent); }
 .restore-job-icon { flex: 0 0 auto; width: 2rem; height: 2rem; }
-.restore-location:focus-visible, .restore-job-tab:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 2px; }
 #page-restore .restore-native-job { display: none; }
 .restore-sidebar-empty { padding: var(--ui-space-4); color: var(--ui-color-text-subtle); }
 
@@ -297,12 +286,8 @@
 }
 
 @media (max-width: 767px) {
-  .restore-location-row, .restore-job-row { align-items: flex-start; flex-direction: column; gap: 4px; }
   .restore-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .restore-stepper button { justify-content: flex-start; }
-}
-@media (pointer: coarse) {
-  .restore-location, .restore-job-tab { min-height: 44px; }
 }
 
 #page-restore .restore-workspace-header { min-height: 0; padding: 0 0 var(--ui-space-3); border: 0; border-radius: 0; }
@@ -328,16 +313,10 @@
 #page-restore .restore-redesign-workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #page-restore .restore-stepper { flex-shrink: 0; margin-bottom: 10px; }
 #page-restore .restore-stepper button { min-height: 2.5rem; }
-#page-restore .restore-location-row { padding-top: 0; }
-#page-restore .restore-job-row { padding-top: 4px; padding-bottom: 4px; }
-#page-restore .restore-location { padding-top: 7px; padding-bottom: 7px; }
-#page-restore .restore-job-tab { padding-top: 4px; padding-bottom: 4px; }
 #page-restore .restore-workspace-header { padding-bottom: 12px; }
 #page-restore .restore-workspace-header > div > small { display: none; }
 #page-restore .restore-workspace-header h2 { font-size: var(--ui-font-size-md); }
 #page-restore .restore-workspace-header p { margin-top: 3px; }
-.restore-source-summary { display: none; }
-.restore-source-choices { max-height: min(30dvh, 16rem); overflow-y: auto; }
 #page-restore .restore-wizard-actions {
   flex-shrink: 0; grid-template-columns: 6rem minmax(0, 1fr) minmax(10rem, auto);
   min-height: 5rem; margin: 0; padding: 10px 12px; background: var(--ui-color-surface);
@@ -352,18 +331,6 @@
 #page-restore .restore-mapping-scroll { max-height: none; overflow: visible; }
 #page-restore > #restore-runs-panel { flex-shrink: 0; max-height: 20dvh; overflow: auto; }
 #page-restore > #restore-msg:not(.hidden), #page-restore > #restore-assist-msg:not(.hidden) { flex-shrink: 0; max-height: 15dvh; overflow: auto; }
-@media (max-width: 1100px), (max-height: 800px) {
-  .restore-source-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; }
-  #restore-source-summary { min-width: 0; overflow-wrap: anywhere; font-size: var(--ui-font-size-sm); }
-  #restore-source-toggle { flex-shrink: 0; }
-  .restore-source-choices:not(.is-open) { display: none; }
-  #page-restore .restore-job-navigation { position: relative; z-index: 3; }
-  .restore-source-choices.is-open {
-    position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: min(45dvh, 20rem);
-    border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md);
-    background: var(--ui-color-surface); box-shadow: var(--shadow-soft);
-  }
-}
 @media (max-width: 767px) {
   #page-restore.active:has(#restore-view-wizard-btn.is-active) { padding: 10px 12px 8px; }
   #page-restore .restore-stepper { grid-template-columns: repeat(4, minmax(0, 1fr)); }

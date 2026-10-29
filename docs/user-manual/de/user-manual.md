@@ -709,8 +709,8 @@ Berichte helfen bei der Auswertung von Trends:
 
 ### 6.2 Bereiche und Funktionen
 
-- **Gemeinsame Reiterleiste:** Oben stehen Standorte mit auswertbaren Jobs und deren Anzahl. Darunter wählen Sie einen Job dieses Standorts. Name, Symbol und Archivpräfix bleiben sichtbar.
-- **Suchfeld:** Filtert die Jobs des gewählten Standorts nach Name, Archivpräfix oder Kennung. Beim Standortwechsel wird die Suche zurückgesetzt. Der zuletzt gewählte Job je Standort wird während der Sitzung wieder ausgewählt.
+- **Kompakte Jobauswahl:** Oben stehen Symbol, Name und tatsächlicher Standort des gewählten Jobs. **Job wechseln** öffnet einen Dialog mit Standortfiltern, Jobanzahl und Jobliste inklusive Archivpräfix. Leere Standorte werden ausgeblendet.
+- **Suche im Dialog:** Filtert Jobs nach Name, Archivpräfix oder Kennung. Ein Standortwechsel im Dialog setzt die Suche zurück, ändert aber noch nicht den aktiven Job. Erst die Jobauswahl übernimmt den Wechsel; Escape oder Abbrechen schließt ohne Änderung. Die letzte Auswahl wird je Seite in diesem Browser gespeichert, sofern der Browser dies erlaubt. Entfernte Jobs werden durch eine gültige Auswahl ersetzt.
 - **Kennzahlen:** Zeigen zusammengefasste Werte für den gewählten Zeitraum.
 - **Trendtabellen und Diagramme:** Zeigen Entwicklungen über Zeit.
 - **Monatlicher Status-Verlauf:** Zeigt alle Monate in einem begrenzten Scrollbereich mit feststehender Tabellenüberschrift. Der Bereich ist auch per Tab und Pfeil-/Bildtasten bedienbar. Beim Jobwechsel beginnt er wieder beim neuesten Monat. Auf kleinen Bildschirmen kann die Seite weiterhin normal gescrollt werden.
@@ -720,7 +720,7 @@ Berichte helfen bei der Auswertung von Trends:
 ### 6.3 Typische Aktionen
 
 1. Öffnen Sie **Berichte**.
-2. Wählen Sie oben einen Standort und darunter den gewünschten Job. Beim ersten Öffnen wird der erste auswertbare Job geladen. Bei erneutem Öffnen bleibt eine weiterhin gültige Auswahl erhalten.
+2. Öffnen Sie **Job wechseln**, wählen Sie bei Bedarf einen Standort und dann den Job. Beim ersten Öffnen wird der erste auswertbare Job geladen; eine gespeicherte, weiterhin gültige Auswahl hat Vorrang.
 3. Prüfen Sie Laufzeiten, Größen und Trends.
 4. Laden Sie Borg-Repository-Informationen, wenn Sie Details zum Repository benötigen.
 5. Vergleichen Sie auffällige Werte mit **History** und den Logs.
@@ -759,9 +759,9 @@ Die Seite hat zwei Reiter:
 
 ### 7.3 Restore-Wizard
 
-Wählen Sie zuerst oben den Standort und den Backup-Job. Die gemeinsame Reiterleiste zeigt die konfigurierten Job-Icons und nur Standorte mit Backup-Jobs. Ein Standortwechsel filtert die angebotenen Jobs; erst die Jobauswahl wechselt die Restore-Quelle. Eine vorhandene Archiv-, Datei- und Zielauswahl wird beim Jobwechsel nach Bestätigung zurückgesetzt. Während einer laufenden Restore-Aktion ist die Auswahl gesperrt.
+Die kompakte Auswahlzeile zeigt das konfigurierte Symbol, den Jobnamen und seinen tatsächlichen Standort. **Job wechseln** öffnet den Dialog mit Suche und Standortfiltern; nur Standorte mit Backup-Jobs werden angeboten. Die letzte gültige Jobauswahl wird für diese Seite in diesem Browser gespeichert, sofern der Browser dies erlaubt. Ein Standortwechsel filtert die angebotenen Jobs; erst die Jobauswahl wechselt die Restore-Quelle. Eine vorhandene Archiv-, Datei- und Zielauswahl wird beim Jobwechsel nach Bestätigung zurückgesetzt. Während einer laufenden Restore-Aktion ist die Auswahl gesperrt.
 
-Darunter führt der Assistent durch vier Schritte. Der Arbeitsbereich nutzt die verfügbare Fensterhöhe; lange Inhalte scrollen innerhalb dieses Bereichs. Zurück, Weiter bzw. Zur Prüfung sowie im letzten Schritt Prüfbestätigung und Startaktion bleiben in der unteren Aktionsleiste sichtbar. Auf schmalen oder niedrigen Fenstern zeigt die Quellauswahl Standort und Job kompakt an; **Auswahl ändern** klappt die Reiter auf. Die separate Restore History bleibt verfügbar und scrollt weiterhin als normale Seite.
+Darunter führt der Assistent durch vier Schritte. Der Arbeitsbereich nutzt die verfügbare Fensterhöhe; lange Inhalte scrollen innerhalb dieses Bereichs. Zurück, Weiter bzw. Zur Prüfung sowie im letzten Schritt Prüfbestätigung und Startaktion bleiben in der unteren Aktionsleiste sichtbar. Die kompakte Quellauswahl gilt für jede Fenstergröße. Der Jobdialog begrenzt seine Höhe auf das Fenster; lange Joblisten scrollen innerhalb des Dialogs. Die separate Restore History bleibt verfügbar und scrollt weiterhin als normale Seite.
 
 #### Schritt 1: Archiv auswählen
 

@@ -182,30 +182,15 @@ function restoreJobIcon(job) {
   return `<span class="type-icon restore-job-icon${colorClass}">${typeIcon(icon)}</span>`;
 }
 
-/** Render location/job tabs; browsing locations does not change the restore source. */
+/** Render only the active job and its actual location; filtering happens in the modal. */
 function renderRestoreJobNavigation() {
-  const list = document.getElementById('restore-job-list');
-  const locations = document.getElementById('restore-location-list');
-  if (!list || !locations) return;
-  const jobs = restoreState.jobs || [];
-  const locationOf = job => String(job.location || 'local').toLowerCase();
-  const order = ['local', 'usb', 'smb', 'storagebox'];
-  const visibleLocations = [...new Set([...order, ...jobs.map(locationOf)])]
-    .filter(location => jobs.some(job => locationOf(job) === location));
-  if (!visibleLocations.includes(restoreState.location)) {
-    restoreState.location = locationOf(jobs.find(job => String(job.key) === String(restoreState.job)) || jobs[0] || {});
-  }
-  const selected = jobs.find(job => String(job.key) === String(restoreState.job));
+  const selected = (restoreState.jobs || []).find(job => String(job.key) === String(restoreState.job));
   const summary = document.getElementById('restore-source-summary');
-  if (summary) summary.textContent = selected
-    ? `${restoreLocationLabel(locationOf(selected))} / ${selected.name || selected.display_name || selected.key}`
-    : restoreT('chooseJob');
-  const disabled = restoreState.assistBusy ? 'disabled' : '';
-  locations.innerHTML = visibleLocations.map(location => `<button type="button" class="restore-location ${location === restoreState.location ? 'is-active' : ''}" data-restore-location="${escHtml(location)}" aria-pressed="${location === restoreState.location}" ${disabled}>${escHtml(restoreLocationLabel(location))}<span class="location-nav-count">${jobs.filter(job => locationOf(job) === location).length}</span></button>`).join('');
-  list.innerHTML = jobs.filter(job => locationOf(job) === restoreState.location).map(job => {
-    const active = String(job.key) === String(restoreState.job);
-    return `<button type="button" class="restore-job-tab ${active ? 'is-active' : ''}" data-restore-job="${escHtml(job.key)}" aria-pressed="${active}" ${disabled}>${restoreJobIcon(job)}<span>${escHtml(job.name || job.display_name || job.key)}</span></button>`;
-  }).join('') || `<span class="restore-sidebar-empty">${escHtml(restoreT('noMatchingJobs'))}</span>`;
+  if (summary) summary.innerHTML = selected
+    ? `${restoreJobIcon(selected)}<div><strong title="${escHtml(selected.name || selected.display_name || selected.key)}">${escHtml(selected.name || selected.display_name || selected.key)}</strong><small>${escHtml(restoreLocationLabel(selected.location || 'local'))}</small></div>`
+    : escHtml(restoreT('chooseJob'));
+  const button = document.getElementById('restore-source-toggle');
+  if (button) button.disabled = restoreState.assistBusy || !(restoreState.jobs || []).length;
 }
 
 /** Confirm before discarding a restore draft, then reset it and load the new job's archives.
@@ -318,33 +303,19 @@ function renderRestoreSourceContext() {
   if (archive) archive.textContent = restoreState.archive || '—';
 }
 
-/** Expand/collapse the compact source picker without changing the restore draft.
- * @param {boolean} [expanded] Desired state; omitted toggles the current state.
- */
+/** Open the job dialog, or close it when expanded is false; never mutate a draft. */
 function restoreToggleSource(expanded) {
-  const button = document.getElementById('restore-source-toggle');
-  if (!button) return;
-  const open = expanded === undefined ? button.getAttribute('aria-expanded') !== 'true' : !!expanded;
-  button.setAttribute('aria-expanded', String(open));
-  document.getElementById('restore-source-choices')?.classList.toggle('is-open', open);
-  if (!open && document.getElementById('restore-source-choices')?.contains(document.activeElement)) button.focus();
+  const picker = window.BBUI.components?.jobPicker;
+  if (expanded === false) { picker?.close(); return; }
+  if (restoreState.assistBusy || restoreState.changingJob || !restoreState.jobs.length) return;
+  picker?.open({jobs: restoreState.jobs, selected: restoreState.job,
+    icon: restoreJobIcon, locationLabel: restoreLocationLabel,
+    trigger: document.getElementById('restore-source-toggle'), onSelect: restoreSelectJob});
 }
 
 function onRestoreRedesignClick(event) {
   if (event.target.closest('[data-restore-source-toggle]')) {
     restoreToggleSource();
-    return;
-  }
-  const locationButton = event.target.closest('[data-restore-location]');
-  if (locationButton) {
-    if (restoreState.assistBusy) return;
-    restoreState.location = locationButton.dataset.restoreLocation;
-    renderRestoreJobNavigation();
-    return;
-  }
-  const jobButton = event.target.closest('[data-restore-job]');
-  if (jobButton) {
-    restoreSelectJob(jobButton.dataset.restoreJob || '');
     return;
   }
   const archiveButton = event.target.closest('[data-restore-archive]');
@@ -991,7 +962,7 @@ function restoreClearArchives() {
 }
 
 async function restoreInit() {
-  const selectedJob = restoreState.job;
+  const selectedJob = restoreState.job || window.BBUI.components?.jobPicker?.recalled('restore') || '';
   const request = ++restoreState.sourceRequest;
   restoreState.job = '';
   restoreState.jobs = [];
@@ -1118,6 +1089,7 @@ async function restoreLoadArchives() {
   }
   restoreRenderArchiveFilterControls();
   restoreState.job = jobKey;
+  window.BBUI.components?.jobPicker?.remember('restore', restoreState.jobs.find(job => String(job.key) === String(jobKey)));
   restoreClearArchives();
   _restoreMsg('');
 
@@ -1625,7 +1597,8 @@ async function restoreLoadAllowedTargetRoots() {
 
 function _setRestoreAssistBusy(busy) {
   restoreState.assistBusy = !!busy;
-  document.querySelectorAll?.('[data-restore-location], [data-restore-job], #restore-stepper button').forEach(button => { button.disabled = !!busy; });
+  if (busy) window.BBUI.components?.jobPicker?.close();
+  document.querySelectorAll?.('#restore-source-toggle, #restore-stepper button').forEach(button => { button.disabled = !!busy; });
   const back = document.getElementById('restore-step-back-btn');
   const next = document.getElementById('restore-step-next-btn');
   if (back) back.disabled = !!busy || restoreState.step <= 2;

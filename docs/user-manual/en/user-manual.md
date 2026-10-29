@@ -701,8 +701,8 @@ Reports help analyze trends:
 
 ### 6.2 Areas and Functions
 
-- **Shared tab navigation:** Locations with report-capable jobs and their counts appear on top. Select a job at that location in the row below; its name, icon and archive prefix remain visible.
-- **Search field:** Filters jobs at the selected location by name, archive prefix or identifier. Switching locations clears the search and restores the last selected job at that location during the session.
+- **Compact job selection:** The selected job icon, name and actual location appear at the top. **Switch job** opens a dialog with location filters, counts and jobs including archive prefixes. Empty locations are omitted.
+- **Dialog search:** Filters jobs by name, archive prefix or identifier. Changing location clears the search without changing the active job. Selecting a job applies the change; Escape or Cancel closes without changes. The last selection is stored per page in this browser when browser storage is available. Removed jobs fall back to a valid selection.
 - **Metrics:** Show aggregated values for the selected period.
 - **Trend tables and charts:** Show development over time.
 - **Monthly status history:** Keeps all months in a bounded scroll region with a fixed table heading. Use Tab and the arrow/Page keys to scroll with the keyboard. Switching jobs returns to the latest month. On smaller screens, the page still scrolls normally.
@@ -712,7 +712,7 @@ Reports help analyze trends:
 ### 6.3 Typical Actions
 
 1. Open **Reports**.
-2. Select a location and then the desired job below it. The first report-capable job loads initially; reopening the page retains a still-valid selection.
+2. Open **Switch job**, filter by location if needed, then select the job. The first report-capable job loads initially; a saved, still-valid selection takes precedence.
 3. Review runtimes, sizes, and trends.
 4. Load Borg repository information if repository details are needed.
 5. Compare suspicious values with **History** and logs.
@@ -751,9 +751,9 @@ The page has two tabs:
 
 ### 7.3 Restore Wizard
 
-First select the location and backup job in the shared tabs at the top. The tabs show configured job icons and only locations with backup jobs. Changing location filters the offered jobs; selecting a job changes the restore source. Switching jobs asks for confirmation before resetting an existing archive, file and destination selection. Selection is locked during an active restore operation.
+The compact selection bar shows the configured icon, job name and actual location. **Switch job** opens the searchable dialog with location filters; only locations with backup jobs are offered. The last valid selection is stored for this page in this browser when browser storage is available. Changing location filters the offered jobs; selecting a job changes the restore source. Switching jobs asks for confirmation before resetting an existing archive, file and destination selection. Selection is locked during an active restore operation.
 
-The wizard below contains four steps. The workspace fills the available window height; long content scrolls within it. Back, Next or Review, and the final review confirmation and start action remain visible in the bottom action bar. Narrow or short windows show a compact source summary; **Change selection** expands the location and job tabs. The separate Restore History remains available and retains normal page scrolling.
+The wizard below contains four steps. The workspace fills the available window height; long content scrolls within it. Back, Next or Review, and the final review confirmation and start action remain visible in the bottom action bar. The compact source summary applies at every window size. The job dialog fits within the window; long job lists scroll inside it. The separate Restore History remains available and retains normal page scrolling.
 
 #### Step 1: Select Archive
 

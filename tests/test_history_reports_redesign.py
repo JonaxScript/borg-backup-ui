@@ -56,13 +56,13 @@ def test_reports_preserves_selection_search_and_analysis_contracts() -> None:
     html = _read("ui/index.html")
     script = _read("ui/js/pages/reports.js")
     for element_id in (
-        "bericht-job-sel", "report-job-search", "report-job-list",
+        "bericht-job-sel", "report-source-toggle", "report-selection-title",
         "bericht-body", "bericht-borginfo-btn", "br-run-badge",
         "bericht-trend-body", "bericht-status-body",
     ):
         assert f'id="{element_id}"' in html
     for contract in (
-        "data-report-job", "/api/reports/data?job=", "/api/restore/repo-stats?job=",
+        "components.jobPicker.open", "/api/reports/data?job=", "/api/restore/repo-stats?job=",
         "_berichtRenderGrowthCards", "_berichtRestoreVerification",
         "_berichtTrendTable", "_berichtSparkline", "_berichtStatusTable",
         "resolveJobIcon(job)", "resolveJobIconColor(job)", "typeIcon(icon)",
@@ -78,7 +78,6 @@ def test_history_reports_layout_is_responsive_and_compact() -> None:
     assert "@media (max-width: 767px)" in css
     assert "overflow-x: auto" in css
     assert ".history-detail-panel" in css
-    assert ".report-job-list" in css
     assert ".report-job-icon" in css
     assert ".report-metric-ledger" in css
     assert ".report-sparkline" in css
