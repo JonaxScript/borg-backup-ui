@@ -8,7 +8,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
 function harness(lang = 'de') {
   const dict = JSON.parse(fs.readFileSync(`ui/i18n/${lang}.json`));
   const elements = new Map();
-  for (const id of ['resource-activity', 'resource-active', 'resource-runs', 'resource-values', 'resource-live', 'resource-tests', 'resource-history', 'resource-history-toggle']) {
+  for (const id of ['resource-activity', 'resource-active', 'resource-values', 'resource-live', 'resource-tests', 'resource-history', 'resource-history-toggle']) {
     elements.set(id, {innerHTML: '', textContent: '', hidden: false, attrs: {}, listeners: {},
       classList: {toggle() {}}, setAttribute(k, v) {this.attrs[k] = v;}, addEventListener(k, v) {this.listeners[k] = v;}});
   }
@@ -60,7 +60,6 @@ for (const lang of ['de', 'en']) {
     assert.match(h.elements.get('resource-values').innerHTML, /38 %/);
     assert.match(h.elements.get('resource-values').innerHTML, /resource-ram-capacity/);
     assert.equal(h.elements.get('resource-history').hidden, true);
-    assert.equal(h.elements.get('resource-runs').hidden, false);
     assert.equal(h.elements.get('resource-activity').hidden, false);
     assert.match(h.elements.get('resource-active').textContent, /1/);
     assert.doesNotMatch(h.elements.get('resource-tests').innerHTML, /<img/);
@@ -72,6 +71,11 @@ for (const lang of ['de', 'en']) {
     assert.match(h.elements.get('resource-history').innerHTML, /75 %/);
     assert.match(h.elements.get('resource-history').innerHTML, /24 GiB/);
     assert.doesNotMatch(h.elements.get('resource-history').innerHTML, /NaN|undefined/);
+    h.setResponse(async () => ({ok: true, json: async () => ({...sample(), runs:[{job_key:'appdata',operation:'backup'}], protected_tests:[]})}));
+    h.tick(2000); await flush();
+    assert.equal(h.elements.get('resource-activity').hidden, true);
+    assert.match(h.elements.get('resource-active').textContent, /1/);
+    assert.ok([...h.timers.values()].some(t => t.delay === 2000));
     h.setResponse(async () => ({ok: true, json: async () => sample(false)}));
     h.tick(2000); await flush();
     assert.equal(h.elements.get('resource-tests').hidden, true);

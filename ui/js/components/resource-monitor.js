@@ -122,12 +122,8 @@
     return job?.display_name || job?.name || key;
   }
 
-  function operation(name) {
-    return t(({backup: 'backup', restore: 'restore', restore_test: 'restoreTest'})[name] || 'otherRun');
-  }
-
-  /** Update compact host values and RAM capacity; keep run names and protected-test budgets visible.
-   * Active-run details and history use full-width regions below the summary cards.
+  /** Update host values, RAM capacity and the existing Active runs summary.
+   * Protected-test budgets and history use full-width regions below the summary cards.
    * History retains its toggle and chart focus across polls. */
   function render() {
     if (!el('resource-values')) return;
@@ -139,7 +135,6 @@
     const active = runs?.length > 0;
     el('resource-live').textContent = unavailable ? t('unavailable') : t('live', {seconds: active ? 2 : 10});
     el('resource-live').classList.toggle('is-unavailable', unavailable);
-    const description = runs?.map(run => `${jobName(run.job_key)} · ${operation(run.operation)}`).join(', ');
     const ramRatio = valid(host.memory_available_bytes) && valid(host.memory_total_bytes) && host.memory_total_bytes > 0
       ? Math.max(0, Math.min(100, 100 * host.memory_available_bytes / host.memory_total_bytes)) : null;
     el('resource-values').innerHTML = `<div class="resource-value"><span title="${escHtml(t('cpuScale'))}">${escHtml(t('cpu'))}</span><strong>${escHtml(percent(host.cpu_percent))}</strong>${chart(history, s => s.host.cpu_percent, 100, t('cpu'))}</div>
@@ -147,9 +142,7 @@
       ${ramRatio === null ? '' : `<progress class="resource-ram-capacity" max="100" value="${ramRatio}" aria-label="${escHtml(t('ramTotal', {total: gib(host.memory_total_bytes)}))}"></progress>`}</div>`;
     if (typeof renderDashboardActiveRuns === 'function') renderDashboardActiveRuns(runs);
     el('resource-active').textContent = runs === null ? `${t('active')}: ${t('unavailable')}` : t('activeCount', {count: runs.length});
-    el('resource-activity').hidden = !active && !tests.length;
-    el('resource-runs').hidden = !active;
-    el('resource-runs').textContent = description || '';
+    el('resource-activity').hidden = !tests.length;
     el('resource-tests').hidden = !tests.length;
     el('resource-tests').innerHTML = tests.map(test => {
       const ratio = valid(test.memory_bytes) && test.memory_limit_bytes > 0 ? Math.min(100, 100 * test.memory_bytes / test.memory_limit_bytes) : null;

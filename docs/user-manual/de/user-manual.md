@@ -171,6 +171,8 @@ Start, Stopp und Autostart des Dienstes werden durch das Plugin verwaltet. Ergä
 
 Vier kompakte Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung**, **Aktive Läufe** und **Server-Auslastung**. Der Standortfilter in der Kopfzeile gilt für die ersten drei Kennzahlen, Handlungsbedarf, historische Statistiken und die Standortübersicht. Die erste Karte zählt das letzte gespeicherte Ergebnis pro Job. Restore-Abdeckung zählt gültige Nachweise gegenüber allen Jobs; die Quote innerhalb vorhandener Testpläne steht separat daneben. Fehlende Statusdaten sind kein Erfolg.
 
+Laufende Jobs werden ausschließlich in **Aktive Läufe** mit dem vorhandenen Link angezeigt; eine zusätzliche Namenszeile über Handlungsbedarf entfällt.
+
 **Handlungsbedarf** zeigt eine kompakte Statuszeile. Bei Problemen öffnet **Ansehen** vollständige Fehlertexte, Warnungen, übersprungene oder abgebrochene Läufe und überfällige Backups oder Restore-Nachweise. **Job ansehen** öffnet den passenden Job samt Status. Jobs ohne Testplan werden in der Karte **Restore-Abdeckung** mit einem Link zu Restore Tests genannt.
 
 Statusgrafiken verwenden einheitliche, klare Vollfarben: Grün für Erfolg, Orange für Warnungen, Rot für Fehler, Grau für übersprungene, Blauviolett für abgebrochene und Hellgrau für unbekannte Ergebnisse. Handlungsbedarf bleibt auf einer neutralen Kartenfläche mit Warndreieck; konkrete Fehler sind weiterhin am Text erkennbar. Die Server-Auslastung behält ihre blaue Darstellung.
