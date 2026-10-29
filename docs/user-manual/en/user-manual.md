@@ -703,6 +703,7 @@ Reports help analyze trends:
 - **Search field:** Filters jobs at the selected location by name, archive prefix or identifier. Switching locations clears the search and restores the last selected job at that location during the session.
 - **Metrics:** Show aggregated values for the selected period.
 - **Trend tables and charts:** Show development over time.
+- **Monthly status history:** Keeps all months in a bounded scroll region with a fixed table heading. Use Tab and the arrow/Page keys to scroll with the keyboard. Switching jobs returns to the latest month. On smaller screens, the page still scrolls normally.
 - **Borg repository information:** Can be loaded if available.
 - **Refresh/Load:** Reloads data or fetches Borg information.
 

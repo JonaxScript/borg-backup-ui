@@ -291,9 +291,13 @@ function _berichtSparkline(values, color, label) {
   return `<svg class="report-sparkline" viewBox="0 0 180 36" role="img" aria-label="${escHtml(reportsT('trendFor', { metric: label }))}"><polyline points="${coordinates}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/><circle cx="176" cy="${lastY}" r="3" fill="${color}"/></svg>`;
 }
 
+/** Render monthly totals newest first and reset scrolling when report data changes.
+ * @param {Array<object>} monthly Monthly status counts; missing data renders an empty row.
+ */
 function _berichtStatusTable(monthly) {
   const body = document.getElementById('bericht-status-body');
   if (!body) return;
+  body.closest('.report-month-scroll')?.scrollTo(0, 0);
   const rows = Array.isArray(monthly) ? [...monthly].reverse() : [];
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="7">${escHtml(reportsT('noData'))}</td></tr>`;

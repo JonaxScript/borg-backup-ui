@@ -78,7 +78,8 @@
 .history-pagination { padding-bottom: var(--ui-space-1); }
 
 /* Shared location tabs and job row above the unchanged reports (#629). */
-.report-layout.ui-context-layout { grid-template-columns: minmax(0, 1fr); }
+.report-layout.ui-context-layout { grid-template-columns: minmax(0, 1fr); gap: var(--ui-space-3); }
+#page-berichte > .page-header { margin-bottom: var(--ui-space-3); }
 .report-navigation { min-width: 0; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .report-location-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 14px 0; border-bottom: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0; background: var(--ui-color-surface-subtle); }
 .report-navigation-label { flex: 0 0 auto; color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
@@ -90,7 +91,7 @@
 .report-search { display: flex; align-items: center; gap: var(--ui-space-2); margin: 0 0 8px auto; min-width: 0; }
 .report-search span { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); }
 .report-search input { width: 13rem; max-width: 100%; min-width: 0; padding: 6px 10px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-sm); background: var(--ui-color-surface); color: var(--ui-color-text); font: inherit; }
-.report-job-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
+.report-job-row { display: flex; align-items: center; gap: 14px; padding: 4px 14px; }
 .report-job-list { display: flex; flex: 1; flex-wrap: wrap; min-width: 0; gap: 4px 12px; }
 .report-job { display: flex; align-items: center; gap: var(--ui-space-2); max-width: 100%; padding: 8px 2px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ui-color-text); font: inherit; text-align: left; }
 .report-job:hover { background: var(--ui-color-surface-subtle); }
@@ -149,6 +150,10 @@
 .report-ledger-columns dd span { display: block; color: var(--ui-color-text-subtle) !important; font-size: var(--ui-font-size-xs) !important; font-weight: normal; }
 
 .report-analysis-scroll { overflow-x: auto; }
+/* Keep all months reachable without stretching the report (#635). */
+.report-month-scroll { max-height: 11rem; overflow: auto; scrollbar-gutter: stable; }
+.report-month-scroll:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: -2px; }
+.report-month-scroll thead th { position: sticky; top: 0; z-index: 1; background: var(--ui-color-surface); box-shadow: 0 1px var(--ui-color-border); }
 .report-analysis-panel table { width: 100%; min-width: 850px; border-collapse: collapse; }
 .report-analysis-panel th { padding: var(--ui-space-2) var(--ui-space-3); border-bottom: 1px solid var(--ui-color-border); color: var(--ui-color-text-subtle); font-size: var(--ui-font-size-xs); text-align: left; text-transform: uppercase; }
 .report-analysis-panel td { padding: var(--ui-space-2) var(--ui-space-3); border-bottom: 1px solid var(--ui-color-border); font-size: var(--ui-font-size-sm); vertical-align: middle; }
@@ -180,7 +185,9 @@
 }
 #bericht-body .repo-stat-card { flex: 1 1 12rem; min-width: 0; padding: var(--ui-space-3); border: 0; border-radius: 0; box-shadow: none; }
 #bericht-body .repo-stat-value { font-size: var(--ui-font-size-lg); overflow-wrap: anywhere; }
-.bericht-borginfo-section { margin-bottom: var(--ui-space-3); }
+.bericht-borginfo-section { margin-bottom: var(--ui-space-3); padding-block: var(--ui-space-2); }
+.bericht-borginfo-header { margin-bottom: 0; }
+#bericht-borginfo-cards, #bericht-borginfo-msg:not(.hidden) { margin-top: var(--ui-space-2); }
 #bericht-body { min-width: 0; }
 @media (max-width: 1279px) {
   .report-ledger-columns { grid-template-columns: minmax(0, 1fr); }

@@ -63,6 +63,31 @@ const {chromium} = require('playwright');
   assert.equal(await page.locator('#bericht-status-body tr').count(),2);
   assert.equal(await page.locator('.report-status-distribution').count(),2);
   assert.match(await page.locator('#br-restore-verification').innerText(),/2026-10-17 17:38:53.*2026-11-16 16:38:53/);
+  // A long history remains complete, with a stable heading and keyboard access (#635).
+  await page.evaluate(()=>_berichtStatusTable(Array.from({length:24},(_,i)=>({month:`${2025+Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`,success:i+1,warning:0,error:0}))));
+  const months=page.locator('.report-month-scroll');
+  assert.equal(await months.locator('tbody tr').count(),24);
+  assert(await months.evaluate(el=>el.scrollHeight>el.clientHeight));
+  assert(await months.evaluate(el=>el.clientHeight<=parseFloat(getComputedStyle(document.documentElement).fontSize)*11+1));
+  const headingY=await months.locator('th').first().evaluate(el=>el.getBoundingClientRect().top-el.closest('.report-month-scroll').getBoundingClientRect().top);
+  await months.focus();await page.keyboard.press('End');
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-0.5;});
+  assert(Math.abs(await months.locator('th').first().evaluate(el=>el.getBoundingClientRect().top-el.closest('.report-month-scroll').getBoundingClientRect().top)-headingY)<2);
+  // End scrolling is animated by the browser; wait until the final row is fully visible.
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll tbody tr:last-child'),box=el.getBoundingClientRect(),parent=el.closest('.report-month-scroll').getBoundingClientRect();return box.bottom<=parent.bottom+1&&box.top>=parent.top;});
+  await page.evaluate(()=>_berichtStatusTable(reportFixture('local-vms').monthly_status));
+  assert.equal(await months.evaluate(el=>el.scrollTop),0);
+  // Six months fit the large desktop page without sacrificing report sections.
+  await page.setViewportSize({width:1701,height:1254});
+  await page.evaluate(()=>_berichtStatusTable(Array.from({length:6},(_,i)=>({month:`2026-${String(i+5).padStart(2,'0')}`,success:5}))));
+  const desktopFits=await page.evaluate(()=>{return document.scrollingElement.scrollHeight<=innerHeight+2;});
+  assert(desktopFits,'Report overview should fit the reference desktop height');
+  if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/reports-compact-${lang}-${theme}.png`,fullPage:true});
+  await page.setViewportSize({width:390,height:720});
+  assert(await page.evaluate(()=>{return document.scrollingElement.scrollHeight>innerHeight;}),'Small windows retain page scrolling');
+  await months.focus();await page.keyboard.press('End');
+  await page.waitForFunction(()=>{const el=document.querySelector('.report-month-scroll');return el.scrollTop+el.clientHeight>=el.scrollHeight-0.5;});
+  await page.setViewportSize({width:1600,height:1100});
   await page.locator('#bericht-borginfo-btn').click();await page.waitForFunction(()=>BBUI.reportState.borgInfoLoaded);
   assert.equal(await page.locator('#bi-count').innerText(),'18');assert.equal(await page.locator('#bi-savings').innerText(),'75%');
   for(const el of await page.locator('#bericht-borginfo-cards .repo-stat-value').all())assert.notEqual(await el.innerText(),'—');
