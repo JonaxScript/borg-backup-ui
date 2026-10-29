@@ -707,8 +707,8 @@ Berichte helfen bei der Auswertung von Trends:
 
 ### 6.2 Bereiche und Funktionen
 
-- **Job-Sidebar:** Wählt einen oder alle Jobs aus.
-- **Suchfeld:** Filtert Jobs.
+- **Gemeinsame Reiterleiste:** Oben stehen Standorte mit auswertbaren Jobs und deren Anzahl. Darunter wählen Sie einen Job dieses Standorts. Name, Symbol und Archivpräfix bleiben sichtbar.
+- **Suchfeld:** Filtert die Jobs des gewählten Standorts nach Name, Archivpräfix oder Kennung. Beim Standortwechsel wird die Suche zurückgesetzt. Der zuletzt gewählte Job je Standort wird während der Sitzung wieder ausgewählt.
 - **Kennzahlen:** Zeigen zusammengefasste Werte für den gewählten Zeitraum.
 - **Trendtabellen und Diagramme:** Zeigen Entwicklungen über Zeit.
 - **Borg-Repository-Informationen:** Können geladen werden, wenn verfügbar.
@@ -717,7 +717,7 @@ Berichte helfen bei der Auswertung von Trends:
 ### 6.3 Typische Aktionen
 
 1. Öffnen Sie **Berichte**.
-2. Wählen Sie einen Job oder **Alle Jobs**.
+2. Wählen Sie oben einen Standort und darunter den gewünschten Job. Beim ersten Öffnen wird der erste auswertbare Job geladen. Bei erneutem Öffnen bleibt eine weiterhin gültige Auswahl erhalten.
 3. Prüfen Sie Laufzeiten, Größen und Trends.
 4. Laden Sie Borg-Repository-Informationen, wenn Sie Details zum Repository benötigen.
 5. Vergleichen Sie auffällige Werte mit **History** und den Logs.

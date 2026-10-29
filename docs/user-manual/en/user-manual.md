@@ -699,8 +699,8 @@ Reports help analyze trends:
 
 ### 6.2 Areas and Functions
 
-- **Job sidebar:** Selects one job or all jobs.
-- **Search field:** Filters jobs.
+- **Shared tab navigation:** Locations with report-capable jobs and their counts appear on top. Select a job at that location in the row below; its name, icon and archive prefix remain visible.
+- **Search field:** Filters jobs at the selected location by name, archive prefix or identifier. Switching locations clears the search and restores the last selected job at that location during the session.
 - **Metrics:** Show aggregated values for the selected period.
 - **Trend tables and charts:** Show development over time.
 - **Borg repository information:** Can be loaded if available.
@@ -709,7 +709,7 @@ Reports help analyze trends:
 ### 6.3 Typical Actions
 
 1. Open **Reports**.
-2. Select a job or **All jobs**.
+2. Select a location and then the desired job below it. The first report-capable job loads initially; reopening the page retains a still-valid selection.
 3. Review runtimes, sizes, and trends.
 4. Load Borg repository information if repository details are needed.
 5. Compare suspicious values with **History** and logs.

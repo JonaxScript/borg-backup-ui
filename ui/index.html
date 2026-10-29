@@ -458,11 +458,17 @@
       </div>
 
       <div class="report-layout ui-context-layout">
-        <aside class="report-sidebar ui-context-sidebar" data-i18n-aria-label="reports.jobs" aria-label="Jobs">
-          <div class="ui-context-sidebar__header"><small data-i18n="reports.selection">Selection</small><strong data-i18n="reports.jobs">Backup jobs</strong></div>
-          <label class="report-search"><span data-i18n="reports.search">Search</span><input id="report-job-search" type="search" data-i18n-placeholder="reports.searchPlaceholder" placeholder="Search jobs"></label>
-          <nav id="report-job-list" class="report-job-list"></nav>
-        </aside>
+        <section class="report-navigation" data-i18n-aria-label="reports.selection" aria-label="Selection">
+          <div class="report-location-row">
+            <span class="report-navigation-label" data-i18n="jobs.locations">Standorte</span>
+            <nav id="report-location-list" class="report-location-list" data-i18n-aria-label="jobs.locations" aria-label="Standorte"></nav>
+            <label class="report-search"><span data-i18n="reports.search">Search</span><input id="report-job-search" type="search" data-i18n-placeholder="reports.searchPlaceholder" placeholder="Search jobs"></label>
+          </div>
+          <div class="report-job-row">
+            <span class="report-navigation-label" data-i18n="reports.jobs">Backup jobs</span>
+            <nav id="report-job-list" class="report-job-list" data-i18n-aria-label="reports.jobs" aria-label="Backup jobs"></nav>
+          </div>
+        </section>
         <section class="report-workspace ui-workspace">
           <header class="ui-workspace-header"><div class="ui-workspace-header__title"><small data-i18n="reports.analysis">Analysis</small><h2 id="report-selection-title" data-i18n="reports.noJobSelected">No job selected</h2><span id="report-selection-subtitle" class="ui-workspace-header__subtitle" data-i18n="reports.workspaceSubtitle">Exact run, growth, and repository values</span></div></header>
 
