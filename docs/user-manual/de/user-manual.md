@@ -711,6 +711,7 @@ Berichte helfen bei der Auswertung von Trends:
 - **Suchfeld:** Filtert die Jobs des gewählten Standorts nach Name, Archivpräfix oder Kennung. Beim Standortwechsel wird die Suche zurückgesetzt. Der zuletzt gewählte Job je Standort wird während der Sitzung wieder ausgewählt.
 - **Kennzahlen:** Zeigen zusammengefasste Werte für den gewählten Zeitraum.
 - **Trendtabellen und Diagramme:** Zeigen Entwicklungen über Zeit.
+- **Monatlicher Status-Verlauf:** Zeigt alle Monate in einem begrenzten Scrollbereich mit feststehender Tabellenüberschrift. Der Bereich ist auch per Tab und Pfeil-/Bildtasten bedienbar. Beim Jobwechsel beginnt er wieder beim neuesten Monat. Auf kleinen Bildschirmen kann die Seite weiterhin normal gescrollt werden.
 - **Borg-Repository-Informationen:** Können geladen werden, wenn verfügbar.
 - **Aktualisieren/Laden:** Lädt Daten neu oder ruft Borg-Informationen ab.
 
