@@ -758,7 +758,7 @@ Die Seite hat zwei Reiter:
 
 Wählen Sie zuerst oben den Standort und den Backup-Job. Die gemeinsame Reiterleiste zeigt die konfigurierten Job-Icons und nur Standorte mit Backup-Jobs. Ein Standortwechsel filtert die angebotenen Jobs; erst die Jobauswahl wechselt die Restore-Quelle. Eine vorhandene Archiv-, Datei- und Zielauswahl wird beim Jobwechsel nach Bestätigung zurückgesetzt. Während einer laufenden Restore-Aktion ist die Auswahl gesperrt.
 
-Darunter führt der Assistent durch vier Schritte. Die Standort- und Jobleiste bleibt sichtbar; lange Inhalte scrollen im Arbeitsbereich, während Zurück und Weiter an derselben Position bleiben. Die separate Restore History bleibt verfügbar.
+Darunter führt der Assistent durch vier Schritte. Der Arbeitsbereich nutzt die verfügbare Fensterhöhe; lange Inhalte scrollen innerhalb dieses Bereichs. Zurück, Weiter bzw. Zur Prüfung sowie im letzten Schritt Prüfbestätigung und Startaktion bleiben in der unteren Aktionsleiste sichtbar. Auf schmalen oder niedrigen Fenstern zeigt die Quellauswahl Standort und Job kompakt an; **Auswahl ändern** klappt die Reiter auf. Die separate Restore History bleibt verfügbar und scrollt weiterhin als normale Seite.
 
 #### Schritt 1: Archiv auswählen
 

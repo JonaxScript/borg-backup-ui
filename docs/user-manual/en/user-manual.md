@@ -750,7 +750,7 @@ The page has two tabs:
 
 First select the location and backup job in the shared tabs at the top. The tabs show configured job icons and only locations with backup jobs. Changing location filters the offered jobs; selecting a job changes the restore source. Switching jobs asks for confirmation before resetting an existing archive, file and destination selection. Selection is locked during an active restore operation.
 
-The wizard below contains four steps. Location and job tabs remain visible; long content scrolls inside the workspace while Back and Next stay in place. The separate Restore History remains available.
+The wizard below contains four steps. The workspace fills the available window height; long content scrolls within it. Back, Next or Review, and the final review confirmation and start action remain visible in the bottom action bar. Narrow or short windows show a compact source summary; **Change selection** expands the location and job tabs. The separate Restore History remains available and retains normal page scrolling.
 
 #### Step 1: Select Archive
 

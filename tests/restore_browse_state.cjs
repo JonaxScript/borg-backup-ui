@@ -20,7 +20,7 @@ function page(language = 'en') {
       const stepNumber = id.startsWith('restore-step-badge-') ? {textContent: ''} : null;
       elements.set(id, {
         value: '', checked: false, disabled: false, textContent: '', style: {}, html: '', dataset: {},
-        focus() {}, setAttribute() {}, querySelector(selector) { return selector === 'span' ? stepNumber : null; },
+        focus() {}, contains() { return false; }, setAttribute() {}, querySelector(selector) { return selector === 'span' ? stepNumber : null; },
         get innerHTML() { return this.html; },
         set innerHTML(value) { this.html = value; if (id.endsWith('-sel')) this.value = ''; },
         appendChild() {}, classList: {

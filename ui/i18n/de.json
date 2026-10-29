@@ -1969,6 +1969,7 @@
     "entryRestored": "Wiederhergestellt",
     "errorDetails": "Technische Fehlerdetails",
     "runSimulationHelp": "Borg liest und prüft die ausgewählten Daten. Es werden keine Dateien ins Ziel geschrieben.",
+    "changeSource": "Auswahl ändern",
     "changeJobTitle": "Job wechseln?",
     "changeJobMessage": "Die bisherige Archiv-, Datei- und Zielauswahl wird zurückgesetzt. Möchtest du einen anderen Job auswählen?",
     "changeJobConfirm": "Job wechseln"

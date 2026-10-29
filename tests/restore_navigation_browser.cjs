@@ -6,6 +6,7 @@ const {chromium} = require('playwright');
  const browser = await chromium.launch({headless:true, ...(process.env.BBUI_CHROMIUM ? {executablePath:process.env.BBUI_CHROMIUM} : {})});
  try {
  const page = await browser.newPage({viewport:{width:1600,height:1100}});
+ page.setDefaultTimeout(10000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  let html=fs.readFileSync('ui/index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
  html=html.replace(/<link[^>]+href="\/([^\"]+)"[^>]*>/g,(_,path)=>path.endsWith('.css')?`<style>${fs.readFileSync(path,'utf8')}</style>`:'');
@@ -38,7 +39,7 @@ const {chromium} = require('playwright');
    else if(u.pathname==='/api/restore/history')data={runs:historyFixture,total:historyFixture.length};
    else if(u.pathname==='/api/restore/history/detail')data={...historyFixture[0],lines:['Saved restore log'],source_paths:['folder'],counts_complete:true,counts:{files:1,directories:1}};
    else if(u.pathname==='/api/restore/precheck'){
-    const body=JSON.parse(options.body);data={ok:true,target_dir:body.target_dir,source_paths:body.source_paths,items:body.source_paths.map(path=>({source_path:path,source_type:path==='folder'?'directory':'file',destination_path:body.target_dir+'/'+path,status:'ok'})),checks:{target_exists:true,target_writable:true,space_ok:true}};
+    const body=JSON.parse(options.body);data={ok:true,target_dir:body.target_dir,source_paths:body.source_paths,items:body.source_paths.map(path=>({path,type:path.startsWith('folder')?'d':'-',destination_path:body.target_dir+'/'+path,status:'ok'})),checks:{target_exists:true,target_writable:true,space_ok:true}};
    }else if(u.pathname==='/api/restore/start')data={restore_id:'run-1'};
    else if(u.pathname==='/api/restore/state')data={state:runResult,dry_run:true,job_name:'Appdata',archive:'local-app-2026-10-28',target_dir:'/mnt/user/restore',source_paths:['folder','readme.txt'],duration_seconds:12};
    else throw Error('Unexpected URL '+url);
@@ -108,6 +109,7 @@ const {chromium} = require('playwright');
   assert.equal(await page.locator('#restore-preserve-owner').isChecked(),false);
   assert.equal(await page.locator('#restore-dry-run').isChecked(),true);
   await page.locator('#restore-view-history-btn').click();
+  assert.equal(await page.locator('.main-content').evaluate(e=>getComputedStyle(e).maxHeight),'none','History keeps ordinary page scrolling');
   await page.locator('[data-restore-history-action=detail]').click();
   await page.waitForFunction(()=>document.getElementById('restore-history-detail-history-1').textContent.includes('Saved restore log'));
   assert.equal(await page.locator('[data-restore-history-action=delete]').count(),1);
@@ -116,14 +118,73 @@ const {chromium} = require('playwright');
   assert.equal(await page.evaluate(()=>BBUI.restoreState.job),'usb-app');
   for(const width of [390,768,1024]){
    await page.setViewportSize({width,height:1000});
+   if (!(await page.locator('[data-restore-location=storagebox]').isVisible())) await page.locator('#restore-source-toggle').click();
    await page.locator('[data-restore-location=storagebox]').click();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`Overflow at ${width}`);
    if(width===390)await capture(`restore-mobile-${language}-${theme}`);
   }
  }
+ // Long plans must never push the existing confirmation/start controls off screen (#633).
+ for(const language of ['de','en']) {
+  await page.evaluate(async language=>{
+   lang=language;translate();restoreSwitchView('wizard');await restoreInit();
+   document.getElementById('restore-archive-sel').value=BBUI.restoreState.archives[0].name;
+   await restoreBrowse('');restoreSetStep(3);
+   for(let i=0;i<40;i++)restorePrepare('folder-'+i,'folder-'+i,'d');
+   document.getElementById('restore-target-path').value='/mnt/user/restore';
+  },language);
+  for(const [width,height] of [[3440,1440],[1366,768],[1024,600],[768,1024],[390,844],[320,568],[844,390]]) {
+   await page.setViewportSize({width,height});
+   await page.evaluate(()=>restoreToggleSource(false));
+   let previousFooter;
+   for(const step of [3,4,5]) {
+    await page.evaluate(step=>restoreSetStep(step),step);
+    if(step===5)await page.waitForFunction(()=>BBUI.restoreState.precheck?.ok&&!BBUI.restoreState.assistBusy);
+    const geometry=await page.evaluate(()=>{
+     const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height,right:r.right};};
+     return {back:rect('restore-step-back-btn'),action:rect(BBUI.restoreState.step===5?'restore-start-btn':'restore-step-next-btn'),content:rect('restore-step-content'),width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth};
+    });
+    assert.equal(geometry.overflow,false,`Horizontal overflow at ${width}x${height}`);
+    assert.ok(geometry.action.bottom<=height&&geometry.back.bottom<=height,`Actions outside ${width}x${height}: ${JSON.stringify(geometry)}`);
+    assert.ok(geometry.content.height>50,`No usable work area at ${width}x${height}`);
+    if(previousFooter!==undefined)assert.ok(Math.abs(geometry.back.top-previousFooter)<2,`Back moves between steps at ${width}x${height}`);
+    previousFooter=geometry.back.top;
+    await page.locator('#restore-step-content').evaluate(e=>e.scrollTop=e.scrollHeight);
+    assert.ok(Math.abs((await page.locator('#restore-step-back-btn').boundingBox()).y-previousFooter)<2,'Scrolling moves actions');
+   }
+   assert.equal(await page.locator('#restore-destination-map tbody tr').count(),40);
+   await page.locator('#restore-confirm-check').check();
+   assert.equal(await page.locator('#restore-start-btn').isDisabled(),false);
+   if(width===1366||width===390)await capture(`restore-footer-${width}-${language}`);
+   if(width<=1100||height<=800) {
+    assert.equal(await page.locator('#restore-source-toggle').isVisible(),true);
+    const source=await page.locator('#restore-source-summary').innerText();
+    await page.locator('#restore-source-toggle').click();
+    assert.ok((await page.locator('#restore-start-btn').boundingBox()).y < height, 'Expanded source picker keeps actions visible');
+    await page.locator('[data-restore-location=local]').click();
+    assert.equal(await page.locator('#restore-source-summary').innerText(),source,'Filtering must not change source summary');
+    await page.locator('#restore-source-toggle').click();
+   }
+  }
+ }
+ // Changing mode still invalidates confirmation and updates the same fixed start control.
+ await page.setViewportSize({width:1366,height:768});
+ await page.evaluate(()=>restoreSetStep(4));
+ await page.locator('#restore-dry-run').uncheck();
+ await page.locator('#restore-step-next-btn').click();
+ await page.waitForFunction(()=>BBUI.restoreState.precheck?.ok&&!BBUI.restoreState.assistBusy);
+ assert.equal(await page.locator('#restore-start-btn').isDisabled(),true);
+ assert.equal(await page.locator('#restore-start-btn').innerText(),await page.evaluate(()=>restoreT('startRestore')));
+ await page.locator('#restore-confirm-check').check();
+ await page.locator('#restore-start-btn').click();
+ await page.waitForFunction(()=>!!BBUI.restoreState.confirmResolver);
+ await page.evaluate(()=>closeRestoreConfirmModal(false));
+ assert.equal(await page.evaluate(()=>posts.some(p=>p.url==='/api/restore/start')),false,'Cancelling confirmation must not start');
+ await page.evaluate(()=>{BBUI.restoreState.precheck.ok=false;restoreUpdateConfirmState();});
+ assert.equal(await page.locator('#restore-start-btn').isDisabled(),true,'Failed precheck keeps Start disabled');
  // Exercise the existing explicit start confirmation, actual payload and completion path.
  await page.setViewportSize({width:1600,height:1100});
- await page.evaluate(async()=>{await restoreInit();document.getElementById('restore-archive-sel').value=BBUI.restoreState.archives[0].name;await restoreBrowse('');restoreSetStep(3);});
+ await page.evaluate(async()=>{await restoreInit();document.getElementById('restore-dry-run').checked=true;document.getElementById('restore-archive-sel').value=BBUI.restoreState.archives[0].name;await restoreBrowse('');restoreSetStep(3);});
  await page.locator('input[data-restore-action=select][data-path=folder]').check();await page.locator('#restore-step-next-btn').click();
  await page.locator('#restore-target-path').fill('/mnt/user/restore');await page.locator('#restore-conflict-mode').selectOption('overwrite');await page.locator('#restore-preserve-owner').check();
  await page.locator('#restore-step-next-btn').click();await page.waitForFunction(()=>BBUI.restoreState.precheck?.ok&&!BBUI.restoreState.assistBusy);
@@ -131,6 +192,8 @@ const {chromium} = require('playwright');
  await page.waitForFunction(()=>!!BBUI.restoreState.confirmResolver);await page.evaluate(()=>closeRestoreConfirmModal(true));
  await page.waitForFunction(()=>BBUI.restoreState.activeRestoreId==='run-1');
  assert.equal(await page.locator('[data-restore-job]').first().isDisabled(),true);
+ assert.equal(await page.locator('#restore-start-btn').isVisible(),false);
+ assert.equal(await page.locator('#restore-footer-confirm').isVisible(),false);
  assert.equal(await page.locator('#restore-step-back-btn').isDisabled(),true);
  assert.deepEqual(await page.evaluate(()=>posts.find(p=>p.url==='/api/restore/start').body),{confirm:true,job_key:'usb-app',archive:'usb-app-2026-10-28',source_path:'folder',source_paths:['folder'],target_dir:'/mnt/user/restore',conflict_mode:'overwrite',preserve_owner:true,dry_run:true});
  await page.evaluate(async()=>{runResult='done';_stopRestorePolling();await _pollRestoreState('run-1');});
