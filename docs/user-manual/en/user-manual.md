@@ -163,6 +163,8 @@ Service start, stop, and autostart are managed by the plugin. Do not add a separ
 
 Four compact cards show **Latest backup runs**, **Restore coverage**, **Active runs** and **Server resources**. The location filter in the header applies to the first three metrics, attention items, historical statistics and location totals. The first card counts the last saved outcome per job. Restore coverage compares valid evidence with all jobs; the ratio within known test plans appears separately. Missing status data never counts as success.
 
+Running jobs appear only in **Active runs**, using the existing link; no duplicate job-name row appears above attention items.
+
 **Needs attention** shows a compact status strip. When problems exist, **View** expands full failure messages, warnings, skipped or cancelled runs, overdue backups and restore evidence. **View job** opens the matching job and its status. Jobs without test plans are listed in the **Restore coverage** card with a link to Restore Tests.
 
 Status charts use consistent solid colors: green for success, orange for warnings, red for errors, gray for skipped, blue-violet for cancelled, and light gray for unknown outcomes. Needs attention uses a neutral card surface with a warning triangle; specific failures remain identifiable by their labels. Server resources retain their blue styling.

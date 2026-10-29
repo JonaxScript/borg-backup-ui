@@ -757,8 +757,7 @@
 .resource-footer button:focus-visible { outline: 2px solid var(--ui-color-accent); outline-offset: 3px; }
 .resource-activity { min-width: 0; margin-bottom: var(--ui-space-4); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); overflow: hidden; }
 .resource-activity[hidden] { display: none; }
-.resource-activity .resource-runs { border-top: 0; }
-.resource-activity .resource-runs[hidden] + .resource-tests { border-top: 0; }
+.resource-activity .resource-tests { border-top: 0; }
 .resource-history { min-width: 0; margin-bottom: var(--ui-space-4); padding: 0 16px 16px; border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); background: var(--ui-color-surface); }
 .resource-note { color: var(--ui-color-text-muted); font-size: var(--ui-font-size-xs); margin: 10px 0 0; }
 .resource-plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -806,8 +805,6 @@
 .resource-ram-capacity::-webkit-progress-bar { background: var(--ui-color-border); }
 .resource-ram-capacity::-webkit-progress-value { background: var(--ui-color-accent); }
 .resource-ram-capacity::-moz-progress-bar { background: var(--ui-color-accent); }
-.resource-runs { padding: 8px 16px; border-top: 1px solid var(--ui-color-border); font-size: var(--ui-font-size-xs); overflow-wrap: anywhere; }
-.resource-runs[hidden] { display: none; }
 
 /* Management overview and independent saved job status (#607). */
 .management-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; font-size:var(--ui-font-size-sm); }
