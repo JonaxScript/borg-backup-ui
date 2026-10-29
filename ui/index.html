@@ -578,15 +578,11 @@
     <!-- Browse & Restore Page -->
     <div id="page-restore" class="page">
       <div class="page-header ui-page-header">
-        <div>
-          <h1 data-i18n="restore.title">Browse &amp; Restore</h1>
-          <p class="page-subtitle" data-i18n="restore.subtitle">Geführter Assistent in festen Schritten</p>
+        <div><h1 data-i18n="restore.title">Browse &amp; Restore</h1><p class="page-subtitle" data-i18n="restore.subtitle">Geführter Assistent in festen Schritten</p></div>
+        <div class="restore-view-tabs" role="tablist" data-i18n-aria-label="restore.viewTabs" aria-label="Restore Ansicht">
+          <button type="button" id="restore-view-wizard-btn" class="is-active" data-restore-view="wizard" role="tab" aria-selected="true" data-i18n="restore.viewWizard">Restore</button>
+          <button type="button" id="restore-view-history-btn" data-restore-view="history" role="tab" aria-selected="false" data-i18n="restore.viewHistory">Restore History</button>
         </div>
-      </div>
-
-      <div class="restore-view-tabs" role="tablist" data-i18n-aria-label="restore.viewTabs" aria-label="Restore Ansicht">
-        <button type="button" id="restore-view-wizard-btn" class="is-active" data-restore-view="wizard" role="tab" aria-selected="true" data-i18n="restore.viewWizard">Restore</button>
-        <button type="button" id="restore-view-history-btn" data-restore-view="history" role="tab" aria-selected="false" data-i18n="restore.viewHistory">Restore History</button>
       </div>
 
       <section id="restore-runs-panel" class="restore-runs-panel hidden">
@@ -630,8 +626,14 @@
 
       <div id="restore-wizard" class="restore-redesign-layout" style="display:none">
         <section class="restore-job-navigation" data-i18n-aria-label="restore.backupJobs" aria-label="Backup jobs">
-          <div class="restore-location-row"><span data-i18n="jobs.locations">Standorte</span><nav id="restore-location-list" data-i18n-aria-label="jobs.locations" aria-label="Standorte"></nav></div>
-          <div class="restore-job-row"><span data-i18n="restore.job">Job</span><nav id="restore-job-list" data-i18n-aria-label="restore.selectJob" aria-label="Job auswählen"></nav></div>
+          <div class="restore-source-summary">
+            <span id="restore-source-summary" aria-live="polite"></span>
+            <button type="button" id="restore-source-toggle" class="btn btn-secondary btn-sm" data-restore-source-toggle aria-expanded="false" aria-controls="restore-source-choices" data-i18n="restore.changeSource">Auswahl ändern</button>
+          </div>
+          <div id="restore-source-choices" class="restore-source-choices">
+            <div class="restore-location-row"><span data-i18n="jobs.locations">Standorte</span><nav id="restore-location-list" data-i18n-aria-label="jobs.locations" aria-label="Standorte"></nav></div>
+            <div class="restore-job-row"><span data-i18n="restore.job">Job</span><nav id="restore-job-list" data-i18n-aria-label="restore.selectJob" aria-label="Job auswählen"></nav></div>
+          </div>
           <label for="restore-job-sel" class="form-label form-label-required restore-native-job"><span class="form-required-marker" aria-hidden="true">*</span><span data-i18n="restore.selectJob">Job auswählen</span></label>
           <select id="restore-job-sel" class="restore-native-job" tabindex="-1" aria-hidden="true"><option value="" data-i18n="restore.chooseJob">— Job wählen —</option></select>
         </section>
@@ -778,24 +780,22 @@
             <section><header data-i18n="restore.systemCheck">Systemprüfung</header><div id="restore-system-check-facts" class="restore-review-facts"></div></section>
             </div>
             <div id="restore-destination-map" class="restore-destination-map"></div>
-            <div class="restore-confirm-actions">
-            <label class="form-checkbox-row restore-confirm-row">
-              <input id="restore-confirm-check" type="checkbox">
-              <span>
-                <strong data-i18n="restore.confirmSummary">Ich habe die Zusammenfassung geprüft und möchte die Wiederherstellung starten.</strong>
-              </span>
-            </label>
-            <div class="restore-start-actions">
-              <button class="btn btn-primary" id="restore-start-btn" disabled data-i18n="restore.start">Wiederherstellen starten</button>
-            </div>
-            </div>
             <details class="restore-precheck-output"><summary data-i18n="restore.showTechnicalPrecheck">Technische Precheck-Ausgabe anzeigen</summary><pre id="restore-precheck-output" class="log-output" style="max-height:260px; min-height:100px"></pre></details>
           </div>
         </div>
         <div class="restore-wizard-actions">
           <button class="btn btn-secondary btn-sm" id="restore-step-back-btn" disabled data-i18n="restore.back">Zurück</button>
-          <span id="restore-step-status"></span>
-          <button class="btn btn-primary btn-sm" id="restore-step-next-btn" data-i18n="restore.next">Weiter</button>
+          <div class="restore-footer-context">
+            <span id="restore-step-status"></span>
+            <label id="restore-footer-confirm" class="form-checkbox-row restore-confirm-row hidden">
+              <input id="restore-confirm-check" type="checkbox">
+              <span data-i18n="restore.confirmSummary">Ich habe Auswahl, Zielpfade und geplante Aktionen geprüft.</span>
+            </label>
+          </div>
+          <div class="restore-footer-primary">
+            <button class="btn btn-primary btn-sm" id="restore-step-next-btn" data-i18n="restore.next">Weiter</button>
+            <button class="btn btn-primary btn-sm hidden" id="restore-start-btn" disabled data-i18n="restore.start">Wiederherstellen starten</button>
+          </div>
         </div>
         </section>
       </div>

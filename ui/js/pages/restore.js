@@ -116,12 +116,25 @@ function restoreSetStep(step) {
   }
   const status = document.getElementById('restore-step-status');
   if (status) status.textContent = restoreT('stepStatus', { step: next - 1, total: 4 });
+  restoreRenderFooter();
   _restoreRenderSelectionSummary();
+}
+
+/** Keep the existing confirmation and start controls in the persistent footer.
+ * Shows them only during review; running/completed restores retain their status view.
+ * Does not change precheck, confirmation or start-button eligibility.
+ */
+function restoreRenderFooter() {
+  const review = restoreState.step === 5 && !restoreState.liveMode;
+  document.getElementById('restore-footer-confirm')?.classList.toggle('hidden', !review);
+  document.getElementById('restore-start-btn')?.classList.toggle('hidden', !review);
+  document.getElementById('restore-step-status')?.classList.toggle('hidden', review);
 }
 
 /** Switch step five between precheck and running/completed restore views. */
 function restoreSetLiveMode(enabled) {
   restoreState.liveMode = !!enabled;
+  restoreRenderFooter();
   const panel = document.getElementById('restore-step-panel-5');
   if (panel) panel.classList.toggle('restore-live-mode', restoreState.liveMode);
   document.getElementById('restore-run-status')?.classList.toggle('hidden', !restoreState.liveMode);
@@ -182,6 +195,11 @@ function renderRestoreJobNavigation() {
   if (!visibleLocations.includes(restoreState.location)) {
     restoreState.location = locationOf(jobs.find(job => String(job.key) === String(restoreState.job)) || jobs[0] || {});
   }
+  const selected = jobs.find(job => String(job.key) === String(restoreState.job));
+  const summary = document.getElementById('restore-source-summary');
+  if (summary) summary.textContent = selected
+    ? `${restoreLocationLabel(locationOf(selected))} / ${selected.name || selected.display_name || selected.key}`
+    : restoreT('chooseJob');
   const disabled = restoreState.assistBusy ? 'disabled' : '';
   locations.innerHTML = visibleLocations.map(location => `<button type="button" class="restore-location ${location === restoreState.location ? 'is-active' : ''}" data-restore-location="${escHtml(location)}" aria-pressed="${location === restoreState.location}" ${disabled}>${escHtml(restoreLocationLabel(location))}<span class="location-nav-count">${jobs.filter(job => locationOf(job) === location).length}</span></button>`).join('');
   list.innerHTML = jobs.filter(job => locationOf(job) === restoreState.location).map(job => {
@@ -218,11 +236,12 @@ async function restoreSelectJob(key) {
     document.getElementById('restore-preserve-owner').checked = false;
     document.getElementById('restore-job-sel').value = key;
     restoreState.location = String(job.location || 'local').toLowerCase();
+    restoreToggleSource(false);
     restoreSetStep(2);
     return restoreLoadArchives();
   } finally {
     restoreState.changingJob = false;
-    if (previous?.isConnected) previous.focus();
+    if (previous?.isConnected && previous.getClientRects().length) previous.focus();
   }
 }
 
@@ -299,7 +318,23 @@ function renderRestoreSourceContext() {
   if (archive) archive.textContent = restoreState.archive || '—';
 }
 
+/** Expand/collapse the compact source picker without changing the restore draft.
+ * @param {boolean} [expanded] Desired state; omitted toggles the current state.
+ */
+function restoreToggleSource(expanded) {
+  const button = document.getElementById('restore-source-toggle');
+  if (!button) return;
+  const open = expanded === undefined ? button.getAttribute('aria-expanded') !== 'true' : !!expanded;
+  button.setAttribute('aria-expanded', String(open));
+  document.getElementById('restore-source-choices')?.classList.toggle('is-open', open);
+  if (!open && document.getElementById('restore-source-choices')?.contains(document.activeElement)) button.focus();
+}
+
 function onRestoreRedesignClick(event) {
+  if (event.target.closest('[data-restore-source-toggle]')) {
+    restoreToggleSource();
+    return;
+  }
   const locationButton = event.target.closest('[data-restore-location]');
   if (locationButton) {
     if (restoreState.assistBusy) return;
