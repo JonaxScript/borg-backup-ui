@@ -31,8 +31,10 @@ from typing import Dict, List, Optional
 
 try:
     from .retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from .source_size import SourceSizeEstimate
 except ImportError:  # Direct CLI invocation.
     from retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from source_size import SourceSizeEstimate
 
 logger = logging.getLogger(__name__)
 
@@ -401,6 +403,8 @@ class BorgRunner:
         Exit 0 = OK, 1 = Warnungen (Backup nutzbar), ≥2 = Fehler.
         JSON-Fortschritt wird nur als fluechtiger Prozessstatus weitergegeben.
         Abschlussstatistik, Diagnostik und optionale Dateiaktivitaet bleiben im Log.
+        Mit Prozessstatus wird die logische Quellgroesse automatisch parallel
+        geschaetzt; Fehler dieser Messung beeinflussen den Borg-Exit-Code nicht.
 
         Args:
             archive_name:   Optional exact archive name for verified database artifacts.
@@ -495,12 +499,22 @@ class BorgRunner:
             stop_event=wd_stop,
         )
         assert process.stdout is not None
+        estimate = None
+        if self.process_controller is not None:
+            estimate = SourceSizeEstimate(
+                paths, exclusions,
+                unsupported=bool(self.config.exclude_if_present or self.config.exclude_from),
+                cancelled=self.process_controller.is_cancel_requested,
+            )
         try:
             for line in process.stdout:
                 line = line.rstrip("\n")
                 if line:
-                    _consume_borg_output(line, self.process_controller, operation="create")
+                    _consume_borg_output(line, self.process_controller, operation="create",
+                                         source_estimate=estimate.snapshot() if estimate else None)
         finally:
+            if estimate is not None:
+                estimate.close()
             process.wait()
             _publish_borg_progress(self.process_controller, None)
             if self.process_controller is not None:
@@ -691,7 +705,7 @@ def _publish_borg_progress(process_controller, event: Optional[Dict]) -> None:
             pass
 
 
-def _consume_borg_output(line: str, process_controller, *, operation: str = "check") -> None:
+def _consume_borg_output(line: str, process_controller, *, operation: str = "check", source_estimate=None) -> None:
     """Route Borg JSON progress to status without logging recurring counters.
 
     operation identifies create, prune, compact or check. Create retains final
@@ -702,6 +716,8 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
     numeric create/prune/compact details in memory, including final create
     statistics and Borg's approximate reclaimed repository bytes;
     archive names, paths and raw messages are never copied to those details.
+    source_estimate optionally supplies a local size-scan result for create
+    progress only; it is not persisted in logs or command result statistics.
     Plain-text startup/argument errors are retained. Malformed JSON is ignored
     with a diagnostic, without leaking an unparsed progress payload.
     """
@@ -756,6 +772,8 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
             except (OSError, ValueError, TypeError):
                 pass
     if kind in ("progress_percent", "progress_message", "archive_progress"):
+        if operation == "create" and source_estimate is not None:
+            event["source_estimate"] = source_estimate
         _publish_borg_progress(process_controller, event)
     elif kind == "file_status" and operation == "create":
         status, path = event.get("status"), event.get("path")

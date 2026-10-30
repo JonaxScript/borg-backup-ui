@@ -706,6 +706,19 @@
     "repositoryLastInfoFailed": "Last info query failed"
   },
   "jobs": {
+    "liveMetrics": {
+      "processing": "Processing: {speed}/s",
+      "total": "Source size: approx. {size}",
+      "remaining": "Archive creation: approx. {time} remaining",
+      "remainingUnknown": "Remaining archive creation time: unknown",
+      "percent": "approx. {percent}%",
+      "scanning": "Measuring source size …",
+      "unsupported": "Size estimate unavailable with marker or pattern exclusions",
+      "failed": "Source size unavailable",
+      "timedOut": "Size scan stopped after 5 min.",
+      "cancelled": "Size scan cancelled",
+      "outgrown": "Source size exceeded – progress and remaining time unknown"
+    },
     "createRunning": "Creating archive (borg create)",
     "createFiles": "{count} files processed",
     "createBytes": "Original data: {size}",

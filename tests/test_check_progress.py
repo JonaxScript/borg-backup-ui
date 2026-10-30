@@ -1,4 +1,4 @@
-"""Delayed create/check feedback and quiet persisted logs (#579)."""
+"""Immediate create/check feedback and quiet persisted logs (#579, #646)."""
 import io
 import json
 import logging
@@ -261,3 +261,5 @@ def test_real_borg_create_progress_and_final_statistics(tmp_path, monkeypatch, c
     stats = borg_runner.parse_borg_stats(log_file)
     assert stats.files == 1 and stats.original_size > 0
     assert stats.archive_name.startswith('progress-test-')
+    estimates = [event['source_estimate'] for event in events if event and 'source_estimate' in event]
+    assert {'status': 'ready', 'bytes': source.stat().st_size} in estimates

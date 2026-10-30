@@ -22,7 +22,7 @@ const runtime = {running: true, phase: 'borg_check', run_id: 'first', borg_progr
 let html = context.renderBorgProgress(runtime, 200);
 assert.match(html, /value="63"/);
 assert.match(html, /jobs.compact.liveProgress/);
-assert.match(html, /jobs.borgUpdated 0:20/);
+assert.doesNotMatch(html, /jobs.borgUpdated/);
 assert.match(html, /jobs.checkStep/);
 assert.equal(context.renderBorgProgress({...runtime, running: false}), '');
 assert.equal(context.renderBorgProgress({...runtime, phase: 'post_script'}), '');
@@ -44,10 +44,10 @@ assert.equal(element('log-output').textContent, 'Existing log\n');
 context.updateBorgProgressDisplays({});
 assert.equal(element('job-live-metrics-demo').innerHTML, '');
 assert.ok(!nodes.has('log-borg-progress'), 'Progress never creates a live-log status field');
-console.log('Check progress: percentage, indeterminate state, age, run identity and log isolation passed.');
+console.log('Check progress: percentage, indeterminate state, run identity and log isolation passed.');
 
-// Visibility is per process, independent of opening logs. Never flash short runs.
-assert.equal(context.renderBorgProgress(runtime, 159.999), '');
+// Each supported Borg process is visible immediately, independent of opening logs.
+assert.match(context.renderBorgProgress(runtime, 100), /value="63"/);
 assert.match(context.renderBorgProgress(runtime, 160), /value="63"/);
 assert.equal(context.renderBorgProgress({...runtime, running:false}, 160), '');
 const creating = {...runtime, phase:'borg_create', borg_progress:{...runtime.borg_progress, nfiles:123, original_size:1073741824}};
@@ -56,9 +56,9 @@ assert.match(html, /jobs.createRunning/);
 assert.match(html, /123/);
 assert.match(html, /1.0 GiB/);
 assert.doesNotMatch(html, / value=|jobs.checkStep|jobs.checkPercent/);
-assert.equal(context.renderBorgProgress(creating, 159), '');
+assert.match(context.renderBorgProgress(creating, 100), /jobs.createRunning/);
 const nextCheck = {...runtime, borg_progress:{phase:'borg_check', started_at:200, percent:5}};
-assert.equal(context.renderBorgProgress(nextCheck, 259), '', 'A long create does not bypass the next check delay');
+assert.match(context.renderBorgProgress(nextCheck, 200), /value="5"/, 'The next process is visible immediately');
 assert.match(context.renderBorgProgress(nextCheck, 260), /value="5"/);
 assert.equal(context.renderBorgProgress({...runtime, borg_progress:{phase:'borg_create',started_at:100}}, 200), '');
 
@@ -87,11 +87,11 @@ for(const fileActivity of [false,true]) {
   job.borg_progress={started_at:Date.now()/1000, percent:1};
   context.openLogPanel('demo');
   context.updateBorgProgressDisplays({demo:job});
-  assert.equal(element('job-live-metrics-demo').innerHTML, '', 'Short processes stay hidden on open');
+  assert.match(element('job-live-metrics-demo').innerHTML, /<progress/, 'Short processes are visible on open');
   assert.ok(!nodes.has('log-borg-progress'));
   context.closeLogPanel();
 }
-console.log('Borg progress: 60-second per-process gate, create counters and late log opening passed.');
+console.log('Borg progress: immediate per-process display, create counters and late log opening passed.');
 
 // The four-step ledger persists independently of transient progress.
 const steps = {create:{status:'success',duration_seconds:492},prune:{status:'warning',duration_seconds:18},
@@ -102,7 +102,7 @@ assert.match(timeline, /8:12/);
 assert.match(timeline, /is-warning/);
 assert.match(timeline, /is-skipped/);
 assert.match(timeline, /jobs.borgStep.keep_all/);
-assert.doesNotMatch(timeline, /<progress/,'The stepper is visible immediately; detailed progress waits 60 seconds');
+assert.doesNotMatch(timeline, /<progress/,'The stepper does not duplicate the separate progress display');
 timeline = context.renderBorgRun({...runtime,run_borg_steps:steps},160);
 assert.doesNotMatch(timeline, /<progress/, 'Progress is in the operating-status cell, not duplicated in the timeline');
 const saved = {...steps,check:{status:'error',duration_seconds:193}};
@@ -117,16 +117,18 @@ assert.doesNotMatch(context.renderBorgRun({...completed,running:true,run_borg_st
 assert.match(context.renderBorgRun({running:false,last_borg_steps:steps},500),/is-interrupted/);
 for(const phase of ['borg_prune','borg_compact']) {
   const maintenance={running:true,phase,borg_progress:{phase,started_at:100,updated_at:110,percent:40}};
-  assert.equal(context.renderBorgProgress(maintenance,159),'');
+  assert.match(context.renderBorgProgress(maintenance,100),/value="40"/);
   assert.match(context.renderBorgProgress(maintenance,160),/value="40"/);
-  assert.equal(context.renderBorgProgress({...maintenance,borg_progress:{...maintenance.borg_progress,updated_at:null}},200),'','Do not invent maintenance progress without events');
+  const waiting=context.renderBorgProgress({...maintenance,borg_progress:{phase,started_at:100}},100);
+  assert.match(waiting,/<progress max="100" aria-label=/,'Show an indeterminate bar before the first event');
+  assert.match(waiting,/jobs.borgWaiting/);
 }
 // The regular timer must preserve completed results even with no live state.
 state.jobs=[{key:'demo',...completed}];
 context.updateBorgProgressDisplays({});
 assert.match(element('job-workflow-demo').innerHTML,/is-error/);
 assert.doesNotMatch(element('job-live-metrics-demo').innerHTML,/<progress/);
-console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and maintenance gate passed.');
+console.log('Four-step timeline: durations, saved results, skip/warning/error states, new-run reset and immediate maintenance display passed.');
 
 (async () => {
   // Starting a job only refreshes the card. A log opens only after a click.
@@ -275,3 +277,24 @@ const timed=context.renderJobOperation({...workflowJob,run_start_time:new Date(5
 assert.match(timed,/jobs.compact.currentAction/);
 assert.match(timed,/jobs.compact.stepElapsed 1:40/);
 assert.match(timed,/jobs.borgTotalElapsed 2:30/);
+
+// Optional create estimates reuse the existing metrics row (#646).
+const measuredCreate = {running:true,phase:'borg_create',borg_progress:{phase:'borg_create',started_at:100,
+  updated_at:200,nfiles:10,original_size:500,source_size_status:'ready',estimated_total_bytes:1000,
+  estimated_percent:50,processing_speed_bytes_per_sec:25,rate_updated_at:200,estimated_remaining_seconds:20}};
+html=context.renderBorgProgress(measuredCreate,200);
+assert.match(html,/value="50"/);
+assert.match(html,/jobs.liveMetrics.percent/);
+assert.match(html,/jobs.liveMetrics.processing 25 B/);
+assert.match(html,/jobs.liveMetrics.remaining 0:20/);
+assert.doesNotMatch(context.renderBorgProgress(measuredCreate,231),/jobs.liveMetrics.processing|jobs.liveMetrics.remaining /);
+assert.match(context.renderBorgProgress(measuredCreate,231),/jobs.liveMetrics.remainingUnknown/);
+for(const status of ['scanning','failed','unsupported','timed_out','cancelled','outgrown']) {
+  html=context.renderBorgProgress({...measuredCreate,borg_progress:{...measuredCreate.borg_progress,source_size_status:status}},200);
+  assert.doesNotMatch(html,/value="50"/);
+  assert.doesNotMatch(html,/jobs.liveMetrics.remaining /);
+}
+measuredCreate.borg_progress.processing_speed_bytes_per_sec=0;
+assert.match(context.renderBorgProgress(measuredCreate,200),/jobs.liveMetrics.processing 0 B/);
+assert.doesNotMatch(context.borgProgressSize(.5),/undefined|NaN/);
+console.log('Create estimates: optional progress, stale rates, zero speed and scan states passed.');

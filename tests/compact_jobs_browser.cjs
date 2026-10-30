@@ -164,9 +164,28 @@ const {chromium} = require('playwright');
     await page.evaluate(()=>{window.lang='de';renderJobsGrid(jobsState.jobs);});
     await page.locator('#job-card-running [data-jobs-action="toggle-workflow"]').click();
     await page.evaluate(()=>{window.spinner=document.querySelector('#job-card-running tr.is-running svg');window.meter=document.querySelector('#job-card-running progress');});
-    await page.evaluate(()=>{live.borg_progress.nfiles=999;updateBorgProgressDisplays({running:live});});
+    await page.evaluate(()=>{live.borg_progress.nfiles=999;live.borg_progress.started_at=Date.now()/1000;updateBorgProgressDisplays({running:live});});
     assert.equal(await page.evaluate(()=>spinner===document.querySelector('#job-card-running tr.is-running svg')&&meter===document.querySelector('#job-card-running progress')),true);
     assert.ok((await page.locator('#job-card-running .job-live-metrics').textContent()).includes('999'));
+    await page.evaluate(()=>{
+      Object.assign(live.borg_progress,{source_size_status:'ready',estimated_total_bytes:2*1024**3,
+        estimated_percent:50,processing_speed_bytes_per_sec:8*1024**2,estimated_remaining_seconds:128,rate_updated_at:Date.now()/1000});
+      updateBorgProgressDisplays({running:live});
+    });
+    assert.equal(await page.locator('#job-card-running progress').getAttribute('value'),'50');
+    assert.match(await page.locator('#job-card-running .job-live-metrics').textContent(),/8[,.]0 MiB\/s/);
+    for(const width of [1600,768,390])for(const language of ['de','en']) {
+      await page.setViewportSize({width,height:1100});
+      await page.evaluate(language=>{window.lang=language;updateBorgProgressDisplays({running:live});},language);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Metrics fit ${width}/${language}`);
+      const bar=await page.locator('#job-card-running progress').boundingBox();
+      const metrics=await page.locator('#job-card-running .borg-progress-metrics').boundingBox();
+      assert.ok(metrics.y>=bar.y+bar.height,`Metrics appear below bar ${width}/${language}`);
+      assert.doesNotMatch(await page.locator('#job-card-running .job-live-metrics').textContent(),/Letzte Borg-Rückmeldung|Last Borg update/);
+
+      if(process.env.BBUI_SCREENSHOT_DIR)await page.locator('#job-card-running').screenshot({animations:'disabled',path:`${process.env.BBUI_SCREENSHOT_DIR}/live-metrics-${language}-${width}.png`});
+    }
+    await page.setViewportSize({width:1600,height:1100});
     await page.evaluate(()=>{jobsState.jobs=jobsState.jobs.map(j=>j.key==='running'?{...j,...jobRuntimeState(live)}:j);renderJobsGrid(jobsState.jobs);});
     assert.equal(await page.locator('#job-card-running [data-jobs-action="toggle-workflow"]').getAttribute('aria-expanded'),'true');
     await page.evaluate(()=>{

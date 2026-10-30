@@ -7,9 +7,22 @@ repository.
 
 ## Test Command
 
+From the repository root, expose runtime modules to spawned Python test
+processes and keep temporary files inside the repository:
+
 ```bash
+mkdir -p .release-tmp/test-tmp
+export TMPDIR="$PWD/.release-tmp/test-tmp"
+export PYTHONPATH="$PWD:$PWD/api:$PWD/runtime${PYTHONPATH:+:$PYTHONPATH}"
 pytest -q
 ```
+
+Use the same environment for `plugin/mr-preflight.sh`. Put the installed test
+Python/pytest, Node.js and Borg executables on `PATH`. Browser tests additionally
+need Playwright and Chromium; `BBUI_CHROMIUM` can select an installed Chromium
+executable (including headless shell). Tests that exercise the job runtime
+loader must isolate its deliberate `os.environ` changes so Unraid defaults such
+as `/mnt/cache` do not leak into subsequent local Borg tests (#646).
 
 ## Coverage Map
 

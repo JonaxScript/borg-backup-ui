@@ -706,6 +706,19 @@
     "repositoryLastInfoFailed": "Letzte Info-Abfrage fehlgeschlagen"
   },
   "jobs": {
+    "liveMetrics": {
+      "processing": "Verarbeitung: {speed}/s",
+      "total": "Quellgröße: ca. {size}",
+      "remaining": "Archiverstellung: noch ca. {time}",
+      "remainingUnknown": "Restzeit der Archiverstellung: unbekannt",
+      "percent": "ca. {percent} %",
+      "scanning": "Quellgröße wird ermittelt …",
+      "unsupported": "Größenschätzung bei Marker- oder Musterausschlüssen nicht verfügbar",
+      "failed": "Quellgröße nicht verfügbar",
+      "timedOut": "Größenscan nach 5 Min. beendet",
+      "cancelled": "Größenscan abgebrochen",
+      "outgrown": "Quellgröße überschritten – Fortschritt und Restzeit unbekannt"
+    },
     "createRunning": "Archiv erstellen (borg create)",
     "createFiles": "{count} Dateien verarbeitet",
     "createBytes": "Originaldaten: {size}",
