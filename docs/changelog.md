@@ -1,5 +1,10 @@
 # Changelog
 
+## Pending - Compact completed maintenance results (#666)
+
+- Place desktop maintenance actions in two separated columns with aligned, stationary Start buttons. Bound result areas to the shared workspace so expanded logs scroll inside their action instead of pushing Compact below the panel. Preserve readable stacked layouts and outer scrolling on short/narrow windows.
+- Cover results arriving after the initial compact overview, mixed old/new detail records, all four expanded logs, warning/error/running states and narrow/short layouts in both languages. Existing action routing, confirmations and guards remain unchanged.
+
 ## Pending - Refresh repository job links on return (#664)
 
 - Invalidate lifecycle snapshots when repository/job data is refreshed and reload the expanded repository regardless of its selected tab. Load archive and lifecycle details independently so archive reads do not delay current link information.

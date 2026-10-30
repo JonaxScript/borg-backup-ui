@@ -1802,3 +1802,17 @@
 @media (min-width: 1101px) {
   .storage-repository-management > .storage-lifecycle-card + .storage-lifecycle-card { border-left: 1px solid var(--ui-color-border); padding-left: 24px; }
 }
+
+/* Keep completed maintenance results and their controls inside the shared workspace (#666). */
+@media (min-width: 1101px) {
+  .storage-maintenance-page { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 12px; }
+  .storage-maintenance-page > .storage-section-heading { flex-shrink: 0; }
+  .storage-maintenance-action-grid { flex: 1; min-height: 22rem; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .storage-repository-card .storage-maintenance-action-grid .storage-maintenance-card { min-height: 0; grid-template-columns: minmax(0, 1fr) 110px; grid-template-rows: auto minmax(0, 1fr); gap: 8px 16px; padding: 12px 0; }
+  .storage-maintenance-action-grid .storage-maintenance-title { grid-column: 1; grid-row: 1; }
+  .storage-repository-card .storage-maintenance-action-grid .storage-maintenance-card > button { grid-column: 2; grid-row: 1; }
+  .storage-maintenance-action-grid .storage-maintenance-copy { grid-column: 1 / -1; grid-row: 2; align-self: stretch; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+  .storage-repository-card .storage-maintenance-action-grid .storage-maintenance-card:nth-child(even) { border-left: 1px solid var(--ui-color-border); padding-left: 24px; }
+  .storage-maintenance-action-grid .storage-maintenance-result-details pre,
+  .storage-maintenance-action-grid .storage-maintenance-result-details ul { max-height: none; overflow: visible; }
+}
