@@ -8,6 +8,7 @@ const {chromium} = require('playwright');
     for (const language of ['de','en']) {
       const page = await browser.newPage({viewport:{width:1200,height:1000}});
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
+      let runsOverride=null;
       let profiles=[], actions=0, action='', deletes=0, lastAction;
       const browserDialogs=[];page.on('dialog',async dialog=>{browserDialogs.push(dialog.message());await dialog.dismiss();});
       const credential=language==='de'?'b'.repeat(32):'database-'+'a'.repeat(60)+'-v001';
@@ -19,7 +20,7 @@ const {chromium} = require('playwright');
           if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:credential};profiles=[row];body={profile:row};}
           else if(req.method()==='DELETE'){deletes++;profiles=[];body={deleted:true};}
           else body={profiles,unsupported_profiles:[{id:'db-cccccccccccc',name:'<img retired>',engine:'sqlite'}]};
-        } else if(url.pathname.endsWith('/runs')) body={runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
+        } else if(url.pathname.endsWith('/runs')) body=runsOverride || {runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
         else if(url.pathname.endsWith('/action')) {actions++;lastAction=req.postDataJSON();action=lastAction.action;body={id:'a'.repeat(32),status:'running'};}
         else if(url.pathname.endsWith('/status')) body={status:'completed',profile_id:'db-aaaaaaaaaaaa',action,results:[],...(action==='discover'?{databases:['app','photos','new_unselected']}:{})};
         else if(url.pathname.endsWith('/runtime-inventory')) body={docker_containers:['mariadb-test','postgres-test']};
@@ -145,6 +146,23 @@ const {chromium} = require('playwright');
       await page.locator('#settings-dialog-confirm-btn').click();
       await page.waitForFunction(()=>settingsState.activeTab==='general');
       assert.equal(await page.evaluate(()=>settingsState.databaseDirty),false);
+      const labels=JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`,'utf8')).database;
+      const storageError={profile_id:'db-aaaaaaaaaaaa',profile_name:'<img missing>',staging_dir:'/mnt/cache/<dump>',error_code:'database_storage_missing'};
+      runsOverride={runs:[],errors:[storageError]};
+      await page.evaluate(()=>loadDatabaseRuns());
+      let runText=await page.locator('#db-runs').textContent();
+      assert.ok(runText.includes(labels.runsUnavailable));
+      assert.equal(runText.includes(labels.noRuns),false);
+      assert.ok(runText.includes('<img missing>') && runText.includes('/mnt/cache/<dump>'));
+      assert.equal(await page.locator('#db-runs img, #db-runs dump').count(),0);
+      runsOverride={runs:[{profile_name:'Available profile',directory:'/mnt/cache/available',status:'dump_completed',bytes:123}],errors:[storageError]};
+      await page.evaluate(()=>loadDatabaseRuns());
+      runText=await page.locator('#db-runs').textContent();
+      assert.ok(runText.includes('Available profile') && runText.includes('<img missing>'));
+      assert.equal(runText.includes(labels.noRuns),false);
+      runsOverride={runs:[],errors:[]};
+      await page.evaluate(()=>loadDatabaseRuns());
+      assert.ok((await page.locator('#db-runs').textContent()).includes(labels.noRuns));
       assert.deepEqual(browserDialogs,[]);
       assert.deepEqual(errors,[]);
       await page.close();

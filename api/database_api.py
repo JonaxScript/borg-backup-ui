@@ -1,12 +1,14 @@
 """Asynchronous administrator actions for managed database backups (#591)."""
 from __future__ import annotations
 import json
+import os
+import stat
 import threading
 import uuid
 from pathlib import Path
 
 from database_profiles import DatabaseError, data_root, snapshot_profiles, list_profiles
-from database_backup import export_profiles, reconcile_operations, open_staging, _descriptor_path, _private_path, cleanup_run, is_run_directory_name, utc_now, discover_databases, close_results
+from database_backup import export_profiles, reconcile_operations, open_staging, _descriptor_path, open_dump_directory, open_dump_file, cleanup_run, is_run_directory_name, utc_now, discover_databases, close_results
 from inventory_store import atomic_write_json
 
 _active = {}
@@ -106,34 +108,42 @@ def start_operation(config, payload):
 
 
 def retained_runs(config):
-    """List current/legacy runs with profile snapshots, dates and byte counts.
+    """List dumps with normal Unraid permissions through held directory handles.
 
-    Never follow links or open an absent mount. Original sizes come from completed
-    manifest entries; bytes includes all regular run files, including the manifest.
+    Listing never creates paths or changes owners/modes. Unavailable locations
+    include their profile name and configured path for actionable UI diagnostics.
     """
     rows, errors = [], []
     for profile in list_profiles(config)['profiles']:
         try:
             with open_staging(profile, require_space=False) as fd:
-                root = _descriptor_path(fd)
-                for directory in sorted(root.glob('bbui-*'))[-500:]:
-                    if not is_run_directory_name(directory.name) or directory.is_symlink() or not directory.is_dir():
+                for name in sorted(name for name in os.listdir(fd) if is_run_directory_name(name))[-500:]:
+                    info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                    if not stat.S_ISDIR(info.st_mode):
                         continue
-                    _private_path(directory)
-                    path = directory / 'manifest.json'
-                    if path.is_symlink() or not path.is_file():
-                        continue
-                    row = json.loads(path.read_text())
-                    if row.get('profile_id') != profile['id']:
-                        continue
-                    rows.append({'profile_id': profile['id'], 'profile_name': row.get('profile_name') or profile['name'],
-                                 'compression': row.get('compression', 'none'),
-                                 'uncompressed_bytes': sum(f.get('uncompressed_bytes', f.get('bytes', 0)) for f in row.get('files', [])),
-                                 'directory': str(Path(profile['staging_dir']) / directory.name), 'status': row.get('status'),
-                                 'started_at': row.get('started_at'), 'archived': row.get('archived', False),
-                                 'bytes': sum(p.stat().st_size for p in directory.iterdir() if p.is_file() and not p.is_symlink())})
+                    with open_dump_directory(fd, name) as run_fd:
+                        directory = _descriptor_path(run_fd)
+                        try:
+                            with open_dump_file(directory / 'manifest.json') as handle:
+                                row = json.load(handle)
+                        except FileNotFoundError:
+                            continue
+                        if row.get('profile_id') != profile['id']:
+                            continue
+                        size = 0
+                        for child in os.listdir(run_fd):
+                            entry = os.stat(child, dir_fd=run_fd, follow_symlinks=False)
+                            if stat.S_ISREG(entry.st_mode):
+                                size += entry.st_size
+                        rows.append({'profile_id': profile['id'], 'profile_name': row.get('profile_name') or profile['name'],
+                                     'compression': row.get('compression', 'none'),
+                                     'uncompressed_bytes': sum(f.get('uncompressed_bytes', f.get('bytes', 0)) for f in row.get('files', [])),
+                                     'directory': str(Path(profile['staging_dir']) / name), 'status': row.get('status'),
+                                     'started_at': row.get('started_at'), 'archived': row.get('archived', False), 'bytes': size})
         except DatabaseError as exc:
-            errors.append({'profile_id': profile['id'], 'error_code': exc.api_code})
+            errors.append({'profile_id': profile['id'], 'profile_name': profile['name'],
+                           'staging_dir': profile['staging_dir'], 'error_code': exc.api_code})
         except Exception:
-            errors.append({'profile_id': profile['id'], 'error_code': 'database_invalid_storage'})
+            errors.append({'profile_id': profile['id'], 'profile_name': profile['name'],
+                           'staging_dir': profile['staging_dir'], 'error_code': 'database_invalid_storage'})
     return {'runs': rows, 'errors': errors}

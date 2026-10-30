@@ -56,11 +56,9 @@ def test_staging_and_source_overlap_fail_closed(monkeypatch, profile):
     backup.validate_sources([profile],[str(Path(profile['staging_mount'])/'other')])
 
 
-def test_staging_rejects_unsafe_permissions_and_low_space(monkeypatch, profile):
+def test_shared_staging_preserves_space_checks(monkeypatch, profile):
     root=Path(profile['staging_dir'])
     root.chmod(0o777)
-    with pytest.raises(profiles.DatabaseError,match='storage_permissions'):backup._private_path(root)
-    root.chmod(0o700)
     monkeypatch.setattr(backup.os.path,'ismount',lambda p:True)
     monkeypatch.setattr(backup,'_run',lambda *a,**kw:Mock(stdout='xfs'))
     monkeypatch.setattr(backup.os,'fstatvfs',lambda fd:Mock(f_bavail=1,f_frsize=1))
@@ -69,7 +67,7 @@ def test_staging_rejects_unsafe_permissions_and_low_space(monkeypatch, profile):
 
 
 def fake_export(monkeypatch, profile, failure=None):
-    # Substitute host mount/type only; retain real FD, ownership and mode checks.
+    # Substitute host mount/type only; retain real descriptor and access checks.
     monkeypatch.setattr(backup.os.path, 'ismount', lambda p: True)
     monkeypatch.setattr(backup, '_run', lambda *a, **kw: Mock(stdout='xfs'))
     monkeypatch.setattr(backup, 'container_identity', lambda p:'a'*64)
@@ -89,7 +87,7 @@ def test_export_uses_only_current_completed_files_and_retains_previous(config, p
     paths=backup.artifact_paths(second)
     assert {p.name for p in paths} == {'app.sql.gz','manifest.json'}
     assert all(p.parent.samefile(second[0]['directory']) for p in paths)
-    assert all(p.is_file() and p.stat().st_mode & 0o777 == 0o600 for p in paths)
+    assert all(p.is_file() and p.stat().st_mode & 0o777 == 0o644 for p in paths)
     assert first[0]['restore_tested'] is False
 
 
@@ -196,6 +194,7 @@ def test_runner_database_step_precedes_container_stop(run_backup, monkeypatch, t
     monkeypatch.setattr(wizard_runner,'_load_env_from_job',load)
     monkeypatch.setattr(backup,'validate_sources',lambda *a:None)
     monkeypatch.setattr(backup,'reconcile_operations',lambda *a:None)
+    (tmp_path/'result').mkdir()
     result={'directory':str(tmp_path/'result'),'files':[], 'profile_id':profile['id']}
     def export(*a,**kw):
         state.actions.append('database')

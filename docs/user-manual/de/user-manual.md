@@ -2130,22 +2130,31 @@ die Zähler nennen die ausgewählten Ordner bzw. Profile. Der Reiterwechsel
 
 Das Feld **Docker-Container** bietet eine Auswahlliste der erkannten Container.
 
-Ein privates Verzeichnis (Modus `0700`, Eigentümer normalerweise root)
-auf einem tatsächlich gemounteten lokalen Pool/Datenträger auswählen. Pool und Elternverzeichnisse
-behalten ihre normalen Unraid-Eigentümer und Rechte (auch `nobody:users`, `0777`).
-Nur das private Dump-Verzeichnis benötigt den Plugin-Eigentümer und `0700`;
-vorhandene Pool-Rechte ändert das Plugin nicht. Alle Pfadbestandteile werden ohne
-Verfolgung symbolischer Links geöffnet. Gehaltene Verzeichnis-Handles stellen
-sicher, dass Export, Archivierung und Bereinigung beim ursprünglichen Verzeichnis
-bleiben, wenn ein anderer Benutzer dessen Pfad umbenennt oder ersetzt. Unterstützt: Btrfs, XFS, ext-Dateisysteme
-und ZFS. Den echten Poolpfad statt `/mnt/user` verwenden. Bootstick, RAM und
-Netzwerk-Dateisysteme sind nicht unterstützt. Den tatsächlichen Mountpunkt separat
-angeben. Die Freiplatzgrenze schätzt die Dump-Größe nicht; Platz für vollständige
-Exporte vorsehen. Ein fehlendes Verzeichnis direkt unter dem eingebundenen Pool
-legt ein ausdrücklich gestarteter Dump mit Modus `0700` an. Mountpunkt und etwaige
-Zwischenverzeichnisse müssen vorhanden sein. Fehlermeldungen unterscheiden einen
-fehlenden Mount, unzugängliche Pfade/Symlinks, falsche Rechte des privaten Ordners,
-ein ungeeignetes Dateisystem und fehlenden freien Speicher.
+Ein Dump-Verzeichnis auf einem tatsächlich gemounteten lokalen Pool/Datenträger
+verwenden. Vorhandene Eigentümer und Rechte bleiben unverändert, auch
+`nobody:users` und `0777`. Entscheidend ist, dass das Plugin das Verzeichnis
+lesen, durchsuchen und für Exporte beschreiben kann. Neue Laufverzeichnisse
+verwenden `0755`, Dump-Dateien und Manifeste `0644`. Zugangsdaten und interne
+Steuerdaten bleiben separat mit privaten Rechten geschützt.
+
+Alle Pfadbestandteile werden ohne Verfolgung symbolischer Links geöffnet.
+Gehaltene Verzeichnis-Handles binden Export und Archivierung an das ursprüngliche
+Laufverzeichnis, auch wenn dessen Name oder der übergeordnete Pfad ersetzt wird.
+Die Bereinigung verweigert ersetzte Laufverzeichnisse, Links und unbekannte Dateien.
+Unterstützt werden Btrfs, XFS, ext-Dateisysteme und ZFS. Den echten Poolpfad statt
+`/mnt/user` verwenden. Bootstick, RAM und Netzwerk-Dateisysteme sind nicht
+unterstützt. Den tatsächlichen Mountpunkt separat angeben. Die Freiplatzgrenze
+schätzt die Dump-Größe nicht; Platz für vollständige Exporte vorsehen.
+
+Ein ausdrücklich gestarteter Dump kann ein fehlendes Verzeichnis direkt unter
+dem eingebundenen Pool mit Modus `0755` (begrenzt durch die Prozess-Umask) anlegen.
+Mountpunkt und etwaige Zwischenverzeichnisse müssen vorhanden sein. Das Speichern
+eines Profils und das Auflisten lokaler Läufe legen keine Dump-Verzeichnisse an.
+Fehlermeldungen nennen Profil und Pfad und unterscheiden fehlenden Mount,
+fehlendes Dump-Verzeichnis, unzugänglichen Pfad/Symlink, fehlende Zugriffsrechte,
+ungeeignetes Dateisystem und fehlenden freien Speicher. Bei einem Lesefehler
+erscheint die Übersicht nicht als erfolgreich geprüfte, leere Liste; lesbare
+Profile bleiben sichtbar. Bestehende Profile und Dumps benötigen keine Migration.
 
 ### 19.2 Ablauf und Prüfung
 

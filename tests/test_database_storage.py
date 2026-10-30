@@ -1,4 +1,4 @@
-"""Unraid writable-pool access and descriptor lifetime regressions (#591)."""
+"""Unraid writable-pool access and descriptor lifetime regressions (#591, #652)."""
 import copy
 import json
 import os
@@ -43,13 +43,13 @@ def test_writable_pool_and_foreign_pool_owner_are_accepted(monkeypatch, profile,
 
 
 @pytest.mark.parametrize('mode', [0o755, 0o770, 0o777])
-def test_only_dump_directory_must_be_private(profile, pool, mode):
+def test_normal_dump_directory_modes_are_preserved(profile, pool, mode):
     Path(profile['staging_dir']).chmod(mode)
-    with pytest.raises(DatabaseError, match='storage_permissions'):
-        backup.staging_root(profile)
+    assert backup.staging_root(profile) == Path(profile['staging_dir'])
+    assert Path(profile['staging_dir']).stat().st_mode & 0o777 == mode
 
 
-def test_foreign_dump_owner_is_rejected(monkeypatch, profile, pool):
+def test_foreign_dump_owner_is_accepted(monkeypatch, profile, pool):
     original = backup.os.fstat
     inode = Path(profile['staging_dir']).stat().st_ino
     def foreign_dump_owner(fd):
@@ -59,16 +59,16 @@ def test_foreign_dump_owner_is_rejected(monkeypatch, profile, pool):
             return os.stat_result(values)
         return info
     monkeypatch.setattr(backup.os, 'fstat', foreign_dump_owner)
-    with pytest.raises(DatabaseError, match='storage_permissions'): backup.staging_root(profile)
+    assert backup.staging_root(profile) == Path(profile['staging_dir'])
 
 
 def test_only_export_creates_missing_direct_child(profile, pool):
     root = Path(profile['staging_dir']); root.rmdir()
-    with pytest.raises(DatabaseError, match='storage_path'):
+    with pytest.raises(DatabaseError, match='storage_missing'):
         backup.staging_root(profile, require_space=False)
     assert not root.exists()
     backup.staging_root(profile)
-    assert root.stat().st_mode & 0o777 == 0o700
+    assert root.stat().st_mode & 0o777 == 0o755
     assert pool.stat().st_mode & 0o777 == 0o777
 
 
@@ -132,8 +132,9 @@ def test_path_replacement_during_export_cannot_redirect_io(config, profile, pool
 
 def test_retained_listing_reports_precise_storage_error(config, profile, pool, monkeypatch):
     monkeypatch.setattr(database_api, 'list_profiles', lambda config: {'profiles':[profile]})
-    Path(profile['staging_dir']).chmod(0o755)
-    assert database_api.retained_runs(config) == {'runs':[], 'errors':[{'profile_id':profile['id'], 'error_code':'database_storage_permissions'}]}
+    Path(profile['staging_dir']).rmdir()
+    assert database_api.retained_runs(config) == {'runs':[], 'errors':[{'profile_id':profile['id'], 'profile_name':profile['name'], 'staging_dir':profile['staging_dir'], 'error_code':'database_storage_missing'}]}
+    assert not Path(profile['staging_dir']).exists()
 
 
 def test_retained_cleanup_on_writable_pool_and_no_fd_in_json(config, profile, pool, monkeypatch):
@@ -149,12 +150,15 @@ def test_retained_cleanup_on_writable_pool_and_no_fd_in_json(config, profile, po
 
 
 @pytest.mark.skipif(shutil.which('borg') is None, reason='Borg executable required')
-def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, monkeypatch, tmp_path):
+@pytest.mark.parametrize('replaced', ['root', 'run'])
+def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, monkeypatch, tmp_path, replaced):
     fake_export(monkeypatch, profile)
     results = backup.export_profiles(config, [profile], 'job', 'run')
     try:
-        root = Path(profile['staging_dir']); root.rename(root.with_name('original'))
-        root.mkdir(mode=0o700)
+        root = Path(profile['staging_dir'])
+        original = root if replaced == 'root' else Path(results[0]['directory'])
+        original.rename(original.with_name('original'))
+        original.mkdir(mode=0o777)
         for key in ('BORG_CACHE_DIR', 'BORG_SECURITY_DIR'):
             monkeypatch.setenv(key, str(tmp_path/key))
         monkeypatch.setenv('BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK', 'yes')
@@ -162,6 +166,14 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         def borg(*args):
             return subprocess.check_output(['borg', *args], stderr=subprocess.PIPE, text=True, timeout=60)
         borg('init', '--encryption=none', repo)
+        # The persistent configuration may be on FAT, which has no symlinks.
+        symlink = backup.os.symlink
+        def reject_persistent_alias(target, name, **kwargs):
+            parent = Path(os.readlink(backup._descriptor_path(kwargs['dir_fd'])))
+            if parent.is_relative_to(backup.data_root(config)):
+                raise OSError('boot filesystem does not support symlinks')
+            return symlink(target, name, **kwargs)
+        monkeypatch.setattr(backup.os, 'symlink', reject_persistent_alias)
         archive = 'appdata-backup-2026-10-24_12-40-29'
         borg('create', repo+'::'+archive, *backup.borg_artifact_paths(results))
         before = borg('list', '--json', repo)
@@ -172,8 +184,17 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         assert sorted(paths) == sorted(results[0]['archive_directory']+'/'+name for name in ['app.sql.gz','manifest.json'])
         backup.verify_archive(repo, archive, results)
         backup.write_manifest(results[0])
-        backup.cleanup_run(results[0], profile, verified=True)
-        assert not list(root.iterdir())
+        alias = results[0]._alias_path
+        assert alias.stat().st_mode & 0o777 == 0o700
+        if replaced == 'root':
+            backup.cleanup_run(results[0], profile, verified=True)
+            assert not list(root.iterdir())
+        else:
+            with pytest.raises(DatabaseError, match='cleanup_blocked'):
+                backup.cleanup_run(results[0], profile, verified=True)
+            assert not list(original.iterdir())
+        backup.close_results(results)
+        assert not alias.exists()
     finally:
         backup.close_results(results)
 
@@ -196,3 +217,104 @@ def test_export_failure_retains_manifest_and_releases_handle(config, profile, po
         backup.close_results(results)
     with pytest.raises(OSError): os.fstat(fd)
     assert (Path(results[0]['directory'])/'app.sql.gz.partial').is_file()
+
+
+def test_unraid_modes_and_ownership_allow_export_listing_and_cleanup(config, profile, pool, monkeypatch):
+    fake_export(monkeypatch, profile)
+    root = Path(profile['staging_dir'])
+    root.chmod(0o777)
+    results = backup.export_profiles(config, [profile], 'job', 'run')
+    run = Path(results[0]['directory'])
+    assert run.stat().st_mode & 0o777 == 0o755
+    assert all(path.stat().st_mode & 0o777 == 0o644 for path in run.iterdir())
+    backup.close_results(results)
+    run.chmod(0o777)
+    for path in run.iterdir():
+        path.chmod(0o666)
+    # Simulate Unraid's nobody:users ownership without requiring root in CI.
+    original = backup.os.stat
+    def foreign_owner(*args, **kwargs):
+        info = original(*args, **kwargs)
+        values = list(info); values[4] = 99; values[5] = 100
+        return os.stat_result(values)
+    monkeypatch.setattr(backup.os, 'stat', foreign_owner)
+    monkeypatch.setattr(database_api, 'list_profiles', lambda _: {'profiles':[profile]})
+    listing = database_api.retained_runs(config)
+    assert len(listing['runs']) == 1 and not listing['errors']
+    backup.cleanup_run(run, profile)
+    assert list(root.iterdir()) == []
+    assert root.stat().st_mode & 0o777 == 0o777
+
+
+def test_run_replacement_cannot_redirect_export_or_manifest(config, profile, pool, monkeypatch, tmp_path):
+    fake_export(monkeypatch, profile)
+    root = Path(profile['staging_dir']); root.chmod(0o777)
+    outside = tmp_path / 'outside'; outside.mkdir()
+    sentinel = outside / 'manifest.json'; sentinel.write_text('keep')
+    old = []
+    def replace(*args):
+        run = next(root.glob('bbui-*'))
+        renamed = run.with_name('renamed-run')
+        run.rename(renamed)
+        run.symlink_to(outside, target_is_directory=True)
+        old.append(renamed)
+        return {'server_version':'11.4', 'client_version':'11.4', 'extensions':[]}
+    monkeypatch.setattr(backup, '_probe', replace)
+    results = backup.export_profiles(config, [profile], 'job', 'run')
+    try:
+        backup.write_manifest(results[0])
+        assert (old[0] / 'app.sql.gz').is_file()
+        assert sentinel.read_text() == 'keep'
+        assert not (outside / 'app.sql.gz').exists()
+        with pytest.raises(DatabaseError, match='cleanup_blocked'):
+            backup.cleanup_run(results[0], profile)
+    finally:
+        backup.close_results(results)
+
+
+def test_listing_permission_denied_and_missing_mount_are_distinct(config, profile, pool, monkeypatch):
+    monkeypatch.setattr(database_api, 'list_profiles', lambda _: {'profiles':[profile]})
+    monkeypatch.setattr(backup.os, 'access', lambda *a, **kw: False)
+    assert database_api.retained_runs(config)['errors'][0]['error_code'] == 'database_storage_permissions'
+    monkeypatch.setattr(backup.os.path, 'ismount', lambda _: False)
+    assert database_api.retained_runs(config)['errors'][0]['error_code'] == 'database_storage_mount'
+
+
+def test_listing_partial_results_preserves_available_profile(config, profile, pool, monkeypatch):
+    fake_export(monkeypatch, profile)
+    results = backup.export_profiles(config, [profile], 'job', 'run')
+    backup.close_results(results)
+    missing = dict(profile, id='db-bbbbbbbbbbbb', name='Missing database', staging_dir=str(pool/'absent'))
+    monkeypatch.setattr(database_api, 'list_profiles', lambda _: {'profiles':[profile, missing]})
+    response = database_api.retained_runs(config)
+    assert len(response['runs']) == 1
+    assert response['errors'][0]['profile_name'] == 'Missing database'
+    assert response['errors'][0]['staging_dir'] == str(pool/'absent')
+    assert not (pool/'absent').exists()
+
+
+@pytest.mark.parametrize('kind', ['symlink', 'hardlink', 'fifo'])
+def test_shared_manifest_links_and_special_files_are_rejected(config, profile, pool, monkeypatch, tmp_path, kind):
+    fake_export(monkeypatch, profile)
+    results = backup.export_profiles(config, [profile], 'job', 'run')
+    run = Path(results[0]['directory'])
+    backup.close_results(results)
+    run.chmod(0o777)
+    manifest = run / 'manifest.json'
+    outside = tmp_path / 'outside.json'
+    outside.write_bytes(manifest.read_bytes())
+    original = outside.read_bytes()
+    manifest.unlink()
+    if kind == 'symlink':
+        manifest.symlink_to(outside)
+    elif kind == 'hardlink':
+        os.link(outside, manifest)
+    else:
+        os.mkfifo(manifest)
+    monkeypatch.setattr(database_api, 'list_profiles', lambda _: {'profiles':[profile]})
+    listing = database_api.retained_runs(config)
+    assert not listing['runs'] and listing['errors'][0]['error_code'] == 'database_storage_path'
+    with pytest.raises(DatabaseError, match='cleanup_blocked'):
+        backup.cleanup_run(run, profile)
+    assert outside.read_bytes() == original
+    assert (run / 'app.sql.gz').exists()

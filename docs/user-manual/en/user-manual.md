@@ -2088,20 +2088,29 @@ both selections and the backup destination.
 
 The **Docker container** field offers a dropdown of discovered containers.
 
-Use a directory with mode `0700`, owned by the plugin execution user
-(normally root), on a real mounted local pool/disk. Pool and parent directories may retain their normal Unraid ownership
-and permissions (including `nobody:users`, `0777`). Only the private dump directory
-requires the plugin owner and `0700`; the plugin never changes existing pool
-permissions. All components are opened without following symlinks. Held directory
-handles keep exports, archiving and cleanup on the original directory if another
-user renames or replaces its path. Supported filesystem types are Btrfs, XFS, ext-family and ZFS. Use the
-actual pool path, not `/mnt/user`; boot storage, RAM and network filesystems are
-not supported. Select the actual mount point separately. The free-space reserve
-is a guard, not an estimate of dump size; allocate room for complete exports.
-An explicit dump creates a missing directory directly below the mounted pool
-with mode `0700`; the mount and any intermediate directories must already exist.
-Storage errors distinguish an absent mount, inaccessible/symlink path, incorrect
-private-directory permissions, unsupported filesystem and insufficient free space.
+Use a dump directory on a real mounted local pool/disk. Existing ownership and
+permissions remain unchanged, including `nobody:users` and `0777`. The plugin
+needs read/traversal access and, for exports, write access. New run directories
+use `0755`; dump files and manifests use `0644`. Credentials and internal control
+records remain separately protected with private permissions.
+
+All path components are opened without following symlinks. Held directory handles
+keep exports and archiving on the original run directory even if its name or a
+parent path is replaced. Cleanup rejects replaced run directories, links and
+unknown files. Supported filesystem types are Btrfs, XFS, ext-family and ZFS.
+Use the actual pool path, not `/mnt/user`; boot storage, RAM and network
+filesystems are not supported. Select the actual mount point separately. The
+free-space reserve is a guard, not a dump-size estimate; allow room for complete
+exports.
+
+An explicit dump may create a missing directory directly below the mounted pool
+with mode `0755` (subject to the process umask). The mount and intermediate
+directories must already exist. Saving a profile and listing local runs never
+create dump directories. Errors include the profile and path and distinguish an
+absent mount, missing dump directory, inaccessible/symlink path, insufficient
+access permissions, unsupported filesystem and insufficient free space. A listing
+failure is not shown as a successfully checked empty history; readable profiles
+remain visible. Existing profiles and dumps need no migration.
 
 ### 19.2 Run and verify
 

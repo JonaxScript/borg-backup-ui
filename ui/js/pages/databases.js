@@ -215,8 +215,8 @@ async function loadDatabaseRuns() {
       return `<article class="database-run"><header><strong>${escHtml(r.profile_name || r.profile_id)}</strong><time datetime="${escHtml(r.started_at || '')}">${escHtml(timestamp)}</time></header>
         <div class="database-run-meta"><span class="badge">${escHtml(dbT(r.status))}</span><span>${escHtml(r.compression === 'gzip' ? dbT('compressedSize', {size:settingsFmtBytes(r.bytes)}) : settingsFmtBytes(r.bytes))}</span>${r.compression === 'gzip' ? `<span>${escHtml(dbT('originalSize', {size:settingsFmtBytes(r.uncompressed_bytes)}))}</span>` : ''}</div>
         <code>${escHtml(r.directory)}</code><span>${escHtml(r.archived ? dbT('archived') : dbT('notArchived'))}</span><button class="btn btn-secondary" data-cleanup="${i}">${escHtml(dbT('cleanup'))}</button></article>`;
-    }).join('') || `<p>${escHtml(dbT('noRuns'))}</p>`;
-    for (const error of data.errors || []) { const p = document.createElement('p'); p.textContent = `${error.profile_id}: ${apiErrorMessage({code:error.error_code})}`; node.append(p); }
+    }).join('') || `<p>${escHtml(dbT(data.errors?.length ? 'runsUnavailable' : 'noRuns'))}</p>`;
+    for (const error of data.errors || []) { const p = document.createElement('p'); p.textContent = `${error.profile_name || error.profile_id}${error.staging_dir ? " (" + error.staging_dir + ")" : ""}: ${apiErrorMessage({code:error.error_code})}`; node.append(p); }
     node.querySelectorAll('[data-cleanup]').forEach(button => button.addEventListener('click', () => {
       const r=data.runs[Number(button.dataset.cleanup)]; startDatabaseAction(r.profile_id, 'cleanup', r.directory);
     }));
