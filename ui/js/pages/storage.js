@@ -22,6 +22,11 @@ const storageState = window.BBUI.storageState;
 storageState.archivePages = storageState.archivePages || {};
 storageState.archiveRanges = storageState.archiveRanges || {};
 let storageArchiveResizeObserver;
+let storageWorkspaceSize;
+window.addEventListener('resize', () => {
+  sizeStorageRepositoryWorkspace();
+  updateStorageArchivePagination(true);
+});
 storageState.target = storageState.target || 'all';
 storageState.archiveCache = storageState.archiveCache || {};
 storageState.archiveBrowser = storageState.archiveBrowser || { repositoryKey: '', archive: '', path: '', files: [], loading: false, error: '' };
@@ -320,12 +325,40 @@ function renderStorage(data) {
     ? groups.map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-count">${escHtml(countLabel(rows.length))}</span><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header><div class="storage-column-headings" aria-hidden="true">${['storage.columns.repository', 'storage.columns.storageTarget', 'storage.columns.linkedJobs', 'storage.columns.archiveData'].map(column => `<span>${escHtml(storageT(column))}</span>`).join('')}</div>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
     : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`);
 
+  sizeStorageRepositoryWorkspace();
   updateStorageArchivePagination();
   storageArchiveResizeObserver?.disconnect();
-  storageArchiveResizeObserver = new ResizeObserver(() => updateStorageArchivePagination(true));
-  el.querySelectorAll('.storage-archive-list').forEach(list => storageArchiveResizeObserver.observe(list));
+  storageArchiveResizeObserver = new ResizeObserver(() => {
+    sizeStorageRepositoryWorkspace();
+    updateStorageArchivePagination(true);
+  });
+  el.querySelectorAll('.storage-archive-list, .storage-repository-panels').forEach(list => storageArchiveResizeObserver.observe(list));
 
   if (focusData) Array.from(el.querySelectorAll('[data-storage-action]')).find(node => Object.entries(focusData).every(([key, value]) => node.dataset[key] === value))?.focus({ preventScroll: true });
+}
+
+/**
+ * Size all repository tabs from the natural overview height, bounded by the window.
+ * Retain the size through loading/refreshes; remeasure on reopen, resize or language
+ * changes. Long panel content scrolls internally. Does nothing without an open card.
+ */
+function sizeStorageRepositoryWorkspace() {
+  const panels = document.querySelector('.storage-repository-panels');
+  const overview = panels?.querySelector('.storage-repository-overview');
+  if (!overview) return;
+  const card = panels.closest('.storage-repository-card');
+  const signature = [storageState.selectedRepositoryKey, panels.clientWidth, window.innerHeight,
+    window.BBUI?.components?.i18n?.getLanguage?.()].join('|');
+  if (storageWorkspaceSize?.signature !== signature) {
+    const style = getComputedStyle(overview.parentElement);
+    const naturalHeight = overview.getBoundingClientRect().height
+      + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const chromeHeight = card.querySelector('.storage-card-summary').getBoundingClientRect().height
+      + card.querySelector('.storage-repository-tabs').getBoundingClientRect().height;
+    storageWorkspaceSize = { signature, height: Math.ceil(Math.max(180,
+      Math.min(naturalHeight, window.innerHeight - chromeHeight - 34))) };
+  }
+  panels.style.height = `${storageWorkspaceSize.height}px`;
 }
 
 /** Use the storage object's identity, with a location fallback for unassigned records. */
@@ -964,7 +997,7 @@ function renderStorageRepositoryManagement(repo) {
   </div>`;
 }
 
-/** Keep other workspaces stable while the overview uses its own compact height; inactive panels stay inert. */
+/** Render overlapping, inert inactive panels inside one compact shared workspace. */
 function renderStorageRepositoryWorkspace(repo, job) {
   const selected = ['overview', 'archives', 'maintenance', 'management'].includes(storageState.selectedTab)
     ? storageState.selectedTab
@@ -1113,6 +1146,7 @@ function onStorageContentClick(event) {
     storageState.expanded = same ? !storageState.expanded : true;
     storageState.selectedRepositoryKey = key;
     if (!same) storageState.selectedTab = 'overview';
+    if (storageState.expanded) storageWorkspaceSize = null;
     renderStorage(storageState.data);
     if (storageState.expanded && storageState.selectedTab === 'archives') loadRepositoryArchives(key);
     if (storageState.expanded) { scrollStorageRepositoryIntoView(key); loadRepositoryLifecycle(key); }
@@ -1145,6 +1179,7 @@ function onStorageContentClick(event) {
   if (action === 'select-repository-tab') {
     storageState.selectedTab = el.dataset.repositoryTab || 'overview';
     const workspace = el.closest('.storage-repository-master-detail');
+    workspace.querySelector('.storage-repository-panels').dataset.activeTab = storageState.selectedTab;
     workspace.querySelectorAll('[data-repository-tab]').forEach(button => {
       const active = button.dataset.repositoryTab === storageState.selectedTab;
       button.classList.toggle('is-active', active);

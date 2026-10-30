@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Stable compact repository tabs (#662)
+
+- Derive one shared, viewport-bounded workspace height from the compact overview, retaining it across tab changes and asynchronous refreshes. Recalculate on resize, language change or explicit reopening.
+- Fit archive panes and dynamic pagination inside that workspace; scroll longer content internally. Synchronize the active-tab marker on direct switches.
+- Exercise the delayed first archive load and cached return to overview, all four tabs in both languages, responsive pagination and internal scrolling.
+
 ## Pending - Compact repository overview and explicit statistics (#660)
 
 - Scroll explicitly expanded repository cards into view when needed, respecting reduced motion and retaining keyboard focus. Background refreshes do not scroll.
