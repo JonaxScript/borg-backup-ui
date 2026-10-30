@@ -512,7 +512,7 @@ function syncSettingsProfileManager(type, selectLast = false) {
       <p class="profile-workflow-hint">${settingsT('profiles.workflowHint')}</p>
       <header data-profile-editor-header></header>
       <div class="settings-profile-editor-body"></div>
-      <p id="settings-profile-${type}-feedback" class="status-message hidden" role="status" aria-live="polite"></p>
+      <p id="settings-profile-${type}-feedback" data-feedback-inline class="status-message hidden" role="status" aria-live="polite"></p>
       <footer class="profile-save-bar">
         <span data-profile-save-status></span>
         <button type="button" class="btn btn-secondary btn-sm" data-profile-cancel>${settingsT('dialog.cancel')}</button>

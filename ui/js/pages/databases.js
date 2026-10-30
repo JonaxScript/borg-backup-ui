@@ -9,7 +9,12 @@ async function databaseRequest(path, body, method = 'POST') {
     method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(apiErrorMessage(data, response.status));
+  if (!response.ok) {
+    const error = new Error(apiErrorMessage(data, response.status));
+    error.field = data.message_params?.field;
+    error.code = data.code;
+    throw error;
+  }
   return data;
 }
 
@@ -53,22 +58,21 @@ function renderDatabaseSettings() {
       <div class="form-group"><label class="form-label" for="db-engine">${escHtml(dbT('engine'))}</label><select class="form-select" id="db-engine" name="engine"><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option><option value="mysql">MySQL</option></select></div>
       <div class="form-group"><label class="form-label" for="db-container">${escHtml(dbT('container'))}</label><div><select class="form-select" id="db-container" name="container" required aria-describedby="db-container-hint"><option value="" disabled ${row.container ? '' : 'selected'}>${escHtml(dbT('chooseContainer'))}</option>${containers.map(name => `<option value="${escHtml(name)}" ${name === row.container ? 'selected' : ''}>${escHtml(name)}</option>`).join('')}</select><p class="form-help" id="db-container-hint">${escHtml(dbT(databaseState.containers.length ? 'containerHint' : 'containersEmpty'))}</p></div></div>
       <div class="form-group database-auth-field">${input('database_user','text','required autocomplete="username"')}</div>
-      <div class="form-group database-auth-field"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id ? 'passwordKeep' : 'passwordEnter'))}"></div>
+      <div class="form-group database-auth-field"><label class="form-label" for="db-password">${escHtml(dbT('password'))}</label><input class="form-input" id="db-password" name="password" type="password" autocomplete="new-password" maxlength="4096" placeholder="${escHtml(dbT(row.credential_id || row.auth_mode === 'container' ? 'passwordKeep' : 'passwordEnter'))}"></div>
       <p class="form-help database-auth-field">${escHtml(dbT('credentials'))}</p>
-      <p class="form-help" id="db-engine-scope"></p>
-      ${row.auth_mode === 'managed' && row.credential_id ? `<p class="form-help database-secret-file">${escHtml(dbT('secretFile'))}: <code>${escHtml('secrets/' + (/^[a-f0-9]{32}$/.test(row.credential_id) ? '.database-' : '') + row.credential_id + '.json')}</code></p>` : ''}
-      ${row.auth_mode === 'container' ? `<p class="status-message info">${escHtml(dbT('legacyCredentials'))} <code>${escHtml(row.credential_file)}</code></p>` : ''}
       <details class="database-advanced"><summary>${escHtml(dbT('advancedConnection'))}</summary>
+      ${row.auth_mode === 'container' ? `<p class="status-message info">${escHtml(dbT('legacyCredentials'))} <code>${escHtml(row.credential_file)}</code></p>` : ''}
         <div class="form-group">${input('port','number','required min="1" max="65535"')}</div>
         <div class="form-group">${input('execution_user')}</div>
+      ${row.auth_mode === 'managed' && row.credential_id ? `<p class="form-help database-secret-file">${escHtml(dbT('secretFile'))}: <code>${escHtml('secrets/' + (/^[a-f0-9]{32}$/.test(row.credential_id) ? '.database-' : '') + row.credential_id + '.json')}</code></p>` : ''}
       </details>
     </div>`)}
     ${settingsCard(escHtml(dbT('databases')), settingsMenuIcon('backup'), `<div class="settings-body">
-      <p class="form-help">${escHtml(dbT('selectionHint'))}</p>
+      <p class="form-help">${escHtml(dbT('selectionHint'))}</p><p class="form-help" id="db-engine-scope"></p>
       <button class="btn btn-secondary" type="submit" data-db-discover>${escHtml(dbT('discover'))}</button>
       <div id="db-databases" class="database-selection"></div>
       <div class="database-flags"><label id="db-globals-label"><input type="checkbox" id="db-globals" ${row.include_globals ? 'checked' : ''}> ${escHtml(dbT('globals'))}</label></div>
-      <p class="form-help">${escHtml(dbT('globalsHint'))}</p><p class="form-help">${escHtml(dbT('scope'))}</p>
+      <p id="db-globals-hint" class="form-help">${escHtml(dbT('globalsHint'))}</p><p class="form-help">${escHtml(dbT('scope'))}</p>
     </div>`)}
     ${settingsCard(escHtml(dbT('storageTitle')), settingsMenuIcon('backup'), `<div class="settings-body database-fields">
       <p class="form-help">${escHtml(dbT('storageHint'))}</p>
@@ -80,7 +84,7 @@ function renderDatabaseSettings() {
         <div class="form-group">${input('timeout_seconds','number','required min="1" max="86400"')}</div>
       </details>
     </div>`)}
-      <p id="db-save-feedback" class="status-message hidden" role="status" aria-live="polite"></p>
+      <p id="db-save-feedback" data-feedback-inline class="status-message hidden" role="status" aria-live="polite"></p>
       <div class="database-footer profile-save-bar"><span data-profile-save-status></span><label><input type="checkbox" id="db-enabled" ${row.enabled ? 'checked' : ''}> ${escHtml(dbT('enabled'))}</label>
       <div class="job-script-actions"><button class="btn btn-primary" type="submit">${escHtml(dbT('save'))}</button>
         <button class="btn btn-danger" id="db-delete" type="button" ${row.id ? '' : 'disabled'}>${escHtml(dbT('delete'))}</button></div></div>
@@ -88,6 +92,7 @@ function renderDatabaseSettings() {
     ${settingsCard(escHtml(dbT('actions')), settingsMenuIcon('restore'), `<div class="settings-body">
       <p class="form-help">${escHtml(dbT('savedActions'))}</p><div class="job-script-actions">${['check','dump','reconcile'].map(action => `<button class="btn btn-secondary" type="button" data-db-action="${action}" ${row.id && (row.enabled || action === 'reconcile') ? '' : 'disabled'}>${escHtml(dbT(action))}</button>`).join('')}
       <button class="btn btn-secondary" id="db-cancel" ${databaseState.operation ? '' : 'disabled'}>${escHtml(dbT('cancel'))}</button></div>
+      <div id="db-progress" class="database-progress hidden" aria-live="off"></div>
       <p id="db-result" class="status-message hidden" role="status" aria-live="polite"></p>
     </div>`)}
     ${settingsCard(escHtml(dbT('runs')), settingsMenuIcon('backup'), `<div class="settings-body"><p class="form-help">${escHtml(dbT('runsHint'))}</p><p class="form-help">${escHtml(dbT('housekeeping'))}</p><button class="btn btn-secondary" id="db-refresh">${escHtml(dbT('refresh'))}</button><div id="db-runs"></div></div>`)}
@@ -98,11 +103,16 @@ function renderDatabaseSettings() {
   const form = document.getElementById('database-form');
   const updateDraft = () => {
     settingsState.databaseDirty = settingsFormSignature(form) !== databaseState.savedDraft;
-    document.getElementById('db-save-feedback')?.classList.add('hidden');
+    hideEl('db-save-feedback');
+    clearDatabaseFieldErrors();
     _updateUnsavedChangesUi();
   };
   form.addEventListener('input', updateDraft);
   form.addEventListener('change', updateDraft);
+  form.addEventListener('invalid', event => {
+    event.preventDefault();
+    if (event.target === form.querySelector(':invalid')) showDatabaseSaveError({field:event.target.id.replace(/^db-/, ''), message:event.target.validationMessage});
+  }, true);
   databaseEngineFields(row.engine);
   renderDatabaseChoices(databaseState.available[row.id] || [], row.databases);
   document.getElementById('db-engine').addEventListener('change', e => {
@@ -130,7 +140,9 @@ function renderDatabaseSettings() {
     controls.forEach(([el]) => { el.disabled = true; });
     settingsState.profileSaving = true;
     _updateUnsavedChangesUi();
-    let savedProfile = null;
+    clearDatabaseFieldErrors();
+    hideEl('db-save-feedback');
+    let savedProfile = null, saveError = null;
     try {
       const data = await databaseRequest('', body);
       // The acknowledged profile is authoritative; a later inventory GET must
@@ -142,12 +154,13 @@ function renderDatabaseSettings() {
       void loadDatabaseRuns();
       showMsg('db-save-feedback', 'success', dbT(discover ? 'connectionSaved' : 'saved'));
       savedProfile = data.profile.id;
-    } catch (err) { showMsg('db-save-feedback', 'error', err.message); }
+    } catch (err) { saveError = err; }
     finally {
       settingsState.profileSaving = false;
       controls.forEach(([el, disabled]) => { el.disabled = disabled; });
       _updateUnsavedChangesUi();
     }
+    if (saveError) showDatabaseSaveError(saveError);
     if (discover && savedProfile) await startDatabaseAction(savedProfile, 'discover');
   });
   document.getElementById('db-select').addEventListener('change', async e => {
@@ -172,10 +185,53 @@ function renderDatabaseSettings() {
   databaseState.savedDraft = settingsFormSignature(form);
   _updateUnsavedChangesUi();
 }
+/** Remove field diagnostics without touching entered values or unrelated help. */
+function clearDatabaseFieldErrors() {
+  const form = document.getElementById('database-form');
+  form?.querySelectorAll('.database-field-error').forEach(node => node.remove());
+  form?.querySelectorAll('[aria-invalid="true"]').forEach(node => {
+    node.removeAttribute('aria-invalid');
+    node.classList.remove('input-error');
+    const described = (node.getAttribute('aria-describedby') || '').split(' ').filter(id => id && !id.endsWith('-validation-error'));
+    if (described.length) node.setAttribute('aria-describedby', described.join(' '));
+    else node.removeAttribute('aria-describedby');
+  });
+}
+
+/** Show a persistent save error at its field and reveal collapsed inputs before focus. */
+function showDatabaseSaveError(error) {
+  clearDatabaseFieldErrors();
+  const aliases = {include_globals:'globals', databases:'databases'};
+  const field = typeof error.field === 'string' ? error.field : '';
+  const target = document.getElementById('db-' + (aliases[field] || field));
+  const form = document.getElementById('database-form');
+  if (!target || !form?.contains(target)) { showMsg('db-save-feedback', 'error', error.message); return; }
+  const control = target.matches('input, select, textarea') ? target : target.querySelector('input') || target;
+  const message = document.createElement('span');
+  message.id = control.id ? control.id + '-validation-error' : 'db-selection-validation-error';
+  message.className = 'database-field-error';
+  const hint = dbT('fieldHints.' + field);
+  message.textContent = error.code === 'database_invalid_profile' && hint !== 'database.fieldHints.' + field ? hint : error.message;
+  message.setAttribute('role', 'alert');
+  control.setAttribute('aria-invalid', 'true');
+  control.setAttribute('aria-describedby', [control.getAttribute('aria-describedby'), message.id].filter(Boolean).join(' '));
+  control.classList.add('input-error');
+  (target.closest('.form-group') || target.closest('label') || target).appendChild(message);
+  for (let parent = control.parentElement; parent && parent !== form; parent = parent.parentElement) {
+    if (parent.tagName === 'DETAILS') parent.open = true;
+  }
+  if (!control.matches('input, select, textarea')) control.tabIndex = -1;
+  control.focus({preventScroll:true});
+  control.scrollIntoView({block:'center'});
+  const label = dbT(field === 'include_globals' ? 'globals' : field);
+  showMsg('db-save-feedback', 'error', dbT('correctField', {field:label}));
+}
+
 /** Show only applicable engine options, retaining shared profile fields. */
 function databaseEngineFields(engine) {
   const pg = engine === 'postgresql';
   document.getElementById('db-globals-label').classList.toggle('hidden', !pg);
+  document.getElementById('db-globals-hint').classList.toggle('hidden', !pg);
   document.getElementById('db-engine-scope').textContent = ['mariadb','mysql'].includes(engine) ? dbT('mysqlScope') : '';
 
 }
@@ -197,12 +253,31 @@ async function startDatabaseAction(profile_id, action, directory) {
   if (databaseState.operation) { databaseFeedback(dbT('running')); return; }
   if (settingsState.databaseDirty) { databaseFeedback(dbT('saveFirst')); return; }
   if (action === 'cleanup' && !await _openSettingsDialog({dialogClass:'database-confirmation', title:dbT('cleanup'), message:dbT('confirmCleanup') + '\n\n' + directory, confirmText:dbT('cleanup'), confirmClass:'btn-danger'})) return;
+  renderDatabaseProgress({status:'running', action, started_at:new Date().toISOString(), progress:{phase:'preparing'}});
   try {
     const result = await databaseRequest('/action', {profile_id, action, directory});
     databaseState.operation = result.id;
     document.getElementById('db-cancel').disabled = false;
     pollDatabaseOperation();
-  } catch (e) { databaseFeedback(e.message); }
+  } catch (e) { renderDatabaseProgress({status:'failed'}); databaseFeedback(e.message); }
+}
+
+/** Render live test-export measurements without estimating unknown totals. */
+function renderDatabaseProgress(status) {
+  const node = document.getElementById('db-progress');
+  if (!node) return;
+  node.classList.toggle('hidden', status.status !== 'running' || status.action !== 'dump');
+  if (status.status !== 'running' || status.action !== 'dump') return;
+  const progress = status.progress || {};
+  const phase = ['preparing','checking','exporting','globals','finalizing','completed'].includes(progress.phase) ? progress.phase : 'preparing';
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(status.started_at || '')) / 1000)) || 0;
+  const elapsed = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const database = progress.database ? `${progress.database} (${progress.database_index}/${progress.databases_total})` : status.profile_name || '';
+  node.innerHTML = `<strong>${escHtml(dbT('progress.' + phase))}${database ? ' · ' + escHtml(database) : ''}</strong>
+    <progress aria-label="${escHtml(dbT('progress.running'))}"></progress>
+    <div class="database-progress-values"><span>${escHtml(dbT('progress.elapsed', {value:elapsed}))}</span>
+    <span>${escHtml(dbT('progress.processed', {value:settingsFmtBytes(progress.processed_bytes || 0)}))}</span>
+    <span>${escHtml(dbT('progress.written', {value:settingsFmtBytes(progress.written_bytes || 0)}))}</span></div>`;
 }
 
 /** Poll the asynchronous operation, stopping after completion or an HTTP error. */
@@ -212,9 +287,12 @@ async function pollDatabaseOperation() {
   try {
     while (databaseState.operation) {
       const status = await databaseRequest(`/status?id=${encodeURIComponent(databaseState.operation)}`, undefined);
+      renderDatabaseProgress(status);
       const error = status.error_code ? apiErrorMessage({code:status.error_code}) : '';
       const locations = (status.results || []).map(r => r.directory).join(', ');
-      databaseFeedback([dbT(status.status), error, locations, status.action === 'dump' && status.status === 'completed' ? dbT('testOnly') : ''].filter(Boolean).join(' · '));
+      const completed = {check:'checkCompleted', dump:'dumpCompleted', cleanup:'cleanupCompleted', reconcile:'reconcileCompleted'};
+      const message = status.status === 'completed' && completed[status.action] ? dbT(completed[status.action]) : dbT(status.status);
+      databaseFeedback([message, error, locations].filter(Boolean).join(' · '));
       if (status.status !== 'running') {
         if (status.status === 'completed' && Array.isArray(status.databases) && status.profile_id === databaseState.selected) {
           databaseState.available[status.profile_id] = status.databases;
@@ -226,7 +304,7 @@ async function pollDatabaseOperation() {
       }
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
-  } catch (e) { databaseFeedback(e.message); }
+  } catch (e) { renderDatabaseProgress({status:'failed'}); databaseFeedback(e.message); }
   finally { databaseState.polling = false; const b = document.getElementById('db-cancel'); if (b) b.disabled = !databaseState.operation; }
 }
 
@@ -235,14 +313,22 @@ async function loadDatabaseRuns() {
   const node = document.getElementById('db-runs'); if (!node) return;
   try {
     const data = await databaseRequest('/runs', undefined);
+    const errors = (data.errors || []).filter(error => error.error_code !== 'database_storage_missing');
+    const pending = (data.errors || []).filter(error => error.error_code === 'database_storage_missing');
     node.innerHTML = data.runs.map((r,i) => {
       const date = new Date(r.started_at || NaN);
       const timestamp = Number.isNaN(date.getTime()) ? (r.started_at || '') : date.toLocaleString(settingsLocale(), {dateStyle:'medium', timeStyle:'long'});
       return `<article class="database-run"><header><strong>${escHtml(r.profile_name || r.profile_id)}</strong><time datetime="${escHtml(r.started_at || '')}">${escHtml(timestamp)}</time></header>
         <div class="database-run-meta"><span class="badge">${escHtml(dbT(r.status))}</span><span>${escHtml(r.compression === 'gzip' ? dbT('compressedSize', {size:settingsFmtBytes(r.bytes)}) : settingsFmtBytes(r.bytes))}</span>${r.compression === 'gzip' ? `<span>${escHtml(dbT('originalSize', {size:settingsFmtBytes(r.uncompressed_bytes)}))}</span>` : ''}</div>
         <code>${escHtml(r.directory)}</code><span>${escHtml(r.archived ? dbT('archived') : dbT('notArchived'))}</span><button class="btn btn-secondary" data-cleanup="${i}">${escHtml(dbT('cleanup'))}</button></article>`;
-    }).join('') || `<p>${escHtml(dbT(data.errors?.length ? 'runsUnavailable' : 'noRuns'))}</p>`;
-    for (const error of data.errors || []) { const p = document.createElement('p'); p.textContent = `${error.profile_name || error.profile_id}${error.staging_dir ? " (" + error.staging_dir + ")" : ""}: ${apiErrorMessage({code:error.error_code})}`; node.append(p); }
+    }).join('') || `<p>${escHtml(dbT(errors.length ? 'runsUnavailable' : 'noRuns'))}</p>`;
+    for (const item of pending) {
+      const p = document.createElement('p');
+      p.className = 'database-pending-directory';
+      p.textContent = `${item.profile_name || item.profile_id}: ${dbT('pendingDirectory', {path:item.staging_dir || ''})}`;
+      node.append(p);
+    }
+    for (const error of errors) { const p = document.createElement('p'); p.textContent = `${error.profile_name || error.profile_id}${error.staging_dir ? " (" + error.staging_dir + ")" : ""}: ${apiErrorMessage({code:error.error_code})}`; node.append(p); }
     node.querySelectorAll('[data-cleanup]').forEach(button => button.addEventListener('click', () => {
       const r=data.runs[Number(button.dataset.cleanup)]; startDatabaseAction(r.profile_id, 'cleanup', r.directory);
     }));

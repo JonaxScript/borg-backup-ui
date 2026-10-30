@@ -2162,17 +2162,26 @@ Unterstützt werden Btrfs, XFS, ext-Dateisysteme und ZFS. Den echten Poolpfad st
 unterstützt. Den tatsächlichen Mountpunkt separat angeben. Die Freiplatzgrenze
 schätzt die Dump-Größe nicht; Platz für vollständige Exporte vorsehen.
 
-Ein ausdrücklich gestarteter Dump kann ein fehlendes Verzeichnis direkt unter
-dem eingebundenen Pool mit Modus `0755` (begrenzt durch die Prozess-Umask) anlegen.
-Mountpunkt und etwaige Zwischenverzeichnisse müssen vorhanden sein. Das Speichern
-eines Profils und das Auflisten lokaler Läufe legen keine Dump-Verzeichnisse an.
-Fehlermeldungen nennen Profil und Pfad und unterscheiden fehlenden Mount,
-fehlendes Dump-Verzeichnis, unzugänglichen Pfad/Symlink, fehlende Zugriffsrechte,
-ungeeignetes Dateisystem und fehlenden freien Speicher. Bei einem Lesefehler
-erscheint die Übersicht nicht als erfolgreich geprüfte, leere Liste; lesbare
-Profile bleiben sichtbar. Bestehende Profile und Dumps benötigen keine Migration.
+Den Speicherordner als absoluten Pfad eingeben, zum Beispiel
+`/mnt/cache/borg-database-dumps/TheTwist/`. Ein abschließender `/` ist erlaubt
+und wird beim Speichern vereinheitlicht. Ungültige Eingaben werden am betroffenen
+Feld erläutert; die eingegebenen Werte bleiben erhalten.
+
+Beim ersten Test-Dump oder Backup werden fehlende Unterordner innerhalb des
+angegebenen, eingebundenen Pools angelegt. Das Speichern eines Profils und das
+Auflisten lokaler Läufe erstellen keine Ordner. Ein noch nicht angelegter Ordner
+erscheint in der Übersicht als Hinweis, nicht als fehlgeschlagene Sicherung.
+Die Übersicht umfasst alle gespeicherten Profile. Ein fehlender Datenträger,
+Zugriffsprobleme und ungeeignete Speicherorte bleiben Fehler mit Profil und Pfad.
+Bestehende Profile und Dumps benötigen keine Migration.
 
 ### 19.2 Ablauf und Prüfung
+
+**Test-Dump erstellen** zeigt sofort die Vorbereitung und anschließend die
+aktuelle Datenbank, den Arbeitsschritt, die Laufzeit sowie exportierte und
+komprimierte Datenmenge. Die Werte werden während des Exports aktualisiert;
+ohne bekannte Gesamtgröße werden keine Prozentzahl oder Restzeit geschätzt.
+Nach Abschluss steht dort, was erstellt wurde und in welchem Ordner.
 
 Die Jobkarte zeigt **Datenbank-Sicherungen** als eigenen Schritt vor den
 Docker-/VM-Stopps. Während des Exports sind der aktive Schritt und seine

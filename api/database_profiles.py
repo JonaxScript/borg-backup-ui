@@ -13,11 +13,12 @@ from inventory_store import inventory_lock, read_inventory, atomic_write_invento
 
 
 class DatabaseError(ValueError):
-    """Expose a safe, localized database operation error without client output."""
+    """Expose localized errors with optional field/limit metadata, never submitted values."""
 
-    def __init__(self, reason: str):
+    def __init__(self, reason: str, *, field=None, **limits):
         self.reason = reason
         self.api_code = 'database_' + reason
+        self.api_message_params = ({'field': field, **limits} if field else {})
         super().__init__('Database backup: ' + reason)
 
 
@@ -123,21 +124,21 @@ def read_password(config, profile):
         raise DatabaseError('credentials') from None
 
 
-def _text(value, pattern=None, maximum=256):
+def _text(value, pattern=None, maximum=256, *, field=None):
     if not isinstance(value, str) or not value or len(value) > maximum or any(ord(c) < 32 for c in value):
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field=field)
     if pattern and not re.fullmatch(pattern, value):
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field=field)
     return value
 
 
 def validate_profile(raw):
-    """Return a normalized profile; reject unsafe names, paths and unsupported scope."""
+    """Normalize directory separators; reject unsafe values with field-specific metadata."""
     if not isinstance(raw, dict):
         raise DatabaseError('invalid_profile')
     engine = raw.get('engine')
     if engine not in SUPPORTED_ENGINES:
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='engine')
     row = {'engine': engine}
     row['auth_mode'] = raw.get('auth_mode', 'container' if raw.get('credential_file') else 'managed')
     if row['auth_mode'] not in ('managed', 'container'):
@@ -149,48 +150,52 @@ def validate_profile(raw):
     for key, default in [('enabled', True), ('include_globals', False)]:
         row[key] = raw.get(key, default)
         if not isinstance(row[key], bool):
-            raise DatabaseError('invalid_profile')
+            raise DatabaseError('invalid_profile', field=key)
     row['id'] = _text(raw.get('id'), r'db-[a-f0-9]{12}')
-    row['name'] = _text(raw.get('name'), maximum=100)
-    row['container'] = _text(raw.get('container'), r'[A-Za-z0-9][A-Za-z0-9_.-]*', 128)
+    row['name'] = _text(raw.get('name'), maximum=100, field='name')
+    row['container'] = _text(raw.get('container'), r'[A-Za-z0-9][A-Za-z0-9_.-]*', 128, field='container')
     row['execution_user'] = raw.get('execution_user', '')
     if not isinstance(row['execution_user'], str):
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='execution_user')
     if row['execution_user']:
-        _text(row['execution_user'], r'[A-Za-z0-9_][A-Za-z0-9_.:-]*', 128)
+        _text(row['execution_user'], r'[A-Za-z0-9_][A-Za-z0-9_.:-]*', 128, field='execution_user')
     row['database_user'] = raw.get('database_user', '')
     if not isinstance(row['database_user'], str):
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='database_user')
     if row['auth_mode'] == 'managed' or engine == 'postgresql' or row['database_user']:
-        _text(row['database_user'], r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63)
+        _text(row['database_user'], r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63, field='database_user')
     if engine != 'postgresql' and row['include_globals']:
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='include_globals')
     for key in (['credential_file'] if row['auth_mode'] == 'container' else []) + ['staging_mount', 'staging_dir']:
-        value = _text(raw.get(key))
+        value = _text(raw.get(key), field=key)
+        if key in ('staging_mount', 'staging_dir'):
+            value = value.rstrip('/') or '/'
         path = Path(value)
         if not path.is_absolute() or '..' in path.parts or str(path) != value:
-            raise DatabaseError('invalid_profile')
+            raise DatabaseError('invalid_path', field=key)
         row[key] = value
     mount, staging = Path(row['staging_mount']), Path(row['staging_dir'])
-    if mount == Path('/') or mount not in staging.parents or any(
+    if mount not in staging.parents:
+        raise DatabaseError('storage_outside_mount', field='staging_dir')
+    if mount == Path('/') or any(
         mount == Path(p) or Path(p) in mount.parents for p in ('/boot', '/proc', '/sys', '/dev', '/run', '/tmp')):
-        raise DatabaseError('invalid_storage')
+        raise DatabaseError('invalid_storage', field='staging_mount')
     databases = raw.get('databases')
     if not isinstance(databases, list) or len(databases) > 64:
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='databases')
     system = {'information_schema', 'performance_schema', 'mysql', 'sys'} if engine in ('mariadb', 'mysql') else {'template0', 'template1'}
-    row['databases'] = list(dict.fromkeys(_text(x, r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63) for x in databases))
+    row['databases'] = list(dict.fromkeys(_text(x, r'[A-Za-z0-9_][A-Za-z0-9_.-]*', 63, field='databases') for x in databases))
     if any(x.lower() in system for x in row['databases']):
-        raise DatabaseError('system_database')
+        raise DatabaseError('system_database', field='databases')
     for key, default, minimum, maximum in [('port', {'mariadb':3306, 'mysql':3306, 'postgresql':5432}[engine], 1, 65535),
                                          ('timeout_seconds', 1800, 1, 86400), ('min_free_mib', 1024, 1, 104857600)]:
         value = raw.get(key, default)
         if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-            raise DatabaseError('invalid_profile')
+            raise DatabaseError('invalid_number', field=key, minimum=minimum, maximum=maximum)
         row[key] = value
     row['retention'] = raw.get('retention', 'keep')
     if row['retention'] not in ('keep', 'after_archive'):
-        raise DatabaseError('invalid_profile')
+        raise DatabaseError('invalid_profile', field='retention')
     return row
 
 
@@ -293,9 +298,9 @@ def save_profile(config, raw):
         if row['auth_mode'] == 'managed':
             password = raw.get('password')
             if password is not None and (not isinstance(password, str) or len(password) > 4096 or any(c in password for c in '\x00\r\n')):
-                raise DatabaseError('credentials')
+                raise DatabaseError('credentials', field='password')
             if not row['credential_id'] and password is None:
-                raise DatabaseError('credentials')
+                raise DatabaseError('credentials', field='password')
             identity_changed = any(old.get(key) != row.get(key) for key in ('name', 'engine', 'container', 'database_user'))
             if password or not row['credential_id'] or identity_changed:
                 if not password and row['credential_id']:

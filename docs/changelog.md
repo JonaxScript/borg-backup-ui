@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Database path feedback and live test dumps (#656)
+
+- Accept trailing separators in database storage directories and safely create nested missing directories during explicit exports. Listing and profile saving remain read-only; uncreated storage is a neutral initial state while mount/access failures remain visible.
+- Return safe field metadata, focus invalid fields and show persistent inline feedback through the production message helper. Simplify input/action text and move technical credential details out of the main form.
+- Show test-dump phase, current database, elapsed time and streamed original/compressed byte counts. Throttle callbacks and keep live measurements in memory instead of repeatedly writing boot-storage status; preserve cancellation and final durable outcomes.
+- Exercise real HTTP profile validation in a bilingual browser, shared production feedback, nested-directory guards, stream counters and in-memory operation status.
+
 ## Pending - Clear profile save workflow (#654)
 
 - Show database and storage profile guidance, pending/saving/saved states and save errors beside the edited form. Explicitly label database discovery as saving the connection and loading database names; identify new profiles as not saved yet.

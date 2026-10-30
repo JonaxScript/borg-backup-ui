@@ -57,7 +57,8 @@ function schedulePageFeedbackDismissal(el, severity, text) {
 }
 
 /**
- * Show inline dialog feedback or a page notification without shifting controls.
+ * Show persistent dialog/opt-in form feedback or a dismissible page notification.
+ * Opt in with data-feedback-inline on the target or its container.
  * @param {string} elementId Target element ID.
  * @param {string} type Requested severity (`warn` maps to `warning`).
  * @param {string} text Message to show; blank text hides the target.
@@ -67,7 +68,7 @@ function showMsg(elementId, type, text) {
   if (!el) return;
   if (!String(text || '').trim()) { hideEl(elementId); return; }
   const severity = type === 'warn' ? 'warning' : (['error', 'success', 'warning'].includes(type) ? type : 'info');
-  const inline = !!el.closest('.modal-backdrop, [role="dialog"]');
+  const inline = !!el.closest('.modal-backdrop, [role="dialog"], [data-feedback-inline]');
   // Late results from a hidden page/panel must not clear current feedback.
   if (!inline && el.parentElement?.getClientRects().length === 0) return;
   // Keep form validation inside its dialog. Page action feedback must not move
