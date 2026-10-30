@@ -46,6 +46,7 @@ function renderDatabaseSettings() {
     ${databaseState.unsupportedProfiles.length ? `<p class="status-message warning" id="db-unsupported">${escHtml(dbT('unsupportedProfiles'))}<br>${databaseState.unsupportedProfiles.map(p => `${escHtml(p.name)} (${escHtml(p.engine)})`).join(', ')}</p>` : ''}
     <div class="form-group"><label class="form-label" for="db-select">${escHtml(dbT('profile'))}</label>
     <select class="form-select" id="db-select"><option value="">${escHtml(dbT('new'))}</option>${databaseState.profiles.map(p => `<option value="${escHtml(p.id)}" ${p.id === row.id ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('')}</select></div>
+    <p class="profile-workflow-hint">${escHtml(dbT('workflowHint'))}</p>
     <form id="database-form" class="database-form">
     ${settingsCard(escHtml(dbT('connection')), settingsMenuIcon('repository'), `<div class="settings-body database-fields">
       <div class="form-group">${input('name','text','required maxlength="100"')}</div>
@@ -64,7 +65,7 @@ function renderDatabaseSettings() {
     </div>`)}
     ${settingsCard(escHtml(dbT('databases')), settingsMenuIcon('backup'), `<div class="settings-body">
       <p class="form-help">${escHtml(dbT('selectionHint'))}</p>
-      <button class="btn btn-primary" type="submit" data-db-discover>${escHtml(dbT('discover'))}</button>
+      <button class="btn btn-secondary" type="submit" data-db-discover>${escHtml(dbT('discover'))}</button>
       <div id="db-databases" class="database-selection"></div>
       <div class="database-flags"><label id="db-globals-label"><input type="checkbox" id="db-globals" ${row.include_globals ? 'checked' : ''}> ${escHtml(dbT('globals'))}</label></div>
       <p class="form-help">${escHtml(dbT('globalsHint'))}</p><p class="form-help">${escHtml(dbT('scope'))}</p>
@@ -79,7 +80,8 @@ function renderDatabaseSettings() {
         <div class="form-group">${input('timeout_seconds','number','required min="1" max="86400"')}</div>
       </details>
     </div>`)}
-      <div class="database-footer"><label><input type="checkbox" id="db-enabled" ${row.enabled ? 'checked' : ''}> ${escHtml(dbT('enabled'))}</label>
+      <p id="db-save-feedback" class="status-message hidden" role="status" aria-live="polite"></p>
+      <div class="database-footer profile-save-bar"><span data-profile-save-status></span><label><input type="checkbox" id="db-enabled" ${row.enabled ? 'checked' : ''}> ${escHtml(dbT('enabled'))}</label>
       <div class="job-script-actions"><button class="btn btn-primary" type="submit">${escHtml(dbT('save'))}</button>
         <button class="btn btn-danger" id="db-delete" type="button" ${row.id ? '' : 'disabled'}>${escHtml(dbT('delete'))}</button></div></div>
     </form>
@@ -94,7 +96,13 @@ function renderDatabaseSettings() {
   document.getElementById('db-retention').value = row.retention;
   settingsState.databaseDirty = false;
   const form = document.getElementById('database-form');
-  form.addEventListener('input', () => { settingsState.databaseDirty = true; _updateUnsavedChangesUi(); });
+  const updateDraft = () => {
+    settingsState.databaseDirty = settingsFormSignature(form) !== databaseState.savedDraft;
+    document.getElementById('db-save-feedback')?.classList.add('hidden');
+    _updateUnsavedChangesUi();
+  };
+  form.addEventListener('input', updateDraft);
+  form.addEventListener('change', updateDraft);
   databaseEngineFields(row.engine);
   renderDatabaseChoices(databaseState.available[row.id] || [], row.databases);
   document.getElementById('db-engine').addEventListener('change', e => {
@@ -106,6 +114,7 @@ function renderDatabaseSettings() {
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (settingsState.profileSaving) return;
     const body = Object.fromEntries(new FormData(form));
     if (row.id) body.id = row.id;
     body.databases = [...form.querySelectorAll('#db-databases input:checked')].map(el => el.value);
@@ -117,13 +126,29 @@ function renderDatabaseSettings() {
     for (const k of ['port','timeout_seconds','min_free_mib']) body[k] = Number(body[k]);
     body.enabled = document.getElementById('db-enabled').checked;
     body.include_globals = document.getElementById('db-globals').checked;
+    const controls = [...panel.querySelectorAll('input, select, button')].map(el => [el, el.disabled]);
+    controls.forEach(([el]) => { el.disabled = true; });
+    settingsState.profileSaving = true;
+    _updateUnsavedChangesUi();
+    let savedProfile = null;
     try {
       const data = await databaseRequest('', body);
+      // The acknowledged profile is authoritative; a later inventory GET must
+      // not turn a successful save into a failed save or overwrite the draft.
+      databaseState.profiles = [...databaseState.profiles.filter(p => p.id !== data.profile.id), data.profile];
+      databaseState.selected = data.profile.id;
       settingsState.databaseDirty = false;
-      await loadDatabaseSettings(data.profile.id);
-      databaseFeedback(dbT('saved'));
-      if (discover) await startDatabaseAction(data.profile.id, 'discover');
-    } catch (err) { databaseFeedback(err.message); }
+      renderDatabaseSettings();
+      void loadDatabaseRuns();
+      showMsg('db-save-feedback', 'success', dbT(discover ? 'connectionSaved' : 'saved'));
+      savedProfile = data.profile.id;
+    } catch (err) { showMsg('db-save-feedback', 'error', err.message); }
+    finally {
+      settingsState.profileSaving = false;
+      controls.forEach(([el, disabled]) => { el.disabled = disabled; });
+      _updateUnsavedChangesUi();
+    }
+    if (discover && savedProfile) await startDatabaseAction(savedProfile, 'discover');
   });
   document.getElementById('db-select').addEventListener('change', async e => {
     const selected = e.target.value;
@@ -144,6 +169,7 @@ function renderDatabaseSettings() {
     catch (e) { databaseFeedback(e.message); }
   });
   document.getElementById('db-refresh').addEventListener('click', loadDatabaseRuns);
+  databaseState.savedDraft = settingsFormSignature(form);
   _updateUnsavedChangesUi();
 }
 /** Show only applicable engine options, retaining shared profile fields. */

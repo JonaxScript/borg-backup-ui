@@ -376,12 +376,20 @@ function renderSettingsMenu(tabs) {
   }).join('');
 }
 
-/** Switch Settings panels after resolving database draft discard; cancellation preserves the draft. */
+/** Resolve pending settings/profile edits before switching; keep drafts on cancel or during save. */
 async function activateSettingsTab(tabKey) {
   const tabs = getSettingsTabs();
   const active = tabs.find((tab) => tab.key === tabKey) || tabs[0];
   if (!active) return;
+  if (settingsState.profileSaving) return;
   const previousTab = settingsState.activeTab;
+  if (previousTab === active.key && (settingsState.dirty || settingsState.databaseDirty || settingsState.scriptDirty)) return;
+  if (previousTab !== active.key && settingsState.dirty) {
+    if (settingsState.settingsDiscardPending) return;
+    settingsState.settingsDiscardPending = true;
+    try { if (!await canLeaveSettingsPage()) return; }
+    finally { settingsState.settingsDiscardPending = false; }
+  }
   if (previousTab !== active.key && settingsState.databaseDirty) {
     if (settingsState.databaseDiscardPending) return;
     settingsState.databaseDiscardPending = true;
@@ -501,9 +509,12 @@ function syncSettingsProfileManager(type, selectLast = false) {
     const editor = document.createElement('section');
     editor.className = 'settings-profile-editor readonly';
     editor.innerHTML = `
+      <p class="profile-workflow-hint">${settingsT('profiles.workflowHint')}</p>
       <header data-profile-editor-header></header>
       <div class="settings-profile-editor-body"></div>
-      <footer>
+      <p id="settings-profile-${type}-feedback" class="status-message hidden" role="status" aria-live="polite"></p>
+      <footer class="profile-save-bar">
+        <span data-profile-save-status></span>
         <button type="button" class="btn btn-secondary btn-sm" data-profile-cancel>${settingsT('dialog.cancel')}</button>
         <button type="button" class="btn btn-primary btn-sm" data-profile-save>${settingsT('menu.saveProfile')}</button>
       </footer>`;
@@ -530,9 +541,20 @@ function syncSettingsProfileManager(type, selectLast = false) {
       const saved = await saveSettings();
       if (!saved) return;
       settingsState.profileEditing = '';
-      await reloadSettingsDataAfterSave(type);
-      if (['local', 'usb', 'smb', 'storagebox'].includes(type)) {
-        await window.BBUI?.setupWizard?.resumeAfterExternalSave?.('storage');
+      settingsState.profileSaving = true;
+      const pendingControls = [...editor.querySelectorAll('input, select, button')].map(el => [el, el.disabled]);
+      pendingControls.forEach(([el]) => { el.disabled = true; });
+      try {
+        const refreshed = await reloadSettingsDataAfterSave(type);
+        showMsg(`settings-profile-${type}-feedback`, refreshed ? 'success' : 'warning', settingsT(refreshed ? 'profiles.saved' : 'profiles.savedRefreshFailed'));
+        if (['local', 'usb', 'smb', 'storagebox'].includes(type)) {
+          await window.BBUI?.setupWizard?.resumeAfterExternalSave?.('storage');
+        }
+      } finally {
+        pendingControls.forEach(([el, disabled]) => { el.disabled = disabled; });
+        if (editor.isConnected) syncSettingsProfileManager(type);
+        settingsState.profileSaving = false;
+        _updateUnsavedChangesUi();
       }
     });
   }
@@ -541,6 +563,7 @@ function syncSettingsProfileManager(type, selectLast = false) {
   rows.forEach((row, index) => {
     if (!row.dataset.profileUiKey) row.dataset.profileUiKey = row.dataset.profileKey || `new-${type}-${index + 1}`;
   });
+  if (!settingsProfileBaselines.has(rowsBox)) settingsProfileBaselines.set(rowsBox, settingsFormSignature(rowsBox));
   if (selectLast && rows.length) settingsState.profileSelection[type] = rows.at(-1).dataset.profileUiKey;
   const selectedKey = settingsState.profileSelection[type] || rows[0]?.dataset.profileUiKey || '';
   settingsState.profileSelection[type] = selectedKey;
@@ -592,6 +615,7 @@ function syncSettingsProfileManager(type, selectLast = false) {
   header?.querySelector('[data-profile-edit]')?.addEventListener('click', () => {
     settingsState.profileEditing = type;
     syncSettingsProfileManager(type);
+    _updateUnsavedChangesUi();
   });
   const footer = manager.querySelector('.settings-profile-editor > footer');
   if (footer) footer.classList.toggle('hidden', !editing);
@@ -691,7 +715,7 @@ function validateLocalProfilesForSave() {
     const normalized = normalizeCanonicalStoragePath(submitted);
     input?.classList.toggle('input-error', !normalized);
     if (!normalized) {
-      showMsg('local-profiles-msg', 'error', settingsT('profiles.invalidLocalPath', {
+      showMsg(document.getElementById('settings-profile-local-feedback') ? 'settings-profile-local-feedback' : 'local-profiles-msg', 'error', settingsT('profiles.invalidLocalPath', {
         path: submitted || settingsT('common.none'),
       }));
       input?.focus();
@@ -7446,8 +7470,22 @@ function fmonoRO(label, value) {
   </div>`;
 }
 
+/** Capture editable values for comparison; no values are persisted or logged. */
+function settingsFormSignature(root) {
+  return JSON.stringify([...root.querySelectorAll('input:not([type=hidden]), select, textarea')]
+    .filter(el => el.type !== 'checkbox' || el.id || el.name || el.checked).map(el =>
+    [el.id || el.name || el.value, el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value]));
+}
+
+const settingsProfileBaselines = new WeakMap();
+
+/** Track actual profile differences; selecting or reverting values is not an edit. */
 function markSettingsDirty() {
-  settingsState.dirty = true;
+  const config = SETTINGS_PROFILE_CONFIG[settingsState.activeTab];
+  const rows = document.getElementById(config?.rowsId || '');
+  settingsState.dirty = rows && settingsProfileBaselines.has(rows)
+    ? settingsFormSignature(rows) !== settingsProfileBaselines.get(rows) : true;
+  document.getElementById(`settings-profile-${settingsState.activeTab}-feedback`)?.classList.add('hidden');
   _updateUnsavedChangesUi();
 }
 
@@ -7456,13 +7494,22 @@ function _updateUnsavedChangesUi() {
   btn?.classList.toggle('btn-save-dirty', !!settingsState.dirty);
   const state = document.getElementById('settings-workspace-save-state');
   if (state) {
-    const dirty = settingsState.dirty || settingsState.scriptDirty || settingsState.databaseDirty;
+    const dirty = settingsState.activeTab === 'databases' ? settingsState.databaseDirty
+      : settingsState.activeTab === 'scripts' ? settingsState.scriptDirty : settingsState.dirty;
     state.className = `badge ${dirty ? 'warning' : 'success'}`;
-    state.textContent = settingsT(dirty ? 'menu.unsaved' : 'menu.saved');
+    const fresh = settingsState.activeTab === 'databases' && !document.getElementById('db-select')?.value;
+    state.textContent = settingsT(settingsState.profileSaving ? 'profiles.saving' : dirty ? 'menu.unsaved' : fresh ? 'profiles.newProfile' : 'menu.saved');
   }
+  document.querySelectorAll('[data-profile-save-status]').forEach(node => {
+    const database = !!node.closest('#database-form');
+    const dirty = database ? settingsState.databaseDirty : settingsState.dirty;
+    const fresh = database && !document.getElementById('db-select')?.value;
+    node.textContent = settingsT(settingsState.profileSaving ? 'profiles.saving' : dirty ? 'profiles.pending' : fresh ? 'profiles.newProfile' : 'profiles.noChanges');
+  });
 }
 
 async function canLeaveSettingsPage() {
+  if (settingsState.profileSaving) return false;
   if (!settingsState.dirty && !settingsState.scriptDirty && !settingsState.databaseDirty) return true;
   const discard = await _openSettingsDialog({
     title: settingsT('forms.unsavedTitle'),
@@ -7488,7 +7535,11 @@ if (!window.__bbuiSettingsBeforeUnloadBound) {
   window.__bbuiSettingsBeforeUnloadBound = true;
 }
 
+/** Persist the active settings area; only an acknowledged write clears edits.
+ * Follow-up refresh failures do not change the outcome of a successful write.
+ */
 async function saveSettings() {
+  if (settingsState.profileSaving) return false;
   syncUsbProfilesHiddenInput();
   syncSmbProfilesHiddenInput();
   syncStorageProfilesHiddenInput();
@@ -7510,9 +7561,10 @@ async function saveSettings() {
   if (activeTab === 'usb') profileUpdates.usb = getUsbProfilesFromDom();
   if (activeTab === 'smb') profileUpdates.smb = getSmbProfilesFromDom();
   if (activeTab === 'storagebox') profileUpdates.storagebox = getStorageProfilesFromDom();
+  const feedbackId = SETTINGS_PROFILE_CONFIG[activeTab] ? `settings-profile-${activeTab}-feedback` : 'settings-message';
   const notificationTemplates = activeTab === 'notifications' ? collectNotificationTemplates(activePanel) : null;
   if (Object.prototype.hasOwnProperty.call(updates, 'GLOBAL_DATA_DIR') && !String(updates.GLOBAL_DATA_DIR || '').trim()) {
-    showMsg('settings-message', 'error', settingsT('forms.dataDirRequired'));
+    showMsg(feedbackId, 'error', settingsT('forms.dataDirRequired'));
     return false;
   }
   if (Object.prototype.hasOwnProperty.call(updates, 'GLOBAL_DATA_DIR')) {
@@ -7527,7 +7579,7 @@ async function saveSettings() {
       .map((value) => normalizeRestoreRootInput(value))
       .filter((value) => value && !isSafeRestoreRoot(value));
     if (invalid.length) {
-      showMsg('settings-message', 'error', settingsT('forms.restoreAllowedRootsInvalid', { paths: invalid.join(', ') }));
+      showMsg(feedbackId, 'error', settingsT('forms.restoreAllowedRootsInvalid', { paths: invalid.join(', ') }));
       return false;
     }
     updates.RESTORE_ALLOWED_ROOTS = parseRestoreAllowedRoots(updates.RESTORE_ALLOWED_ROOTS).join(',');
@@ -7535,8 +7587,12 @@ async function saveSettings() {
 
   const btn = document.getElementById('settings-save-btn');
   if (btn) btn.classList.add('loading');
-  hideEl('settings-message');
+  hideEl(feedbackId);
 
+  const controls = [...(activePanel?.querySelectorAll('input, select, textarea, button') || [])].map(el => [el, el.disabled]);
+  controls.forEach(([el]) => { el.disabled = true; });
+  settingsState.profileSaving = true;
+  _updateUnsavedChangesUi();
   try {
     const res = await fetch('/api/settings', {
       method: 'PUT',
@@ -7552,44 +7608,49 @@ async function saveSettings() {
     const data = await res.json();
     if (!res.ok) throw new Error(apiErrorMessage(data, res.status));
     settingsState.dirty = false;
+    const profileRows = document.getElementById(SETTINGS_PROFILE_CONFIG[activeTab]?.rowsId || '');
+    if (profileRows) settingsProfileBaselines.set(profileRows, settingsFormSignature(profileRows));
     _updateUnsavedChangesUi();
     const dd = data?.data_dirs;
     if (data?.data_dir_initialized && dd && dd.logs && dd.status && dd.restore_status) {
       showMsg(
-        'settings-message',
+        feedbackId,
         'success',
         settingsT('forms.savedDirectories', { directories: `${dd.logs}, ${dd.status}, ${dd.restore_status}` })
       );
     } else {
-      showMsg('settings-message', 'success', settingsT('forms.saved'));
+      showMsg(feedbackId, 'success', settingsT('forms.saved'));
     }
     if (data?.smb_cleanup && Array.isArray(data.smb_cleanup.removed) && data.smb_cleanup.removed.length) {
       const removed = data.smb_cleanup.removed.map((r) => r.path).filter(Boolean).join(', ');
-      showMsg('settings-message', 'success', settingsT('forms.savedMountsRemoved', { paths: removed }));
+      showMsg(feedbackId, 'success', settingsT('forms.savedMountsRemoved', { paths: removed }));
     }
     if (data?.smb_secret_cleanup && Array.isArray(data.smb_secret_cleanup.removed) && data.smb_secret_cleanup.removed.length) {
       const removedSecrets = data.smb_secret_cleanup.removed.map((r) => r.path).filter(Boolean).join(', ');
-      showMsg('settings-message', 'success', settingsT('forms.credentialsRemoved', { paths: removedSecrets }));
+      showMsg(feedbackId, 'success', settingsT('forms.credentialsRemoved', { paths: removedSecrets }));
     }
     settingsState.smbCleanupKeys = [];
     settingsState.smbSecretCleanupKeys = [];
     if (window.BBUI?.core?.invalidateSetupStatusCache) {
       window.BBUI.core.invalidateSetupStatusCache();
     }
-    await refreshSettingsConfigBackups();
-    await window.BBUI.core.updateDataDirWarning();
-    if (!['usb', 'smb', 'storagebox'].includes(activeTab)) {
+    await Promise.allSettled([refreshSettingsConfigBackups(), window.BBUI.core.updateDataDirWarning()]);
+    if (!SETTINGS_PROFILE_CONFIG[activeTab]) {
       await reloadSettingsDataAfterSave();
     }
     return true;
   } catch (err) {
-    showMsg('settings-message', 'error', settingsT('error', { message: err.message }));
+    showMsg(feedbackId, 'error', settingsT('error', { message: err.message }));
     return false;
   } finally {
+    settingsState.profileSaving = false;
+    controls.forEach(([el, disabled]) => { el.disabled = disabled; });
+    _updateUnsavedChangesUi();
     if (btn) btn.classList.remove('loading');
   }
 }
 
+/** Refresh acknowledged settings; return false when only the follow-up read fails. */
 async function reloadSettingsDataAfterSave(profileType = '') {
   try {
     const res = await fetch('/api/settings/basic');
@@ -7608,8 +7669,10 @@ async function reloadSettingsDataAfterSave(profileType = '') {
       }
     }
     renderSettings(settingsState.data, settingsState.systemHealth);
+    return true;
   } catch (_) {
     if (profileType) syncSettingsProfileManager(profileType);
+    return false;
   }
 }
 

@@ -8,16 +8,19 @@ const {chromium} = require('playwright');
     for (const language of ['de','en']) {
       const page = await browser.newPage({viewport:{width:1200,height:1000}});
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
-      let runsOverride=null;
+      let runsOverride=null, saveFailure=false, saveDelay=0;
       let profiles=[], actions=0, action='', deletes=0, lastAction;
       const browserDialogs=[];page.on('dialog',async dialog=>{browserDialogs.push(dialog.message());await dialog.dismiss();});
       const credential=language==='de'?'b'.repeat(32):'database-'+'a'.repeat(60)+'-v001';
       await page.route('http://bbui.test/**', async route => {
         const req=route.request(),url=new URL(req.url());
         let body={};
-        if (url.pathname==='/') {await route.fulfill({contentType:'text/html',body:'<main id="page-settings" style="max-width:850px;margin:20px auto"><div class="settings-tab-panel" data-settings-panel="databases"><div id="settings-databases-panel"></div></div><div id="wiz-databases"></div><div id="managed-preview"></div></main>'});return;}
+        if (url.pathname==='/') {await route.fulfill({contentType:'text/html',body:'<span id="settings-workspace-save-state"></span><main id="page-settings" style="max-width:850px;margin:20px auto"><div class="settings-tab-panel" data-settings-panel="databases"><div id="settings-databases-panel"></div></div><div id="wiz-databases"></div><div id="managed-preview"></div></main>'});return;}
         if (url.pathname==='/api/settings/databases') {
-          if (req.method()==='POST') {const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:credential};profiles=[row];body={profile:row};}
+          if (req.method()==='POST') {
+            if(saveDelay) await new Promise(resolve=>setTimeout(resolve,saveDelay));
+            if(saveFailure){await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({code:'database_invalid_profile'})});return;}
+            const {password,...payload}=req.postDataJSON(); const row={...payload,id:'db-aaaaaaaaaaaa',credential_id:credential};profiles=[row];body={profile:row};}
           else if(req.method()==='DELETE'){deletes++;profiles=[];body={deleted:true};}
           else body={profiles,unsupported_profiles:[{id:'db-cccccccccccc',name:'<img retired>',engine:'sqlite'}]};
         } else if(url.pathname.endsWith('/runs')) body=runsOverride || {runs:[{profile_id:'db-aaaaaaaaaaaa',profile_name:'MariaDB Apps',started_at:'2026-10-24T09:35:10Z',status:'dump_completed',compression:'gzip',bytes:123456789,uncompressed_bytes:5700000000,directory:'/mnt/cache/db-dumps/bbui-mariadb-apps-2026-10-24_11-35-10+0200-'+'a'.repeat(32)}],errors:[]};
@@ -38,12 +41,14 @@ const {chromium} = require('playwright');
         }}}};
         window.escHtml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
         window.settingsT=(key,params)=>window.BBUI.components.i18n.t('settings.'+key,params);
-        window.settingsState={};window._updateUnsavedChangesUi=()=>{};
+        window.settingsState={};
+        window.showMsg=(id,kind,message)=>{const node=document.getElementById(id);if(node){node.className='status-message '+kind;node.textContent=message;}};
         window.settingsLocale=()=> 'de-DE';window.settingsFmtBytes=v=>`${v} B`;window.apiErrorMessage=d=>d.code||'error';
         window.wizardState={jobIdRequest:1};window._wizardShowError=()=>{};
       },JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`,'utf8')));
       const settings=fs.readFileSync('ui/js/pages/settings.js','utf8');
       await page.addScriptTag({content:settings.match(/function settingsCard[\s\S]*?\n}/)[0] + settings.match(/function settingsMenuIcon[\s\S]*?\n}/)[0]});
+      for(const name of ['settingsFormSignature','_updateUnsavedChangesUi','canLeaveSettingsPage']) await page.addScriptTag({content:settings.match(new RegExp('(?:async )?function '+name+'[\\s\\S]*?\\n}'))[0]});
       await page.addScriptTag({content:settings.match(/function _openSettingsDialog[\s\S]*?\n}/)[0]});
       await page.addScriptTag({content:fs.readFileSync('ui/js/pages/databases.js','utf8')});
       await page.addScriptTag({content:settings.match(/async function activateSettingsTab[\s\S]*?\n}/)[0]});
@@ -75,9 +80,39 @@ const {chromium} = require('playwright');
       assert.equal(await page.locator('.database-secret-file code').textContent(), 'secrets/'+(language==='de'?'.database-':'')+credential+'.json');
       assert.equal(profiles[0].databases.length,2);assert.equal(profiles[0].retention,'keep');
       assert.equal(await page.locator('#settings-databases-panel img').count(),0);
+      const savedName=await page.locator('#db-name').inputValue();
+      await page.locator('#db-name').fill('edited profile');
+      assert.equal(await page.evaluate(()=>settingsState.databaseDirty),true);
+      await page.locator('#db-name').fill(savedName);
+      assert.equal(await page.evaluate(()=>settingsState.databaseDirty),false);
+      assert.equal(await page.evaluate(()=>canLeaveSettingsPage()),true);
+      await page.locator('#db-name').fill('Saved database profile');
+      await page.evaluate(()=>activateSettingsTab('databases'));
+      assert.equal(await page.locator('#db-name').inputValue(),'Saved database profile');
+      saveFailure=true;
+      await page.locator('.database-footer button[type=submit]').click();
+      await page.waitForSelector('#db-save-feedback.error');
+      assert.equal(await page.locator('#db-name').inputValue(),'Saved database profile');
+      assert.equal(await page.evaluate(()=>settingsState.databaseDirty),true);
+      assert.ok((await page.locator('#settings-workspace-save-state').textContent()).length>0);
+      saveFailure=false;saveDelay=150;
+      await page.locator('.database-footer button[type=submit]').click();
+      assert.equal(await page.locator('#db-name').isDisabled(),true);
+      assert.equal(await page.evaluate(()=>canLeaveSettingsPage()),false);
+      await page.waitForFunction(()=>!settingsState.profileSaving && !settingsState.databaseDirty);
+      assert.equal(await page.locator('#db-name').inputValue(),'Saved database profile');
+      assert.equal(await page.locator('#db-save-feedback.success').count(),1);
+      assert.equal(await page.locator('#settings-workspace-save-state').textContent(),JSON.parse(fs.readFileSync(`ui/i18n/${language}.json`,'utf8')).settings.menu.saved);
+      assert.equal(await page.evaluate(()=>canLeaveSettingsPage()),true);
+      saveDelay=0;
+      // Preserve the malicious fixture name for the existing escaping tests.
+      await page.locator('#db-name').fill(savedName);
+      await page.locator('.database-footer button[type=submit]').click();
+      await page.waitForFunction(()=>!settingsState.profileSaving && !settingsState.databaseDirty);
       await page.locator('[data-db-action=dump]').click();
       await page.waitForFunction(()=>document.getElementById('db-result').textContent.includes('Borg')===false && document.getElementById('db-cancel').disabled);
       assert.equal(actions,2);
+      await page.waitForSelector('#db-runs article');
       assert.ok((await page.locator('#db-runs').textContent()).includes('MariaDB Apps'));
       assert.ok((await page.locator('#db-runs').textContent()).includes('5700000000'));
       assert.equal(await page.locator('#db-runs time').getAttribute('datetime'),'2026-10-24T09:35:10Z');

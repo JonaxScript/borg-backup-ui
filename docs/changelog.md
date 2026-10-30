@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Clear profile save workflow (#654)
+
+- Show database and storage profile guidance, pending/saving/saved states and save errors beside the edited form. Explicitly label database discovery as saving the connection and loading database names; identify new profiles as not saved yet.
+- Compare actual editable values to saved baselines, block duplicate saves and edits during persistence, and acknowledge database saves directly from the returned profile. Resolve pending settings before switching areas so stale dirty state is not attributed to another profile.
+- Preserve drafts on failed writes and do not report ancillary refresh failures as failed persistence. Cover database and all four storage profile types, successful/failed writes, reverts, discard cancellation/confirmation and bilingual browser rendering.
+
 ## Pending - Normal Unraid database dump permissions (#652, #596)
 
 - Accept existing dump roots and retained runs with ordinary Unraid ownership/modes, including nobody:users and 0777. Preserve existing permissions; create run directories with 0755 and dumps/manifests with 0644 while credentials and control records remain private.
