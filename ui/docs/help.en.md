@@ -83,7 +83,7 @@ SSH profiles contain host, port, user, base path, and SSH key. Existing keys are
 
 ## 5. Repositories
 
-All repository tabs share a compact height based on the overview and the window size. Switching tabs or loading data keeps the card height unchanged. Archive pages fit this area; longer contents scroll inside the selected tab. On wide screens Management places key recovery, removal and deletion in columns separated by vertical dividers, with action buttons aligned along the bottom. The repository ID stays on one line; truncated IDs are available in full on hover. On narrow screens the management sections, archive list and file browser are stacked.
+All repository tabs share a compact height based on the overview and the window size. Switching tabs or loading data keeps the card height unchanged. Archive pages fit this area; longer contents scroll inside the selected tab. On wide screens Management places key recovery, removal and deletion in columns separated by vertical dividers, with action buttons aligned along the bottom. The repository ID stays on one line; truncated IDs are available in full on hover. On narrow screens the management sections, archive list and file browser are stacked. Returning to Repositories automatically refreshes job links and the availability of management actions. Deleting a job does not require an additional Refresh click; any other blockers still apply.
 
 The **Repositories** page groups Borg repositories by storage target. A repository has a display name, a full repository path, encryption metadata, and optional job assignments.
 

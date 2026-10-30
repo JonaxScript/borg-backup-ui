@@ -276,6 +276,7 @@ function storageVisibleRepositories(data) {
   return storageRepositories(data).filter(repo => storageState.target === 'all' || storageTargetKey(repo) === storageState.target);
 }
 
+/** Reload repository/job data and invalidate lifecycle snapshots before rendering current links. */
 async function refreshStorage() {
   hideEl('storage-message');
   try {
@@ -289,13 +290,16 @@ async function refreshStorage() {
     storageState.jobs = jobsRes.ok ? (await jobsRes.json()).jobs || [] : [];
     storageState.maintenanceState = maintenanceRes.ok ? await maintenanceRes.json() : { running: false };
     storageState.loaded = true;
+    storageState.lifecycleCache = {};
     renderStorage(storageState.data);
+    const detailRefreshes = [];
+    if (storageState.expanded && storageState.selectedRepositoryKey) {
+      detailRefreshes.push(loadRepositoryLifecycle(storageState.selectedRepositoryKey));
+    }
     if (storageState.selectedTab === 'archives' && storageState.selectedRepositoryKey) {
-      await loadRepositoryArchives(storageState.selectedRepositoryKey, true);
+      detailRefreshes.push(loadRepositoryArchives(storageState.selectedRepositoryKey, true));
     }
-    if (storageState.selectedTab === 'management' && storageState.selectedRepositoryKey) {
-      await loadRepositoryLifecycle(storageState.selectedRepositoryKey, true);
-    }
+    await Promise.all(detailRefreshes);
     if (storageState.pendingRepositoryKeyImportGuide) {
       storageState.pendingRepositoryKeyImportGuide = false;
       showMsg('storage-message', 'info', storageT('storage.repositoryKeyImportGuide'));
@@ -1042,10 +1046,18 @@ async function loadRepositoryArchives(repositoryKey, force = false) {
   if (storageState.data && storageState.selectedRepositoryKey === key) renderStorage(storageState.data);
 }
 
+/**
+ * Load current job links and lifecycle blockers, optionally replacing a cached request.
+ * Ignore superseded responses/errors so invalidated job links cannot reappear.
+ * Failures are shown in Management; this read-only preview never deletes anything.
+ * @param {string} repositoryKey Registered repository identifier.
+ * @param {boolean} force Replace an existing cached snapshot/request when true.
+ */
 async function loadRepositoryLifecycle(repositoryKey, force = false) {
   const key = String(repositoryKey || '').trim();
   if (!key || (!force && storageState.lifecycleCache[key])) return;
-  storageState.lifecycleCache[key] = { loading: true };
+  const request = { loading: true };
+  storageState.lifecycleCache[key] = request;
   if (storageState.data && storageState.selectedRepositoryKey === key) renderStorage(storageState.data);
   try {
     const response = await fetch('/api/repositories/lifecycle', {
@@ -1055,8 +1067,10 @@ async function loadRepositoryLifecycle(repositoryKey, force = false) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(apiErrorMessage(data, response.status));
+    if (storageState.lifecycleCache[key] !== request) return;
     storageState.lifecycleCache[key] = { loading: false, ...data };
   } catch (error) {
+    if (storageState.lifecycleCache[key] !== request) return;
     storageState.lifecycleCache[key] = { loading: false, error: error.message || storageT('storage.error') };
   }
   if (storageState.data && storageState.selectedRepositoryKey === key) renderStorage(storageState.data);

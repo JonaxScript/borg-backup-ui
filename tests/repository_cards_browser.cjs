@@ -322,6 +322,80 @@ const {chromium} = require('playwright');
     assert.equal(await card.locator('.storage-repository-master-detail').count(),0);
     await page.locator('[data-repository-card=old] [data-storage-action=toggle-repository]').click();await page.locator('[data-repository-card=old] [data-repository-tab=maintenance]').click();
     assert.equal(await page.locator('[data-repository-card=old] [data-repository-panel=maintenance] [data-repository-action=prune]').isDisabled(),true,'Unassigned repositories cannot infer retention');
+    // Exercise actual job deletion and page navigation, including a delayed obsolete preview (#664).
+    await page.addScriptTag({content:fs.readFileSync('ui/js/core/app-core.js','utf8')});
+    await page.evaluate(()=>{
+      window.BBUI.core.updateDataDirWarning=async()=>{};
+      updateSidebarSystemHealth=()=>{};
+      setCoreAction('refreshJobs',()=>{window.navigationRefresh=refreshJobs();});
+      setCoreAction('refreshStorage',()=>{window.navigationRefresh=refreshStorage();});
+      window.linkTestFetch=window.fetch;
+      window.fetch=async(url,options={})=>{
+        let data;
+        if(url==='/api/jobs' && options.method==='DELETE') {
+          const key=JSON.parse(options.body).job_key;
+          serverJobs=serverJobs.filter(job=>job.key!==key);
+          return {ok:true,json:async()=>({filename:key})};
+        }
+        if(url==='/api/jobs')data={jobs:serverJobs};
+        else if(url==='/api/storage') {
+          data=JSON.parse(JSON.stringify(storageState.data));
+          data.groups.local.find(repo=>repo.repository_key==='flash').used_by=serverJobs.map(job=>job.key);
+        }
+        else if(['/api/schedules','/api/jobs/running','/api/status'].includes(url))data={};
+        else if(url==='/api/repositories/lifecycle' && JSON.parse(options.body).repository_key==='flash') {
+          if(window.failCurrentLifecycle)throw Error('Current lifecycle unavailable');
+          data={job_keys:serverJobs.map(job=>job.key),allowed:serverJobs.length===0,blockers:serverJobs.length?['jobs_linked']:[],repository_id:'a'.repeat(64)};
+          if(window.delayLifecycle) {
+            window.delayLifecycle=false;
+            await new Promise(resolve=>window.releaseOldLifecycle=resolve);
+            if(window.failOldLifecycle)throw Error('Obsolete lifecycle request failed');
+          }
+        } else return linkTestFetch(url,options);
+        return {ok:true,json:async()=>data};
+      };
+    });
+    for(const lang of ['de','en'])for(const returnTab of ['overview','archives','management','collapsed']) {
+      await page.evaluate(async({lang,returnTab})=>{
+        window.lang=lang;
+        window.serverJobs=[{key:'job-deleted-technical-id',name:'Flash USB',icon:'flash',location:'usb'}];
+        storageState.jobs=[...serverJobs];
+        storageState.data.groups.local.find(repo=>repo.repository_key==='flash').used_by=[serverJobs[0].key];
+        storageState.target='all';storageState.selectedRepositoryKey='flash';storageState.expanded=true;
+        storageState.selectedTab=returnTab==='collapsed'?'overview':returnTab;
+        await loadRepositoryLifecycle('flash',true);
+        window.delayLifecycle=true;window.failOldLifecycle=lang==='en';
+        window.obsoleteLifecycle=loadRepositoryLifecycle('flash',true);
+        if(returnTab==='collapsed')storageState.expanded=false;
+        navigate('jobs');await navigationRefresh;
+        jobsState.pendingDeleteJobKey='job-deleted-technical-id';
+        await confirmJobDelete();
+        navigate('storage');await navigationRefresh;
+      },{lang,returnTab});
+      assert.equal(await page.evaluate(()=>serverJobs.length),0,'Actual job delete handler completed');
+      if(returnTab==='collapsed')await card.locator('[data-storage-action=toggle-repository]').click();
+      await card.locator('[data-repository-tab=management]').click();
+      await page.waitForFunction(()=>storageState.lifecycleCache.flash?.allowed===true);
+      const management=card.locator('[data-repository-panel=management]');
+      assert.equal(await management.locator('[data-lifecycle-mode=delete]').isDisabled(),false,`Deletion available after returning via ${returnTab}/${lang}`);
+      assert.equal(await management.locator('[data-lifecycle-mode=remove]').isDisabled(),false);
+      assert(!/job-deleted-technical-id|Flash USB/.test(await management.innerText()),'Deleted job is not replaced by a raw ID');
+      assert.equal(await card.locator('.storage-card-identity h2').innerText(),'Flash');
+      await page.evaluate(async()=>{releaseOldLifecycle();await obsoleteLifecycle;});
+      assert.equal(await page.evaluate(()=>storageState.lifecycleCache.flash.allowed),true,'Obsolete response/error cannot restore blockers');
+      assert.equal(await management.locator('[data-lifecycle-mode=delete]').isDisabled(),false);
+    }
+    await page.evaluate(async()=>{
+      serverJobs=[{key:'new-link',name:'New linked job'}];
+      await refreshStorage();
+    });
+    assert(await card.locator('[data-repository-panel=management] [data-lifecycle-mode=delete]').isDisabled(),'New links also restore the deletion guard');
+    await page.evaluate(async()=>{window.failCurrentLifecycle=true;await refreshStorage();});
+    assert.match(await card.locator('[data-repository-panel=management]').innerText(),/Current lifecycle unavailable/);
+    assert.equal(await card.locator('[data-repository-panel=management] [data-lifecycle-mode=delete]').count(),0,'Failed current refresh does not expose stale actions');
+    await page.evaluate(()=>{window.failCurrentLifecycle=false;});
+    await card.locator('[data-repository-panel=management] [data-storage-action=refresh-repository-lifecycle]').click();
+    await page.waitForFunction(()=>storageState.lifecycleCache.flash?.allowed===false);
     assert.deepEqual(errors,[]);
     console.log('Repository cards: registry/target filters/four columns, stable panels DE/EN, lifecycle/key blockers, archive paging/browser, maintenance routing and zero/unknown amounts passed.');
   } finally { await browser.close(); }

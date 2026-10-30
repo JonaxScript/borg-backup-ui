@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Refresh repository job links on return (#664)
+
+- Invalidate lifecycle snapshots when repository/job data is refreshed and reload the expanded repository regardless of its selected tab. Load archive and lifecycle details independently so archive reads do not delay current link information.
+- Ignore superseded lifecycle responses and errors. Preserve read-only previews, current-request error feedback and server-side removal/deletion validation.
+- Exercise actual job deletion and page navigation in German and English, returning to overview, archives, management and collapsed cards. Cover stale success/error responses, new links and retry after a current request fails.
+
 ## Pending - Stable compact repository tabs (#662)
 
 - Arrange key recovery, removal and deletion in visually separated columns on wide screens with bottom-aligned action buttons and compact linked-job context above. Keep the repository ID on one line with ellipsis and its full value in the title. Keep the last action visible within the overview-sized workspace for ordinary desktop content; longer and narrow-screen content remains scrollable.
