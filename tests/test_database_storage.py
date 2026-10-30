@@ -389,9 +389,13 @@ def test_live_operation_progress_is_in_memory_until_completion(config, profile, 
         assert 'progress' not in persisted
     finally:
         finish.set()
-    for _ in range(100):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
         final = database_api.operation_status(config, state['id'])
-        if final['status']!='running': break
+        # The final file is published before the worker removes its live state.
+        with database_api._guard:
+            worker_finished = state['id'] not in database_api._active
+        if final['status']!='running' and worker_finished: break
         time.sleep(.01)
     assert final['status']=='completed' and final['progress']['database']=='digikam'
     assert state['id'] not in database_api._live_progress
