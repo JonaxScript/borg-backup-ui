@@ -2362,6 +2362,13 @@
       "jobsCount": "Jobs: {count}"
     },
     "profiles": {
+      "savedRefreshFailed": "Profile saved. The view could not be refreshed. Please reload the page.",
+      "newProfile": "New profile – not saved yet",
+      "workflowHint": "Select a profile → “Edit” → “Save profile”. The confirmation appears beside the form.",
+      "saving": "Saving …",
+      "pending": "Changes pending – save now.",
+      "noChanges": "No pending changes.",
+      "saved": "Profile saved. You can now leave this section.",
       "name": "Profile name",
       "host": "Host / IP",
       "port": "Port",
@@ -3767,6 +3774,8 @@
     }
   },
   "database": {
+    "workflowHint": "1. Enter the connection and click “Save connection & load databases”. 2. Select databases and dump storage. 3. Click “Save profile”. Test actions use the saved profile.",
+    "connectionSaved": "Connection saved. Next select the databases and click “Save profile”.",
     "title": "Database backups",
     "profile": "Profile",
     "new": "New profile",
@@ -3834,7 +3843,7 @@
     "passwordKeep": "Leave blank to keep the saved password",
     "passwordEnter": "Enter the database password",
     "selectionHint": "Load databases with the configured account, then select the databases to back up. Newly discovered databases are never selected automatically.",
-    "discover": "Save connection and load databases",
+    "discover": "Save connection & load databases",
     "notLoaded": "Load the database list to make your selection.",
     "discovered": "{count} databases found. Select the required databases and save the profile.",
     "storageTitle": "3. Dump storage and retention",

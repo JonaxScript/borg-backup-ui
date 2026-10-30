@@ -2362,6 +2362,13 @@
       "jobsCount": "Jobs: {count}"
     },
     "profiles": {
+      "savedRefreshFailed": "Profil gespeichert. Die Ansicht konnte nicht aktualisiert werden. Bitte die Seite neu laden.",
+      "newProfile": "Neues Profil – noch nicht gespeichert",
+      "workflowHint": "Profil auswählen → „Bearbeiten“ → „Profil speichern“. Die Bestätigung erscheint direkt am Formular.",
+      "saving": "Wird gespeichert …",
+      "pending": "Änderungen offen – jetzt speichern.",
+      "noChanges": "Keine offenen Änderungen.",
+      "saved": "Profil gespeichert. Sie können diesen Bereich jetzt verlassen.",
       "name": "Profilname",
       "host": "Host / IP",
       "port": "Port",
@@ -3767,6 +3774,8 @@
     }
   },
   "database": {
+    "workflowHint": "1. Verbindung eintragen und „Verbindung speichern & Datenbanken laden“ klicken. 2. Datenbanken und Dump-Speicher auswählen. 3. „Profil speichern“ klicken. Testaktionen verwenden das gespeicherte Profil.",
+    "connectionSaved": "Verbindung gespeichert. Wählen Sie anschließend die Datenbanken aus und klicken Sie auf „Profil speichern“.",
     "title": "Datenbank-Sicherungen",
     "profile": "Profil",
     "new": "Neues Profil",
@@ -3834,7 +3843,7 @@
     "passwordKeep": "Leer lassen, um das gespeicherte Passwort zu behalten",
     "passwordEnter": "Datenbank-Passwort eingeben",
     "selectionHint": "Datenbanken mit dem angegebenen Konto laden und die gewünschten Datenbanken anhaken. Neu gefundene Datenbanken werden niemals automatisch ausgewählt.",
-    "discover": "Verbindung speichern und Datenbanken laden",
+    "discover": "Verbindung speichern & Datenbanken laden",
     "notLoaded": "Datenbankliste laden, um die Auswahl zu treffen.",
     "discovered": "{count} Datenbanken gefunden. Gewünschte Datenbanken auswählen und Profil speichern.",
     "storageTitle": "3. Dump-Speicher und Aufbewahrung",

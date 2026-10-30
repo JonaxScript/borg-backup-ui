@@ -1042,6 +1042,15 @@ Die Stichprobe zielt standardmäßig auf 5 % der regulären Dateien, begrenzt du
 
 ## 9. Einstellungen
 
+Speicherprofile unter **Lokal**, **USB**, **SMB** und **SSH** werden in drei
+Schritten geändert: Profil auswählen, **Bearbeiten** öffnen, anschließend
+**Profil speichern** klicken. Die Bestätigung oder ein Speicherfehler erscheint
+direkt am Formular. Während des Speicherns sind die Eingaben gesperrt.
+„Ungespeichert“ bezeichnet offene Änderungen; zurückgesetzte Felder zählen nicht
+als Änderung. Bei einem Fehler bleiben die Eingaben erhalten. Vor dem Wechsel in
+einen anderen Einstellungsbereich werden offene Änderungen geklärt, damit sie
+nicht dem nächsten Profil zugerechnet werden.
+
 ![Einstellungen mit Navigation, Systemzustand und Konfigurationsbereich](../assets/de/settings-guide.png)
 
 **Abbildung 4 - Einstellungen:** (1) Bereichsnavigation, (2) Systemzustand und Migration, (3) Einstellungen des gewählten Bereichs, (4) zentrale Speicheraktion.
@@ -2043,6 +2052,13 @@ Produktionsdaten und dienen gezielten Tests.
 ## 19. Datenbank-Sicherungen in Docker (#591)
 
 ### 19.1 Profile und Voraussetzungen
+
+Die Anleitung über dem Formular zeigt die Reihenfolge. **Verbindung speichern &
+Datenbanken laden** speichert die Verbindungsdaten und lädt die verfügbaren Namen.
+Danach Datenbanken und Dump-Speicher auswählen und **Profil speichern** klicken.
+Die Rückmeldung steht direkt über den Speicheraktionen. Neue Profile sind als
+„noch nicht gespeichert“ gekennzeichnet. Erst eine erfolgreiche Speicherantwort
+setzt den Änderungsstatus zurück; Testaktionen verwenden das gespeicherte Profil.
 
 Unter **Einstellungen > Datenbank-Sicherungen** ein Profil für einen laufenden
 lokalen MariaDB-, MySQL- oder PostgreSQL-Container anlegen (Umfang siehe Abschnitt 19.5). Datenbankbenutzer (üblicherweise

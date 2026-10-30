@@ -1302,3 +1302,15 @@
 .database-run header, .database-run-meta { display:flex; gap:var(--ui-space-3); align-items:center; flex-wrap:wrap; }
 .database-run code { overflow-wrap:anywhere; }
 .database-run .btn { justify-self:start; }
+
+/* Profile save guidance stays alongside the edited values and actions. */
+.profile-workflow-hint {
+  margin: 0;
+  padding: var(--ui-space-3);
+  color: var(--ui-color-text-muted);
+  background: var(--ui-color-surface);
+  line-height: 1.5;
+}
+.profile-save-bar { flex-wrap: wrap; gap: var(--ui-space-3); }
+.profile-save-bar [data-profile-save-status] { flex: 1 1 12rem; font-size: 0.85rem; }
+.settings-profile-editor > .status-message { margin: var(--ui-space-3); }

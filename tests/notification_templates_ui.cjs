@@ -32,7 +32,7 @@ function loadSettings(language) {
   };
   const context = vm.createContext({
     window: {BBUI: {api: {_fetch401Wrapped: true}, components: {i18n: {t: translate}}}, addEventListener() {}},
-    document: {addEventListener() {}, getElementById: () => null},
+    document: {addEventListener() {}, getElementById: () => null, querySelectorAll: () => []},
     escHtml: (value) => (value ? String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : ''),
     locationIcon: () => '',
   });

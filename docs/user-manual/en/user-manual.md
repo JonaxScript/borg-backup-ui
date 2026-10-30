@@ -1030,6 +1030,13 @@ The sample targets 5% of regular files by default, capped by the configured file
 
 ## 9. Settings
 
+To change a **Local**, **USB**, **SMB** or **SSH** storage profile, select it,
+choose **Edit**, then click **Save profile**. Confirmation or a save error appears
+beside the form. Inputs are locked while saving. “Unsaved” indicates pending
+changes; reverting fields to their saved values clears those changes. A failed
+save preserves the draft. Pending settings changes are resolved before switching
+areas, so they are not attributed to the next profile.
+
 ![Settings with navigation, system health, and configuration area](../assets/en/settings-guide.png)
 
 **Figure 4 - Settings:** (1) Section navigation, (2) system health and migration, (3) settings for the selected section, (4) central save action.
@@ -2007,6 +2014,12 @@ modify production data.
 ## 19. Database backups in Docker (#591)
 
 ### 19.1 Profiles and prerequisites
+
+The guide above the form shows the sequence. **Save connection & load databases**
+persists connection settings and discovers available names. Then select databases
+and dump storage and click **Save profile**. Feedback appears directly above the
+save actions. New profiles are marked as not saved yet. Only an acknowledged save
+clears the pending-change state; test actions use the saved profile.
 
 Under **Settings > Database backups**, create a profile for a running local
 MariaDB, MySQL or PostgreSQL container (see section 19.5 for scope). Enter the database user (typically `root` for
