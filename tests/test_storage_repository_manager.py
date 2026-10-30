@@ -1,5 +1,7 @@
 from job_fixtures import identified_job, job_id
 import json
+import logging
+import shlex
 import subprocess
 import sys
 from datetime import datetime, timedelta
@@ -212,7 +214,7 @@ def test_repository_prune_rejects_retention_source_from_other_repository(tmp_pat
         )
 
 
-def test_repository_maintenance_uses_repository_secret_without_shell(tmp_path: Path, monkeypatch):
+def test_repository_maintenance_uses_repository_secret_without_shell(tmp_path: Path, monkeypatch, caplog):
     secret = tmp_path / "secrets" / ".borg-passphrase-repo_test"
     secret.parent.mkdir(parents=True)
     secret.write_text("secret", encoding="utf-8")
@@ -246,6 +248,9 @@ def test_repository_maintenance_uses_repository_secret_without_shell(tmp_path: P
         returncode = 0
 
     def fake_popen(cmd, **kwargs):
+        start = next(record.getMessage() for record in caplog.records if record.getMessage().startswith("BORG_EXEC "))
+        assert shlex.split(start.split(": ", 1)[1]) == cmd
+        assert str(secret) not in start
         captured["cmd"] = cmd
         captured["kwargs"] = kwargs
         return Process()
@@ -253,7 +258,8 @@ def test_repository_maintenance_uses_repository_secret_without_shell(tmp_path: P
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr("threading.Thread.start", lambda _self: None)
 
-    ok, error = CheckManager().start_repository(config, "repo_test", "check", "quick")
+    with caplog.at_level(logging.INFO):
+        ok, error = CheckManager().start_repository(config, "repo_test", "check", "quick")
 
     assert ok is True and error is None
     assert captured["cmd"] == [

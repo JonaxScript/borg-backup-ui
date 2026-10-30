@@ -31,9 +31,11 @@ from typing import Dict, List, Optional
 
 try:
     from .retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from .borg_exec_log import BorgExecutionLog
     from .source_size import SourceSizeEstimate
 except ImportError:  # Direct CLI invocation.
     from retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from borg_exec_log import BorgExecutionLog
     from source_size import SourceSizeEstimate
 
 logger = logging.getLogger(__name__)
@@ -343,7 +345,7 @@ class BorgRunner:
 
         Entspricht borg_check() in borg-common.sh.
         Fortschritt wird nur als fluechtiger Status weitergegeben; im Log
-        stehen Warnungen/Fehler und eine abschliessende Ergebniszeile.
+        stehen maskierter Aufruf/Exit-Code, Warnungen/Fehler und eine Ergebniszeile.
         Check wird übersprungen, wenn letzter Check kürzer als
         check_interval_days zurückliegt.
 
@@ -397,7 +399,7 @@ class BorgRunner:
         archive_name: Optional[str] = None,
     ) -> int:
         """
-        Erstellt ein neues Borg-Archiv.
+        Erstellt ein neues Borg-Archiv und protokolliert maskierten Aufruf/Exit-Code.
 
         Entspricht dem 'borg create' Aufruf in allen Backup-Skripten.
         Exit 0 = OK, 1 = Warnungen (Backup nutzbar), ≥2 = Fehler.
@@ -474,6 +476,7 @@ class BorgRunner:
         if extra_env:
             env.update(extra_env)
 
+        execution_log = BorgExecutionLog(cmd, logger.info, env)
         try:
             process = subprocess.Popen(
                 cmd,
@@ -482,11 +485,13 @@ class BorgRunner:
                 text=True,
                 env=env,
             )
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
+            execution_log.failed(exc)
             logger.error("borg was not found; is Borg Backup installed?")
             return BORG_EXIT_ERROR
         except OSError as exc:
-            logger.error("Borg process could not be started: %s", exc)
+            execution_log.failed(exc)
+            logger.error("Borg process could not be started: %s", type(exc).__name__)
             return BORG_EXIT_ERROR
 
         if self.process_controller is not None:
@@ -516,6 +521,7 @@ class BorgRunner:
             if estimate is not None:
                 estimate.close()
             process.wait()
+            execution_log.finished(process.returncode)
             _publish_borg_progress(self.process_controller, None)
             if self.process_controller is not None:
                 self.process_controller.detach_process()
@@ -794,6 +800,7 @@ def _consume_borg_output(line: str, process_controller, *, operation: str = "che
 def _run_borg(cmd: List[str], process_controller=None) -> int:
     """
     Führt ein Borg-Kommando aus und streamt die Ausgabe mit Zeitstempel.
+    Protokolliert vorher den maskierten Aufruf und danach den rohen Prozesscode.
 
     Entspricht dem Pattern: borg ... 2>&1 | add_timestamp in borg-common.sh.
     Kombiniert stdout und stderr. Borg-JSON wird in fluechtigen Fortschritt
@@ -806,6 +813,7 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
     env["LC_ALL"] = "C"
     env["LANG"] = "C"
 
+    execution_log = BorgExecutionLog(cmd, logger.info, env)
     try:
         process = subprocess.Popen(
             cmd,
@@ -814,11 +822,13 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
             text=True,
             env=env,
         )
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
+        execution_log.failed(exc)
         logger.error("borg was not found; is Borg Backup installed?")
         return BORG_EXIT_ERROR
     except OSError as exc:
-        logger.error("Borg process could not be started: %s", exc)
+        execution_log.failed(exc)
+        logger.error("Borg process could not be started: %s", type(exc).__name__)
         return BORG_EXIT_ERROR
 
     if process_controller is not None:
@@ -843,6 +853,7 @@ def _run_borg(cmd: List[str], process_controller=None) -> int:
                     logger.info("%s", line)
     finally:
         process.wait()
+        execution_log.finished(process.returncode)
         if process_controller is not None:
             process_controller.detach_process()
         wd_stop.set()

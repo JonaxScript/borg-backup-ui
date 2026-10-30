@@ -81,7 +81,8 @@ def test_check_routes_progress_without_log_flooding(control, monkeypatch, caplog
     runner = borg_runner.BorgRunner(cfg, process_controller=control)
     with caplog.at_level(logging.INFO, logger=borg_runner.logger.name):
         assert runner.check() == code
-    messages = [r.getMessage() for r in caplog.records if r.name == borg_runner.logger.name]
+    messages = [r.getMessage() for r in caplog.records if r.name == borg_runner.logger.name
+                and not r.getMessage().startswith(('BORG_EXEC ', 'BORG_EXIT '))]
     assert len(messages) == 1
     assert outcome in messages[0]
     assert not any(str(n) + ' %' in caplog.text for n in (63, 65, 70))
@@ -182,7 +183,8 @@ def test_real_borg_check_keeps_only_final_summary(tmp_path, monkeypatch, caplog)
         assert runner.check() == 0
     assert any(event and event.get('type') == 'progress_percent' for event in events)
     assert events[-1] is None
-    messages = [r.getMessage() for r in caplog.records if r.name == borg_runner.logger.name]
+    messages = [r.getMessage() for r in caplog.records if r.name == borg_runner.logger.name
+                and not r.getMessage().startswith(('BORG_EXEC ', 'BORG_EXIT '))]
     assert len(messages) == 1 and 'succeeded' in messages[0]
 
 

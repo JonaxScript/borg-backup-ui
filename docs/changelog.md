@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Correlated Borg invocation logging (#648)
+
+- Log the actual argument vector before managed create/prune/compact/check, version/info diagnostics and manual repository maintenance. Pair each invocation with its raw process exit code using a unique ID; distinguish startup failures, signals and diagnostic timeouts without changing job outcomes.
+- Shell-quote display arguments, escape control characters and mask credentials, sensitive options, nested command values and known secret values. Never dump the process environment or alter execution arguments.
+- Retain command/exit evidence in bounded maintenance details, including successful runs, and existing sanitized support exports. Document diagnostic limits in German and English.
+
 ## Pending - Live processing speed and mounted-source estimates (#646)
 
 - Extend the existing Live metrics area with a rolling 30-second logical-byte processing rate, independent of network throughput and deduplicated storage statistics. Place measurements below a full-width progress bar and omit the last Borg update timestamp.
