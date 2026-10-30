@@ -108,8 +108,30 @@ const {chromium} = require('playwright');
     if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/compact-repository-overview.png`});
 
     assert.equal(await page.evaluate(()=>calls.some(c=>c.url.includes('/archives?'))),false,'Expanding a card does not scan archives');
+    // Hold the first archive response to reproduce Overview -> loading -> Archives -> Overview (#662).
+    const compactHeight=(await card.boundingBox()).height;
+    await page.evaluate(()=>{
+      window.originalFetch=window.fetch;
+      window.fetch=async (...args)=>{
+        if(args[0].startsWith('/api/repositories/archives?'))await new Promise(resolve=>window.releaseArchives=resolve);
+        return originalFetch(...args);
+      };
+    });
     await card.locator('[data-repository-tab=archives]').click();
+    await page.waitForFunction(()=>typeof releaseArchives==='function');
+    assert.equal((await card.boundingBox()).height,compactHeight,'Loading does not grow the card');
+    await page.evaluate(()=>{releaseArchives();window.fetch=originalFetch;});
     await page.waitForFunction(()=>!!BBUI.storageState.archiveCache.flash?.data);
+    assert.equal((await card.boundingBox()).height,compactHeight,'Loaded archives fit the initial overview');
+    if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/stable-archives.png`});
+    await card.locator('[data-repository-tab=overview]').click();
+    assert.equal((await card.boundingBox()).height,compactHeight,'Cached return does not retain an oversized archive panel');
+    assert.equal(await card.locator('.storage-repository-panels').getAttribute('data-active-tab'),'overview');
+    assert(await overview.evaluate(panel=>panel.getBoundingClientRect().bottom-panel.firstElementChild.getBoundingClientRect().bottom<35),'No oversized blank area below the overview');
+    await page.evaluate(()=>renderStorage(storageState.data));
+    assert.equal((await card.boundingBox()).height,compactHeight,'Background rendering preserves the compact height');
+    if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/stable-overview-return.png`});
+    await card.locator('[data-repository-tab=archives]').click();
     // Measured row heights fill the available space; both pagers disclose the range (#658).
     for (const lang of ['de', 'en']) {
       await page.setViewportSize({width:1280,height:500});
@@ -239,17 +261,54 @@ const {chromium} = require('playwright');
     for(const width of [1600,1024,390])for(const lang of ['de','en']){
       await page.setViewportSize({width,height:1100});await page.evaluate(lang=>{window.lang=lang;document.documentElement.lang=lang;renderStorage(storageState.data);},lang);
       const heights=[];
-      for(const tab of ['overview','archives','maintenance','management']){
+      for(const tab of ['overview','archives','maintenance','management','overview']){
         await card.locator(`[data-repository-tab=${tab}]`).click();
         if(tab==='overview') {
           assert.equal(await card.locator('.storage-repository-overview .storage-repository-stats > div').count(),6);
-        } else heights.push((await card.boundingBox()).height);
+        }
+        heights.push((await card.boundingBox()).height);
+        const activePanel=card.locator('[data-repository-panel].is-active');
+        assert(await activePanel.evaluate(panel=>panel.scrollWidth<=panel.clientWidth+1),`No horizontal panel overflow ${width}/${lang}/${tab}`);
+        if(width===390 && tab==='management') {
+          assert(await activePanel.evaluate(panel=>{
+            panel.scrollTop=panel.scrollHeight;
+            return panel.querySelector('[data-lifecycle-mode=delete]').getBoundingClientRect().bottom<=panel.getBoundingClientRect().bottom;
+          }),'Last management action remains reachable on narrow screens');
+        }
+        if(width===390 && tab==='overview') {
+          assert(await activePanel.evaluate(panel=>panel.scrollHeight>panel.clientHeight),'Long mobile overview scrolls internally');
+          assert(await activePanel.evaluate(panel=>{
+            panel.scrollTop=panel.scrollHeight;
+            return panel.firstElementChild.getBoundingClientRect().bottom<=panel.getBoundingClientRect().bottom;
+          }),'Last overview details remain reachable');
+        }
         assert.equal(await card.locator('[data-repository-panel]:not(.is-active) button').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).visibility==='hidden')),true,'Inactive controls cannot paint through hidden panels');
         assert.equal(await card.locator('[data-repository-panel]:not(.is-active)').evaluateAll(nodes=>nodes.every(n=>n.inert&&getComputedStyle(n).visibility==='hidden')),true);
       }
       assert.ok(Math.max(...heights)-Math.min(...heights)<1,`Stable panels at ${width}/${lang}: ${heights}`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`No page overflow ${width}/${lang}`);
     }
+    // Management must fit the compact overview even without expanded maintenance results (#662).
+    await page.evaluate(()=>{window.savedResults=baseRepo.maintenance_results;baseRepo.maintenance_results={};});
+    for(const width of [1600,1440,1280])for(const lang of ['de','en']) {
+      await page.setViewportSize({width,height:900});
+      await page.evaluate(lang=>{window.lang=lang;storageWorkspaceSize=null;storageState.selectedTab='overview';renderStorage(storageState.data);},lang);
+      const height=(await card.boundingBox()).height;
+      await card.locator('[data-repository-tab=management]').click();
+      const panel=card.locator('[data-repository-panel=management]');
+      assert.equal((await card.boundingBox()).height,height,'Management must keep the shared card height');
+      assert(await panel.evaluate(p=>p.scrollHeight<=p.clientHeight+1),`All management content fits ${width}/${lang}: ${JSON.stringify(await panel.evaluate(p=>({height:p.clientHeight,scroll:p.scrollHeight})))}`);
+      assert(await panel.locator('[data-lifecycle-mode=delete]').evaluate(button=>button.getBoundingClientRect().bottom<=button.closest('[data-repository-panel]').getBoundingClientRect().bottom),'Delete action is visible without scrolling');
+      assert(await panel.locator('[data-lifecycle-mode=delete]').isDisabled(),'Linked-job deletion guard remains in place');
+      const id=panel.locator('.storage-lifecycle-key-recovery dd').first();
+      assert.equal(await id.evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+      assert.equal(await id.getAttribute('title'),await id.textContent(),'Full repository ID remains available');
+      const buttons=await panel.locator('[data-storage-action=repository-key-import-select], [data-lifecycle-mode=remove], [data-lifecycle-mode=delete]').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
+      assert(Math.max(...buttons)-Math.min(...buttons)<1,`Management buttons align ${width}/${lang}: ${buttons}`);
+      assert.deepEqual(await panel.locator('.storage-lifecycle-card').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).borderLeftWidth)),['0px','1px','1px'],'Vertical separators distinguish the three action columns');
+      if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/management-${width}-${lang}.png`});
+    }
+    await page.evaluate(()=>{baseRepo.maintenance_results=savedResults;});
     for(const theme of ['light','dark']){
       await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
       assert.ok(await page.locator('.storage-card-key-warning').evaluate(n=>getComputedStyle(n).fontWeight==='400'&&getComputedStyle(n).borderTopWidth==='0px'));

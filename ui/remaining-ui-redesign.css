@@ -1642,9 +1642,9 @@
 .storage-repository-card .storage-repository-master-detail { min-height: 0; border-top: 1px solid var(--ui-color-border); }
 .storage-repository-card .storage-repository-tabs { flex-wrap: wrap; overflow: visible; }
 .storage-repository-card .storage-repository-tabs button { font-weight: 400; padding: 12px; }
-/* Inactive panels contribute their intrinsic height, but cannot be read or focused. */
-.storage-repository-panels { display: grid; min-height: 650px; }
-.storage-repository-panels > .storage-repository-tab-content { grid-area: 1 / 1; align-self: start; min-width: 0; visibility: hidden; pointer-events: none; }
+/* A shared measured height prevents loading and tab switches from resizing the card (#662). */
+.storage-repository-panels { display: grid; min-height: 0; }
+.storage-repository-panels > .storage-repository-tab-content { grid-area: 1 / 1; height: 100%; min-height: 0; min-width: 0; overflow: auto; scrollbar-gutter: stable; box-sizing: border-box; visibility: hidden; pointer-events: none; }
 .storage-repository-panels > .is-active { visibility: visible; pointer-events: auto; }
 .storage-repository-card strong, .storage-repository-card b, .storage-repository-card dt, .storage-repository-card dd { font-weight: 400; }
 .storage-repository-card h3, .storage-repository-card h4 { font-weight: 500; }
@@ -1729,8 +1729,10 @@
   .storage-card-summary { grid-template-columns: minmax(0, 1fr); }
   .storage-target-group-heading { flex-wrap: wrap; }
 }
-/* Reserve both archive panes so browsing folders never moves the pager (#621). */
-.storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); height: clamp(22rem, calc(100dvh - 20rem), 48rem); }
+/* Fit archive panes to the shared workspace, preserving both pagers (#621, #662). */
+.storage-repository-panels > [data-repository-panel="archives"] { display: flex; flex-direction: column; }
+.storage-repository-panels > [data-repository-panel="archives"] > :not(.storage-archive-layout) { flex-shrink: 0; }
+.storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); flex: 1; min-height: 150px; height: auto; }
 .storage-archive-column { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: 100%; min-height: 0; min-width: 0; }
 .storage-archive-column .storage-archive-pagination { padding-top: 0; }
 .storage-repository-card .storage-archive-list { height: 100%; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
@@ -1748,13 +1750,11 @@
 .storage-repository-card .storage-archive-pagination { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
 .storage-repository-card .storage-archive-pagination > span { text-align: center; }
 @media (max-width: 1100px) {
-  .storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: clamp(22rem, 55dvh, 38rem) 28rem; height: auto; gap: 1rem; }
+  .storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: clamp(22rem, 55dvh, 38rem) 28rem; flex: none; height: auto; gap: 1rem; }
 }
 
-/* Compact overview; archive/maintenance workspaces keep their reserved panes (#660). */
+/* Compact overview and readable archive names (#660). */
 .storage-repository-card { scroll-margin-top: 16px; }
-.storage-repository-panels[data-active-tab="overview"] { display: block; min-height: 0; }
-.storage-repository-panels[data-active-tab="overview"] > :not(.is-active) { display: none; }
 .storage-repository-overview { gap: 12px; }
 .storage-repository-card .storage-repository-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 16px; }
 .storage-repository-card .storage-repository-stats strong { font-size: 1rem; }
@@ -1776,4 +1776,29 @@
 }
 @media (max-width: 450px) {
   .storage-repository-card .storage-maintenance-summary-grid .storage-maintenance-card { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* Use the available width for management instead of extending the shared panel (#662). */
+.storage-repository-card .storage-repository-management { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; align-items: stretch; }
+.storage-repository-management > .storage-section-heading,
+.storage-lifecycle-context { grid-column: 1 / -1; }
+.storage-lifecycle-context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding-bottom: 8px; border-bottom: 1px solid var(--ui-color-border); }
+.storage-repository-card .storage-lifecycle-context .storage-lifecycle-jobs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 0; border: 0; }
+.storage-lifecycle-context .storage-lifecycle-blocker { flex: 1 1 24rem; }
+.storage-lifecycle-context .status-message { margin: 0; }
+.storage-repository-card .storage-repository-management .storage-lifecycle-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; gap: 10px; padding: 0 0 12px; }
+.storage-repository-management .storage-lifecycle-card > button { align-self: flex-start; margin-top: auto; }
+.storage-repository-management .storage-lifecycle-actions { justify-content: flex-start; margin-top: auto; }
+.storage-repository-management .storage-lifecycle-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.storage-repository-management .storage-lifecycle-card dl > div:first-child { grid-column: 1 / -1; }
+.storage-lifecycle-key-recovery dl > div:first-child dd { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1100px) {
+  .storage-repository-card .storage-repository-management { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .storage-repository-management .storage-lifecycle-key-recovery dl { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (min-width: 1101px) {
+  .storage-repository-management > .storage-lifecycle-card + .storage-lifecycle-card { border-left: 1px solid var(--ui-color-border); padding-left: 24px; }
 }
