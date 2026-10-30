@@ -277,7 +277,17 @@ def test_database_http_profile_routes(tmp_path, monkeypatch, profile):
         created=payload['profile']
         code,error=request('POST',{**created,'container':'--privileged'})
         assert code==400 and error['code']=='database_invalid_profile'
+        assert error['message_params']['field']=='container'
         assert request('GET')[1]['profiles'][0]['container']=='mariadb'
+        nested = created['staging_mount'] + '/borg-database-dumps/TheTwist/'
+        code, saved = request('POST', {**created, 'staging_mount':created['staging_mount']+'/', 'staging_dir':nested})
+        assert code == 200 and saved['profile']['staging_dir'] == nested.rstrip('/')
+        assert not Path(nested).exists()  # Saving is not a dump.
+        code, error = request('POST', {**saved['profile'], 'staging_dir':'relative/path'})
+        assert code == 400 and error['code'] == 'database_invalid_path'
+        assert error['message_params'] == {'field':'staging_dir'}
+        assert 'relative/path' not in json.dumps(error)
+        assert request('GET')[1]['profiles'][0]['staging_dir'] == nested.rstrip('/')
         assert request('DELETE',suffix='?id='+created['id'])[0]==200
     finally:server.shutdown();server.server_close();worker.join(5)
 

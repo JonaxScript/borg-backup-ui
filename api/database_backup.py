@@ -318,7 +318,7 @@ def open_staging(profile, *, require_space=True):
 
     Existing owners/modes (including nobody:users, 0777) are never changed.
     Components are opened without symlinks; callers also hold each run directory.
-    Explicit exports may create a missing direct child with 0755. Read-only
+    Explicit exports may create missing nested directories with 0755. Read-only
     listing never creates paths or requires write access. Mount, space and
     filesystem checks remain active. Errors use localized diagnostic codes.
     """
@@ -344,9 +344,14 @@ def open_staging(profile, *, require_space=True):
             try:
                 child = os.open(component, flags, dir_fd=fd)
             except FileNotFoundError:
-                if not require_space or len(parts) != 1:
+                if not require_space:
                     raise
-                os.mkdir(component, mode=0o755, dir_fd=fd)
+                # Validate the held parent before creating anything beneath it.
+                _local_filesystem(fd)
+                try:
+                    os.mkdir(component, mode=0o755, dir_fd=fd)
+                except FileExistsError:
+                    pass  # A concurrent creator still has to pass O_NOFOLLOW below.
                 child = os.open(component, flags, dir_fd=fd)
             os.close(fd)
             fd = child
@@ -547,13 +552,40 @@ def is_run_directory_name(name):
     return bool(re.fullmatch(r'bbui-(?:' + stamp + r'(?:-[a-f0-9]{32})?|[a-f0-9]{32})', name))
 
 
-def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, progress=None, check_only=False, results=None):
+class _DumpProgressWriter:
+    """Forward gzip writes and report byte counters at most once per second.
+
+    The caller owns both streams. No dump contents enter the callback and no
+    telemetry is written to disk by this adapter. Sink/callback failures propagate.
+    """
+
+    def __init__(self, compressed, handle, report):
+        self.compressed, self.handle, self.report = compressed, handle, report
+        self.last_update = float('-inf')
+
+    def write(self, block):
+        """Write one chunk and publish current original/compressed byte counts."""
+        written = self.compressed.write(block)
+        now = time.monotonic()
+        if now - self.last_update >= 1:
+            self.last_update = now
+            self.report(self.compressed.tell(), self.handle.tell())
+        return written
+
+    def tell(self):
+        """Return the uncompressed stream position."""
+        return self.compressed.tell()
+
+
+def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, progress=None, check_only=False, results=None, live_progress=None):
     """Export into held Unraid dump directories; retain completed files on failure.
 
     New runs use profile/time directory names and stream raw client bytes through
     gzip level 6 without an uncompressed staging copy. Publish .gz files only after
     successful client exit, nonempty input, gzip close and fsync. Manifests record
     original byte counts and compressed sizes/hashes; failed partial files remain.
+    live_progress receives throttled, content-free phase/byte updates; progress
+    retains its per-completed-file manifest contract.
     Returns JSON-serializable DumpResult manifests. Call close_results after the
     final archive/cleanup operation; pass results to retain partial manifests and
     explicitly close handles even when this function raises.
@@ -587,7 +619,15 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
             write_manifest(manifest)
             cid = container_identity(profile)
             manifest['container_id'] = cid
-            for database in profile['databases']:
+            for database_index, database in enumerate(profile['databases'], 1):
+                def report_live(phase, processed=0, stored=0):
+                    """Publish totals across completed files plus the active stream."""
+                    if live_progress:
+                        live_progress({'phase':phase, 'database':database, 'database_index':database_index,
+                            'databases_total':len(profile['databases']),
+                            'processed_bytes':sum(f['uncompressed_bytes'] for f in manifest['files']) + processed,
+                            'written_bytes':sum(f['bytes'] for f in manifest['files']) + stored})
+                report_live('checking')
                 started = time.monotonic()
                 versions = _probe(config, profile, cid, database, cancelled, directory)
                 if check_only:
@@ -602,10 +642,12 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                 for action in actions:
                     name = ('globals.sql' if action == 'globals' else database + dump_suffix(profile['engine'])) + '.gz'
                     partial = directory / (name + '.partial')
+                    report_live('globals' if action == 'globals' else 'exporting')
                     with partial.open('xb') as handle:
                         os.fchmod(handle.fileno(), 0o644)
                         with gzip.GzipFile(filename='', mode='wb', fileobj=handle, compresslevel=6, mtime=0) as compressed:
-                            _operation(config, profile, cid, action, database, compressed, cancelled)
+                            sink = _DumpProgressWriter(compressed, handle, lambda count, stored: report_live('globals' if action == 'globals' else 'exporting', count, stored)) if live_progress else compressed
+                            _operation(config, profile, cid, action, database, sink, cancelled)
                             uncompressed_bytes = compressed.tell()
                         handle.flush()
                         os.fsync(handle.fileno())
@@ -616,12 +658,14 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                         with gzip.open(partial, 'rb') as handle:
                             if handle.read(len(magic)) != magic:
                                 raise DatabaseError('invalid_dump')
+                    report_live('finalizing', uncompressed_bytes, partial.stat().st_size)
                     final = directory / name
                     partial.rename(final)
                     manifest['files'].append({'name': name, 'database': database, 'kind': action, **versions,
                                               'bytes': final.stat().st_size, 'uncompressed_bytes': uncompressed_bytes, 'compression': 'gzip', 'sha256': _hash(final, cancelled),
                                               'duration_seconds': round(time.monotonic() - started, 3), 'status': 'dump_completed'})
                     write_manifest(manifest)
+                    report_live('completed')
                     if progress:
                         progress(manifest)
             manifest['status'] = 'checked' if check_only else 'dump_completed'

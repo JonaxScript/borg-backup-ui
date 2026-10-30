@@ -1314,3 +1314,10 @@
 .profile-save-bar { flex-wrap: wrap; gap: var(--ui-space-3); }
 .profile-save-bar [data-profile-save-status] { flex: 1 1 12rem; font-size: 0.85rem; }
 .settings-profile-editor > .status-message { margin: var(--ui-space-3); }
+
+.database-field-error { grid-column: 1 / -1; display: block; margin-top: var(--ui-space-2); color: var(--error); font-size: .875rem; }
+.database-pending-directory { color: var(--ui-color-text-muted); overflow-wrap: anywhere; }
+
+.database-progress { padding: var(--ui-space-3); border: 1px solid var(--ui-color-border); border-radius: var(--ui-radius-md); margin-top: var(--ui-space-3); }
+.database-progress progress { display: block; width: 100%; margin-block: var(--ui-space-2); }
+.database-progress-values { display: flex; gap: var(--ui-space-3); flex-wrap: wrap; font-variant-numeric: tabular-nums; }

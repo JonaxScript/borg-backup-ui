@@ -12,6 +12,7 @@ from database_backup import export_profiles, reconcile_operations, open_staging,
 from inventory_store import atomic_write_json
 
 _active = {}
+_live_progress = {}
 _guard = threading.Lock()
 
 
@@ -23,10 +24,13 @@ def _state_path(config, identifier):
 
 
 def operation_status(config, identifier):
-    """Return durable test status; mark a lost worker interrupted after process restart."""
+    """Return durable status plus in-memory telemetry; detect workers lost on restart."""
     result = json.loads(_state_path(config, identifier).read_text())
     with _guard:
         active = identifier in _active
+        progress = dict(_live_progress.get(identifier, {}))
+    if progress:
+        result['progress'] = progress
     if result['status'] == 'running' and not active:
         result.update(status='interrupted', error_code='database_unresolved_export')
     return result
@@ -53,7 +57,7 @@ def start_operation(config, payload):
     profile = profiles[0]
     identifier = uuid.uuid4().hex
     event = threading.Event()
-    state = {'id': identifier, 'profile_id': profile['id'], 'action': action, 'status': 'running', 'started_at': utc_now()}
+    state = {'id': identifier, 'profile_id': profile['id'], 'action': action, 'profile_name': profile['name'], 'status': 'running', 'started_at': utc_now()}
     path = _state_path(config, identifier)
     locks = ResourceLockSet(resolve_resource_lock_dir(config),
                             job_key='database-test-' + identifier, operation='database-test', run_id=identifier)
@@ -65,9 +69,15 @@ def start_operation(config, payload):
         atomic_write_json(path, state)
         with _guard:
             _active[identifier] = event
+            _live_progress[identifier] = {'phase':'preparing', 'processed_bytes':0, 'written_bytes':0}
     except BaseException:
         locks.release()
         raise
+
+    def publish_progress(value):
+        """Publish content-free measurements in memory; never rewrite boot status per chunk."""
+        with _guard:
+            _live_progress[identifier] = dict(value)
 
     def worker():
         """Own locks through termination/reconciliation and persist only safe diagnostics."""
@@ -77,7 +87,7 @@ def start_operation(config, payload):
                 state['databases'] = discover_databases(config, profile, event.is_set)
             elif action == 'dump':
                 state['results'] = []
-                export_profiles(config, profiles, 'test', identifier, event.is_set, results=state['results'])
+                export_profiles(config, profiles, 'test', identifier, event.is_set, results=state['results'], live_progress=publish_progress)
             elif action == 'cleanup':
                 # Successful reconciliation under docker-control proves no exporter remains.
                 cleanup_run(Path(str(payload.get('directory', ''))), profile, interrupted=True)
@@ -87,6 +97,8 @@ def start_operation(config, payload):
         except Exception:
             state.update(status='failed', error_code='database_operation_failed')
         finally:
+            with _guard:
+                state['progress'] = dict(_live_progress.get(identifier, {}))
             close_results(state.get('results', []))
             state['finished_at'] = utc_now()
             try:
@@ -97,12 +109,14 @@ def start_operation(config, payload):
                 finally:
                     with _guard:
                         _active.pop(identifier, None)
+                        _live_progress.pop(identifier, None)
     try:
         threading.Thread(target=worker, name='database-' + identifier, daemon=True).start()
     except BaseException:
         locks.release()
         with _guard:
             _active.pop(identifier, None)
+            _live_progress.pop(identifier, None)
         raise
     return state.copy()
 

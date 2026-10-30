@@ -2116,16 +2116,24 @@ filesystems are not supported. Select the actual mount point separately. The
 free-space reserve is a guard, not a dump-size estimate; allow room for complete
 exports.
 
-An explicit dump may create a missing directory directly below the mounted pool
-with mode `0755` (subject to the process umask). The mount and intermediate
-directories must already exist. Saving a profile and listing local runs never
-create dump directories. Errors include the profile and path and distinguish an
-absent mount, missing dump directory, inaccessible/symlink path, insufficient
-access permissions, unsupported filesystem and insufficient free space. A listing
-failure is not shown as a successfully checked empty history; readable profiles
-remain visible. Existing profiles and dumps need no migration.
+Enter an absolute backup folder, for example
+`/mnt/cache/borg-database-dumps/TheTwist/`. A trailing `/` is accepted and
+normalized when saving. Invalid input is explained at the relevant field;
+entered values are preserved.
+
+The first test dump or backup creates missing subfolders inside the specified,
+mounted pool. Saving a profile and listing local runs do not create folders.
+A folder that has not been created yet is shown as an informational initial state,
+not a failed backup. The overview covers all saved profiles. Missing disks,
+access problems and unsupported storage still produce errors naming the profile
+and path. Existing profiles and dumps need no migration.
 
 ### 19.2 Run and verify
+
+**Create test dump** immediately shows preparation, followed by the current
+database, phase, elapsed time and exported/compressed byte counts. Measurements
+update during export. No percentage or ETA is estimated without a known total.
+Completion states what was created and where it was stored.
 
 The job card shows **Database backups** as a separate step before Docker/VM
 shutdown. During export, the active step and elapsed time remain visible. Its

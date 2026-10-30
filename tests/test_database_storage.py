@@ -318,3 +318,84 @@ def test_shared_manifest_links_and_special_files_are_rejected(config, profile, p
         backup.cleanup_run(run, profile)
     assert outside.read_bytes() == original
     assert (run / 'app.sql.gz').exists()
+
+
+@pytest.mark.parametrize('suffix', ['new', 'new/deeper/TheTwist'])
+def test_nested_directories_are_created_only_by_explicit_export(profile, pool, suffix):
+    profile['staging_dir'] = str(pool / suffix)
+    with pytest.raises(DatabaseError, match='storage_missing'):
+        backup.staging_root(profile, require_space=False)
+    assert not (pool / 'new').exists()
+    backup.staging_root(profile)
+    assert Path(profile['staging_dir']).is_dir()
+    assert pool.stat().st_mode & 0o777 == 0o777
+
+
+def test_nested_creation_rejects_symlink_and_foreign_filesystem(profile, pool, monkeypatch, tmp_path):
+    outside = tmp_path / 'outside'; outside.mkdir()
+    (pool / 'linked').symlink_to(outside)
+    profile['staging_dir'] = str(pool / 'linked' / 'never-created')
+    with pytest.raises(DatabaseError, match='storage_path'):
+        backup.staging_root(profile)
+    assert not (outside / 'never-created').exists()
+    (pool / 'network').mkdir()
+    profile['staging_dir'] = str(pool / 'network' / 'never-created')
+    values = iter(['xfs','nfs'])
+    monkeypatch.setattr(backup, '_run', lambda *a, **kw: Mock(stdout=next(values)))
+    with pytest.raises(DatabaseError, match='storage_filesystem'):
+        backup.staging_root(profile)
+    assert not (pool / 'network' / 'never-created').exists()
+
+
+def test_live_dump_progress_counts_streamed_bytes_and_finalization(config, profile, pool, monkeypatch):
+    fake_export(monkeypatch, profile)
+    messages = []
+    def export(config, profile, cid, action, database, output, cancelled):
+        for _ in range(4):
+            output.write(b'CREATE TABLE example;\n' * 1000)
+    monkeypatch.setattr(backup, '_operation', export)
+    results = backup.export_profiles(config, [profile], 'job', 'run', live_progress=lambda value: messages.append(value.copy()))
+    try:
+        assert messages[0]['phase'] == 'checking'
+        streamed = [m for m in messages if m['phase']=='exporting' and m['processed_bytes']]
+        assert streamed and streamed[0]['processed_bytes'] < messages[-1]['processed_bytes']
+        assert any(m['phase']=='finalizing' for m in messages)
+        assert messages[-1]['processed_bytes'] == results[0]['files'][0]['uncompressed_bytes']
+        assert messages[-1]['written_bytes'] == results[0]['files'][0]['bytes']
+        assert all(m['database']=='app' and m['database_index']==1 for m in messages)
+        assert 'CREATE TABLE' not in json.dumps(messages)
+    finally:
+        backup.close_results(results)
+
+
+def test_live_operation_progress_is_in_memory_until_completion(config, profile, monkeypatch):
+    import threading
+    import time
+    import database_profiles
+    saved = database_profiles.save_profile(config, {k:v for k,v in profile.items() if k!='id'})['profile']
+    entered, finish = threading.Event(), threading.Event()
+    monkeypatch.setattr(database_api, 'reconcile_operations', lambda _:None)
+    def export(*args, **kwargs):
+        kwargs['live_progress']({'phase':'exporting','database':'digikam','processed_bytes':6*1024**3,'written_bytes':1024**3})
+        entered.set()
+        assert finish.wait(5)
+    monkeypatch.setattr(database_api, 'export_profiles', export)
+    state = database_api.start_operation(config, {'action':'dump','profile_id':saved['id']})
+    try:
+        assert entered.wait(3)
+        live = database_api.operation_status(config, state['id'])
+        assert live['status']=='running' and live['progress']['processed_bytes']==6*1024**3
+        persisted = json.loads(database_api._state_path(config, state['id']).read_text())
+        assert 'progress' not in persisted
+    finally:
+        finish.set()
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        final = database_api.operation_status(config, state['id'])
+        # The final file is published before the worker removes its live state.
+        with database_api._guard:
+            worker_finished = state['id'] not in database_api._active
+        if final['status']!='running' and worker_finished: break
+        time.sleep(.01)
+    assert final['status']=='completed' and final['progress']['database']=='digikam'
+    assert state['id'] not in database_api._live_progress
