@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from lib.borg_runner import BorgStats
     from lib.notifications import MailConfig
 
+from .borg_exec_log import BorgExecutionLog
 from .vm_manager import VmShutdownError
 from .job_workflow import tracked_runtime_step
 
@@ -814,7 +815,8 @@ class BackupJob:
         Fehlende UD-Quellmounts speichern den Skip-Grund und beenden mit
         SystemExit(0). Andere fehlende Backup-Pfade loesen
         RequiredSourcePathsMissing aus; Mount-/Zugriffsfehler bleiben OSError.
-        Die Pruefung erfolgt vor Docker/VM und Borg.
+        Die Pruefung erfolgt vor Docker/VM und Borg-Backups. Der Borg-Versionsaufruf
+        wird mit maskierten Argumenten und Prozess-Exit-Code protokolliert.
         """
         _log_section("PHASE 1: VALIDATION")
         logger.info("Validating prerequisites...")
@@ -852,12 +854,14 @@ class BackupJob:
         if not shutil.which("borg"):
             logger.error("  ERROR: borg command not found")
             raise SystemExit(1)
+        command = ["borg", "--version"]
+        execution_log = BorgExecutionLog(command, logger.info)
         try:
-            proc = subprocess.run(
-                ["borg", "--version"], capture_output=True, text=True, timeout=10
-            )
+            proc = subprocess.run(command, capture_output=True, text=True, timeout=10)
+            execution_log.finished(proc.returncode)
             borg_version = proc.stdout.strip().splitlines()[0] if proc.stdout else "unknown"
-        except (subprocess.TimeoutExpired, OSError):
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            execution_log.failed(exc)
             borg_version = "unknown"
         logger.info("  OK - %s", borg_version)
 
@@ -1437,27 +1441,32 @@ class BackupJob:
 
     def _get_repository_size(self) -> int:
         """
-        Ermittelt Repository-Größe via 'borg info --json'.
+        Ermittelt Repository-Größe via 'borg info --json', mit Aufruf-/Exit-Log.
 
         Gibt cache.stats.unique_size zurück (deduplizierte Gesamtgröße).
         Fallback: 0 (bei fehlendem BORG_REPO oder Fehler).
         """
         if not self.config.borg_repo:
             return 0
+        command = ["borg", "info", "--json", self.config.borg_repo]
+        execution_log = BorgExecutionLog(command, logger.info)
         try:
             result = subprocess.run(
-                ["borg", "info", "--json", self.config.borg_repo],
+                command,
                 capture_output=True,
                 text=True,
                 timeout=30,
                 env=os.environ.copy(),
             )
+            execution_log.finished(result.returncode)
             if result.returncode == 0 and result.stdout:
                 data = json.loads(result.stdout)
                 return int(
                     data.get("cache", {}).get("stats", {}).get("unique_size", 0) or 0
                 )
-        except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError, ValueError):
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            execution_log.failed(exc)
+        except (json.JSONDecodeError, ValueError):
             pass
         return 0
 

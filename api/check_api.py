@@ -6,6 +6,7 @@ signal and presents the persisted structured result.
 """
 
 import subprocess
+import logging
 import threading
 import time
 import json
@@ -15,13 +16,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, List, Optional
 
+from runtime.lib.borg_exec_log import BorgExecutionLog
 from archive_prefix import archive_prefix_from_job_key as _archive_prefix_from_job_key
+
+logger = logging.getLogger(__name__)
 
 
 class _CheckState:
+    """Maintenance output and result; proc is unset only during synchronous startup."""
+
     def __init__(
         self,
-        proc: subprocess.Popen,
+        proc: Optional[subprocess.Popen],
         target_key: str,
         mode: str,
         start_time: datetime,
@@ -40,6 +46,7 @@ class _CheckState:
         self.finished = False
         self.exit_code: Optional[int] = None
         self.cleanup = None
+        self.execution_log = None
         self.config = dict(config or {})
         self.repository = dict(repository or {})
         self.result: Optional[dict] = None
@@ -85,7 +92,11 @@ class CheckManager:
         *,
         job_key: str = "",
     ) -> tuple:
-        """Start a maintenance action for one managed repository object."""
+        """Start maintenance with masked, correlated command/exit log evidence.
+
+        Returns (started, error_message). A failed process start logs its error
+        type without exception arguments and leaves no running maintenance state.
+        """
         with self._lock:
             if self._state is not None and not self._state.finished:
                 return False, "A repository maintenance action is already running"
@@ -138,31 +149,29 @@ class CheckManager:
         except Exception as exc:
             return False, f"Repository information is not readable: {exc}"
 
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                text=True,
-                bufsize=1,
-            )
-        except OSError as exc:
-            if cleanup:
-                cleanup()
-            return False, f"Start failed: {exc}"
-
         state = _CheckState(
-            proc,
-            str(repository_key),
-            mode,
-            datetime.now(timezone.utc),
-            action=action,
-            config=config,
-            repository=repository,
+            None, str(repository_key), mode, datetime.now(timezone.utc),
+            action=action, config=config, repository=repository,
         )
         state.cleanup = cleanup
-        state.append_line(f"[Info] Starting repository {action}: {' '.join(cmd[:-1])} {repo_path}")
+
+        def log_execution(line: str) -> None:
+            """Keep command evidence in the maintenance result and service log."""
+            state.append_line(line)
+            logger.info("%s", line)
+
+        state.execution_log = BorgExecutionLog(cmd, log_execution, env)
+        try:
+            state.proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=env, text=True, bufsize=1,
+            )
+        except OSError as exc:
+            state.execution_log.failed(exc)
+            if cleanup:
+                cleanup()
+            return False, f"Start failed: {type(exc).__name__}"
+
         with self._lock:
             self._state = state
         threading.Thread(
@@ -270,6 +279,8 @@ class CheckManager:
             pass
         finally:
             state.proc.wait()
+            if state.execution_log is not None:
+                state.execution_log.finished(state.proc.returncode)
             if state.cleanup:
                 try:
                     state.cleanup()
@@ -288,7 +299,7 @@ class CheckManager:
 
     @staticmethod
     def _maintenance_result(state: _CheckState) -> dict:
-        """Summarize a completed run with bounded, secret-masked execution evidence."""
+        """Summarize a run in 20 masked lines, retaining bounded command/exit evidence."""
         from borg_ssh import SSH_INTERRUPTION_CODE, SSH_INTERRUPTION_MESSAGE, is_ssh_connection_interruption
         from security_utils import mask_secrets
 
@@ -321,12 +332,17 @@ class CheckManager:
 
         # Keep bounded, masked execution evidence for successful runs as well.
         # Mask before truncation so a cut-off secret cannot escape redaction.
+        evidence = state.execution_log.records if state.execution_log is not None else []
         visible = [
             mask_secrets(str(line or "").strip())[:2000]
             for line in lines
-            if str(line or "").strip() and not str(line or "").startswith("[Info] Starting repository")
+            if str(line or "").strip() and str(line or "").strip() not in evidence
+            and not str(line or "").startswith("[Info] Starting repository")
         ]
-        details = visible[-20:]
+        # Pin generated invocation/exit records even after verbose progress output.
+        details = ([mask_secrets(line)[:2000] for line in evidence[:1]]
+                   + visible[-(20 - len(evidence)):]
+                   + [mask_secrets(line)[:2000] for line in evidence[1:]])
         combined_output = "\n".join(str(line or "") for line in lines)
         interrupted = status != "success" and is_ssh_connection_interruption(combined_output)
         return {

@@ -276,7 +276,7 @@ def test_real_source_check_follows_pre_and_preserves_post_semantics(
     monkeypatch.setattr(Path, 'resolve', lambda self, *a, **kw:
                         self if self == source else original_resolve(self, *a, **kw))
     monkeypatch.setattr('lib.backup_job.shutil.which', lambda name: '/usr/bin/' + name)
-    monkeypatch.setattr('lib.backup_job.subprocess.run', lambda *a, **kw: SimpleNamespace(stdout='borg 1.4.5\n'))
+    monkeypatch.setattr('lib.backup_job.subprocess.run', lambda *a, **kw: SimpleNamespace(stdout='borg 1.4.5\n', returncode=0))
     monkeypatch.setattr(BackupJob, '_send_notification_event', lambda *_: None)
     saved = []
     monkeypatch.setattr(BackupJob, '_save_skip_status', lambda job:
