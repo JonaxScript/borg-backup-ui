@@ -1659,6 +1659,15 @@
                 </div>
               </div>
               <div id="wiz-docker-selection" class="wizard-runtime-selection hidden"></div>
+              <div class="wizard-order-group">
+                <div class="wizard-order-head">
+                  <span class="form-label" id="wiz-docker-order-title" data-i18n="wizard.dockerOrder">Reihenfolge</span>
+                  <span id="wiz-docker-order-state" class="wizard-runtime-card-meta"></span>
+                  <button type="button" class="btn btn-secondary btn-sm hidden" id="wiz-docker-order-reset" data-i18n="wizard.dockerOrderReset">Standardreihenfolge wiederherstellen</button>
+                </div>
+                <p id="wiz-docker-order-hint" class="form-hint" data-i18n="wizard.dockerOrderHint">Ziehen oder mit den Pfeilen verschieben. Nach dem Backup starten die Container von oben nach unten. Bei einer eigenen Reihenfolge werden sie vor dem Backup einzeln in umgekehrter Reihenfolge gestoppt, also oben stehende Container wie Datenbanken zuletzt.</p>
+                <div id="wiz-docker-order-list" class="wizard-runtime-selection wizard-order-list" role="list" aria-labelledby="wiz-docker-order-title" aria-describedby="wiz-docker-order-hint"></div>
+              </div>
             </div>
           </div>
         </div>
