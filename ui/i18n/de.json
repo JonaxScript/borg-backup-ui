@@ -971,9 +971,6 @@
     "deleteError": "Fehler beim Löschen: {message}"
   },
   "wizard": {
-    "estimateSourceSize": "Quellgröße und Restzeit schätzen",
-    "estimateSourceSizeHelp": "Optionaler zusätzlicher Scan der eingehängten Quellen während der Archiverstellung (max. 5 Min.). Kann Datenträger und Netzwerk belasten. Bei Marker- oder Musterausschlüssen bleibt die Schätzung unbekannt.",
-    "previewSourceEstimate": "Größenschätzung: {value}",
     "jobId": "Job-ID",
     "jobIdInvalid": "Der Server hat keine gültige Job-ID geliefert.",
     "jobIdLoadFailed": "Job-ID konnte nicht geladen werden. Bitte den Wizard schließen und erneut öffnen. {message}",

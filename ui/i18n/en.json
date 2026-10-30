@@ -971,9 +971,6 @@
     "deleteError": "Error deleting schedule: {message}"
   },
   "wizard": {
-    "estimateSourceSize": "Estimate source size and remaining time",
-    "estimateSourceSizeHelp": "Optional extra scan of mounted sources during archive creation (up to 5 min.). May add disk and network load. Estimates remain unknown with marker or pattern exclusions.",
-    "previewSourceEstimate": "Source size estimate: {value}",
     "jobId": "Job ID",
     "jobIdInvalid": "The server did not return a valid job ID.",
     "jobIdLoadFailed": "Could not load the job ID. Please close and reopen the Wizard. {message}",

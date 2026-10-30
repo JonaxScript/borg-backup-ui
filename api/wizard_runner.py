@@ -340,13 +340,6 @@ class SmbMountSession:
 
 
 def _load_env_from_job(job_key: str, borg_scripts_dir: Path, backup_scripts_dir: Path) -> tuple[dict, dict]:
-    """Resolve canonical job metadata into runtime environment and job settings.
-
-    Loads configuration and repository credentials, configures Borg process
-    environment, and validates sources/exclusions. Source-size estimation is
-    opt-in per job and overrides inherited environment settings. Invalid or
-    missing configuration raises ValueError or the underlying read error.
-    """
     from job_identity import validate_job_id
     job_key = validate_job_id(job_key)
     _ensure_runtime_import_paths(backup_scripts_dir)
@@ -455,7 +448,6 @@ def _load_env_from_job(job_key: str, borg_scripts_dir: Path, backup_scripts_dir:
             logging.info("Storage Box repository URI has no user; using STORAGEBOX_USER=%s", storagebox_user)
     env["BORG_COMPRESSION"] = meta_compression
     env["BORG_FILE_ACTIVITY"] = "1" if meta_file_activity else "0"
-    env["BORG_ESTIMATE_SOURCE_SIZE"] = "1" if _env_flag(meta.get("estimate_source_size"), default=False) else "0"
     env.setdefault("BORG_CHECKPOINT_INTERVAL", env.get("GLOBAL_BORG_CHECKPOINT_INTERVAL", "1800"))
     env["BORG_CACHE_DIR"] = cache_dir
     env.setdefault("BORG_CHECK_INTERVAL_DAYS", env.get("GLOBAL_BORG_CHECK_INTERVAL_DAYS", "30"))

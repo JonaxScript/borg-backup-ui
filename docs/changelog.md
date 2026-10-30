@@ -2,10 +2,10 @@
 
 ## Pending - Live processing speed and mounted-source estimates (#646)
 
-- Extend the existing Live metrics row with a rolling 30-second logical-byte processing rate, independent of network throughput and deduplicated storage statistics.
-- Add an opt-in job setting for asynchronous GNU du source estimation, supporting mounted local/USB/SMB/SSH paths, literal excluded subtrees, overlapping roots and logical sparse-file sizes. Borg marker/pattern exclusions disable estimates rather than using mismatched semantics.
-- Bound scans to five minutes, stop them on cancellation/create completion, discard partial failures, and expire stale rates/ETAs. Percent and ETA cover create only and never signal job success. Preserve the existing 60-second visibility gate and maintenance progress.
-- Cover real du scans, real Borg create with estimates on/off, settings round trips, cancellation, timeouts, counter resets and bilingual browser rendering. Physical Unraid mount/performance testing remains a maintainer check.
+- Extend the existing Live metrics area with a rolling 30-second logical-byte processing rate, independent of network throughput and deduplicated storage statistics. Place measurements below a full-width progress bar and omit the last Borg update timestamp.
+- Automatically start asynchronous GNU du source estimation for each managed backup, supporting mounted local/USB/SMB/SSH paths, literal excluded subtrees, overlapping roots and logical sparse-file sizes. Borg marker/pattern exclusions disable estimates rather than using mismatched semantics.
+- Bound scans to five minutes, stop them on cancellation/create completion, discard partial failures, and expire stale rates/ETAs. Percent and ETA cover create only and never signal job success. Show progress immediately when each Borg process starts, including indeterminate maintenance progress before its first event.
+- Cover real du scans, automatic estimation during real Borg create, cancellation, timeouts, counter resets and bilingual browser rendering. Physical Unraid mount/performance testing remains a maintainer check.
 
 ## Pending - Unassigned Devices backup sources (#639)
 

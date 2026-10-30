@@ -1,10 +1,11 @@
-"""Optional, bounded logical-size estimates for mounted backup sources (#646)."""
+"""Bounded logical-size estimates for mounted backup sources (#646)."""
 
 from __future__ import annotations
 
 import glob
 import os
 import subprocess
+from subprocess import Popen
 import threading
 import time
 from pathlib import Path
@@ -79,7 +80,7 @@ class SourceSizeEstimate:
             if self._stop.is_set() or self._cancelled():
                 self._result = {"status": "cancelled"}
                 return
-            process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            process = Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                        stderr=subprocess.DEVNULL, env={"PATH": os.defpath, "LC_ALL": "C"})
             payload = b"".join(os.fsencode(path) + b"\0" for path in roots)
             deadline = time.monotonic() + self._timeout

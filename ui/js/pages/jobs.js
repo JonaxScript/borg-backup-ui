@@ -270,33 +270,26 @@ function jobRuntimeState(runtime, previous = {}) {
 }
 
 /**
- * Render process progress after 60 seconds, separately from persisted log text.
+ * Render process progress immediately, separately from persisted log text.
  * Create estimates cover archive creation only; rates expire after 30 seconds
  * without a byte measurement. Missing estimates retain indeterminate progress.
  * @param {Object|null} runtime Active run with phase and transient borg_progress.
- * @param {number} now Current Unix time in seconds for the visibility gate and last-update age.
- * @returns {string} Escaped status markup, or an empty string before 60 seconds or outside a supported Borg process.
+ * @param {number} now Current Unix time in seconds for rate freshness.
+ * @returns {string} Escaped status markup, or an empty string outside a supported Borg process.
  */
 function renderBorgProgress(runtime, now = Date.now() / 1000) {
   const progress = runtime?.borg_progress;
   const phase = runtime?.phase ?? runtime?.run_phase;
   if (!runtime?.running || !['borg_create', 'borg_prune', 'borg_compact', 'borg_check'].includes(phase) || !progress) return '';
-  if (typeof progress.started_at !== 'number' || !Number.isFinite(progress.started_at)
-      || now - progress.started_at < 60) return '';
+  if (typeof progress.started_at !== 'number' || !Number.isFinite(progress.started_at)) return '';
   if (progress.phase && progress.phase !== phase) return '';
   const creating = phase === 'borg_create';
   const maintenance = ['borg_prune', 'borg_compact'].includes(phase);
-  // Maintenance shows details only if Borg has actually emitted progress.
-  if (maintenance && (typeof progress.updated_at !== 'number' || !Number.isFinite(progress.updated_at))) return '';
   const validMetric = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
   const estimateReady = creating && progress.source_size_status === 'ready';
   const rawPercent = creating ? (estimateReady ? progress.estimated_percent : null) : progress.percent;
   const percent = validMetric(rawPercent) ? Math.min(creating ? 99.9 : 100, rawPercent) : null;
   const freshRate = validMetric(progress.rate_updated_at) && now - progress.rate_updated_at <= 30;
-  const age = timestamp => Math.max(0, Math.floor(now - timestamp));
-  const updated = typeof progress.updated_at === 'number' && Number.isFinite(progress.updated_at)
-    ? jobsT('jobs.borgUpdated', { time: borgProgressDuration(age(progress.updated_at)) })
-    : jobsT('jobs.borgWaiting');
   const label = jobsT('jobs.compact.liveProgress');
   const counters = [];
   if (creating) {
@@ -328,11 +321,11 @@ function renderBorgProgress(runtime, now = Date.now() / 1000) {
     }
   }
   const details = creating ? counters : [jobsT(maintenance ? 'jobs.borgCurrentStep' : 'jobs.checkStep')];
+  if (typeof progress.updated_at !== 'number' || !Number.isFinite(progress.updated_at)) details.push(jobsT('jobs.borgWaiting'));
   return `<div class="borg-progress">
     <div class="borg-progress-heading"><strong>${escHtml(label)}</strong>${percent === null ? '' : `<strong>${escHtml(creating ? jobsT('jobs.liveMetrics.percent', {percent: jobMetricNumber(percent, 1)}) : `${percent} %`)}</strong>`}</div>
     <progress max="100"${percent === null ? '' : ` value="${percent}"`} aria-label="${escHtml(jobsT(creating ? 'jobs.createRunning' : 'jobs.borgCurrentStep'))}"></progress>
-    ${details.map(detail => `<small class="borg-progress-metric">${escHtml(detail)}</small>`).join('')}
-    <small>${escHtml(updated)}</small>
+    <div class="borg-progress-metrics">${details.map(detail => `<small class="borg-progress-metric">${escHtml(detail)}</small>`).join('')}</div>
   </div>`;
 }
 

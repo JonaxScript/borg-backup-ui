@@ -250,7 +250,7 @@ def validate_params(
     ui_config: Optional[dict] = None,
     require_runtime_ack: bool = True,
 ) -> None:
-    """Validate wizard input, including opt-in source estimates; raise ValueError."""
+    """Wirft ValueError bei ungültigen Parametern."""
     from archive_prefix import validate_archive_prefix
     from job_identity import validate_job_id
     params["archive_prefix"] = validate_archive_prefix(params.get("archive_prefix"))
@@ -268,7 +268,6 @@ def validate_params(
     if isinstance(params.get("exclude_from"), dict) and "content_b64" in params["exclude_from"]:
         upload_bytes(params["exclude_from"])
     params["file_activity"] = _bool_value(params.get("file_activity"), default=False)
-    params["estimate_source_size"] = _bool_value(params.get("estimate_source_size"), default=False)
     for period, value in retention.items():
         params[f"keep_{period}"] = value
     raw_sources = normalize_source_paths(params.get("source_paths"), allow_empty=bool(params.get("database_profile_ids")))
@@ -368,11 +367,6 @@ def _repository_encryption(repo: Optional[dict], fallback: str = "repokey-blake2
 
 
 def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dict:
-    """Load editable job settings; absent estimate_source_size defaults to false.
-
-    Resolve the canonical job and repository from configuration, raising
-    ValueError for unavailable jobs or invalid source metadata.
-    """
     from archive_prefix import archive_prefix_from_metadata, job_archive_prefixes
     from jobs_api import discover_jobs, get_jobs_meta_dirs, resolve_data_root
 
@@ -492,7 +486,6 @@ def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dic
         "unmount_after_run": meta_unmount_after_run,
         "compression": compression,
         "file_activity": meta_file_activity,
-        "estimate_source_size": _bool_value(meta.get("estimate_source_size"), default=False),
         "encryption": str(repository_context.get("encryption") or ""),
         "passphrase": "",
         "retention_mode": effective_retention.get("mode", "tiered"),
@@ -514,11 +507,7 @@ def load_job_for_wizard(job_key: str, scripts_dir: Path, ui_config: dict) -> dic
 
 
 def generate_flow_preview(params: dict, ui_config: Optional[dict] = None, scripts_dir: Optional[Path] = None) -> dict:
-    """Return wizard flow and settings, including optional source-size estimation.
-
-    Validate source/exclusion and repository settings; invalid input can raise
-    ValueError. Existing repository checks may contact the selected target.
-    """
+    """Erzeugt eine textuelle Backup-Flow-Vorschau fuer den Wizard."""
     location = params.get("location", "local")
     source_paths = normalize_source_paths(params.get("source_paths"), allow_empty=bool(params.get("database_profile_ids")))
     exclude_paths = _exclude_paths(params.get("exclude_paths", []))
@@ -623,7 +612,6 @@ def generate_flow_preview(params: dict, ui_config: Optional[dict] = None, script
             "vm_selected": vm_control["selected"],
             "retention": retention,
             "file_activity": file_activity,
-            "estimate_source_size": _bool_value(params.get("estimate_source_size"), default=False),
         },
         "steps": steps,
         "step_codes": step_codes,
@@ -656,12 +644,7 @@ def _save_job(params: dict, scripts_dir: Path, data_root: Optional[Path] = None,
 
 
 def _save_job_locked(params: dict, scripts_dir: Path, data_root: Optional[Path] = None, ui_config: Optional[dict] = None) -> dict:
-    """Save wizard metadata with canonical repository and opt-in size estimation.
-
-    The estimate_source_size setting defaults to false for new jobs and keeps
-    the existing value when omitted during an edit. Existing validation and
-    inventory write errors propagate to the caller.
-    """
+    """Speichert Job-eigene Wizard-Metadaten mit kanonischer Repository-Referenz."""
     from archive_prefix import job_archive_prefixes, validate_archive_prefix
     from job_identity import JobIdConflictError, new_job_id, metadata_job_id, validate_job_id
     from jobs_api import get_jobs_meta_dir
@@ -751,7 +734,6 @@ def _save_job_locked(params: dict, scripts_dir: Path, data_root: Optional[Path] 
         "hooks": hooks,
         "compression": str(params.get("compression", "lz4")).strip() or "lz4",
         "file_activity": file_activity,
-        "estimate_source_size": _bool_value(params.get("estimate_source_size", existing.get("estimate_source_size")), default=False),
         "retention": retention,
         "created_at": existing.get("created_at", now_iso),
         "updated_at": now_iso,

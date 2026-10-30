@@ -21,6 +21,12 @@ from wizard_api import generate_flow_preview, load_job_for_wizard, save_job  # n
 import wizard_runner  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def isolated_runner_environment(monkeypatch):
+    """Keep runtime-loader environment mutations local to each test."""
+    monkeypatch.setattr(wizard_runner.os, "environ", wizard_runner.os.environ.copy())
+
+
 def _capture_create_command(monkeypatch, tmp_path: Path, *, enabled: bool) -> list[str]:
     captured: dict[str, list[str]] = {}
 

@@ -101,7 +101,6 @@ class BorgConfig:
     # Grund: Initial-Backups (z. B. 1.5TB via 5MB/s) können mehrere Tage laufen.
     max_runtime_hours: int = 0
     file_activity: bool = False
-    estimate_source_size: bool = False
 
     @classmethod
     def from_config(cls, config: Dict[str, str]) -> "BorgConfig":
@@ -139,7 +138,6 @@ class BorgConfig:
             compression=config.get("BORG_COMPRESSION", "lz4") or "lz4",
             checkpoint_interval=_int("BORG_CHECKPOINT_INTERVAL", 1800),
             file_activity=_bool("BORG_FILE_ACTIVITY"),
-            estimate_source_size=_bool("BORG_ESTIMATE_SOURCE_SIZE"),
             max_runtime_hours=_non_negative_int("BORG_MAX_RUNTIME_HOURS", 0),
         )
 
@@ -403,7 +401,8 @@ class BorgRunner:
         Exit 0 = OK, 1 = Warnungen (Backup nutzbar), ≥2 = Fehler.
         JSON-Fortschritt wird nur als fluechtiger Prozessstatus weitergegeben.
         Abschlussstatistik, Diagnostik und optionale Dateiaktivitaet bleiben im Log.
-        Optional wird die logische Quellgroesse parallel geschaetzt; Fehler
+        Mit Prozessstatus wird die logische Quellgroesse automatisch parallel
+        geschaetzt; Fehler
         dieser Messung beeinflussen den Borg-Exit-Code nicht.
 
         Args:
@@ -500,7 +499,7 @@ class BorgRunner:
         )
         assert process.stdout is not None
         estimate = None
-        if self.config.estimate_source_size and self.process_controller is not None:
+        if self.process_controller is not None:
             from .source_size import SourceSizeEstimate
             estimate = SourceSizeEstimate(
                 paths, exclusions,

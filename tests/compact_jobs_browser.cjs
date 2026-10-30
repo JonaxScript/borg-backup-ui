@@ -164,7 +164,7 @@ const {chromium} = require('playwright');
     await page.evaluate(()=>{window.lang='de';renderJobsGrid(jobsState.jobs);});
     await page.locator('#job-card-running [data-jobs-action="toggle-workflow"]').click();
     await page.evaluate(()=>{window.spinner=document.querySelector('#job-card-running tr.is-running svg');window.meter=document.querySelector('#job-card-running progress');});
-    await page.evaluate(()=>{live.borg_progress.nfiles=999;updateBorgProgressDisplays({running:live});});
+    await page.evaluate(()=>{live.borg_progress.nfiles=999;live.borg_progress.started_at=Date.now()/1000;updateBorgProgressDisplays({running:live});});
     assert.equal(await page.evaluate(()=>spinner===document.querySelector('#job-card-running tr.is-running svg')&&meter===document.querySelector('#job-card-running progress')),true);
     assert.ok((await page.locator('#job-card-running .job-live-metrics').textContent()).includes('999'));
     await page.evaluate(()=>{
@@ -178,6 +178,11 @@ const {chromium} = require('playwright');
       await page.setViewportSize({width,height:1100});
       await page.evaluate(language=>{window.lang=language;updateBorgProgressDisplays({running:live});},language);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Metrics fit ${width}/${language}`);
+      const bar=await page.locator('#job-card-running progress').boundingBox();
+      const metrics=await page.locator('#job-card-running .borg-progress-metrics').boundingBox();
+      assert.ok(metrics.y>=bar.y+bar.height,`Metrics appear below bar ${width}/${language}`);
+      assert.doesNotMatch(await page.locator('#job-card-running .job-live-metrics').textContent(),/Letzte Borg-Rückmeldung|Last Borg update/);
+
       if(process.env.BBUI_SCREENSHOT_DIR)await page.locator('#job-card-running').screenshot({animations:'disabled',path:`${process.env.BBUI_SCREENSHOT_DIR}/live-metrics-${language}-${width}.png`});
     }
     await page.setViewportSize({width:1600,height:1100});

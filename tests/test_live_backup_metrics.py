@@ -1,4 +1,4 @@
-"""Live processing estimates, source scans and optional job settings (#646)."""
+"""Live processing estimates, source scans and automatic source measurement (#646)."""
 import json
 import os
 from pathlib import Path
@@ -15,10 +15,6 @@ for path in (ROOT, ROOT / 'api', ROOT / 'runtime'):
 
 import job_control
 from runtime.lib import source_size
-from runtime.lib.borg_runner import BorgConfig
-from test_issue_463_file_activity_log import _local_repository_config
-from wizard_api import save_job, load_job_for_wizard, generate_flow_preview
-from wizard_runner import _load_env_from_job
 
 
 def measured(scan):
@@ -66,7 +62,7 @@ def test_du_discards_partial_size_on_missing_source(tmp_path):
 
 
 def test_unsupported_exclusions_do_not_start_du(monkeypatch, tmp_path):
-    monkeypatch.setattr(source_size.subprocess, 'Popen', lambda *a, **kw: pytest.fail('must not scan'))
+    monkeypatch.setattr(source_size, 'Popen', lambda *a, **kw: pytest.fail('must not scan'))
     assert measured(source_size.SourceSizeEstimate([tmp_path], unsupported=True)) == {'status': 'unsupported'}
 
 
@@ -80,7 +76,7 @@ def test_running_scan_is_killed_and_reaped(monkeypatch, tmp_path, mode):
         processes.append(proc)
         return proc
 
-    monkeypatch.setattr(source_size.subprocess, 'Popen', sleeping_du)
+    monkeypatch.setattr(source_size, 'Popen', sleeping_du)
     cancelled = [False]
     scan = source_size.SourceSizeEstimate([tmp_path], cancelled=lambda: cancelled[0], timeout=.3 if mode == 'timeout' else 10)
     deadline = time.monotonic() + 5
@@ -99,7 +95,7 @@ def test_running_scan_is_killed_and_reaped(monkeypatch, tmp_path, mode):
 def test_missing_du_is_nonfatal(monkeypatch, tmp_path):
     def missing(*args, **kwargs):
         raise FileNotFoundError('not installed')
-    monkeypatch.setattr(source_size.subprocess, 'Popen', missing)
+    monkeypatch.setattr(source_size, 'Popen', missing)
     assert measured(source_size.SourceSizeEstimate([tmp_path])) == {'status': 'failed'}
 
 
@@ -164,27 +160,3 @@ def test_estimates_never_signal_success_and_fail_closed(metrics):
     assert 'estimated_total_bytes' not in result and 'secret' not in result
     result = update(16, 140, source_estimate={'status': 'ready', 'bytes': 0})
     assert 'estimated_percent' not in result
-
-
-@pytest.mark.parametrize('enabled', [False, True])
-def test_estimation_setting_round_trip_and_default(tmp_path, monkeypatch, enabled):
-    # The runtime loader intentionally mutates Borg's process environment.
-    # Keep its Unraid defaults out of subsequent real-Borg integration tests.
-    monkeypatch.setattr(os, 'environ', dict(os.environ))
-    config = _local_repository_config(tmp_path)
-    source = tmp_path / 'source'
-    source.mkdir()
-    params = {'archive_prefix': 'files', 'job_name': 'Files', 'location': 'local',
-              'source_paths': [str(source)], 'repository_key': 'repo_files_test'}
-    if enabled:
-        params['estimate_source_size'] = True
-    saved = save_job(params, tmp_path / 'scripts', tmp_path, config)
-    monkeypatch.setattr('config_api.read_expanded_conf', lambda _: {})
-    loaded = load_job_for_wizard(saved['job_id'], tmp_path / 'scripts', config)
-    assert loaded['estimate_source_size'] is enabled
-    monkeypatch.setenv('BORG_ESTIMATE_SOURCE_SIZE', '1')
-    env, _ = _load_env_from_job(saved['job_id'], tmp_path / 'scripts', tmp_path)
-    assert BorgConfig.from_config(env).estimate_source_size is enabled
-    preview = generate_flow_preview(params, config, tmp_path / 'scripts')
-    assert preview['summary']['estimate_source_size'] is enabled
-    assert BorgConfig.from_config({}).estimate_source_size is False

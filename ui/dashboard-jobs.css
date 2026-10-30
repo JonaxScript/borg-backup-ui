@@ -922,9 +922,10 @@
 .jobs-redesign-actions { justify-content: flex-end; align-items: flex-start; align-content: start; }
 .job-live-metrics { grid-column: 1 / -1; min-width: 0; }
 .job-live-metrics:empty { display: none; }
-.job-live-metrics .borg-progress { margin: 0; padding: 8px 12px; border-top: 1px solid var(--ui-color-border); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; background: var(--ui-state-running-bg); }
-.job-live-metrics .borg-progress-heading { gap: 10px; }
-.job-live-metrics progress { width: 110px; flex: 0 0 110px; }
+.job-live-metrics .borg-progress { margin: 0; padding: 8px 12px; border-top: 1px solid var(--ui-color-border); display: grid; gap: 8px; background: var(--ui-state-running-bg); }
+.job-live-metrics .borg-progress-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.job-live-metrics progress { width: 100%; }
+.job-live-metrics .borg-progress-metrics { display: flex; flex-wrap: wrap; gap: 6px 16px; min-width: 0; }
 .job-live-metrics small { font-size: var(--ui-font-size-xs); }
 .job-details { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--ui-color-border); }
 .job-details[hidden] { display: none; }
