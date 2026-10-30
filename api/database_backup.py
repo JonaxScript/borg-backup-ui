@@ -1,4 +1,4 @@
-"""Bounded Docker database exports, owned staging and archive verification (#591).
+"""Bounded Docker database exports, Unraid-compatible staging and archive verification (#591).
 
 Callers hold the existing docker-control resource for the entire operation.
 Persistent operation journals prevent stale job locks from allowing an unsafe retry.
@@ -6,6 +6,7 @@ Persistent operation journals prevent stale job locks from allowing an unsafe re
 from __future__ import annotations
 
 import copy
+import errno
 import gzip
 import hashlib
 import json
@@ -263,15 +264,37 @@ def _operation(config, profile, cid, action, database, output, cancelled):
             _control(record, 'ack')
 
 
-def _private_path(path):
-    """Require an owned 0700 directory without following a final symlink.
+DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 
-    Call only below an already opened private staging directory; ancestor pool
-    permissions vary and are deliberately not checked here.
+
+def open_dump_file(path):
+    """Open a regular dump/manifest without following links or waiting on a FIFO.
+
+    Ownership and permission modes are left to Unraid. Hard links are rejected
+    because only files belonging to the selected dump run may be used.
+    The caller supplies an anchored parent path and closes the binary handle.
     """
-    info = path.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
-        raise DatabaseError('storage_permissions')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise DatabaseError('storage_path')
+        return os.fdopen(fd, 'rb')
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+@contextmanager
+def open_dump_directory(root_fd, name):
+    """Hold one named run directory without following links; accept Unraid modes."""
+    if not is_run_directory_name(name):
+        raise DatabaseError('storage_path')
+    fd = os.open(name, DIRECTORY_FLAGS, dir_fd=root_fd)
+    try:
+        yield fd
+    finally:
+        os.close(fd)
 
 
 def _descriptor_path(fd):
@@ -291,25 +314,28 @@ def _local_filesystem(fd):
 
 @contextmanager
 def open_staging(profile, *, require_space=True):
-    """Yield an owned private directory FD on a mounted local filesystem.
+    """Yield an accessible dump root on a mounted local filesystem.
 
-    Pool/ancestor ownership and modes are left unchanged. Every component is
-    opened without following symlinks. All later I/O must use the held FD so a
-    rename/replacement in a writable pool cannot redirect exports or cleanup.
-    Only an explicit export may create a missing direct child of the mount.
-    Descriptors are closed on all exits; errors contain safe diagnostic codes.
+    Existing owners/modes (including nobody:users, 0777) are never changed.
+    Components are opened without symlinks; callers also hold each run directory.
+    Explicit exports may create a missing direct child with 0755. Read-only
+    listing never creates paths or requires write access. Mount, space and
+    filesystem checks remain active. Errors use localized diagnostic codes.
     """
     mount, path = Path(profile['staging_mount']), Path(profile['staging_dir'])
     fd = None
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    flags = DIRECTORY_FLAGS
     try:
         if not mount.is_absolute() or not path.is_absolute() or '..' in path.parts or '..' in mount.parts or mount not in path.parents:
             raise DatabaseError('storage_path')
         fd = os.open('/', flags)
-        for component in mount.parts[1:]:
-            child = os.open(component, flags, dir_fd=fd)
-            os.close(fd)
-            fd = child
+        try:
+            for component in mount.parts[1:]:
+                child = os.open(component, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+        except FileNotFoundError:
+            raise DatabaseError('storage_mount') from None
         if not os.path.ismount(mount) or not os.path.samestat(os.fstat(fd), mount.stat()):
             raise DatabaseError('storage_mount')
         _local_filesystem(fd)
@@ -320,12 +346,12 @@ def open_staging(profile, *, require_space=True):
             except FileNotFoundError:
                 if not require_space or len(parts) != 1:
                     raise
-                os.mkdir(component, mode=0o700, dir_fd=fd)
+                os.mkdir(component, mode=0o755, dir_fd=fd)
                 child = os.open(component, flags, dir_fd=fd)
             os.close(fd)
             fd = child
-        info = os.fstat(fd)
-        if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        access = os.R_OK | os.X_OK | (os.W_OK if require_space else 0)
+        if not os.access(_descriptor_path(fd), access, effective_ids=True):
             raise DatabaseError('storage_permissions')
         _local_filesystem(fd)
         if require_space:
@@ -333,8 +359,12 @@ def open_staging(profile, *, require_space=True):
             if space.f_bavail * space.f_frsize < profile['min_free_mib'] * 1024 * 1024:
                 raise DatabaseError('no_space')
         yield fd
-    except OSError:
-        raise DatabaseError('storage_path') from None
+    except FileNotFoundError:
+        raise DatabaseError('storage_missing') from None
+    except PermissionError:
+        raise DatabaseError('storage_permissions') from None
+    except OSError as exc:
+        raise DatabaseError('storage_permissions' if exc.errno == errno.EROFS else 'storage_path') from None
     finally:
         if fd is not None:
             os.close(fd)
@@ -347,35 +377,68 @@ def staging_root(profile, *, require_space=True):
 
 
 class DumpResult(dict):
-    """Serializable manifest with a process-local staging FD, never serialized.
+    """Serializable manifest holding both the dump root and the actual run FD.
 
-    Keep the handle until archive verification/cleanup finishes. close_results
-    releases it explicitly; the destructor also covers abandoned failed calls.
+    A private, descriptor-held alias preserves existing archive paths for Borg
+    even if someone renames a run in a writable Unraid directory. Handles and
+    aliases are released by close_results; no descriptors enter persisted JSON.
     """
 
-    def __init__(self, root_fd, **manifest):
+    def __init__(self, root_fd, name, runtime_dir, **manifest):
         super().__init__(manifest)
-        self._root_fd = os.dup(root_fd)
+        self._root_fd = self._run_fd = self._alias_fd = None
+        self._alias_path = None
+        self._name = name
+        self._runtime_dir = runtime_dir
+        try:
+            self._root_fd = os.dup(root_fd)
+            self._run_fd = os.open(name, DIRECTORY_FLAGS, dir_fd=root_fd)
+            # A freshly created run must still be ours before initializing it.
+            if os.fstat(self._run_fd).st_uid != os.geteuid():
+                raise DatabaseError('storage_path')
+            os.fchmod(self._run_fd, 0o755)
+        except BaseException:
+            self.close()
+            raise
 
     @property
     def path(self):
-        """Return this run below its held staging directory; reject closed handles."""
-        if self._root_fd is None:
+        """Return the held run, independent of replacements of its logical path."""
+        if self._run_fd is None:
             raise DatabaseError('storage_path')
-        return _descriptor_path(self._root_fd) / Path(self['directory']).name
+        return _descriptor_path(self._run_fd)
+
+    @property
+    def borg_directory(self):
+        """Create a private alias once; keep the public archive layout unchanged."""
+        if self._alias_fd is None:
+            self._runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            self._alias_path = Path(tempfile.mkdtemp(prefix='artifacts-', dir=self._runtime_dir))
+            self._alias_fd = os.open(self._alias_path, DIRECTORY_FLAGS)
+            os.symlink(str(self.path), self._name, dir_fd=self._alias_fd)
+        return str(_descriptor_path(self._alias_fd)) + '/./' + self._name
 
     def close(self):
-        """Release the staging descriptor, idempotently, without deleting dumps."""
-        fd, self._root_fd = self._root_fd, None
-        if fd is not None:
-            os.close(fd)
+        """Close owned handles and remove only this process's empty alias folder."""
+        if self._alias_fd is not None:
+            try:
+                os.unlink(self._name, dir_fd=self._alias_fd)
+                if os.path.samestat(os.fstat(self._alias_fd), self._alias_path.lstat()):
+                    self._alias_path.rmdir()
+            except OSError:
+                pass
+        for key in ('_alias_fd', '_run_fd', '_root_fd'):
+            fd = getattr(self, key, None)
+            setattr(self, key, None)
+            if fd is not None:
+                os.close(fd)
 
     def __copy__(self):
-        """Copy only manifest data; a report must never own the live descriptor."""
+        """Copy manifest data only; reports never own live directory handles."""
         return dict(self)
 
     def __deepcopy__(self, memo):
-        """Return detached report data without copying or closing the live handle."""
+        """Return detached JSON data without copying/closing live handles."""
         return copy.deepcopy(dict(self), memo)
 
     def __del__(self):
@@ -396,8 +459,32 @@ def result_directory(result):
 
 
 def write_manifest(result):
-    """Persist a manifest through the held private directory when available."""
-    atomic_write_json(result_directory(result) / 'manifest.json', result)
+    """Write a 0644 dump manifest atomically through its held run directory.
+
+    Set mode on the new file descriptor before publishing, never chmod a name
+    that could have been replaced in a shared directory. Existing secrets and
+    internal journals continue using their private persistence helpers.
+    """
+    directory = result_directory(result)
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    name = '.manifest-' + uuid.uuid4().hex + '.tmp'
+    try:
+        target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o644, dir_fd=fd)
+        with os.fdopen(target, 'w') as handle:
+            os.fchmod(handle.fileno(), 0o644)
+            json.dump(result, handle, ensure_ascii=False, indent=2)
+            handle.write('\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, 'manifest.json', src_dir_fd=fd, dst_dir_fd=fd)
+        os.fsync(fd)
+    finally:
+        try:
+            os.unlink(name, dir_fd=fd)
+        except FileNotFoundError:
+            pass
+        finally:
+            os.close(fd)
 
 
 def validate_sources(profiles, sources):
@@ -413,7 +500,7 @@ def validate_sources(profiles, sources):
 def _hash(path, cancelled=lambda: False):
     """Hash an artifact incrementally and honor cancellation between bounded reads."""
     digest = hashlib.sha256()
-    with path.open('rb') as handle:
+    with open_dump_file(path) as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b''):
             if cancelled():
                 raise DatabaseError('cancelled')
@@ -462,7 +549,7 @@ def is_run_directory_name(name):
 
 
 def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, progress=None, check_only=False, results=None):
-    """Export into held private directories; retain completed files on failure.
+    """Export into held Unraid dump directories; retain completed files on failure.
 
     New runs use profile/time directory names and stream raw client bytes through
     gzip level 6 without an uncompressed staging copy. Publish .gz files only after
@@ -482,11 +569,11 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
         name = run_directory_name(profile['name'], started_at)
         with open_staging(profile) as fd:
             try:
-                os.mkdir(name, mode=0o700, dir_fd=fd)
+                os.mkdir(name, mode=0o755, dir_fd=fd)
             except FileExistsError:
                 raise DatabaseError('dump_exists') from None
-            manifest = DumpResult(fd)
-        directory = _descriptor_path(manifest._root_fd) / name
+            manifest = DumpResult(fd, name, data_root(config) / 'database-runtime')
+        directory = manifest.path
         manifest.update({'format_version': 1, 'helper_version': 1, 'job_id': job_id, 'run_id': run_id,
                     'profile_id': profile['id'], 'profile_name': profile['name'], 'engine': profile['engine'], 'started_at': started_at,
                     'compression': 'gzip',
@@ -498,7 +585,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                     'restore': restore_hint(profile['engine'])})
         results.append(manifest)
         try:
-            atomic_write_json(directory / 'manifest.json', manifest)
+            write_manifest(manifest)
             cid = container_identity(profile)
             manifest['container_id'] = cid
             for database in profile['databases']:
@@ -517,7 +604,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                     name = ('globals.sql' if action == 'globals' else database + dump_suffix(profile['engine'])) + '.gz'
                     partial = directory / (name + '.partial')
                     with partial.open('xb') as handle:
-                        os.fchmod(handle.fileno(), 0o600)
+                        os.fchmod(handle.fileno(), 0o644)
                         with gzip.GzipFile(filename='', mode='wb', fileobj=handle, compresslevel=6, mtime=0) as compressed:
                             _operation(config, profile, cid, action, database, compressed, cancelled)
                             uncompressed_bytes = compressed.tell()
@@ -535,7 +622,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                     manifest['files'].append({'name': name, 'database': database, 'kind': action, **versions,
                                               'bytes': final.stat().st_size, 'uncompressed_bytes': uncompressed_bytes, 'compression': 'gzip', 'sha256': _hash(final, cancelled),
                                               'duration_seconds': round(time.monotonic() - started, 3), 'status': 'dump_completed'})
-                    atomic_write_json(directory / 'manifest.json', manifest)
+                    write_manifest(manifest)
                     if progress:
                         progress(manifest)
             manifest['status'] = 'checked' if check_only else 'dump_completed'
@@ -544,7 +631,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
             raise
         finally:
             manifest['finished_at'] = utc_now()
-            atomic_write_json(directory / 'manifest.json', manifest)
+            write_manifest(manifest)
     return results
 
 
@@ -555,7 +642,7 @@ def artifact_paths(results):
 
 def borg_artifact_paths(results):
     """Return anchored Borg inputs; slashdot keeps process/FD paths out of archives."""
-    return [str(result_directory(r).parent) + '/./' + Path(r['directory']).name + '/' + name
+    return [r.borg_directory + '/' + name
             if isinstance(r, DumpResult) else str(Path(r['directory']) / name)
             for r in results for name in [*[f['name'] for f in r['files']], 'manifest.json']]
 
@@ -650,28 +737,35 @@ def verify_archive(repo, archive, results, cancelled=lambda: False):
 
 
 def cleanup_run(directory, profile, *, verified=False, interrupted=False):
-    """Remove only owned manifest-listed files through an anchored staging handle.
+    """Remove only recognized files for this profile through held run descriptors.
 
-    A live DumpResult retains its original directory even after a pool rename.
-    interrupted permits an orphaned running manifest only after the caller has
-    reconciled exporters while holding docker-control. Unknown files block cleanup.
+    Existing Unraid ownership/modes are accepted. A replaced run, links, unknown
+    files or incompatible manifest block cleanup. No recursive deletion occurs.
+    interrupted permits a running manifest only after exporter reconciliation
+    under docker-control; verified requires an archived manifest.
     """
     if isinstance(directory, DumpResult):
-        _cleanup_run(directory.path, profile, verified=verified, interrupted=interrupted)
+        _cleanup_run(directory._root_fd, directory._name, directory._run_fd, profile,
+                     verified=verified, interrupted=interrupted)
         return
     logical = Path(directory)
     if logical.parent != Path(profile['staging_dir']) or not is_run_directory_name(logical.name):
         raise DatabaseError('storage_path')
     with open_staging(profile, require_space=False) as fd:
-        _cleanup_run(_descriptor_path(fd) / logical.name, profile, verified=verified, interrupted=interrupted)
+        with open_dump_directory(fd, logical.name) as run_fd:
+            _cleanup_run(fd, logical.name, run_fd, profile, verified=verified, interrupted=interrupted)
 
 
-def _cleanup_run(path, profile, *, verified, interrupted):
-    """Validate and remove one run below an already held private staging directory."""
-    _private_path(path)
-    if (path / 'manifest.json').is_symlink():
+def _cleanup_run(root_fd, run_name, run_fd, profile, *, verified, interrupted):
+    """Validate a pinned manifest and unlink only recognized run-local entries."""
+    if not os.path.samestat(os.fstat(run_fd), os.stat(run_name, dir_fd=root_fd, follow_symlinks=False)):
         raise DatabaseError('cleanup_blocked')
-    manifest = json.loads((path / 'manifest.json').read_text())
+    path = _descriptor_path(run_fd)
+    try:
+        with open_dump_file(path / 'manifest.json') as handle:
+            manifest = json.load(handle)
+    except (OSError, DatabaseError):
+        raise DatabaseError('cleanup_blocked') from None
     if manifest.get('profile_id') != profile['id'] or (manifest.get('status') == 'running' and not interrupted):
         raise DatabaseError('cleanup_blocked')
     if verified and manifest.get('status') != 'archived':
@@ -688,9 +782,11 @@ def _cleanup_run(path, profile, *, verified, interrupted):
     if manifest.get('scope', {}).get('globals'):
         name = 'globals.sql.gz' if manifest.get('compression') == 'gzip' else 'globals.sql'
         allowed.update((name, name + '.partial'))
-    children = list(path.iterdir())
-    if any(p.name not in allowed or p.is_symlink() or not p.is_file() or p.stat().st_uid != os.geteuid() for p in children):
-        raise DatabaseError('cleanup_blocked')
+    children = os.listdir(run_fd)
     for child in children:
-        child.unlink()
-    path.rmdir()
+        info = os.stat(child, dir_fd=run_fd, follow_symlinks=False)
+        if child not in allowed or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise DatabaseError('cleanup_blocked')
+    for child in children:
+        os.unlink(child, dir_fd=run_fd)
+    os.rmdir(run_name, dir_fd=root_fd)

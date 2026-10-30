@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Normal Unraid database dump permissions (#652, #596)
+
+- Accept existing dump roots and retained runs with ordinary Unraid ownership/modes, including nobody:users and 0777. Preserve existing permissions; create run directories with 0755 and dumps/manifests with 0644 while credentials and control records remain private.
+- Pin each live run directory independently of its writable parent and preserve Borg archive paths through private descriptor aliases. Reject linked artifacts and unexpected cleanup entries; retain mount, filesystem and free-space checks.
+- Keep local-run listing read-only. Distinguish missing storage from an empty history, include the profile name and path in errors, and retain readable profiles when another location fails. Update German/English UI and manuals; no data migration is needed.
+
 ## Pending - Correlated Borg invocation logging (#648)
 
 - Log the actual argument vector before managed create/prune/compact/check, version/info diagnostics and manual repository maintenance. Pair each invocation with its raw process exit code using a unique ID; distinguish startup failures, signals and diagnostic timeouts without changing job outcomes.
