@@ -384,12 +384,11 @@ class DumpResult(dict):
     aliases are released by close_results; no descriptors enter persisted JSON.
     """
 
-    def __init__(self, root_fd, name, runtime_dir, **manifest):
+    def __init__(self, root_fd, name, **manifest):
         super().__init__(manifest)
         self._root_fd = self._run_fd = self._alias_fd = None
         self._alias_path = None
         self._name = name
-        self._runtime_dir = runtime_dir
         try:
             self._root_fd = os.dup(root_fd)
             self._run_fd = os.open(name, DIRECTORY_FLAGS, dir_fd=root_fd)
@@ -412,8 +411,8 @@ class DumpResult(dict):
     def borg_directory(self):
         """Create a private alias once; keep the public archive layout unchanged."""
         if self._alias_fd is None:
-            self._runtime_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            self._alias_path = Path(tempfile.mkdtemp(prefix='artifacts-', dir=self._runtime_dir))
+            # Persistent configuration may be on Unraid's FAT boot device.
+            self._alias_path = Path(tempfile.mkdtemp(prefix='bbui-database-artifacts-'))
             self._alias_fd = os.open(self._alias_path, DIRECTORY_FLAGS)
             os.symlink(str(self.path), self._name, dir_fd=self._alias_fd)
         return str(_descriptor_path(self._alias_fd)) + '/./' + self._name
@@ -572,7 +571,7 @@ def export_profiles(config, profiles, job_id, run_id, cancelled=lambda: False, p
                 os.mkdir(name, mode=0o755, dir_fd=fd)
             except FileExistsError:
                 raise DatabaseError('dump_exists') from None
-            manifest = DumpResult(fd, name, data_root(config) / 'database-runtime')
+            manifest = DumpResult(fd, name)
         directory = manifest.path
         manifest.update({'format_version': 1, 'helper_version': 1, 'job_id': job_id, 'run_id': run_id,
                     'profile_id': profile['id'], 'profile_name': profile['name'], 'engine': profile['engine'], 'started_at': started_at,

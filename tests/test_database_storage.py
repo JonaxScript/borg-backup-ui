@@ -166,6 +166,14 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         def borg(*args):
             return subprocess.check_output(['borg', *args], stderr=subprocess.PIPE, text=True, timeout=60)
         borg('init', '--encryption=none', repo)
+        # The persistent configuration may be on FAT, which has no symlinks.
+        symlink = backup.os.symlink
+        def reject_persistent_alias(target, name, **kwargs):
+            parent = Path(os.readlink(backup._descriptor_path(kwargs['dir_fd'])))
+            if parent.is_relative_to(backup.data_root(config)):
+                raise OSError('boot filesystem does not support symlinks')
+            return symlink(target, name, **kwargs)
+        monkeypatch.setattr(backup.os, 'symlink', reject_persistent_alias)
         archive = 'appdata-backup-2026-10-24_12-40-29'
         borg('create', repo+'::'+archive, *backup.borg_artifact_paths(results))
         before = borg('list', '--json', repo)
@@ -177,6 +185,7 @@ def test_real_borg_uses_held_directory_after_replacement(config, profile, pool, 
         backup.verify_archive(repo, archive, results)
         backup.write_manifest(results[0])
         alias = results[0]._alias_path
+        assert alias.stat().st_mode & 0o777 == 0o700
         if replaced == 'root':
             backup.cleanup_run(results[0], profile, verified=True)
             assert not list(root.iterdir())
