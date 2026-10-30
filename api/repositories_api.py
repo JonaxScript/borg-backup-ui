@@ -917,10 +917,16 @@ def _borg_info(
     repo_path: str,
     passphrase_file: Path | None,
     encryption: str = "",
+    latest_archive: bool = False,
 ) -> dict[str, Any]:
+    """Read repository JSON, optionally including the newest archive's statistics.
+
+    Latest-archive mode adds ``--last 1`` instead of requesting every archive.
+    Borg errors and the existing 60-second timeout propagate to the caller.
+    """
     try:
         proc = subprocess.run(
-            ["borg", "info", "--json", repo_path],
+            ["borg", "info", "--json", *(["--last", "1"] if latest_archive else []), repo_path],
             capture_output=True,
             text=True,
             timeout=60,
@@ -1339,11 +1345,24 @@ def _borg_list(
 
 
 def _borg_info_fields(payload: dict[str, Any], archive_payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Extract display metadata; a single archive supplies its own file count.
+
+    Missing or invalid counts remain absent, never inferred from chunk counts.
+    Archive command lines and other raw metadata are not persisted here.
+    """
     repository = payload.get("repository") if isinstance(payload.get("repository"), dict) else {}
     encryption = payload.get("encryption") if isinstance(payload.get("encryption"), dict) else {}
     cache = payload.get("cache") if isinstance(payload.get("cache"), dict) else {}
     stats = cache.get("stats") if isinstance(cache.get("stats"), dict) else {}
     stats = dict(stats)
+    info_archives = payload.get("archives")
+    if isinstance(info_archives, list) and len(info_archives) == 1:
+        latest = info_archives[0]
+        archive_stats = latest.get("stats") if isinstance(latest, dict) else None
+        nfiles = archive_stats.get("nfiles") if isinstance(archive_stats, dict) else None
+        if isinstance(nfiles, int) and not isinstance(nfiles, bool) and nfiles >= 0:
+            stats["latest_archive_files"] = nfiles
+            stats["latest_archive_name"] = str(latest.get("name") or "")
     if isinstance(archive_payload, dict):
         archives = archive_payload.get("archives") if isinstance(archive_payload.get("archives"), list) else []
         stats["archives_count"] = len(archives)
@@ -1356,7 +1375,7 @@ def _borg_info_fields(payload: dict[str, Any], archive_payload: dict[str, Any] |
 
 
 def refresh_repository_info(config: dict, repository_key: str) -> dict[str, Any]:
-    """Read Borg info/list for one repository and persist refreshed metadata.
+    """Read Borg info/list and the newest archive's file count for one repository.
 
     Returns the updated display object. Raises ValueError for missing metadata
     or passphrase file and RepositoryBusyError when a resource lock is active;
@@ -1381,7 +1400,7 @@ def refresh_repository_info(config: dict, repository_key: str) -> dict[str, Any]
         raise ValueError("Repository passphrase file is missing")
     encryption = str(repository.get("encryption") or "").strip()
     try:
-        info_payload = _borg_info(config, storage, repo_path, passphrase_file, encryption)
+        info_payload = _borg_info(config, storage, repo_path, passphrase_file, encryption, True)
         archive_payload = _borg_list(config, storage, repo_path, passphrase_file, encryption)
     except RepositoryBusyError:
         _record_repository_info_busy(config, key, _now())

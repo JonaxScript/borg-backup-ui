@@ -1,5 +1,12 @@
 # Changelog
 
+## Pending - Compact repository overview and explicit statistics (#660)
+
+- Scroll explicitly expanded repository cards into view when needed, respecting reduced motion and retaining keyboard focus. Background refreshes do not scroll.
+- Let the overview use its own compact height, with smaller statistics and two-column maintenance summaries on wide displays. Archive and maintenance tabs retain their reserved pane geometry.
+- Move the renamed statistics refresh action and fetch timestamp beside the statistics; keep the timestamp visible when automatic refresh is disabled. Fetch the newest archive's file count with Borg info --last 1 and preserve unknown counts rather than using chunk totals.
+- Widen the archive-name column and use single-line ellipsis with the full name available on hover and in the opened archive. Document behavior in German and English.
+
 ## Pending - Discoverable archive pages and location links (#658)
 
 - Place synchronized archive range and paging controls above and below the left archive list, retaining stable panes and keyboard focus during paging. Partition loaded archives by measured row heights and responsive pane height; preserve the first visible archive on resize.
