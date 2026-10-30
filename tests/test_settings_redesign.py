@@ -81,15 +81,15 @@ def test_repository_page_shows_disabled_auto_refresh_hint() -> None:
     de = json.loads(_read("ui/i18n/de.json"))
     en = json.loads(_read("ui/i18n/en.json"))
 
-    assert "repository_info_refresh?.enabled !== false" in script
+    assert "repository_info_refresh?.enabled === false" in script
     assert "repositoryInfoAutoRefreshDisabled" in script
     assert "storage-repository-info-disabled" in script
     assert "openRepositoryRefreshSettings" in script
     assert "activateSettingsTab('repository')" in script
     assert "data-storage-action=\"open-repository-refresh-settings\"" in script
     assert ".storage-repository-workspace-status .storage-repository-info-disabled" in css
-    assert de["storage"]["repositoryInfoAutoRefreshDisabled"] == "Info-Automatik deaktiviert"
-    assert en["storage"]["repositoryInfoAutoRefreshDisabled"] == "Info auto-refresh disabled"
+    assert de["storage"]["repositoryInfoAutoRefreshDisabled"] == "Automatische Aktualisierung aus"
+    assert en["storage"]["repositoryInfoAutoRefreshDisabled"] == "Automatic refresh off"
 
 
 def test_repository_settings_stay_in_single_operations_menu_group() -> None:

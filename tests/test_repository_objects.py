@@ -301,10 +301,12 @@ def test_repository_info_counts_archives_from_borg_list(tmp_path: Path, monkeypa
     }]})
     calls = []
 
-    def fake_info(_config, _storage, _repo_path, _passphrase_file, encryption=""):
+    def fake_info(_config, _storage, _repo_path, _passphrase_file, encryption="", latest_archive=False):
+        assert latest_archive is True
         calls.append(("info", encryption))
         return {
         "repository": {"id": "flash-repo"},
+        "archives": [{"name":"flash-16", "stats":{"nfiles":123456}, "command_line":["never persist this"]}],
         "encryption": {"mode": "repokey-blake2"},
         "cache": {"stats": {"total_size": 100, "total_csize": 90, "unique_csize": 10}},
         }
@@ -321,6 +323,9 @@ def test_repository_info_counts_archives_from_borg_list(tmp_path: Path, monkeypa
     assert calls == [("info", "none"), ("list", "none")]
     assert result["repository"]["repository_stats"]["archives_count"] == 17
     stored = read_repository_store(config)["repositories"][0]
+    assert stored["repository_stats"]["latest_archive_files"] == 123456
+    assert stored["repository_stats"]["latest_archive_name"] == "flash-16"
+    assert "never persist this" not in json.dumps(stored)
     assert stored["repository_stats"]["archives_count"] == 17
     assert stored["last_info_refresh_status"] == "success"
     assert stored["last_info_refresh_at"]
@@ -1125,3 +1130,37 @@ def test_repository_import_failure_restores_existing_secret(tmp_path: Path, monk
         assert "wrong passphrase" in str(exc)
 
     assert secret.read_text(encoding="utf-8") == "correct-secret"
+
+
+@pytest.mark.parametrize('nfiles', [0, 123456, None, -1, True, '123', 1.5])
+def test_repository_latest_archive_file_count_is_scoped_and_validated(nfiles):
+    payload = {
+        'cache': {'stats': {'total_chunks': 999999}},
+        'archives': [{'name': 'newest', 'stats': {'nfiles': nfiles}}],
+    }
+    stats = repositories_api._borg_info_fields(payload)['repository_stats']
+    if isinstance(nfiles, int) and not isinstance(nfiles, bool) and nfiles >= 0:
+        assert stats['latest_archive_files'] == nfiles
+        assert stats['latest_archive_name'] == 'newest'
+    else:
+        assert 'latest_archive_files' not in stats
+    assert 'latest_archive_files' not in repositories_api._borg_info_fields({
+        'archives': payload['archives'] * 2,
+    })['repository_stats']
+    assert 'latest_archive_files' not in repositories_api._borg_info_fields({
+        'archives': [],
+    })['repository_stats']
+
+
+def test_repository_info_requests_only_the_newest_archive_when_enabled(monkeypatch):
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, '{}', '')
+    monkeypatch.setattr(repositories_api.subprocess, 'run', run)
+    monkeypatch.setattr(repositories_api, '_repo_env', lambda *_a, **_kw: {})
+    repositories_api._borg_info({}, {}, '/repo', None, latest_archive=True)
+    repositories_api._borg_info({}, {}, '/repo', None)
+    assert calls[0][0] == ['borg', 'info', '--json', '--last', '1', '/repo']
+    assert calls[1][0] == ['borg', 'info', '--json', '/repo']
+    assert calls[0][1]['timeout'] == 60

@@ -100,8 +100,8 @@ Select **Import Existing Repository** and then choose a directory within the sto
 
 ### Tabs
 
-- **Overview:** Borg sizes, archive count, health, path, storage target, encryption, and job assignment.
-- **Archives:** Archive name and creation time; newest archives are listed first. The number of entries per page adapts to the window and row heights. The range and paging buttons appear directly above and below the left archive list, for example "1–5 of 14 loaded archives". Select an archive to browse its folders and files directly in a read-only view. This also works for imported archives without a job assignment. Reading the archive index for the first time can take longer for large or remote repositories. Restore, download, and file preview remain part of the separate **Browse & Restore** workflow.
+- **Overview:** Compact sizes, archive count and files in the newest archive. **Refresh statistics** fetches these values from Borg; the adjacent timestamp identifies that fetch. Maintenance results retain their own timestamps. Expanding a card scrolls it into view when needed.
+- **Archives:** Archive name and creation time; newest archives are listed first. Long names stay on one line; hover or open the archive to read the full name. The number of entries per page adapts to the window and row heights. The range and paging buttons appear directly above and below the left archive list, for example "1–5 of 14 loaded archives". Select an archive to browse its folders and files directly in a read-only view. This also works for imported archives without a job assignment. Reading the archive index for the first time can take longer for large or remote repositories. Restore, download, and file preview remain part of the separate **Browse & Restore** workflow.
 - **Maintenance:** Check, full data verification, prune, and compact.
 - **Administration:** Job links, non-destructive removal from the UI, and protected permanent deletion.
 

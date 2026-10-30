@@ -25,7 +25,7 @@ const {chromium} = require('playwright');
     for(const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/pages/jobs.js','ui/js/pages/storage.js'])await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
     await page.evaluate(()=>{
       const result={status:'success',finished_at:'2026-10-28T09:46:00Z',started_at:'2026-10-28T09:45:56Z',duration_seconds:4};
-      window.baseRepo={last_info_refresh_at:'2026-10-28T11:48:00Z',repository_key:'flash',repository_name:'borg-backup-flash',display_name:'Flash',backup_type:'flash',storage_key:'local',storage_name:'Backup-Lokal',used_by:['job1','job2'],path_display:'/mnt/backup/borg-backup-flash',encryption:'repokey-blake2',borg_key_exported_at:'2026-10-24T15:40:00Z',borg_repository_id:'a'.repeat(64),repository_stats:{archives_count:14,total_size:43.4*1024**3,total_csize:42.2*1024**3,unique_csize:6.7*1024**3},maintenance_results:{check:{...result,details:['Repository check complete. <safe>']},verify_data:result,prune:{...result,deleted_archives_count:2,deleted_archives:['old <archive>','older-archive']},compact:{...result,freed_space:'1.2 GB'}}};
+      window.baseRepo={last_info_refresh_at:'2026-10-28T11:48:00Z',repository_key:'flash',repository_name:'borg-backup-flash',display_name:'Flash',backup_type:'flash',storage_key:'local',storage_name:'Backup-Lokal',used_by:['job1','job2'],path_display:'/mnt/backup/borg-backup-flash',encryption:'repokey-blake2',borg_key_exported_at:'2026-10-24T15:40:00Z',borg_repository_id:'a'.repeat(64),repository_stats:{archives_count:14,total_size:43.4*1024**3,total_csize:42.2*1024**3,unique_csize:6.7*1024**3,latest_archive_files:123456,latest_archive_name:"flash-latest"},maintenance_results:{check:{...result,details:['Repository check complete. <safe>']},verify_data:result,prune:{...result,deleted_archives_count:2,deleted_archives:['old <archive>','older-archive']},compact:{...result,freed_space:'1.2 GB'}}};
       storageState.jobs=[{key:'job1',name:'Flash – Lokal',icon:'flash',icon_color:'blue',retention:{mode:'last',last:3}},{key:'job2',name:'Flash nachts',icon:'flash',icon_color:'blue',retention:{mode:'last',last:3}}];
       storageState.data={storages:[{storage_key:'local',display_name:'Backup-Lokal',location:'local'},{storage_key:'local2',display_name:'Zweites lokales Ziel',location:'local'},{storage_key:'usb',display_name:'USB-5TB',location:'usb',mount_state:'not_mounted'}],groups:{local:[baseRepo,{...baseRepo,repository_key:'old',display_name:'Archiv ohne Job',backup_type:'photos',borg_key_exported_at:'',used_by:[],storage_key:'local2',storage_name:'Zweites lokales Ziel',maintenance_results:{},repository_stats:{archives_count:0}}],usb:[{...baseRepo,repository_key:'usb',display_name:'Flash <USB>',storage_key:'usb',storage_name:'USB-5TB',used_by:[],repository_stats:{unique_csize:123,archives_count:4},maintenance_results:{}}]},repository_info_refresh:{enabled:false}};
       window.calls=[];
@@ -34,6 +34,10 @@ const {chromium} = require('playwright');
         if(url==='/api/repositories/lifecycle'){const key=JSON.parse(options.body).repository_key;data={allowed:key!=='flash',job_keys:key==='flash'?['job1','job2']:[],blockers:key==='flash'?['jobs_linked']:[],repository_id:'a'.repeat(64),archive_count:14};}
         else if(url.startsWith('/api/repositories/archives?'))data={repository_id:'a'.repeat(64),can_delete:true,archive_count:14,archives:Array.from({length:14},(_,i)=>({name:`flash-${String(i).padStart(2,'0')}`,id:`archive${i}`,start:'2026-10-28T09:00:00Z'}))};
         else if(url.startsWith('/api/repositories/archive-files?'))data={files:[{name:'boot',type:'d',path:'boot',mtime:'2026-10-28T09:00:00Z'}]};
+        else if(url==='/api/repositories/info') {baseRepo.last_info_refresh_at='2026-10-30T14:17:00Z';baseRepo.repository_stats.latest_archive_files=123457;data={ok:true};}
+        else if(url==='/api/storage')data=storageState.data;
+        else if(url==='/api/jobs')data={jobs:storageState.jobs};
+        else if(url==='/api/storage/check/state')data={running:false};
         else throw Error('Unexpected API '+url);
         return {ok:true,json:async()=>data};
       };
@@ -72,8 +76,37 @@ const {chromium} = require('playwright');
     assert.match(await page.locator('.storage-repository-card').innerText(),/Archiv ohne Job/);
     await page.locator('[data-storage-target=all]').click();
     const card=page.locator('[data-repository-card=flash]');
+    await page.setViewportSize({width:1600,height:800});
     await card.locator('[data-storage-action=toggle-repository]').click();
     await page.waitForFunction(()=>!!BBUI.storageState.lifecycleCache.flash?.job_keys);
+    await page.waitForFunction(()=>Math.abs(document.querySelector('[data-repository-card=flash]').getBoundingClientRect().top-16)<2);
+    const overview=card.locator('[data-repository-panel=overview]');
+    assert((await overview.boundingBox()).height<600,'Overview must not reserve the height of hidden archive/maintenance panes');
+    assert.match(await overview.locator('.storage-statistics-heading').innerText(),/Statistik abgerufen:.*28/s);
+    assert.equal(await overview.locator('[data-storage-action=repository-info]').count(),1);
+    assert.match(await overview.locator('.storage-repository-stats').innerText(),/Dateien im neuesten Archiv.*123.456/s);
+    assert.equal(await overview.locator('.storage-maintenance-summary-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);
+    const maintenanceBefore=await overview.locator('.storage-maintenance-summary-grid').innerText();
+    await overview.locator('[data-storage-action=repository-info]').click();
+    await page.waitForFunction(()=>document.querySelector('.storage-statistics-heading').textContent.includes('30/10/2026'));
+    assert.match(await overview.locator('.storage-repository-stats').innerText(),/123.457/);
+    assert.equal(await overview.locator('.storage-maintenance-summary-grid').innerText(),maintenanceBefore,'Statistics refresh does not rerun or redate maintenance');
+    assert.equal(await page.evaluate(()=>calls.filter(c=>c.url==='/api/repositories/info').length),1);
+    const cachedCounts=await page.evaluate(()=>{
+      const original=baseRepo.repository_stats.latest_archive_files;
+      delete baseRepo.repository_stats.latest_archive_files;renderStorage(storageState.data);
+      const missing=document.querySelector('.storage-repository-stats > div:last-child strong').textContent;
+      baseRepo.repository_stats.latest_archive_files=0;renderStorage(storageState.data);
+      const zero=document.querySelector('.storage-repository-stats > div:last-child strong').textContent;
+      baseRepo.repository_stats.latest_archive_files=original;renderStorage(storageState.data);
+      return {missing,zero};
+    });
+    assert.deepEqual(cachedCounts,{missing:'—',zero:'0'});
+    const beforeRefresh=await page.evaluate(()=>scrollY);
+    await page.evaluate(()=>renderStorage(storageState.data));
+    assert.equal(await page.evaluate(()=>scrollY),beforeRefresh,'Background refresh does not scroll');
+    if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/compact-repository-overview.png`});
+
     assert.equal(await page.evaluate(()=>calls.some(c=>c.url.includes('/archives?'))),false,'Expanding a card does not scan archives');
     await card.locator('[data-repository-tab=archives]').click();
     await page.waitForFunction(()=>!!BBUI.storageState.archiveCache.flash?.data);
@@ -125,14 +158,18 @@ const {chromium} = require('playwright');
     }
     await page.setViewportSize({width:1600,height:800});
     await page.evaluate(()=>{window.lang='de';storageState.archivePages.flash=0;renderStorage(storageState.data);});
-    // Long names change row heights; do not hide them behind a fixed row count.
+    // Long names stay on one line; the full text is available in the title and browser (#660).
     await page.evaluate(()=>{
       window.originalArchiveNames=storageState.archiveCache.flash.data.archives.map(a=>a.name);
       storageState.archiveCache.flash.data.archives.forEach((a,i)=>{a.name=`backup-${i}-`+'long-archive-name-'.repeat(i%3+3);});
       renderStorage(storageState.data);
     });
     assert(await card.locator('.storage-archive-list').evaluate(list=>list.scrollHeight<=list.clientHeight+1));
-    assert(await card.locator('.storage-archive-entry:not([hidden])').count()<6);
+    assert(await card.locator('.storage-archive-entry:not([hidden])').count()>5);
+    const longName=card.locator('.storage-archive-entry:not([hidden]) strong').first();
+    assert.equal(await longName.getAttribute('title'),await longName.innerText());
+    assert.equal(await longName.evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+    assert.equal(await longName.evaluate(el=>getComputedStyle(el).textOverflow),'ellipsis');
     await page.evaluate(()=>{
       storageState.archiveCache.flash.data.archives.forEach((a,i)=>{a.name=originalArchiveNames[i];});
       storageState.archivePages.flash=0;renderStorage(storageState.data);
@@ -204,7 +241,9 @@ const {chromium} = require('playwright');
       const heights=[];
       for(const tab of ['overview','archives','maintenance','management']){
         await card.locator(`[data-repository-tab=${tab}]`).click();
-        heights.push((await card.boundingBox()).height);
+        if(tab==='overview') {
+          assert.equal(await card.locator('.storage-repository-overview .storage-repository-stats > div').count(),6);
+        } else heights.push((await card.boundingBox()).height);
         assert.equal(await card.locator('[data-repository-panel]:not(.is-active) button').evaluateAll(nodes=>nodes.every(n=>getComputedStyle(n).visibility==='hidden')),true,'Inactive controls cannot paint through hidden panels');
         assert.equal(await card.locator('[data-repository-panel]:not(.is-active)').evaluateAll(nodes=>nodes.every(n=>n.inert&&getComputedStyle(n).visibility==='hidden')),true);
       }
