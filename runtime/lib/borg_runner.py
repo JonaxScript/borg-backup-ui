@@ -31,8 +31,10 @@ from typing import Dict, List, Optional
 
 try:
     from .retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from .source_size import SourceSizeEstimate
 except ImportError:  # Direct CLI invocation.
     from retention_policy import normalize_retention, prune_arguments, retention_description, RetentionError
+    from source_size import SourceSizeEstimate
 
 logger = logging.getLogger(__name__)
 
@@ -402,8 +404,7 @@ class BorgRunner:
         JSON-Fortschritt wird nur als fluechtiger Prozessstatus weitergegeben.
         Abschlussstatistik, Diagnostik und optionale Dateiaktivitaet bleiben im Log.
         Mit Prozessstatus wird die logische Quellgroesse automatisch parallel
-        geschaetzt; Fehler
-        dieser Messung beeinflussen den Borg-Exit-Code nicht.
+        geschaetzt; Fehler dieser Messung beeinflussen den Borg-Exit-Code nicht.
 
         Args:
             archive_name:   Optional exact archive name for verified database artifacts.
@@ -500,7 +501,6 @@ class BorgRunner:
         assert process.stdout is not None
         estimate = None
         if self.process_controller is not None:
-            from .source_size import SourceSizeEstimate
             estimate = SourceSizeEstimate(
                 paths, exclusions,
                 unsupported=bool(self.config.exclude_if_present or self.config.exclude_from),
