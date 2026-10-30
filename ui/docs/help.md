@@ -57,7 +57,7 @@ Drei Karten zeigen **Letzte Backup-Läufe**, **Restore-Abdeckung** und **Aktive 
 
 **Repository-Speicher** verwendet tatsächliche Größen aus gespeicherten Berichten, je gemeinsam genutztem Repository einmal. Der letzte Messwert wird bis zur nächsten Messung fortgeführt. Fehlende Größen werden nicht durch deduplizierte Archivgrößen ersetzt; unvollständige Messreihen bleiben als Lücken sichtbar. Die Zuordnung folgt der aktuellen Job-Konfiguration, da ältere Berichte keine Repository-ID enthalten. Nach einer Änderung der Repository-Zuordnung sind ältere Werte deshalb nur eingeschränkt vergleichbar. Der letzte Messzeitpunkt steht an der Grafik. Gelöschte Jobs sind nicht Teil dieser Übersicht.
 
-Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** führt zur passenden Standortauswahl. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
+Die **Standorte**-Tabelle fasst Jobanzahl, letzte Erfolge, Jobs mit Hinweisen und Restore-Abdeckung zusammen. **Jobs öffnen** in der jeweiligen Standortzeile zeigt nur die Jobs dieses Standorts, zum Beispiel USB. Einzelne Jobdetails und Aktionen befinden sich auf der Jobs-Seite.
 
 Die **Server-Auslastung** direkt unter der Kennzahlenreihe mit **Letzte Backup-Läufe** bleibt standortübergreifend. CPU und RAM sowie der aufklappbare Verlauf nutzen die gesamte Breite. Laufende geschützte Restore-Tests erscheinen ebenfalls über die volle Breite, auch bei geschlossenem Verlauf. Auf schmalen Bildschirmen stehen die Diagramme untereinander.
 
@@ -101,7 +101,7 @@ Wählen Sie **Vorhandenes Repository importieren** und anschließend ein Verzeic
 ### Reiter
 
 - **Übersicht:** Borg-Größen, Archivanzahl, Zustand, Pfad, Speicherziel, Verschlüsselung und Job-Zuordnung.
-- **Archive:** Archive, technische IDs, Zeitpunkte und Dauer; neueste Archive stehen zuerst. Wählen Sie ein Archiv aus, um dessen Ordner und Dateien direkt in einer schreibgeschützten Ansicht zu durchsuchen. Dies funktioniert auch für importierte Archive ohne Job-Zuordnung. Beim ersten Öffnen kann das Einlesen des Archivindex bei großen oder entfernten Repositorys länger dauern. Wiederherstellung, Download und Dateivorschau bleiben dem separaten **Browse & Restore**-Ablauf vorbehalten.
+- **Archive:** Archivname und Erstellungszeit; neueste Archive stehen zuerst. Die Anzahl der Einträge pro Seite passt sich an Fenster- und Zeilenhöhe an. Seitenanzeige und Schaltflächen zum Blättern stehen direkt oberhalb und unterhalb der linken Archivliste, zum Beispiel „1–5 von 14 geladenen Archiven“. Wählen Sie ein Archiv aus, um dessen Ordner und Dateien direkt in einer schreibgeschützten Ansicht zu durchsuchen. Dies funktioniert auch für importierte Archive ohne Job-Zuordnung. Beim ersten Öffnen kann das Einlesen des Archivindex bei großen oder entfernten Repositorys länger dauern. Wiederherstellung, Download und Dateivorschau bleiben dem separaten **Browse & Restore**-Ablauf vorbehalten.
 - **Wartung:** Check, vollständige Datenprüfung, Prune und Compact.
 - **Verwaltung:** Job-Verknüpfungen, Entfernen aus der UI und geschützte endgültige Löschung.
 

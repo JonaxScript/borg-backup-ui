@@ -1161,6 +1161,7 @@
   align-items: center;
   border-bottom: 1px solid var(--ui-color-border);
 }
+.storage-archive-entry[hidden] { display: none; }
 .storage-archive-entry:last-child { border-bottom: 0; }
 .storage-archive-entry .storage-archive-row { min-width: 0; flex: 1; border-bottom: 0; }
 .storage-archive-list.can-delete > header { padding-right: 3.5rem; }
@@ -1729,7 +1730,9 @@
   .storage-target-group-heading { flex-wrap: wrap; }
 }
 /* Reserve both archive panes so browsing folders never moves the pager (#621). */
-.storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); height: 32rem; }
+.storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); height: clamp(22rem, calc(100dvh - 20rem), 48rem); }
+.storage-archive-column { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; height: 100%; min-height: 0; min-width: 0; }
+.storage-archive-column .storage-archive-pagination { padding-top: 0; }
 .storage-repository-card .storage-archive-list { height: 100%; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .storage-repository-card .storage-archive-browser { height: 100%; min-height: 0; display: grid; grid-template-rows: 5rem 3rem minmax(0, 1fr); }
 .storage-repository-card .storage-archive-browser > header { min-width: 0; min-height: 0; }
@@ -1745,5 +1748,5 @@
 .storage-repository-card .storage-archive-pagination { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
 .storage-repository-card .storage-archive-pagination > span { text-align: center; }
 @media (max-width: 1100px) {
-  .storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: 22rem 28rem; height: 51rem; gap: 1rem; }
+  .storage-repository-card .storage-archive-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: clamp(22rem, 55dvh, 38rem) 28rem; height: auto; gap: 1rem; }
 }

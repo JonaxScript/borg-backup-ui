@@ -57,7 +57,7 @@ Three cards show **Latest backup runs**, **Restore coverage** and **Active runs*
 
 **Repository storage** uses actual sizes from saved reports, counting each shared repository once. The last sample is carried forward until the next measurement. Missing sizes are never replaced by deduplicated archive sizes; incomplete series remain gaps. Assignment follows the current job configuration because older reports contain no repository ID. After changing a repository assignment, older values therefore have limited comparability. The chart shows the latest sample time. Deleted jobs are excluded from this overview.
 
-The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** navigates to the matching location selection. Individual job details and actions belong on the Jobs page.
+The **Locations** table summarizes job counts, latest successes, jobs needing attention and restore coverage. **Open jobs** in a location row shows only the jobs at that location, for example USB. Individual job details and actions belong on the Jobs page.
 
 **Server resources** directly below the summary row containing **Latest backup runs** remain global. CPU, RAM and expandable history use the full width. Active protected restore tests also use the full width, even with history collapsed. Charts stack on narrow screens.
 
@@ -101,7 +101,7 @@ Select **Import Existing Repository** and then choose a directory within the sto
 ### Tabs
 
 - **Overview:** Borg sizes, archive count, health, path, storage target, encryption, and job assignment.
-- **Archives:** Archives, technical IDs, timestamps, and duration; newest archives are listed first. Select an archive to browse its folders and files directly in a read-only view. This also works for imported archives without a job assignment. Reading the archive index for the first time can take longer for large or remote repositories. Restore, download, and file preview remain part of the separate **Browse & Restore** workflow.
+- **Archives:** Archive name and creation time; newest archives are listed first. The number of entries per page adapts to the window and row heights. The range and paging buttons appear directly above and below the left archive list, for example "1–5 of 14 loaded archives". Select an archive to browse its folders and files directly in a read-only view. This also works for imported archives without a job assignment. Reading the archive index for the first time can take longer for large or remote repositories. Restore, download, and file preview remain part of the separate **Browse & Restore** workflow.
 - **Maintenance:** Check, full data verification, prune, and compact.
 - **Administration:** Job links, non-destructive removal from the UI, and protected permanent deletion.
 
