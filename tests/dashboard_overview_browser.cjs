@@ -24,6 +24,7 @@ const { chromium } = require('playwright');
       const text = key.split('.').reduce((v,k) => v?.[k], dicts[lang]);
       return typeof text === 'string' ? text.replace(/\{(\w+)\}/g, (_,k) => params[k] ?? '') : key;
     }}}, core: {state: {currentPage: 'dashboard', data: {backups}}, getSchedulesData: () => ({})}};
+    window.openWizard = () => {throw Error('Navigation must not open the job wizard');};
     window.resolveJobIcon = () => 'archive'; window.resolveJobIconColor = () => '';
     window.isStaleDate = () => false; window.calcNextRun = () => new Date();
     window.demoIdle = true;
@@ -39,7 +40,7 @@ const { chromium } = require('playwright');
     window.translate = () => document.querySelectorAll('[data-i18n]').forEach(el => {el.textContent=BBUI.components.i18n.t(el.dataset.i18n);});
     translate();
   }, dictionaries);
-  for (const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/components/resource-monitor.js','ui/js/pages/jobs.js']) await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
+  for (const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/components/resource-monitor.js','ui/js/pages/jobs.js','ui/js/pages/job-groups.js']) await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
   await page.evaluate(() => {
     const data = BBUI.core.state.data;
     const steps = ['stop_vms','create','start_vms','prune','compact','check'].map(id => ({id,status:'success',duration_seconds:60}));
@@ -55,6 +56,7 @@ const { chromium } = require('playwright');
         const days=Number(params.get('days'));
         return {ok:true,json:async()=>({days,location:params.get('location'),from:'2026-10-01',to:'2026-10-27',run_count:days*3,success_rate:200/3,counts:{success:days*2,warning:0,error:days,skipped:0,cancelled:0,unknown:0},repository_count:2,unassigned_jobs:0,repository_last_sample:'2026-10-27T09:00:00Z',daily:Array.from({length:days},(_,i)=>({date:'2026-10-'+String(i+1).padStart(2,'0'),success:2,warning:0,error:1,skipped:0,cancelled:0,unknown:0,repository_bytes:(300+i)*1024**3,measured_repositories:2}))})};
       }
+      if(url==='/api/job-groups')return {ok:true,json:async()=>({groups:[],hooks:{}})};
       if(url==='/api/jobs')return {ok:true,json:async()=>({jobs:demoJobs})};
       if(url==='/api/status')return {ok:true,json:async()=>data};
       if(url==='/api/schedules'||url==='/api/jobs/running')return {ok:true,json:async()=>({})};
@@ -72,6 +74,42 @@ const { chromium } = require('playwright');
   });
   const capture=async name=>{if(process.env.BBUI_SCREENSHOT_DIR)await page.screenshot({animations:'disabled',fullPage:true,path:`${process.env.BBUI_SCREENSHOT_DIR}/${name}.png`});};
   await page.waitForSelector('.management-bars');
+  // Real workspace switching used to reset the requested location on a cold list (#658).
+  for (const lang of ['de','en']) {
+    for (const location of ['usb','local','smb','storagebox']) {
+      await page.evaluate(({lang,location})=>{
+        window.lang=lang;translate();
+        jobsState.jobs=[];jobsState.loaded=false; // first visit / stale cache
+        BBUI.core.state.currentPage='dashboard';
+        document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-dashboard'));
+        dashboardSelectedLocation='all';renderDashboard(BBUI.core.state.data,null);
+      },{lang,location});
+      assert.equal(await page.locator('[aria-labelledby=dashboard-locations-title] .management-heading [data-dashboard-jobs]').count(),0);
+      assert.equal(await page.locator('#dashboard-locations [data-dashboard-jobs]').count(),4);
+      await page.locator(`#dashboard-locations [data-location="${location}"]`).click();
+      await page.waitForFunction(location=>jobsState.loaded && jobsState.selectedLocation===location, location, {timeout:5000}).catch(async error=>{console.error(errors,await page.locator('#jobs-message').innerText(),await page.evaluate(()=>({location:jobsState.selectedLocation,loaded:jobsState.loaded,view:BBUI.jobGroups.state.view})));throw error;});
+      assert(await page.locator(`[data-jobs-location="${location}"]`).evaluate(el=>el.getAttribute('aria-current')==='page'));
+      assert.equal(await page.locator('#jobs-grid .jobs-redesign-row').count(),await page.evaluate(location=>demoJobs.filter(j=>j.location===location).length,location));
+      assert.deepEqual(await page.evaluate(()=>[...new Set([...document.querySelectorAll('#jobs-grid .jobs-redesign-row')].map(el=>jobsState.jobs.find(j=>`job-card-${j.key}`===el.id)?.location))]),[location]);
+      await page.evaluate(()=>refreshJobs());
+      assert.equal(await page.evaluate(()=>jobsState.selectedLocation),location);
+    }
+    await page.evaluate(async()=>{
+      await BBUI.jobGroups.view('groups');
+      BBUI.core.state.currentPage='dashboard';
+      document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-dashboard'));
+      renderDashboard(BBUI.core.state.data,null);
+    });
+    await page.locator('#dashboard-locations [data-location=usb]').click();
+    await page.waitForFunction(()=>BBUI.jobGroups.state.view==='jobs' && jobsState.selectedLocation==='usb');
+    assert(await page.locator('#page-jobs .jobs-location-layout').isVisible());
+  }
+  await page.evaluate(()=>{
+    window.lang='de';translate();
+    BBUI.core.state.currentPage='dashboard';
+    document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-dashboard'));
+    renderDashboard(BBUI.core.state.data,null);
+  });
   assert.equal(await page.locator('.dashboard-summary-section').count(),3);
   assert.equal(await page.locator('.dashboard-coverage-track .success').count(),6);
   assert.equal(await page.locator('#backup-grid').count(),0);

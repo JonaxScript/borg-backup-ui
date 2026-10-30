@@ -1,5 +1,11 @@
 # Changelog
 
+## Pending - Discoverable archive pages and location links (#658)
+
+- Place synchronized archive range and paging controls above and below the left archive list, retaining stable panes and keyboard focus during paging. Partition loaded archives by measured row heights and responsive pane height; preserve the first visible archive on resize.
+- Apply Dashboard job-location selection after switching out of job groups so the first visit with an empty job cache preserves USB and other locations. Remove the redundant action from the locations heading.
+- Cover 14-archive paging in short bilingual browser views and real job-group workspace navigation with cold job caches. Update German and English help.
+
 ## Pending - Database path feedback and live test dumps (#656)
 
 - Accept trailing separators in database storage directories and safely create nested missing directories during explicit exports. Listing and profile saving remain read-only; uncreated storage is a neutral initial state while mount/access failures remain visible.

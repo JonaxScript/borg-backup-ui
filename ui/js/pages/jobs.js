@@ -1942,13 +1942,15 @@ document.addEventListener('keydown', onJobDetailsKeydown);
 /**
  * Navigate from Dashboard to Jobs without starting an action. Open saved facts by
  * default; rendering selects Workflow for a target with a saved outcome message.
+ * Apply the requested location after switching workspaces: that switch renders
+ * the cached job list, which may still be empty on the first Dashboard visit.
  */
 async function openJobsStatus(key = '', location = 'all') {
-  jobsState.selectedLocation = JOBS_LOCATION_ORDER.includes(location) ? location : 'all';
   if (window.BBUI.jobGroups?.view) {
     await window.BBUI.jobGroups.view('jobs');
     if (window.BBUI.jobGroups.state.view !== 'jobs') return;
   }
+  jobsState.selectedLocation = JOBS_LOCATION_ORDER.includes(location) ? location : 'all';
   if (key) { jobWorkflowOpen.add(key); jobDataView.add(key); jobStatusTarget = key; }
   window.BBUI.core.navigate('jobs');
 }

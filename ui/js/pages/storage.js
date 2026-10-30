@@ -20,6 +20,8 @@ window.BBUI.storageState = window.BBUI.storageState || {
 };
 const storageState = window.BBUI.storageState;
 storageState.archivePages = storageState.archivePages || {};
+storageState.archiveRanges = storageState.archiveRanges || {};
+let storageArchiveResizeObserver;
 storageState.target = storageState.target || 'all';
 storageState.archiveCache = storageState.archiveCache || {};
 storageState.archiveBrowser = storageState.archiveBrowser || { repositoryKey: '', archive: '', path: '', files: [], loading: false, error: '' };
@@ -317,6 +319,11 @@ function renderStorage(data) {
   el.innerHTML = `<div class="storage-selection-summary"><h2>${escHtml(title)}</h2><span class="storage-target-count">${escHtml(countLabel(visible.length))}</span></div>` + (visible.length
     ? groups.map(({ target, rows }) => `<section class="storage-target-group"><header class="storage-target-group-heading"><span class="type-icon">${storageLocationIcon(target.location)}</span><h2>${escHtml(target.display_name)}</h2><span class="storage-group-count">${escHtml(countLabel(rows.length))}</span><span class="storage-group-line"></span><span class="storage-target-count">${rows.length}</span></header><div class="storage-column-headings" aria-hidden="true">${['storage.columns.repository', 'storage.columns.storageTarget', 'storage.columns.linkedJobs', 'storage.columns.archiveData'].map(column => `<span>${escHtml(storageT(column))}</span>`).join('')}</div>${rows.map(renderStorageRepositoryCard).join('')}</section>`).join('')
     : `<section class="ui-panel storage-empty">${storageT('storage.noMatchingRepositories')}</section>`);
+
+  updateStorageArchivePagination();
+  storageArchiveResizeObserver?.disconnect();
+  storageArchiveResizeObserver = new ResizeObserver(() => updateStorageArchivePagination(true));
+  el.querySelectorAll('.storage-archive-list').forEach(list => storageArchiveResizeObserver.observe(list));
 
   if (focusData) Array.from(el.querySelectorAll('[data-storage-action]')).find(node => Object.entries(focusData).every(([key, value]) => node.dataset[key] === value))?.focus({ preventScroll: true });
 }
@@ -638,7 +645,69 @@ function renderStorageRepositoryOverview(repo, job) {
   </div>`;
 }
 
-/** Render paged archives beside a reserved browser pane, retaining navigation geometry. */
+/**
+ * Render synchronized controls for one end of the loaded archive list.
+ * @param {number} page Zero-based selected page.
+ * @param {{start:number,end:number}[]} ranges Measured, exclusive-end row ranges.
+ * @param {number} count Number of loaded archives, independent of the repository total.
+ * @param {'top'|'bottom'} position Control position used to retain keyboard focus.
+ * @returns {string} Escaped paging markup.
+ */
+function renderStorageArchivePagination(page, ranges, count, position) {
+  const range = ranges[page] || {start:0, end:count};
+  return `<div class="storage-archive-pagination" data-pagination-position="${position}" tabindex="-1"><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page-step="previous" data-page="${page - 1}"${page === 0 ? ' disabled' : ''}>${escHtml(storageT('storage.previousPage'))}</button><span>${escHtml(storageT('storage.archivePage', { start: range.start + 1, end: range.end, count }))}</span><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page-step="next" data-page="${page + 1}"${page + 1 >= ranges.length ? ' disabled' : ''}>${escHtml(storageT('storage.nextPage'))}</button></div>`;
+}
+
+/**
+ * Partition the bounded, loaded archive list by measured row heights. A resize
+ * keeps the focused archive or previous first entry on the visible page. Hidden
+ * entries remain unavailable to keyboard/screen readers; oversized rows scroll.
+ * @param {boolean} preserveAnchor Keep the current entry visible after resizing.
+ */
+function updateStorageArchivePagination(preserveAnchor = false) {
+  document.querySelectorAll('#storage-content .storage-archive-column').forEach(column => {
+    const list = column.querySelector('.storage-archive-list');
+    if (!list.clientHeight || !list.clientWidth) return;
+    const key = column.dataset.archiveRepositoryKey;
+    const entries = Array.from(list.querySelectorAll('.storage-archive-entry'));
+    const focused = document.activeElement;
+    const focusedIndex = entries.findIndex(entry => entry.contains(focused));
+    const position = focused?.closest('[data-pagination-position]')?.dataset.paginationPosition;
+    const step = focused?.dataset.pageStep;
+    let page = storageState.archivePages[key] || 0;
+    const anchor = focusedIndex >= 0 ? focusedIndex : storageState.archiveRanges[key]?.[page]?.start || 0;
+    entries.forEach(entry => { entry.hidden = false; });
+    const available = Math.max(1, list.clientHeight - list.querySelector('header').getBoundingClientRect().height);
+    const ranges = [];
+    let start = 0, used = 0;
+    entries.forEach((entry, index) => {
+      const height = entry.getBoundingClientRect().height;
+      if (index > start && used + height > available) {
+        ranges.push({start, end:index}); start = index; used = 0;
+      }
+      used += height;
+    });
+    ranges.push({start, end:entries.length});
+    if (preserveAnchor) page = Math.max(0, ranges.findIndex(range => anchor >= range.start && anchor < range.end));
+    page = Math.max(0, Math.min(page, ranges.length - 1));
+    storageState.archiveRanges[key] = ranges;
+    storageState.archivePages[key] = page;
+    entries.forEach((entry, index) => { entry.hidden = index < ranges[page].start || index >= ranges[page].end; });
+    column.querySelectorAll('[data-pagination-position]').forEach(pager => {
+      pager.querySelector('span').textContent = storageT('storage.archivePage', {start:ranges[page].start + 1, end:ranges[page].end, count:entries.length});
+      const previous = pager.querySelector('[data-page-step="previous"]');
+      const next = pager.querySelector('[data-page-step="next"]');
+      previous.dataset.page = String(page - 1); previous.disabled = page === 0;
+      next.dataset.page = String(page + 1); next.disabled = page + 1 >= ranges.length;
+    });
+    if (position && focused.disabled) {
+      const pager = column.querySelector(`[data-pagination-position="${position}"]`);
+      (pager.querySelector(`[data-page-step="${step}"]:not(:disabled)`) || pager.querySelector('button:not(:disabled)') || pager).focus({preventScroll:true});
+    }
+  });
+}
+
+/** Render paged archives with controls at both ends beside a reserved browser pane. */
 function renderStorageRepositoryArchives(repo) {
   const key = storageRepositoryKey(repo);
   const cache = storageState.archiveCache[key];
@@ -647,21 +716,23 @@ function renderStorageRepositoryArchives(repo) {
   const archives = Array.isArray(cache.data?.archives) ? cache.data.archives : [];
   if (!archives.length) return `<div class="storage-repository-empty-state"><p>${storageT('storage.repositoryNoArchives')}</p></div>`;
   const browser = storageState.archiveBrowser.repositoryKey === key ? storageState.archiveBrowser : null;
-  const page = Math.max(0, Math.min(Number(storageState.archivePages[key] || 0), Math.ceil(archives.length / 5) - 1));
-  storageState.archivePages[key] = page;
-  const pageRows = archives.slice(page * 5, page * 5 + 5);
+  const ranges = storageState.archiveRanges[key] || [{start:0, end:archives.length}];
+  const page = Math.max(0, Math.min(Number(storageState.archivePages[key] || 0), ranges.length - 1));
   const canDelete = cache.data.can_delete === true && !!cache.data.repository_id;
   return `<div class="storage-archive-toolbar"><strong>${storageCount(storageRepositoryArchiveCount(repo) ?? archives.length, 'storage.archiveCountOne', 'storage.archiveCountMany')}</strong><button class="btn btn-secondary btn-sm" data-storage-action="refresh-repository-archives" data-repository-key="${escHtml(key)}">${storageT('storage.refresh')}</button></div>
     <p class="storage-archive-intro">${escHtml(storageT('storage.repositoryArchiveBrowseHint'))}</p>
     <div class="storage-archive-layout ${browser?.archive ? 'has-browser' : ''}">
-      <div class="storage-archive-list ${canDelete ? 'can-delete' : ''}"><header><span></span><strong>${storageT('storage.repositoryArchiveName')}</strong><strong>${storageT('storage.repositoryArchiveCreated')}</strong><span></span></header>${pageRows.map((archive) => {
+      <div class="storage-archive-column" data-archive-repository-key="${escHtml(key)}">
+      ${renderStorageArchivePagination(page, ranges, archives.length, 'top')}
+      <div class="storage-archive-list ${canDelete ? 'can-delete' : ''}"><header><span></span><strong>${storageT('storage.repositoryArchiveName')}</strong><strong>${storageT('storage.repositoryArchiveCreated')}</strong><span></span></header>${archives.map((archive) => {
         const name = String(archive.name || '');
         const selected = !!browser && name === browser.archive;
         return `<div class="storage-archive-entry"><button type="button" class="storage-archive-row ${selected ? 'is-selected' : ''}" data-storage-action="open-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" ${selected ? 'aria-current="true"' : ''}><span class="storage-archive-dot"></span><span><strong>${escHtml(name || '—')}</strong></span><time>${escHtml(storageFormatDateTime(archive.start))}</time><span class="storage-archive-open" aria-hidden="true">›</span></button>${canDelete && archive.id ? `<button type="button" class="storage-archive-delete" data-storage-action="delete-repository-archive" data-repository-key="${escHtml(key)}" data-archive="${escHtml(name)}" title="${escHtml(storageT('storage.archiveDelete'))}" aria-label="${escHtml(storageT('storage.archiveDeleteLabel', { name }))}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>` : ''}</div>`;
       }).join('')}</div>
+      ${renderStorageArchivePagination(page, ranges, archives.length, 'bottom')}
+      </div>
       ${browser?.archive ? renderStorageArchiveBrowser(browser) : `<section class="storage-archive-browser storage-archive-browser-placeholder"><div class="storage-archive-browser-state">${escHtml(storageT('storage.repositoryArchiveBrowseHint'))}</div></section>`}
     </div>
-    <div class="storage-archive-pagination"><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page="${page - 1}"${page === 0 ? ' disabled' : ''}>${escHtml(storageT('storage.previousPage'))}</button><span>${escHtml(storageT('storage.archivePage', { start: page * 5 + 1, end: Math.min(archives.length, page * 5 + 5), count: archives.length }))}</span><button type="button" class="btn btn-secondary btn-sm" data-storage-action="archive-page" data-page="${page + 1}"${(page + 1) * 5 >= archives.length ? ' disabled' : ''}>${escHtml(storageT('storage.nextPage'))}</button></div>
     ${storageRepositoryArchiveCount(repo) > archives.length ? `<small>${escHtml(storageT('storage.archiveListLimited', { count: archives.length, total: storageRepositoryArchiveCount(repo) }))}</small>` : ''}`;
 }
 
@@ -1036,8 +1107,13 @@ function onStorageContentClick(event) {
     return;
   }
   if (action === 'archive-page') {
+    const position = el.closest('[data-pagination-position]')?.dataset.paginationPosition;
+    const step = el.dataset.pageStep;
     storageState.archivePages[storageState.selectedRepositoryKey] = Number(el.dataset.page || 0);
     renderStorage(storageState.data);
+    const pager = document.querySelector(`[data-pagination-position="${position}"]`);
+    const target = pager?.querySelector(`[data-page-step="${step}"]:not(:disabled)`) || pager?.querySelector('button:not(:disabled)') || pager;
+    target?.focus({preventScroll:true});
     return;
   }
 

@@ -25,14 +25,14 @@ const {chromium} = require('playwright');
     for(const path of ['ui/js/utils/dom.js','ui/js/utils/format.js','ui/js/pages/dashboard.js','ui/js/pages/jobs.js','ui/js/pages/storage.js'])await page.addScriptTag({content:fs.readFileSync(path,'utf8')});
     await page.evaluate(()=>{
       const result={status:'success',finished_at:'2026-10-28T09:46:00Z',started_at:'2026-10-28T09:45:56Z',duration_seconds:4};
-      window.baseRepo={last_info_refresh_at:'2026-10-28T11:48:00Z',repository_key:'flash',repository_name:'borg-backup-flash',display_name:'Flash',backup_type:'flash',storage_key:'local',storage_name:'Backup-Lokal',used_by:['job1','job2'],path_display:'/mnt/backup/borg-backup-flash',encryption:'repokey-blake2',borg_key_exported_at:'2026-10-24T15:40:00Z',borg_repository_id:'a'.repeat(64),repository_stats:{archives_count:18,total_size:43.4*1024**3,total_csize:42.2*1024**3,unique_csize:6.7*1024**3},maintenance_results:{check:{...result,details:['Repository check complete. <safe>']},verify_data:result,prune:{...result,deleted_archives_count:2,deleted_archives:['old <archive>','older-archive']},compact:{...result,freed_space:'1.2 GB'}}};
+      window.baseRepo={last_info_refresh_at:'2026-10-28T11:48:00Z',repository_key:'flash',repository_name:'borg-backup-flash',display_name:'Flash',backup_type:'flash',storage_key:'local',storage_name:'Backup-Lokal',used_by:['job1','job2'],path_display:'/mnt/backup/borg-backup-flash',encryption:'repokey-blake2',borg_key_exported_at:'2026-10-24T15:40:00Z',borg_repository_id:'a'.repeat(64),repository_stats:{archives_count:14,total_size:43.4*1024**3,total_csize:42.2*1024**3,unique_csize:6.7*1024**3},maintenance_results:{check:{...result,details:['Repository check complete. <safe>']},verify_data:result,prune:{...result,deleted_archives_count:2,deleted_archives:['old <archive>','older-archive']},compact:{...result,freed_space:'1.2 GB'}}};
       storageState.jobs=[{key:'job1',name:'Flash – Lokal',icon:'flash',icon_color:'blue',retention:{mode:'last',last:3}},{key:'job2',name:'Flash nachts',icon:'flash',icon_color:'blue',retention:{mode:'last',last:3}}];
       storageState.data={storages:[{storage_key:'local',display_name:'Backup-Lokal',location:'local'},{storage_key:'local2',display_name:'Zweites lokales Ziel',location:'local'},{storage_key:'usb',display_name:'USB-5TB',location:'usb',mount_state:'not_mounted'}],groups:{local:[baseRepo,{...baseRepo,repository_key:'old',display_name:'Archiv ohne Job',backup_type:'photos',borg_key_exported_at:'',used_by:[],storage_key:'local2',storage_name:'Zweites lokales Ziel',maintenance_results:{},repository_stats:{archives_count:0}}],usb:[{...baseRepo,repository_key:'usb',display_name:'Flash <USB>',storage_key:'usb',storage_name:'USB-5TB',used_by:[],repository_stats:{unique_csize:123,archives_count:4},maintenance_results:{}}]},repository_info_refresh:{enabled:false}};
       window.calls=[];
       window.fetch=async(url,options={})=>{
         calls.push({url,body:options.body});let data;
-        if(url==='/api/repositories/lifecycle'){const key=JSON.parse(options.body).repository_key;data={allowed:key!=='flash',job_keys:key==='flash'?['job1','job2']:[],blockers:key==='flash'?['jobs_linked']:[],repository_id:'a'.repeat(64),archive_count:18};}
-        else if(url.startsWith('/api/repositories/archives?'))data={repository_id:'a'.repeat(64),can_delete:true,archive_count:18,archives:Array.from({length:18},(_,i)=>({name:`flash-${String(i).padStart(2,'0')}`,id:`archive${i}`,start:'2026-10-28T09:00:00Z'}))};
+        if(url==='/api/repositories/lifecycle'){const key=JSON.parse(options.body).repository_key;data={allowed:key!=='flash',job_keys:key==='flash'?['job1','job2']:[],blockers:key==='flash'?['jobs_linked']:[],repository_id:'a'.repeat(64),archive_count:14};}
+        else if(url.startsWith('/api/repositories/archives?'))data={repository_id:'a'.repeat(64),can_delete:true,archive_count:14,archives:Array.from({length:14},(_,i)=>({name:`flash-${String(i).padStart(2,'0')}`,id:`archive${i}`,start:'2026-10-28T09:00:00Z'}))};
         else if(url.startsWith('/api/repositories/archive-files?'))data={files:[{name:'boot',type:'d',path:'boot',mtime:'2026-10-28T09:00:00Z'}]};
         else throw Error('Unexpected API '+url);
         return {ok:true,json:async()=>data};
@@ -77,22 +77,82 @@ const {chromium} = require('playwright');
     assert.equal(await page.evaluate(()=>calls.some(c=>c.url.includes('/archives?'))),false,'Expanding a card does not scan archives');
     await card.locator('[data-repository-tab=archives]').click();
     await page.waitForFunction(()=>!!BBUI.storageState.archiveCache.flash?.data);
+    // Measured row heights fill the available space; both pagers disclose the range (#658).
+    for (const lang of ['de', 'en']) {
+      await page.setViewportSize({width:1280,height:500});
+      await page.evaluate(lang=>{window.lang=lang;storageState.archivePages.flash=0;renderStorage(storageState.data);},lang);
+      const top = card.locator('[data-pagination-position=top]');
+      const bottom = card.locator('[data-pagination-position=bottom]');
+      const visibleEntries = card.locator('.storage-archive-entry:not([hidden])');
+      assert.equal(await card.locator('.storage-archive-column .storage-archive-pagination').count(),2);
+      await top.scrollIntoViewIfNeeded();
+      const bounds = await top.boundingBox();
+      const list = await card.locator('.storage-archive-list').boundingBox();
+      const browserPane = await card.locator('.storage-archive-browser').boundingBox();
+      assert(bounds.y >= 0 && bounds.y + bounds.height <= 500);
+      assert(bounds.y + bounds.height <= list.y && bounds.x + bounds.width <= browserPane.x);
+      assert.match(await top.innerText(), /1–\d+.*14/s);
+      assert(await top.locator('[data-page-step=previous]').isDisabled());
+      const shortCount = await visibleEntries.count();
+      const names=[];
+      let step=0;
+      while (true) {
+        assert.equal(await top.innerText(),await bottom.innerText());
+        names.push(...await visibleEntries.locator('.storage-archive-row').evaluateAll(rows=>rows.map(row=>row.dataset.archive)));
+        const fits=await card.locator('.storage-archive-list').evaluate(list=>list.scrollHeight<=list.clientHeight+1);
+        assert(fits,'Only complete rows should fill the page');
+        if(await top.locator('[data-page-step=next]').isDisabled())break;
+        await (step++ % 2 ? bottom : top).locator('[data-page-step=next]').click();
+        assert(step<14,'Pagination must terminate');
+      }
+      assert.equal(names.length,14);
+      assert.equal(new Set(names).size,14,'Every loaded archive is reachable exactly once');
+      const anchor=await visibleEntries.first().locator('.storage-archive-row').getAttribute('data-archive');
+      await page.setViewportSize({width:1280,height:1100});
+      await page.waitForFunction(shortCount=>document.querySelectorAll('.storage-archive-entry:not([hidden])').length>shortCount,shortCount);
+      assert(await visibleEntries.locator(`.storage-archive-row[data-archive="${anchor}"]`).isVisible(),'Resize retains the previous first archive');
+      assert(await visibleEntries.count()>5,'Tall windows use more than five rows');
+      if(process.env.BBUI_SCREENSHOT_DIR) {
+        await top.scrollIntoViewIfNeeded();
+        await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/archive-paging-${lang}-tall.png`});
+      }
+      await page.setViewportSize({width:1280,height:500});
+      await page.waitForFunction(()=>document.querySelectorAll('.storage-archive-entry:not([hidden])').length<6);
+      if(process.env.BBUI_SCREENSHOT_DIR) {
+        await top.scrollIntoViewIfNeeded();
+        await page.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/archive-paging-${lang}-short.png`});
+      }
+    }
+    await page.setViewportSize({width:1600,height:800});
+    await page.evaluate(()=>{window.lang='de';storageState.archivePages.flash=0;renderStorage(storageState.data);});
+    // Long names change row heights; do not hide them behind a fixed row count.
+    await page.evaluate(()=>{
+      window.originalArchiveNames=storageState.archiveCache.flash.data.archives.map(a=>a.name);
+      storageState.archiveCache.flash.data.archives.forEach((a,i)=>{a.name=`backup-${i}-`+'long-archive-name-'.repeat(i%3+3);});
+      renderStorage(storageState.data);
+    });
+    assert(await card.locator('.storage-archive-list').evaluate(list=>list.scrollHeight<=list.clientHeight+1));
+    assert(await card.locator('.storage-archive-entry:not([hidden])').count()<6);
+    await page.evaluate(()=>{
+      storageState.archiveCache.flash.data.archives.forEach((a,i)=>{a.name=originalArchiveNames[i];});
+      storageState.archivePages.flash=0;renderStorage(storageState.data);
+    });
     const archiveLayoutBefore=await card.locator('.storage-archive-layout').boundingBox();
-    const pagerBefore=await card.locator('.storage-archive-pagination').boundingBox();
-    assert.equal(await card.locator('.storage-archive-entry').count(),5);
+    const pagerBefore=await card.locator('[data-pagination-position=bottom]').boundingBox();
+    assert(await card.locator('.storage-archive-entry:not([hidden])').count()>5);
     assert.equal(await card.locator('.storage-archive-entry small').count(),0,'Technical IDs are not displayed');
     assert.equal(await page.evaluate(()=>storageState.archiveCache.flash.data.archives[0].id),'archive0','IDs remain available for guarded actions');
-    await card.locator('[data-storage-action=archive-page][data-page="1"]').click();
-    assert.match(await card.locator('.storage-archive-pagination').innerText(),/6–10/);
-    await card.locator('[data-storage-action=open-repository-archive]').first().click();
+    await card.locator('[data-pagination-position=top] [data-storage-action=archive-page][data-page="1"]').click();
+    assert.equal(await page.evaluate(()=>storageState.archivePages.flash),1);
+    await card.locator('.storage-archive-entry:not([hidden]) [data-storage-action=open-repository-archive]').first().click();
     await page.waitForFunction(()=>BBUI.storageState.archiveBrowser.files.length===1);
     assert.equal(await card.locator('.storage-archive-browser-table [data-storage-action=browse-repository-archive-path]').count(),1);
-    assert.equal(await card.locator('[data-storage-action=delete-repository-archive]').count(),5);
+    assert.equal(await card.locator('.storage-archive-entry:not([hidden]) [data-storage-action=delete-repository-archive]').count(),await card.locator('.storage-archive-entry:not([hidden])').count());
     assert.ok(Math.abs((await card.locator('.storage-archive-layout').boundingBox()).height-archiveLayoutBefore.height)<1,'Opening browser retains workspace height');
-    assert.ok(Math.abs((await card.locator('.storage-archive-pagination').boundingBox()).y-pagerBefore.y)<1,'Opening browser retains pager position');
+    assert.ok(Math.abs((await card.locator('[data-pagination-position=bottom]').boundingBox()).y-pagerBefore.y)<1,'Opening browser retains pager position');
     for(const width of [1600,1024,390]){
       await page.setViewportSize({width,height:1100});
-      const geometry=()=>card.locator('.storage-archive-pagination').evaluate(n=>({top:n.getBoundingClientRect().top+scrollY,buttons:[...n.querySelectorAll('button')].map(b=>b.getBoundingClientRect().x)}));
+      const geometry=()=>card.locator('[data-pagination-position=bottom]').evaluate(n=>({top:n.getBoundingClientRect().top+scrollY,buttons:[...n.querySelectorAll('button')].map(b=>b.getBoundingClientRect().x)}));
       const baseline=await geometry();
       for(const variant of ['many','one','empty','loading','error','long-path']){
         await page.evaluate(variant=>{
@@ -109,8 +169,9 @@ const {chromium} = require('playwright');
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
       }
       await card.locator('[data-storage-action=close-repository-archive]').click();
-      assert.ok(Math.abs((await geometry()).top-baseline.top)<1,'Closing browser retains pager position');
-      await card.locator('[data-storage-action=open-repository-archive]').first().click();
+      await page.waitForFunction(expected=>Math.abs(document.querySelector('[data-pagination-position=bottom]').getBoundingClientRect().top+scrollY-expected)<1,baseline.top);
+      assert.ok(Math.abs((await geometry()).top-baseline.top)<1,`Closing browser retains pager position at ${width}: before ${baseline.top}, after ${(await geometry()).top}`);
+      await card.locator('.storage-archive-entry:not([hidden]) [data-storage-action=open-repository-archive]').first().click();
       await page.waitForFunction(()=>!storageState.archiveBrowser.loading);
     }
     await page.setViewportSize({width:1600,height:1100});
