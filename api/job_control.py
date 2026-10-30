@@ -10,6 +10,7 @@ import re
 import signal
 import threading
 import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -67,6 +68,7 @@ class JobControl:
         self._process_lock = threading.Lock()
         self._active_process = None
         self._last_borg_progress_write = float("-inf")
+        self._processing_samples = deque(maxlen=64)
         self._monitor_stop = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self.run_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -114,6 +116,7 @@ class JobControl:
         }
         data["job_steps"] = previous.get("job_steps", [])
         self._borg_details = {}
+        self._processing_samples.clear()
         data["borg_steps"] = previous.get("borg_steps", {
             name: {"status": "pending"} for name in ("create", "prune", "compact", "check")
         })
@@ -160,6 +163,9 @@ class JobControl:
         Operation changes and step completion bypass throttling. A finished
         step is indeterminate until another step or the process result arrives.
         Archive events expose only non-negative file/size counters, not paths.
+        Create events also expose a rolling 30-second logical-byte processing
+        rate and, with a valid optional source estimate, approximate progress
+        and remaining create time. At least two seconds of samples are required.
         Writes can raise OSError; callers must keep progress failures non-fatal.
         """
         state = read_control_state(self.run_id, self.run_dir.parent)
@@ -169,6 +175,7 @@ class JobControl:
         now = time.monotonic()
         if event is None:
             state["borg_progress"] = None
+            self._processing_samples.clear()
         else:
             kind = event.get("type")
             if kind == "archive_progress" and state["phase"] != "borg_create":
@@ -191,6 +198,7 @@ class JobControl:
                     pass
             if state["phase"] == "borg_create":
                 percent = None
+                self._update_source_estimate(progress, event.get("source_estimate"))
             if kind == "archive_progress":
                 for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
                     value = event.get(key)
@@ -199,10 +207,67 @@ class JobControl:
                 if finished:
                     for key in ("nfiles", "original_size", "compressed_size", "deduplicated_size"):
                         progress.pop(key, None)
+                self._update_processing_metrics(progress, event, now, finished)
             progress.update(percent=percent, operation=operation, updated_at=time.time())
         state["updated_at"] = _utc_now()
         _atomic_json(self.state_file, state)
         self._last_borg_progress_write = now
+
+    @staticmethod
+    def _update_source_estimate(progress: dict, result: Any) -> None:
+        """Copy allowlisted scan status and complete logical bytes, never errors."""
+        if not isinstance(result, dict):
+            return
+        status = result.get("status")
+        if not isinstance(status, str) or status not in {"scanning", "ready", "unsupported", "failed", "timed_out", "cancelled"}:
+            return
+        progress["source_size_status"] = status
+        progress.pop("estimated_total_bytes", None)
+        value = result.get("bytes")
+        if status == "ready":
+            if type(value) is int and 0 <= value <= 2**53 - 1:
+                progress["estimated_total_bytes"] = value
+            else:
+                progress["source_size_status"] = "failed"
+
+    def _update_processing_metrics(self, progress: dict, event: dict, now: float, finished: bool) -> None:
+        """Derive create-only estimates; reset on invalid/regressing counters.
+
+        Byte samples use monotonic time and cover at most 30 seconds. Equal
+        counters yield a measured zero rate. Estimates never declare completion
+        and are hidden when the source total has been exceeded.
+        """
+        for key in ("processing_speed_bytes_per_sec", "rate_updated_at", "estimated_percent", "estimated_remaining_seconds"):
+            progress.pop(key, None)
+        current = event.get("original_size")
+        if finished or type(current) is not int or not 0 <= current <= 2**53 - 1:
+            self._processing_samples.clear()
+            if finished:
+                progress.pop("estimated_total_bytes", None)
+                progress.pop("source_size_status", None)
+            return
+        samples = self._processing_samples
+        if samples and (current < samples[-1][1] or now <= samples[-1][0]):
+            samples.clear()
+        while samples and samples[0][0] < now - 30:
+            samples.popleft()
+        samples.append((now, current))
+        speed = None
+        if len(samples) > 1 and now - samples[0][0] >= 2:
+            speed = (current - samples[0][1]) / (now - samples[0][0])
+            progress["processing_speed_bytes_per_sec"] = speed
+            progress["rate_updated_at"] = time.time()
+        total = progress.get("estimated_total_bytes")
+        if type(total) is not int or total <= 0:
+            return
+        if current > total:
+            progress["source_size_status"] = "outgrown"
+            return
+        progress["estimated_percent"] = min(99.9, round(100 * current / total, 1))
+        if speed and current < total:
+            remaining = (total - current) / speed
+            if remaining <= 2**53 - 1:
+                progress["estimated_remaining_seconds"] = round(remaining)
 
     def is_cancel_requested(self) -> bool:
         return self.cancel_file.is_file()

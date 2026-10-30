@@ -706,6 +706,19 @@
     "repositoryLastInfoFailed": "Letzte Info-Abfrage fehlgeschlagen"
   },
   "jobs": {
+    "liveMetrics": {
+      "processing": "Verarbeitung: {speed}/s",
+      "total": "Quellgröße: ca. {size}",
+      "remaining": "Archiverstellung: noch ca. {time}",
+      "remainingUnknown": "Restzeit der Archiverstellung: unbekannt",
+      "percent": "ca. {percent} %",
+      "scanning": "Quellgröße wird ermittelt …",
+      "unsupported": "Größenschätzung bei Marker- oder Musterausschlüssen nicht verfügbar",
+      "failed": "Quellgröße nicht verfügbar",
+      "timedOut": "Größenscan nach 5 Min. beendet",
+      "cancelled": "Größenscan abgebrochen",
+      "outgrown": "Quellgröße überschritten – Fortschritt und Restzeit unbekannt"
+    },
     "createRunning": "Archiv erstellen (borg create)",
     "createFiles": "{count} Dateien verarbeitet",
     "createBytes": "Originaldaten: {size}",
@@ -958,6 +971,9 @@
     "deleteError": "Fehler beim Löschen: {message}"
   },
   "wizard": {
+    "estimateSourceSize": "Quellgröße und Restzeit schätzen",
+    "estimateSourceSizeHelp": "Optionaler zusätzlicher Scan der eingehängten Quellen während der Archiverstellung (max. 5 Min.). Kann Datenträger und Netzwerk belasten. Bei Marker- oder Musterausschlüssen bleibt die Schätzung unbekannt.",
+    "previewSourceEstimate": "Größenschätzung: {value}",
     "jobId": "Job-ID",
     "jobIdInvalid": "Der Server hat keine gültige Job-ID geliefert.",
     "jobIdLoadFailed": "Job-ID konnte nicht geladen werden. Bitte den Wizard schließen und erneut öffnen. {message}",

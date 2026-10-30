@@ -235,7 +235,8 @@ def test_create_json_preserves_stats_and_optional_file_activity(control, caplog,
 
 
 @pytest.mark.parametrize('file_activity', [False, True])
-def test_real_borg_create_progress_and_final_statistics(tmp_path, monkeypatch, caplog, file_activity):
+@pytest.mark.parametrize('estimate_size', [False, True])
+def test_real_borg_create_progress_and_final_statistics(tmp_path, monkeypatch, caplog, file_activity, estimate_size):
     borg = shutil.which('borg')
     if not borg:
         pytest.skip('Borg executable required for real create integration')
@@ -248,7 +249,7 @@ def test_real_borg_create_progress_and_final_statistics(tmp_path, monkeypatch, c
     events = []
     controller = SimpleNamespace(update_borg_progress=events.append, attach_process=lambda p: None,
                                  detach_process=lambda: None, is_cancel_requested=lambda: False)
-    runner = borg_runner.BorgRunner(borg_runner.BorgConfig(repo=str(repo), file_activity=file_activity), process_controller=controller)
+    runner = borg_runner.BorgRunner(borg_runner.BorgConfig(repo=str(repo), file_activity=file_activity, estimate_source_size=estimate_size), process_controller=controller)
     with caplog.at_level(logging.INFO, logger=borg_runner.logger.name):
         assert runner.create([source], 'progress-test') == 0
     assert any(event and event.get('type') == 'archive_progress' for event in events)
@@ -261,3 +262,8 @@ def test_real_borg_create_progress_and_final_statistics(tmp_path, monkeypatch, c
     stats = borg_runner.parse_borg_stats(log_file)
     assert stats.files == 1 and stats.original_size > 0
     assert stats.archive_name.startswith('progress-test-')
+    estimates = [event['source_estimate'] for event in events if event and 'source_estimate' in event]
+    if estimate_size:
+        assert {'status': 'ready', 'bytes': source.stat().st_size} in estimates
+    else:
+        assert not estimates

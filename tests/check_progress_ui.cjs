@@ -275,3 +275,24 @@ const timed=context.renderJobOperation({...workflowJob,run_start_time:new Date(5
 assert.match(timed,/jobs.compact.currentAction/);
 assert.match(timed,/jobs.compact.stepElapsed 1:40/);
 assert.match(timed,/jobs.borgTotalElapsed 2:30/);
+
+// Optional create estimates reuse the existing metrics row (#646).
+const measuredCreate = {running:true,phase:'borg_create',borg_progress:{phase:'borg_create',started_at:100,
+  updated_at:200,nfiles:10,original_size:500,source_size_status:'ready',estimated_total_bytes:1000,
+  estimated_percent:50,processing_speed_bytes_per_sec:25,rate_updated_at:200,estimated_remaining_seconds:20}};
+html=context.renderBorgProgress(measuredCreate,200);
+assert.match(html,/value="50"/);
+assert.match(html,/jobs.liveMetrics.percent/);
+assert.match(html,/jobs.liveMetrics.processing 25 B/);
+assert.match(html,/jobs.liveMetrics.remaining 0:20/);
+assert.doesNotMatch(context.renderBorgProgress(measuredCreate,231),/jobs.liveMetrics.processing|jobs.liveMetrics.remaining /);
+assert.match(context.renderBorgProgress(measuredCreate,231),/jobs.liveMetrics.remainingUnknown/);
+for(const status of ['scanning','failed','unsupported','timed_out','cancelled','outgrown']) {
+  html=context.renderBorgProgress({...measuredCreate,borg_progress:{...measuredCreate.borg_progress,source_size_status:status}},200);
+  assert.doesNotMatch(html,/value="50"/);
+  assert.doesNotMatch(html,/jobs.liveMetrics.remaining /);
+}
+measuredCreate.borg_progress.processing_speed_bytes_per_sec=0;
+assert.match(context.renderBorgProgress(measuredCreate,200),/jobs.liveMetrics.processing 0 B/);
+assert.doesNotMatch(context.borgProgressSize(.5),/undefined|NaN/);
+console.log('Create estimates: optional progress, stale rates, zero speed and scan states passed.');
