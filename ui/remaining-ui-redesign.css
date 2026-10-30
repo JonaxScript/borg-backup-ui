@@ -1798,3 +1798,7 @@
 @media (max-width: 600px) {
   .storage-repository-management .storage-lifecycle-key-recovery dl { grid-template-columns: minmax(0, 1fr); }
 }
+
+@media (min-width: 1101px) {
+  .storage-repository-management > .storage-lifecycle-card + .storage-lifecycle-card { border-left: 1px solid var(--ui-color-border); padding-left: 24px; }
+}

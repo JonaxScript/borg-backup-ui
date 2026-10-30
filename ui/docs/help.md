@@ -83,7 +83,7 @@ SSH-Profile enthalten Host, Port, Benutzer, Basispfad und SSH-Key. Vorhandene Sc
 
 ## 5. Repositories
 
-Alle Repository-Reiter verwenden eine gemeinsame, kompakte Höhe passend zur Übersicht und Fenstergröße. Beim Reiterwechsel und Nachladen bleibt die Karte gleich hoch. Die Archivseiten passen sich diesem Bereich an; längere Inhalte lassen sich innerhalb des gewählten Reiters scrollen. Die Verwaltung zeigt Key-Wiederherstellung, Entfernen und Löschen auf breiten Bildschirmen nebeneinander, mit den Aktionsbuttons auf gleicher Höhe. Die Repository-ID bleibt einzeilig; bei gekürzter Anzeige ist sie beim Darüberfahren vollständig sichtbar. Auf schmalen Bildschirmen stehen die Verwaltungsbereiche sowie Archivliste und Dateibrowser untereinander.
+Alle Repository-Reiter verwenden eine gemeinsame, kompakte Höhe passend zur Übersicht und Fenstergröße. Beim Reiterwechsel und Nachladen bleibt die Karte gleich hoch. Die Archivseiten passen sich diesem Bereich an; längere Inhalte lassen sich innerhalb des gewählten Reiters scrollen. Die Verwaltung zeigt Key-Wiederherstellung, Entfernen und Löschen auf breiten Bildschirmen in durch senkrechte Linien getrennten Spalten, mit den Aktionsbuttons auf gleicher Höhe. Die Repository-ID bleibt einzeilig; bei gekürzter Anzeige ist sie beim Darüberfahren vollständig sichtbar. Auf schmalen Bildschirmen stehen die Verwaltungsbereiche sowie Archivliste und Dateibrowser untereinander.
 
 Die Seite **Repositories** gruppiert Borg-Repositorys nach Speicherziel. Ein Repository besitzt einen Anzeigenamen, einen vollständigen Repository-Pfad, Verschlüsselungsmetadaten und optionale Job-Zuordnungen.
 

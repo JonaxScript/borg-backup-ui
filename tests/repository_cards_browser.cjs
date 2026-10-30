@@ -305,6 +305,7 @@ const {chromium} = require('playwright');
       assert.equal(await id.getAttribute('title'),await id.textContent(),'Full repository ID remains available');
       const buttons=await panel.locator('[data-storage-action=repository-key-import-select], [data-lifecycle-mode=remove], [data-lifecycle-mode=delete]').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
       assert(Math.max(...buttons)-Math.min(...buttons)<1,`Management buttons align ${width}/${lang}: ${buttons}`);
+      assert.deepEqual(await panel.locator('.storage-lifecycle-card').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).borderLeftWidth)),['0px','1px','1px'],'Vertical separators distinguish the three action columns');
       if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/management-${width}-${lang}.png`});
     }
     await page.evaluate(()=>{baseRepo.maintenance_results=savedResults;});
