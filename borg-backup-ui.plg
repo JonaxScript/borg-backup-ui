@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name      "borg-backup-ui">
 <!ENTITY author    "Thorsten Steinberg">
-<!ENTITY version   "2026.10.30.0912">
+<!ENTITY version   "2026.10.30.1734">
 <!ENTITY github    "https://raw.githubusercontent.com/borgforge/borg-backup-ui">
 <!ENTITY pluginURL "&github;/main/&name;.plg">
 <!ENTITY bootdir   "/boot/config/plugins/&name;">
@@ -20,6 +20,30 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.30.1734###
+### Bug Fixes
+
+- Show profile names, storage paths and specific errors when local database dumps cannot be listed. Keep readable profiles visible and distinguish unavailable storage from an empty backup history. (#596)
+- Accept normal Unraid permissions for database dump storage, including nobody:users and 0777, without changing existing owners or modes. New dump files use 0644 and run directories use 0755; credentials remain separately protected. (#652)
+- Make profile save status and errors clear for database, Local, USB, SMB and SSH profiles. Successful saves clear pending edits; failed saves keep the draft, and switching settings areas resolves outstanding changes. (#654)
+- Accept database backup folder paths ending in a slash and explain invalid input at the relevant field. Keep save feedback beside the form. (#656)
+- Treat folders that have not been created yet as an initial state, not a failed backup. Show clearly that local backup history covers all saved profiles. (#656)
+- Show archive ranges and paging controls above and below the repository archive list so additional backups are easy to find in short windows. Fit more entries on taller displays and retain the current archive range when resizing. (#658)
+- Keep the selected location when opening Jobs from the Dashboard, including USB on the first visit. Remove the duplicate Jobs button from the locations heading. (#658)
+- Keep repository tabs at the same compact height when switching or loading archives. Avoid the large blank area after returning to Overview; fit archive pages to the available space and scroll longer content inside the tab. (#662)
+- Fit repository management into the compact workspace with clearly separated action columns on wide screens, aligned buttons and single-line repository IDs. (#662)
+- Refresh repository job links automatically when returning to Repositories. Deleted jobs no longer appear as technical IDs or leave stale removal/deletion blockers that require a manual Refresh click. (#664)
+- Keep completed repository maintenance results within the compact workspace using two columns on wide screens. Expanded execution details scroll within their result area while Start buttons retain their position and alignment. (#666)
+
+### Improvements
+
+- Add explicit profile workflow guidance and feedback beside the form. Database discovery now clearly states that it saves the connection before loading database names. (#654)
+- Create missing backup subfolders automatically on the first test dump or backup, with shorter input guidance. (#656)
+- Show the current database, phase, elapsed time and exported/compressed data size during large test dumps. (#656)
+- Scroll expanded repositories into view and make the overview more compact, with smaller statistics and maintenance results arranged in two columns on wider screens. (#660)
+- Show the file count of the newest archive. Clarify "Refresh statistics" and place its fetch timestamp beside the figures, including when automatic refresh is off. (#660)
+- Give archive names more horizontal space and keep them on one line. Full names remain available on hover and after opening an archive. (#660)
+
 ###2026.10.30.0912###
 ### Bug Fixes
 
@@ -87,21 +111,6 @@
 - Use occupied locations instead of a duplicate job list in the Restore Tests sidebar. Show configured job icons and colors in planning and report rows. (#610)
 - Fit the dashboard overview into a compact desktop layout with four summary cards, an integrated location filter, expandable attention details and chart explanations, and a compact location table. Small screens and expanded details remain scrollable. (#615)
 
-###2026.10.26.1618###
-### Migration and compatibility
-
-- Restore Tests default to a 2048 MiB memory budget and a 1024 MiB host reserve, including existing installations. Protected tests require a writable cgroup v2 memory controller with cgroup.kill and permission to protect the idle keeper from OOM killing and fail with a clear report if enforcement is unavailable. Setting the memory limit to 0 explicitly disables protection, the reserve check and sequential execution. No backup data or existing configuration is overwritten. (#599)
-
-### Bug Fixes
-
-- Keep the Restore Test memory group alive until final counters are checked, preventing false failures when Unraid automatically removes empty groups after worker exit. Missing final memory counters still fail verification, and cleanup errors no longer hide the original failure. (#599)
-- Reduce Restore Test memory consumption for archives with millions of files by streaming file lists while preserving full L2 verification and existing sampling rules. (#599)
-- Report timed-out full dry-runs and failed metadata checks as failures instead of successful verification. (#599)
-
-### Improvements
-
-- Add configurable Restore Test memory protection covering the worker and Borg children, monitored host headroom, and sequential execution of protected tests. Preserve per-run reports and log references after retries. (#599)
-
 ]]>
 </CHANGES>
 
@@ -127,7 +136,7 @@ PLUGIN_DIR="/boot/config/plugins/${NAME}"
 PACKAGE_FILE="${PLUGIN_DIR}/${NAME}-${VERSION}.txz"
 PACKAGE_TMP="${PACKAGE_FILE}.tmp"
 PACKAGE_URL="&pkgurl;"
-EXPECTED_MD5="cb6d6c966bb09e8a42d87c4d0e110477"
+EXPECTED_MD5="fa681fa66f2a41d7b9eb02deb7fec6bd"
 INSTALLED_MD5_FILE="${PLUGIN_DIR}/.installed-package-md5"
 VENDOR_DIR="${PLUGIN_DIR}/runtime/vendor"
 VENDOR_BUNDLE_DIR="${PLUGIN_DIR}/runtime/vendor-bundles"
