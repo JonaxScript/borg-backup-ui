@@ -168,6 +168,9 @@ def test_estimates_never_signal_success_and_fail_closed(metrics):
 
 @pytest.mark.parametrize('enabled', [False, True])
 def test_estimation_setting_round_trip_and_default(tmp_path, monkeypatch, enabled):
+    # The runtime loader intentionally mutates Borg's process environment.
+    # Keep its Unraid defaults out of subsequent real-Borg integration tests.
+    monkeypatch.setattr(os, 'environ', dict(os.environ))
     config = _local_repository_config(tmp_path)
     source = tmp_path / 'source'
     source.mkdir()
