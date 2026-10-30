@@ -947,6 +947,7 @@ function storageLifecycleJobLabel(jobKey) {
   return String(job?.display_name || job?.name || jobKey || '').trim();
 }
 
+/** Render compact management groups; retain all lifecycle and key-recovery guards. */
 function renderStorageRepositoryManagement(repo) {
   const key = storageRepositoryKey(repo);
   const state = storageState.lifecycleCache[key];
@@ -975,9 +976,8 @@ function renderStorageRepositoryManagement(repo) {
     : `<p class="storage-lifecycle-blocker">${escHtml(storageT('storage.repositoryKeyRecoveryUnsupported'))}</p>`;
   return `<div class="storage-repository-management">
     <div class="storage-section-heading"><div><h3>${storageT('storage.repositoryManagement')}</h3><p>${storageT('storage.repositoryManagementHint')}</p></div><button class="btn btn-secondary btn-sm" data-storage-action="refresh-repository-lifecycle" data-repository-key="${escHtml(key)}">${storageT('storage.refresh')}</button></div>
-    ${jobList}
-    ${blockerText}
-    <section class="storage-lifecycle-card">
+    <div class="storage-lifecycle-context">${jobList}${blockerText}</div>
+    <section class="storage-lifecycle-card storage-lifecycle-key-recovery">
       <div><h4>${storageT('storage.repositoryKeyRecovery')}</h4><p>${storageT('storage.repositoryKeyRecoveryHint')}</p></div>
       ${keyStatus}
       <div class="storage-lifecycle-actions">
@@ -985,6 +985,7 @@ function renderStorageRepositoryManagement(repo) {
         <input type="file" class="hidden" data-storage-key-import-file data-repository-key="${escHtml(key)}" accept=".keys.enc,application/octet-stream">
       </div>
     </section>
+    <div class="storage-lifecycle-removal">
     <section class="storage-lifecycle-card">
       <div><h4>${storageT('storage.repositoryRemoveFromUi')}</h4><p>${storageT('storage.repositoryRemoveFromUiHint')}</p></div>
       <button class="btn btn-secondary" data-storage-action="repository-lifecycle" data-lifecycle-mode="remove" data-repository-key="${escHtml(key)}"${blocked ? ' disabled' : ''}>${storageT('storage.repositoryRemoveFromUi')}</button>
@@ -994,6 +995,7 @@ function renderStorageRepositoryManagement(repo) {
       <dl><div><dt>${storageT('storage.repositoryPathLabel')}</dt><dd>${escHtml(state.repository_path || repo.path_display || repo.path_raw || '')}</dd></div><div><dt>${storageT('storage.repositoryArchiveCount')}</dt><dd>${Number(state.archive_count || 0)}</dd></div><div><dt>${storageT('storage.repositoryDeduplicatedSize')}</dt><dd>${storageFormatBytes(state.deduplicated_size)}</dd></div></dl>
       <button class="btn-danger" data-storage-action="repository-lifecycle" data-lifecycle-mode="delete" data-repository-key="${escHtml(key)}"${blocked ? ' disabled' : ''}>${storageT('storage.repositoryDeletePermanent')}</button>
     </section>
+    </div>
   </div>`;
 }
 

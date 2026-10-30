@@ -269,6 +269,12 @@ const {chromium} = require('playwright');
         heights.push((await card.boundingBox()).height);
         const activePanel=card.locator('[data-repository-panel].is-active');
         assert(await activePanel.evaluate(panel=>panel.scrollWidth<=panel.clientWidth+1),`No horizontal panel overflow ${width}/${lang}/${tab}`);
+        if(width===390 && tab==='management') {
+          assert(await activePanel.evaluate(panel=>{
+            panel.scrollTop=panel.scrollHeight;
+            return panel.querySelector('[data-lifecycle-mode=delete]').getBoundingClientRect().bottom<=panel.getBoundingClientRect().bottom;
+          }),'Last management action remains reachable on narrow screens');
+        }
         if(width===390 && tab==='overview') {
           assert(await activePanel.evaluate(panel=>panel.scrollHeight>panel.clientHeight),'Long mobile overview scrolls internally');
           assert(await activePanel.evaluate(panel=>{
@@ -282,6 +288,21 @@ const {chromium} = require('playwright');
       assert.ok(Math.max(...heights)-Math.min(...heights)<1,`Stable panels at ${width}/${lang}: ${heights}`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`No page overflow ${width}/${lang}`);
     }
+    // Management must fit the compact overview even without expanded maintenance results (#662).
+    await page.evaluate(()=>{window.savedResults=baseRepo.maintenance_results;baseRepo.maintenance_results={};});
+    for(const width of [1600,1440,1280])for(const lang of ['de','en']) {
+      await page.setViewportSize({width,height:900});
+      await page.evaluate(lang=>{window.lang=lang;storageWorkspaceSize=null;storageState.selectedTab='overview';renderStorage(storageState.data);},lang);
+      const height=(await card.boundingBox()).height;
+      await card.locator('[data-repository-tab=management]').click();
+      const panel=card.locator('[data-repository-panel=management]');
+      assert.equal((await card.boundingBox()).height,height,'Management must keep the shared card height');
+      assert(await panel.evaluate(p=>p.scrollHeight<=p.clientHeight+1),`All management content fits ${width}/${lang}: ${JSON.stringify(await panel.evaluate(p=>({height:p.clientHeight,scroll:p.scrollHeight})))}`);
+      assert(await panel.locator('[data-lifecycle-mode=delete]').evaluate(button=>button.getBoundingClientRect().bottom<=button.closest('[data-repository-panel]').getBoundingClientRect().bottom),'Delete action is visible without scrolling');
+      assert(await panel.locator('[data-lifecycle-mode=delete]').isDisabled(),'Linked-job deletion guard remains in place');
+      if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/management-${width}-${lang}.png`});
+    }
+    await page.evaluate(()=>{baseRepo.maintenance_results=savedResults;});
     for(const theme of ['light','dark']){
       await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
       assert.ok(await page.locator('.storage-card-key-warning').evaluate(n=>getComputedStyle(n).fontWeight==='400'&&getComputedStyle(n).borderTopWidth==='0px'));
