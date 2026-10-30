@@ -2,7 +2,7 @@
 
 ## Pending - Stable compact repository tabs (#662)
 
-- Arrange management in two columns on wide screens, with compact linked-job context above key recovery and removal/deletion. Keep the last action visible within the overview-sized workspace for ordinary desktop content; longer and narrow-screen content remains scrollable.
+- Arrange key recovery, removal and deletion side by side on wide screens with bottom-aligned action buttons and compact linked-job context above. Keep the repository ID on one line with ellipsis and its full value in the title. Keep the last action visible within the overview-sized workspace for ordinary desktop content; longer and narrow-screen content remains scrollable.
 
 - Derive one shared, viewport-bounded workspace height from the compact overview, retaining it across tab changes and asynchronous refreshes. Recalculate on resize, language change or explicit reopening.
 - Fit archive panes and dynamic pagination inside that workspace; scroll longer content internally. Synchronize the active-tab marker on direct switches.

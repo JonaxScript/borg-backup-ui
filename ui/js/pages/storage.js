@@ -972,7 +972,7 @@ function renderStorageRepositoryManagement(repo) {
   const keyImportedAt = String(repo?.borg_key_imported_at || '').trim();
   const keyRepositoryId = String(repo?.borg_key_repository_id || repo?.borg_repository_id || state.repository_id || '').trim();
   const keyStatus = keyRecoverySupported
-    ? `<dl><div><dt>${storageT('storage.repositoryKeyRecoveryRepositoryId')}</dt><dd>${escHtml(keyRepositoryId || '—')}</dd></div><div><dt>${storageT('storage.repositoryKeyRecoveryLastExport')}</dt><dd>${escHtml(keyExportedAt ? storageFormatDateTime(keyExportedAt) : storageT('storage.repositoryKeyRecoveryNeverExported'))}</dd></div><div><dt>${storageT('storage.repositoryKeyRecoveryLastImport')}</dt><dd>${escHtml(keyImportedAt ? storageFormatDateTime(keyImportedAt) : storageT('storage.repositoryKeyRecoveryNeverImported'))}</dd></div></dl>`
+    ? `<dl><div><dt>${storageT('storage.repositoryKeyRecoveryRepositoryId')}</dt><dd title="${escHtml(keyRepositoryId || '—')}">${escHtml(keyRepositoryId || '—')}</dd></div><div><dt>${storageT('storage.repositoryKeyRecoveryLastExport')}</dt><dd>${escHtml(keyExportedAt ? storageFormatDateTime(keyExportedAt) : storageT('storage.repositoryKeyRecoveryNeverExported'))}</dd></div><div><dt>${storageT('storage.repositoryKeyRecoveryLastImport')}</dt><dd>${escHtml(keyImportedAt ? storageFormatDateTime(keyImportedAt) : storageT('storage.repositoryKeyRecoveryNeverImported'))}</dd></div></dl>`
     : `<p class="storage-lifecycle-blocker">${escHtml(storageT('storage.repositoryKeyRecoveryUnsupported'))}</p>`;
   return `<div class="storage-repository-management">
     <div class="storage-section-heading"><div><h3>${storageT('storage.repositoryManagement')}</h3><p>${storageT('storage.repositoryManagementHint')}</p></div><button class="btn btn-secondary btn-sm" data-storage-action="refresh-repository-lifecycle" data-repository-key="${escHtml(key)}">${storageT('storage.refresh')}</button></div>
@@ -985,7 +985,6 @@ function renderStorageRepositoryManagement(repo) {
         <input type="file" class="hidden" data-storage-key-import-file data-repository-key="${escHtml(key)}" accept=".keys.enc,application/octet-stream">
       </div>
     </section>
-    <div class="storage-lifecycle-removal">
     <section class="storage-lifecycle-card">
       <div><h4>${storageT('storage.repositoryRemoveFromUi')}</h4><p>${storageT('storage.repositoryRemoveFromUiHint')}</p></div>
       <button class="btn btn-secondary" data-storage-action="repository-lifecycle" data-lifecycle-mode="remove" data-repository-key="${escHtml(key)}"${blocked ? ' disabled' : ''}>${storageT('storage.repositoryRemoveFromUi')}</button>
@@ -995,7 +994,6 @@ function renderStorageRepositoryManagement(repo) {
       <dl><div><dt>${storageT('storage.repositoryPathLabel')}</dt><dd>${escHtml(state.repository_path || repo.path_display || repo.path_raw || '')}</dd></div><div><dt>${storageT('storage.repositoryArchiveCount')}</dt><dd>${Number(state.archive_count || 0)}</dd></div><div><dt>${storageT('storage.repositoryDeduplicatedSize')}</dt><dd>${storageFormatBytes(state.deduplicated_size)}</dd></div></dl>
       <button class="btn-danger" data-storage-action="repository-lifecycle" data-lifecycle-mode="delete" data-repository-key="${escHtml(key)}"${blocked ? ' disabled' : ''}>${storageT('storage.repositoryDeletePermanent')}</button>
     </section>
-    </div>
   </div>`;
 }
 

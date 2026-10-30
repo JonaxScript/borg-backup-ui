@@ -579,7 +579,7 @@ The page separates storage targets, Borg repositories, and backup jobs. A storag
 
 ### 4.2 Areas and Functions
 
-All repository tabs share a compact height based on the overview and the window size. Switching tabs or loading data keeps the card height unchanged. Archive pages fit this area; longer contents scroll inside the selected tab. On wide screens Management uses two columns: key recovery on the left, removal and deletion on the right. On narrow screens the management sections, archive list and file browser are stacked.
+All repository tabs share a compact height based on the overview and the window size. Switching tabs or loading data keeps the card height unchanged. Archive pages fit this area; longer contents scroll inside the selected tab. On wide screens Management places key recovery, removal and deletion side by side, with action buttons aligned along the bottom. The repository ID stays on one line; truncated IDs are available in full on hover. On narrow screens the management sections, archive list and file browser are stacked.
 
 - **Repository cards:** Arrange facts in **Repository**, **Storage target**, **Linked jobs**, and **Archive data** columns. Names and group headings match the Jobs page typography. The transport appears below the storage target; "Jobs: Appdata, Flash" lists all linked jobs. Archive count and used space appear together with the cached statistics timestamp. Dividers separate storage targets. Consistent linked-job icons are reused; mixed or unassigned repositories use their repository type. A missing Borg key export is visible on the collapsed card.
 - **Storage-target bar:** Shows all targets with subtly outlined repository counts. Multiple local targets remain separately selectable.

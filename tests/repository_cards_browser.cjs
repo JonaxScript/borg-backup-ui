@@ -300,6 +300,11 @@ const {chromium} = require('playwright');
       assert(await panel.evaluate(p=>p.scrollHeight<=p.clientHeight+1),`All management content fits ${width}/${lang}: ${JSON.stringify(await panel.evaluate(p=>({height:p.clientHeight,scroll:p.scrollHeight})))}`);
       assert(await panel.locator('[data-lifecycle-mode=delete]').evaluate(button=>button.getBoundingClientRect().bottom<=button.closest('[data-repository-panel]').getBoundingClientRect().bottom),'Delete action is visible without scrolling');
       assert(await panel.locator('[data-lifecycle-mode=delete]').isDisabled(),'Linked-job deletion guard remains in place');
+      const id=panel.locator('.storage-lifecycle-key-recovery dd').first();
+      assert.equal(await id.evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+      assert.equal(await id.getAttribute('title'),await id.textContent(),'Full repository ID remains available');
+      const buttons=await panel.locator('[data-storage-action=repository-key-import-select], [data-lifecycle-mode=remove], [data-lifecycle-mode=delete]').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top));
+      assert(Math.max(...buttons)-Math.min(...buttons)<1,`Management buttons align ${width}/${lang}: ${buttons}`);
       if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/management-${width}-${lang}.png`});
     }
     await page.evaluate(()=>{baseRepo.maintenance_results=savedResults;});
