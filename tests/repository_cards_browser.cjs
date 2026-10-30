@@ -288,6 +288,61 @@ const {chromium} = require('playwright');
       assert.ok(Math.max(...heights)-Math.min(...heights)<1,`Stable panels at ${width}/${lang}: ${heights}`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`No page overflow ${width}/${lang}`);
     }
+    // Completed checks must fit the original compact height; expanded output cannot move controls (#666).
+    await page.evaluate(()=>{window.maintenanceResultsBefore=baseRepo.maintenance_results;});
+    for(const width of [1600,1440,1280])for(const lang of ['de','en']) {
+      await page.setViewportSize({width,height:900});
+      await page.evaluate(lang=>{
+        window.lang=lang;document.documentElement.lang=lang;
+        baseRepo.maintenance_results={};storageState.maintenanceState={running:false};storageWorkspaceSize=null;
+        storageState.selectedTab='overview';renderStorage(storageState.data);
+      },lang);
+      const initialHeight=(await card.boundingBox()).height;
+      await card.locator('[data-repository-tab=maintenance]').click();
+      const panel=card.locator('[data-repository-panel=maintenance]');
+      const initialPanelHeight=(await panel.boundingBox()).height;
+      const buttonPositions=()=>panel.locator('[data-storage-action=repository-maintenance]').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().top-n.closest('[data-repository-panel]').getBoundingClientRect().top));
+      const initialButtons=await buttonPositions();
+      for(const variant of ['mixed','recorded','warning','error','running']) {
+        await page.evaluate(variant=>{
+          baseRepo.maintenance_results=Object.fromEntries(['check','verify_data','prune','compact'].map(key=>[key,{
+            status:['warning','error'].includes(variant)?variant:'success',finished_at:'2026-10-30T15:30:00Z',duration_seconds:420,
+            ...(variant!=='mixed'||key==='check'?{details:Array.from({length:20},(_,i)=>`${key} output ${i} <safe>`)}:{})
+          }]));
+          storageState.maintenanceState=variant==='running'?{running:true,target_key:'flash',action:'check'}:{running:false};
+          renderStorage(storageState.data);
+        },variant);
+        assert.equal((await panel.boundingBox()).height,initialPanelHeight,`Completed checks retain shared workspace height ${width}/${lang}/${variant}`);
+        if(['mixed','recorded'].includes(variant))assert.equal((await card.boundingBox()).height,initialHeight,'Successful results retain the original card height');
+        assert(await panel.evaluate(p=>p.scrollHeight<=p.clientHeight+1),`Maintenance fits without outer scrolling ${width}/${lang}/${variant}`);
+        assert(await panel.locator('.storage-maintenance-copy').evaluateAll(nodes=>nodes.every(n=>n.scrollHeight<=n.clientHeight+1)),`Collapsed result text fits ${width}/${lang}/${variant}`);
+        assert.deepEqual(await buttonPositions(),initialButtons,'Maintenance controls stay aligned when results change');
+        assert.equal(initialButtons[0],initialButtons[1]);assert.equal(initialButtons[2],initialButtons[3]);
+        if(variant==='mixed' && process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/maintenance-completed-${width}-${lang}.png`});
+        if(variant==='recorded') {
+          for(const summary of await panel.locator('details summary').all())await summary.click();
+          assert.deepEqual(await buttonPositions(),initialButtons,'Expanded logs do not move Start buttons');
+          assert(await panel.evaluate(p=>p.scrollHeight<=p.clientHeight+1),`Expanded logs do not overflow the tab: ${JSON.stringify(await panel.evaluate(p=>({h:p.clientHeight,s:p.scrollHeight,children:[...p.querySelectorAll('.storage-maintenance-page,.storage-maintenance-action-grid,.storage-maintenance-card,.storage-maintenance-copy')].map(n=>({c:n.className,h:n.clientHeight,s:n.scrollHeight,rect:n.getBoundingClientRect().height}))})))}`);
+          assert(await panel.locator('.storage-maintenance-copy').evaluateAll(nodes=>nodes.every(n=>{
+            n.scrollTop=n.scrollHeight;
+            return n.scrollHeight>n.clientHeight && n.querySelector('pre').getBoundingClientRect().bottom<=n.getBoundingClientRect().bottom+1;
+          })),'Every long execution log can be scrolled to its end');
+          if(process.env.BBUI_SCREENSHOT_DIR)await card.screenshot({path:`${process.env.BBUI_SCREENSHOT_DIR}/maintenance-expanded-${width}-${lang}.png`});
+        }
+      }
+    }
+    await page.evaluate(()=>{baseRepo.maintenance_results=maintenanceResultsBefore;storageState.maintenanceState={running:false};renderStorage(storageState.data);});
+    for(const viewport of [{width:1600,height:500},{width:390,height:900}]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(()=>{storageState.selectedTab='maintenance';renderStorage(storageState.data);});
+      const panel=card.locator('[data-repository-panel=maintenance]');
+      assert(await panel.evaluate(p=>{
+        p.scrollTop=p.scrollHeight;
+        const button=p.querySelector('[data-repository-action=compact]');
+        return button.getBoundingClientRect().bottom<=p.getBoundingClientRect().bottom+1;
+      }),'Compact remains reachable in short and narrow windows');
+      assert(await panel.evaluate(p=>p.scrollWidth<=p.clientWidth+1),'Maintenance has no horizontal overflow');
+    }
     // Management must fit the compact overview even without expanded maintenance results (#662).
     await page.evaluate(()=>{window.savedResults=baseRepo.maintenance_results;baseRepo.maintenance_results={};});
     for(const width of [1600,1440,1280])for(const lang of ['de','en']) {
