@@ -405,11 +405,13 @@ Prüfen Sie bei importierten VMs auch die Gastintegration: Der QEMU Guest Agent 
 
 Im Docker-Schritt des Job-Wizards zeigt die Liste **Reihenfolge** alle Container im gewählten Umfang. Ziehen Sie einen Eintrag an die gewünschte Stelle oder verschieben Sie ihn mit den Pfeilen:
 
-- Nach der Archiverstellung startet Borg Backup UI die vom Job gestoppten Container von oben nach unten. Der nächste Start folgt, sobald Docker den vorherigen Start bestätigt hat; auf die Betriebsbereitschaft einer Anwendung wird nicht gewartet.
+- Nach der Archiverstellung startet Borg Backup UI die vom Job gestoppten Container von oben nach unten. Der nächste Start folgt, sobald Docker den vorherigen Start bestätigt hat. Die Pausen zwischen den Prioritätsgruppen des Labels entfallen für die aufgeführten Container.
 - Vor dem Backup werden die Container einzeln in umgekehrter Reihenfolge gestoppt. Stellen Sie Datenbanken nach oben: Sie starten zuerst und werden zuletzt gestoppt.
 - Container, die nicht in der gespeicherten Reihenfolge stehen, etwa später hinzugekommene, stoppen zuerst und starten nach den aufgeführten Containern gemäß ihrer Label-Priorität.
 
-Solange Sie nichts verschieben, zeigt die Liste die Standardreihenfolge (Label `backup.start.priority`, danach Name) und der Job speichert keine eigene Reihenfolge. Die Container werden dann wie bisher gemeinsam gestoppt und nach Prioritätsgruppen gestartet. **Standardreihenfolge wiederherstellen** kehrt zu diesem Verhalten zurück. Das einzelne Stoppen kann länger dauern als der gemeinsame Stopp. Für die aufgeführten Container hat die eigene Reihenfolge Vorrang vor dem Label. Flow-Vorschau und Lauf-Log nennen die verwendete Reihenfolge.
+Solange Sie nichts verschieben, zeigt die Liste die Standardreihenfolge (Label `backup.start.priority`, danach Name) und der Job speichert keine eigene Reihenfolge. Die Container werden dann wie bisher gemeinsam gestoppt und nach Prioritätsgruppen gestartet. **Standardreihenfolge wiederherstellen** kehrt zu diesem Verhalten zurück. Das einzelne Stoppen kann deutlich länger dauern als der gemeinsame Stopp, der Start dagegen ohne Gruppenpausen deutlich kürzer. Für die aufgeführten Container ersetzt die eigene Reihenfolge die Prioritätsgruppen des Labels einschließlich der Pausen zwischen ihnen. Flow-Vorschau und Lauf-Log nennen die verwendete Reihenfolge.
+
+> **Hinweis:** In keinem Modus wartet Borg Backup UI auf Docker-Health-Checks oder auf die Betriebsbereitschaft einer Anwendung. Eine zuerst gestartete Datenbank nimmt deshalb nicht zwingend schon Verbindungen an, wenn die nächste Anwendung startet. Anwendungen sollten fehlgeschlagene Verbindungsversuche selbst wiederholen.
 
 #### Neustart-Priorität für Docker-Container
 

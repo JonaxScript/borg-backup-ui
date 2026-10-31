@@ -397,11 +397,13 @@ For imported VMs, check the guest integration as well: the QEMU Guest Agent may 
 
 In the Docker step of the job wizard, the **Order** list shows all containers in the selected scope. Drag an entry to the desired position or move it with the arrows:
 
-- After archive creation, Borg Backup UI starts the containers stopped by the job from top to bottom. The next start follows once Docker has confirmed the previous one; it does not wait until an application is ready.
+- After archive creation, Borg Backup UI starts the containers stopped by the job from top to bottom. The next start follows once Docker has confirmed the previous one. The pauses between the label priority groups do not apply to the listed containers.
 - Before the backup, the containers are stopped one by one in reverse order. Put databases at the top: they start first and stop last.
 - Containers that are not in the saved order, such as containers added later, stop first and start after the listed containers according to their label priority.
 
-As long as you move nothing, the list shows the default order (`backup.start.priority` label, then name) and the job saves no order of its own. The containers are then stopped together and started by priority group as before. **Restore default order** returns to this behavior. Stopping one by one can take longer than stopping together. For the listed containers, the custom order takes precedence over the label. The flow preview and the run log show the order in use.
+As long as you move nothing, the list shows the default order (`backup.start.priority` label, then name) and the job saves no order of its own. The containers are then stopped together and started by priority group as before. **Restore default order** returns to this behavior. Stopping one by one can take considerably longer than stopping together, while starting without group pauses is considerably shorter. For the listed containers, the custom order replaces the label priority groups, including the pauses between them. The flow preview and the run log show the order in use.
+
+> **Note:** In neither mode does Borg Backup UI wait for Docker health checks or application readiness. A database started first therefore does not necessarily accept connections yet when the next application starts. Applications should retry failed connections themselves.
 
 #### Docker Container Restart Priority
 

@@ -82,7 +82,7 @@ for (const language of ['de', 'en']) {
   assert.deepEqual(plain(wizard._wizardCollectParams().docker_control.order), []);
 
   for (const key of ['wizard.previewDockerOrder', 'wizard.flowSteps.dockerStopOrder', 'wizard.flowSteps.dockerStartOrdered',
-    'wizard.dockerOrderReset', 'wizard.dockerOrderEmpty', 'wizard.dockerOrderHint']) {
+    'wizard.dockerOrderReset', 'wizard.dockerOrderEmpty', 'wizard.dockerOrderHint', 'wizard.dockerOrderNote']) {
     assert.notEqual(t(key), key, `${language}: ${key} is translated`);
   }
 }
